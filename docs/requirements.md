@@ -1,4 +1,4 @@
-# UniHub - Project Requirements
+# UniHub Workshop - Project Requirements
 
 ## Project Overview
 
