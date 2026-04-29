@@ -20,15 +20,15 @@ This approach balances the high-traffic requirements with rapid time-to-market e
 
 ### Core Components
 
-| Component                     | Purpose                                                    | Notes                                                                  |
-| :---------------------------- | :--------------------------------------------------------- | :--------------------------------------------------------------------- |
-| React Web App                 | Student discovery/registration and Admin management portal | React + TypeScript UI with RBAC-guarded views                          |
+| Component                       | Purpose                                                    | Notes                                                                  |
+| :------------------------------ | :--------------------------------------------------------- | :--------------------------------------------------------------------- |
+| React Web App                   | Student discovery/registration and Admin management portal | React + TypeScript UI with RBAC-guarded views                          |
 | Android Mobile App (Java / XML) | QR scanning and offline-first check-in                     | Room/SQLite local store with deterministic sync                        |
-| Java Backend API              | Central business logic and orchestration                   | Spring Boot modular monolith, HikariCP, Resilience4j, outbox relay     |
-| PostgreSQL                    | System of record                                           | Primary-replica topology with pessimistic locking and idempotency keys |
-| Message Broker                | Async event processing                                     | RabbitMQ for notifications, AI, and ingestion events                   |
+| Java Backend API                | Central business logic and orchestration                   | Spring Boot modular monolith, HikariCP, Resilience4j, outbox relay     |
+| PostgreSQL                      | System of record                                           | Primary-replica topology with pessimistic locking and idempotency keys |
+| Message Broker                  | Async event processing                                     | RabbitMQ for notifications, AI, and ingestion events                   |
 | Cache / Rate Limiter            | Spike protection and fast reads                            | Redis token bucket and cache-aside workshop reads                      |
-| Object Storage                | PDFs and ingestion files                                   | S3-compatible storage for brochures and CSV drops                      |
+| Object Storage                  | PDFs and ingestion files                                   | S3-compatible storage for brochures and CSV drops                      |
 
 ### Communication Protocols
 
@@ -80,7 +80,216 @@ Asynchronous workloads run through a **Message Broker** and **Background Workers
 
 This structure ensures the system can scale horizontally under traffic spikes, maintain data integrity with PostgreSQL transactions, and support offline check-ins with eventual reconciliation while keeping operational overhead manageable with optimized operational resources.
 
-## 8. Architectural Decision Records
+## 3. High-Level Architecture Diagram
+
+### High-Level Deployment & Integration Architecture
+
+This diagram shows the production topology: horizontally scaled Spring Boot app servers behind an API gateway, Redis for cache and token bucket rate limiting, PostgreSQL primary-replica for write safety and read scalability, and dedicated workers for outbox relay, AI, and CSV ingestion. External integrations are modeled explicitly.
+
+```mermaid
+flowchart TB
+  Client["Client (Web/Mobile)"] -- HTTPS --> Nginx["API Gateway / Load Balancer (Nginx)"]
+  Nginx -- Load Balancing --> App1["App Server 1 (Java Spring Boot)"] & App2["App Server 2 (Java Spring Boot)"]
+
+  App1 -. Cache/Rate Limit (Token Bucket) .-> Redis["Redis (Cache + Rate Limiting)"]
+  App2 -. Cache/Rate Limit (Token Bucket) .-> Redis
+
+  App1 -- Read (Cache Miss) --> Replica["PostgreSQL Replica"]
+  App2 -- Read (Cache Miss) --> Replica
+  App1 -- Write (Domain + Outbox) --> Primary["PostgreSQL Primary"]
+  App2 -- Write (Domain + Outbox) --> Primary
+  Primary -- Replication --> Replica
+
+  App1 -- Payment Requests --> Pay["Payment Gateway"]
+  App2 -- Payment Requests --> Pay
+
+  App1 -- Upload PDFs --> S3["S3 Object Storage"]
+  App2 -- Upload PDFs --> S3
+  Legacy["Legacy Student System"] -- Nightly CSV Drop --> S3
+
+  Worker["Background Workers (Spring Batch/Async)"] -- Poll Outbox --> Primary
+  Worker -- Publish/Consume --> Rabbit["RabbitMQ Broker"]
+  Worker -- Read PDFs/CSVs --> S3
+  Worker -- AI Requests --> AI["AI Summarization Service"]
+  Worker -- Notifications --> Notify["Notification Providers"]
+
+  Nginx@{ shape: hex }
+  Client:::client
+  Nginx:::nginx
+  App1:::app
+  App2:::app
+  Redis:::redis
+  Primary:::db
+  Replica:::db
+  Rabbit:::broker
+  Worker:::worker
+  S3:::storage
+  Pay:::external
+  AI:::external
+  Notify:::external
+  Legacy:::external
+
+  classDef client fill:#f0f7ff,stroke:#0052cc,stroke-width:1px
+  classDef nginx fill:#f6ffed,stroke:#52c41a,stroke-width:1px
+  classDef app fill:#e6f7ff,stroke:#1890ff,stroke-width:1px
+  classDef redis fill:#fff1f0,stroke:#f5222d,stroke-width:1px
+  classDef db fill:#f9f0ff,stroke:#722ed1,stroke-width:1px
+  classDef broker fill:#fff7e6,stroke:#fa8c16,stroke-width:1px
+  classDef worker fill:#f0f5ff,stroke:#2f54eb,stroke-width:1px
+  classDef storage fill:#f6ffed,stroke:#52c41a,stroke-width:1px
+  classDef external fill:#fff1f0,stroke:#a8071a,stroke-width:1px
+```
+
+### Workshop Registration Flow (Free & Paid)
+
+This sequence captures the end-to-end registration flow, including concurrency control, idempotent payment retries, and outbox-driven notifications.
+
+```mermaid
+sequenceDiagram
+  actor Student
+  participant Web as Web App
+  participant GW as API Gateway
+  participant Redis as Redis (Token Bucket)
+  participant API as Backend API
+  participant DB as PostgreSQL Primary
+  participant Pay as Payment Gateway
+  participant Relay as Outbox Relay Worker
+  participant Broker as RabbitMQ
+  participant Notify as Notification Provider
+
+  Student->>Web: Select workshop + submit registration
+  Web->>GW: POST /registrations (idempotency key)
+  GW->>Redis: Consume token bucket
+  alt Rate limited
+    Redis-->>GW: Reject
+    GW-->>Web: 429 Too Many Requests
+  else Allowed
+    Redis-->>GW: Allow
+    GW->>API: Forward request
+    API->>DB: Begin tx, lock workshop row
+    API->>DB: Check capacity
+    alt Workshop full
+      API-->>Web: 409 Sold out
+    else Seats available
+      alt Free workshop
+        API->>DB: Create registration + outbox event
+        API->>DB: Commit
+        API-->>Web: 201 + QR code
+      else Paid workshop
+        API->>DB: Create pending registration + idempotency record
+        API->>Pay: Charge (idempotency key)
+        alt Payment success
+          Pay-->>API: Approved
+          API->>DB: Confirm registration + outbox event
+          API->>DB: Commit
+          API-->>Web: 201 + QR code
+        else Timeout or failure
+          Pay-->>API: Timeout/Error
+          API->>DB: Mark payment pending/failed
+          API->>DB: Commit
+          API-->>Web: 202 Pending or 502 Error
+        end
+      end
+    end
+  end
+
+  par Outbox publish and notify
+    Relay->>DB: Poll outbox table
+    Relay->>Broker: Publish event
+    Broker->>Notify: Deliver confirmation
+  end
+
+  Note over Web,API: Client retry uses same idempotency key
+  Web->>GW: Retry registration request
+  GW->>API: Forward
+  API->>DB: Lookup idempotency record
+  API-->>Web: Return prior result (no double charge)
+```
+
+### Offline Check-in & Synchronization Flow
+
+This sequence illustrates offline capture, local persistence, and server-authoritative reconciliation that prevents duplicate attendance records.
+
+```mermaid
+sequenceDiagram
+  actor Staff
+  participant Mobile as Android App
+  participant Local as Room/SQLite
+  participant API as Backend API
+  participant DB as PostgreSQL Primary
+
+  Staff->>Mobile: Scan QR code
+  Mobile->>Local: Store check-in event (pending)
+  Note over Mobile,Local: Offline-first capture, no network required
+
+  Mobile->>API: Sync batch when online
+  API->>DB: Validate and upsert attendance (idempotent key)
+  alt New attendance
+    DB-->>API: Inserted
+    API-->>Mobile: Ack (recorded)
+    Mobile->>Local: Mark synced
+  else Duplicate or conflict
+    DB-->>API: Already recorded
+    API-->>Mobile: Ack (existing)
+    Mobile->>Local: Mark synced with server status
+  end
+```
+
+### Async AI Summarization Flow
+
+This sequence shows the asynchronous pipeline for PDF processing using the outbox pattern and brokered workers, including error handling when the AI service is unavailable.
+
+```mermaid
+sequenceDiagram
+  actor Organizer
+  participant Web as Web App
+  participant API as Backend API
+  participant DB as PostgreSQL Primary
+  participant S3 as S3 Object Storage
+  participant Relay as Outbox Relay Worker
+  participant Broker as RabbitMQ
+  participant Worker as AI Worker
+  participant AI as AI Service
+
+  Organizer->>Web: Upload brochure PDF
+  Web->>API: POST /workshops/{id}/brochure
+  API->>S3: Store PDF
+  API->>DB: Create summary job + outbox event
+  API-->>Web: 202 Accepted
+
+  Relay->>DB: Poll outbox table
+  Relay->>Broker: Publish summarization event
+  Broker->>Worker: Deliver job
+  Worker->>S3: Fetch PDF
+  Worker->>AI: Extract and summarize
+  alt AI unavailable
+    AI-->>Worker: Error/Timeout
+    Worker-->>Broker: Retry with backoff
+  else Success
+    AI-->>Worker: Summary
+    Worker->>DB: Store summary result
+  end
+```
+
+### Nightly Legacy CSV Ingestion Flow
+
+This flowchart represents the nightly batch pipeline, showing fault-tolerant parsing, validation, and row-level quarantine without failing the entire job.
+
+```mermaid
+flowchart TD
+  Legacy[Legacy Student System] --> S3[S3 CSV Drop]
+  Scheduler[Scheduler] --> Job[Spring Batch Job]
+  Job --> Fetch[Fetch CSV from S3]
+  Fetch --> Parse[Parse rows]
+  Parse --> Validate[Validate row]
+  Validate -->|Valid| Dedup[Deduplicate]
+  Validate -->|Invalid| Quarantine[Quarantine row + error report]
+  Dedup --> Upsert[Upsert to PostgreSQL]
+  Quarantine --> Continue[Skip row and continue job]
+  Upsert --> Complete[Job complete with metrics]
+```
+
+## 7. Architectural Decision Records
 
 ### ADR 001: Backend Language and Framework
 
