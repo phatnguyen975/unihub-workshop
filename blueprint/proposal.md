@@ -56,7 +56,7 @@ Deliver a secure, scalable UniHub Workshop system that digitizes the full worksh
 ## 3. Target Audience & User Needs
 
 | Actor                  | Who They Are                          | Core Actions                                                                    | What Matters Most                                                |
-| ---------------------- | ------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| :--------------------- | :------------------------------------ | :------------------------------------------------------------------------------ | :--------------------------------------------------------------- |
 | **Students**           | Workshop attendees across faculties   | Browse schedules, register (free/paid), receive QR confirmations, check in      | Fair access during spikes, clear availability, fast confirmation |
 | **Organizers (Admin)** | Organizing Committee staff            | Create/manage workshops, reschedule/cancel, monitor registration and attendance | Operational control, reliable analytics, minimal manual overhead |
 | **Check-in Staff**     | Venue entry staff with mobile devices | Scan QR codes, verify attendance, handle offline mode                           | Speed, offline capability, accurate reconciliation               |

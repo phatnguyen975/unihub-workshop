@@ -4,31 +4,31 @@
 
 ### Architectural Style
 
-**Chosen style:** Modular Monolith with event-driven components and Clean Architecture boundaries.
+**Chosen architecture:** Modular Monolith with event-driven components and Clean Architecture boundaries.
 
-This approach balances the high-traffic requirements with a small team and a tight delivery window. A modular monolith keeps operational complexity low while enforcing strong internal boundaries (registration, payments, check-in, notifications, ingestion, admin). Event-driven components (via a broker and outbox pattern) handle asynchronous workloads like notifications, AI summarization, and CSV ingestion without blocking core transactions.
+This approach balances the high-traffic requirements with rapid time-to-market expectations and optimized operational overhead. A modular monolith keeps operational complexity low while enforcing strong internal boundaries (registration, payments, check-in, notifications, ingestion, admin). Event-driven components (via a broker and outbox pattern) handle asynchronous workloads like notifications, AI summarization, and CSV ingestion without blocking core transactions.
 
-**Why this is the best fit now**
+**Why this is the best fit now:**
 
 - **High concurrency, low ops overhead:** A single deployable unit scales horizontally behind a load balancer while avoiding microservice orchestration burden.
 - **Strict data consistency:** Centralized PostgreSQL transactions reduce the risk of overbooking under heavy contention.
 - **Clear growth path:** Well-defined module boundaries allow gradual extraction into services if future scale requires it.
-- **Timeline-sensitive delivery:** Faster integration and testing for a small team during the DevOps exam period.
+- **Rapid delivery requirements:** Faster integration and testing with reduced operational overhead.
 
 > [!TIP]
 > This architecture keeps the critical path (seat allocation and payment) synchronous and strongly consistent, while offloading non-critical tasks to async workers.
 
 ### Core Components
 
-| Component                     | Purpose                                                    | Notes                                                                 |
-| ----------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
-| React Web App                 | Student discovery/registration and Admin management portal | React UI with RBAC-guarded views                                      |
-| Android Mobile App (Java/XML) | QR scanning and offline-first check-in                     | Room/SQLite local store with deterministic sync                       |
+| Component                     | Purpose                                                    | Notes                                                                  |
+| :---------------------------- | :--------------------------------------------------------- | :--------------------------------------------------------------------- |
+| React Web App                 | Student discovery/registration and Admin management portal | React + TypeScript UI with RBAC-guarded views                          |
+| Android Mobile App (Java / XML) | QR scanning and offline-first check-in                     | Room/SQLite local store with deterministic sync                        |
 | Java Backend API              | Central business logic and orchestration                   | Spring Boot modular monolith, HikariCP, Resilience4j, outbox relay     |
 | PostgreSQL                    | System of record                                           | Primary-replica topology with pessimistic locking and idempotency keys |
-| Message Broker                | Async event processing                                     | RabbitMQ for notifications, AI, and ingestion events                  |
-| Cache / Rate Limiter          | Spike protection and fast reads                            | Redis token bucket and cache-aside workshop reads                     |
-| Object Storage                | PDFs and ingestion files                                   | S3-compatible storage for brochures and CSV drops                     |
+| Message Broker                | Async event processing                                     | RabbitMQ for notifications, AI, and ingestion events                   |
+| Cache / Rate Limiter            | Spike protection and fast reads                            | Redis token bucket and cache-aside workshop reads                      |
+| Object Storage                | PDFs and ingestion files                                   | S3-compatible storage for brochures and CSV drops                      |
 
 ### Communication Protocols
 
@@ -54,7 +54,10 @@ This approach balances the high-traffic requirements with a small team and a tig
 
 ### 2.1. Level 1 - System Context
 
-![System Context Diagram](../docs/diagrams/system_context.png)
+<p align="center">
+  <img src="../docs/diagrams/c4_system_context.png" style="width:80%;" alt="System Context Diagram">
+  <img src="../docs/diagrams/c4_system_context_key.png" style="width:80%;" alt="System Context Diagram Key">
+</p>
 
 The system context view positions UniHub Workshop as the central platform coordinating all workshop lifecycle activities. Three primary personas interact with the system. **Students** browse schedules, register for sessions, and receive QR confirmations. **Organizers** use the system for operational control, including workshop creation, rescheduling, and analytics. **Check-in staff** rely on the system for attendance validation through the mobile app.
 
@@ -64,183 +67,24 @@ This context emphasizes clear trust boundaries: all users interact through secur
 
 ### 2.2. Level 2 - Container
 
-![Container Diagram](../docs/diagrams/container.png)
+<p align="center">
+  <img src="../docs/diagrams/c4_container.png" style="width:80%;" alt="Container Diagram">
+  <img src="../docs/diagrams/c4_container_key.png" style="width:80%;" alt="Container Diagram Key">
+</p>
 
-The container view decomposes UniHub into client apps, backend components, and infrastructure services aligned with the modular monolith strategy. The **React Web App** serves Students and Organizers with distinct RBAC-guarded experiences. The **Android Mobile App** is dedicated to check-in staff and includes a local database for offline-first scanning and later synchronization.
+The container view decomposes UniHub into client apps, backend components, and infrastructure services aligned with the modular monolith strategy. The **React + TypeScript Web App** serves Students and Organizers with distinct RBAC-guarded experiences. The **Android Mobile App** is dedicated to check-in staff and includes a local database for offline-first scanning and later synchronization.
 
 At the edge, an **API Gateway / Load Balancer** provides TLS termination, routing, and rate limiting to protect the backend during the 12,000+ user surge. The **Backend API** is a single Java deployable with strict internal modules (registration, payment, notifications, check-in, ingestion, admin). It performs transactional operations against **PostgreSQL**, enforcing seat allocation and payment consistency.
 
 Asynchronous workloads run through a **Message Broker** and **Background Workers** to keep the critical path fast and reliable. Workers handle notifications, AI summarization, and CSV ingestion without blocking user requests. A **Cache / Rate Limiter** layer (Redis) supports burst control and fast availability reads. **Object Storage** holds workshop PDFs and nightly CSV exports, enabling reliable batch processing and auditability.
 
-This structure ensures the system can scale horizontally under traffic spikes, maintain data integrity with PostgreSQL transactions, and support offline check-ins with eventual reconciliation while keeping operational overhead manageable for a small team.
-
-```structurizr
-workspace "UniHub Workshop" "C4 Model" {
-  model {
-    student = person "Student" "Browse workshops, register, pay, and check in." {
-      tags "Person"
-    }
-
-    organizer = person "Organizer (Admin)" "Manage workshops, schedules, and analytics." {
-      tags "Person"
-    }
-
-    staff = person "Check-in Staff" "Scan QR codes and record attendance on-site." {
-      tags "Person"
-    }
-
-    unihub = softwareSystem "UniHub Workshop System" "End-to-end platform for registration, payments, and check-in." {
-      tags "System"
-
-      web = container "Web App" "Student and Admin web portal." "React" {
-        tags "Container"
-      }
-
-      mobile = container "Mobile App" "Check-in app with offline-first QR scanning and Room/SQLite." "Android (Java, XML)" {
-        tags "Container"
-      }
-
-      gateway = container "API Gateway / Load Balancer" "Edge routing, TLS termination, and Token Bucket rate limiting." "NGINX / API Gateway" {
-        tags "Container"
-      }
-
-      api = container "Backend API" "Core business logic with HikariCP, Resilience4j, and outbox relay." "Java, Spring Boot" {
-        tags "Container"
-      }
-
-      worker = container "Background Workers" "Async jobs for notifications, AI summaries, and CSV ingestion (Spring Batch)." "Java, Spring Boot, Spring Batch" {
-        tags "Container"
-      }
-
-      db = container "PostgreSQL" "Primary-replica topology with pessimistic locking." "PostgreSQL (primary + replicas)" {
-        tags "Container" "Database"
-      }
-
-      broker = container "Message Broker" "Async events and job queues (outbox-driven)." "RabbitMQ" {
-        tags "Container" "Queue"
-      }
-
-      cache = container "Cache / Rate Limiter" "Cache-aside reads and Token Bucket counters." "Redis" {
-        tags "Container" "Cache"
-      }
-
-      storage = container "Object Storage" "Workshop PDFs and CSV drops." "S3-compatible storage" {
-        tags "Container" "Storage"
-      }
-    }
-
-    legacy = softwareSystem "Legacy Student Management System" "Exports nightly student CSV files." {
-      tags "External System"
-    }
-
-    payment = softwareSystem "Payment Gateway" "Processes online payments." {
-      tags "External System"
-    }
-
-    ai = softwareSystem "AI Summarization Service" "Generates summaries from workshop PDFs." {
-      tags "External System"
-    }
-
-    notify = softwareSystem "Notification Providers" "Email and in-app notification delivery." {
-      tags "External System"
-    }
-
-    student -> web "Browse and register" "HTTPS"
-    organizer -> web "Admin operations" "HTTPS"
-    staff -> mobile "Scan and sync" "HTTPS"
-
-    web -> gateway "API calls" "HTTPS"
-    mobile -> gateway "Sync attendance" "HTTPS"
-    gateway -> api "Route API requests" "HTTPS"
-
-    api -> cache "Check cache (cache-aside) and token bucket counters" "TCP"
-    api -> db "Writes to primary; reads from replicas on cache miss" "JDBC"
-    api -> broker "Publish events" "AMQP"
-    api -> payment "Process payments" "HTTPS"
-    api -> storage "Upload and fetch PDFs" "HTTPS/S3"
-
-    worker -> broker "Consume events" "AMQP"
-    worker -> db "Write results" "JDBC"
-    worker -> ai "Request summarization" "HTTPS"
-    worker -> notify "Send confirmations" "HTTPS"
-    worker -> storage "Read PDFs and CSVs" "HTTPS/S3"
-
-    legacy -> storage "Nightly CSV export" "SFTP/CSV"
-  }
-
-  views {
-    systemContext unihub "SystemContext" {
-      include student
-      include organizer
-      include staff
-      include unihub
-      include legacy
-      include payment
-      include ai
-      include notify
-      autolayout lr
-    }
-
-    container unihub "Container" {
-      include student
-      include organizer
-      include staff
-      include web
-      include mobile
-      include gateway
-      include api
-      include worker
-      include db
-      include broker
-      include cache
-      include storage
-      include legacy
-      include payment
-      include ai
-      include notify
-      autolayout lr
-    }
-
-    styles {
-      element "Person" {
-        shape person
-      }
-      element "Database" {
-        shape cylinder
-      }
-      element "Queue" {
-        shape pipe
-      }
-      element "Cache" {
-        background #fff3cd
-        stroke #ffb300
-        strokeWidth 2
-      }
-      element "Storage" {
-        background #e8f5e9
-        stroke #2e7d32
-        strokeWidth 2
-      }
-      element "External System" {
-        background #f8f9fa
-        stroke #6c757d
-        strokeWidth 2
-      }
-      element "System" {
-        background #e7f3ff
-        stroke #1a73e8
-        strokeWidth 2
-      }
-    }
-  }
-}
-```
+This structure ensures the system can scale horizontally under traffic spikes, maintain data integrity with PostgreSQL transactions, and support offline check-ins with eventual reconciliation while keeping operational overhead manageable with optimized operational resources.
 
 ## 8. Architectural Decision Records
 
 ### ADR 001: Backend Language and Framework
 
-- **Context:** The backend must handle 12,000 concurrent users, enforce strict transactional integrity for seat allocation, and be delivered by a small team within a tight timeline.
+- **Context:** The backend must handle 12,000 concurrent users, enforce strict transactional integrity for seat allocation, and be delivered under rapid time-to-market requirements with optimized operational resources.
 - **Decision:** Use Java with Spring Boot in a modular monolith architecture.
 - **Rationale:** Java and Spring Boot provide mature concurrency support, strong ecosystem libraries for resilience patterns, and straightforward transaction management with PostgreSQL. Compared to Node.js, Java offers more predictable multi-threaded performance under sustained load and a larger set of battle-tested tooling for transactional workloads. Compared to Go, Spring Boot accelerates delivery due to richer scaffolding and familiarity while still meeting throughput requirements.
 - **Consequences:** Requires JVM tuning and disciplined module boundaries to avoid monolith sprawl, but reduces operational complexity and time-to-delivery.
@@ -252,11 +96,11 @@ workspace "UniHub Workshop" "C4 Model" {
 - **Rationale:** PostgreSQL provides strong ACID guarantees, row-level locking, and mature indexing, which are critical for the 60-seat race condition. Compared to MongoDB, PostgreSQL offers more reliable transactional semantics and consistent constraints for concurrent seat allocation. This aligns with the requirement to prevent the final seat from being claimed by multiple users.
 - **Consequences:** Schema evolution requires migrations and careful modeling, but yields predictable consistency and safer concurrency controls.
 
-### ADR 003: Web Frontend Framework
+### ADR 003: Web Frontend Framework (React + TypeScript)
 
 - **Context:** The web portal serves two roles (Students and Organizers) with distinct workflows and RBAC controls.
-- **Decision:** Use React for the web application.
-- **Rationale:** React provides strong component reuse for role-specific views and large ecosystem support for routing, state management, and form-heavy admin workflows. Compared to Angular, React has a lighter framework surface that reduces onboarding time for a small team. Compared to Vue, React provides broader enterprise adoption and tooling maturity.
+- **Decision:** Use React with TypeScript for the web application.
+- **Rationale:** React provides strong component reuse for role-specific views and a broad ecosystem for routing and state management. TypeScript adds compile-time type safety and stronger IDE support, reducing runtime errors when handling complex API payloads and RBAC-driven UI states. Compared to plain React with JavaScript, TypeScript improves refactoring safety and long-term maintainability. Compared to Angular, React + TypeScript avoids the heavier framework surface while still delivering strong typing. Compared to Vue, it offers deeper enterprise tooling maturity and larger hiring pools.
 - **Consequences:** Requires disciplined state management and UI architecture to avoid complexity in multi-role experiences.
 
 ### ADR 004: Mobile App Technology
@@ -270,7 +114,7 @@ workspace "UniHub Workshop" "C4 Model" {
 
 - **Context:** Notifications, AI summarization, and CSV ingestion must run asynchronously without blocking registration flows.
 - **Decision:** Use RabbitMQ as the message broker.
-- **Rationale:** RabbitMQ provides straightforward queue semantics, reliable delivery, and operational simplicity for a small team. Compared to Kafka, RabbitMQ has lower operational overhead and fits the task-queue model of notifications and ingestion. Kafka is more suitable for high-throughput event streaming, which is not the primary requirement here.
+- **Rationale:** RabbitMQ provides straightforward queue semantics, reliable delivery, and reduced operational overhead. Compared to Kafka, RabbitMQ has lower operational overhead and fits the task-queue model of notifications and ingestion. Kafka is more suitable for high-throughput event streaming, which is not the primary requirement here.
 - **Consequences:** Lower throughput than Kafka for stream-heavy workloads, but adequate for async tasks and easier to operate.
 
 ### ADR 006: Caching and Rate Limiting Storage
@@ -289,9 +133,9 @@ workspace "UniHub Workshop" "C4 Model" {
 
 ### ADR 008: API Design Style
 
-- **Context:** Two clients (web and mobile) must integrate quickly and reliably under time pressure.
+- **Context:** Two clients (web and mobile) must integrate quickly and reliably under accelerated delivery requirements.
 - **Decision:** Use RESTful APIs for core services.
-- **Rationale:** REST offers clear resource modeling, easier caching, and simpler client integration. Compared to GraphQL, REST avoids additional schema management and resolver performance pitfalls, reducing delivery risk for a small team. GraphQL can be introduced later if client flexibility becomes a stronger need.
+- **Rationale:** REST offers clear resource modeling, easier caching, and simpler client integration. Compared to GraphQL, REST avoids additional schema management and resolver performance pitfalls, reducing delivery risk through streamlined development and operations. GraphQL can be introduced later if client flexibility becomes a stronger need.
 - **Consequences:** May require multiple endpoints for complex UI screens, but simplifies initial delivery and observability.
 
 ### ADR 009: Authentication Mechanism
