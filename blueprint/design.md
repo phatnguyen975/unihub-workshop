@@ -295,6 +295,54 @@ flowchart TD
 - **Archiving strategy:** Processed files are moved to an archive folder to prevent accidental reprocessing.
 - **Proactive alerting:** Job summaries (success and quarantined counts) are published to RabbitMQ to notify administrators.
 
+### Workshop Lifecycle Management Flow
+
+This sequence captures the admin-driven workshop lifecycle and the event-driven propagation of changes to downstream services.
+
+```mermaid
+sequenceDiagram
+  actor Organizer
+  participant Web as Admin Web App
+  participant API as Backend API
+  participant DB as PostgreSQL Primary
+  participant Relay as Outbox Relay Worker
+  participant Broker as RabbitMQ
+  participant NotifWorker as Notification Worker
+  participant Notify as Notification Providers
+
+  Organizer->>Web: Create/Update/Reschedule/Cancel workshop
+  Web->>API: POST/PUT/PATCH /workshops
+  API->>DB: Begin tx
+  API->>DB: Validate and persist lifecycle change
+  alt Create
+    API->>DB: Insert workshop record
+    API->>DB: Insert outbox event (WorkshopCreated)
+  else Update
+    API->>DB: Update workshop details
+    API->>DB: Insert outbox event (WorkshopUpdated)
+  else Reschedule
+    API->>DB: Update schedule/venue
+    API->>DB: Insert outbox event (WorkshopRescheduled)
+  else Cancel
+    API->>DB: Mark workshop as canceled
+    API->>DB: Insert outbox event (WorkshopCanceled)
+  end
+  API->>DB: Commit
+  API-->>Web: 200/201 Response
+
+  par Outbox fan-out
+    Relay->>DB: Poll outbox table
+    Relay->>Broker: Publish lifecycle event
+    Broker->>NotifWorker: Consume lifecycle event
+    NotifWorker->>DB: Fetch registered students (if Rescheduled/Canceled)
+    NotifWorker->>Notify: Send bulk notifications (Email/SMS)
+  end
+```
+
+- **Lifecycle coverage:** Admins can create, update, reschedule, or cancel workshops through the web portal.
+- **Transactional outbox:** The lifecycle change and outbox event are committed in the same transaction to guarantee consistent state and downstream notification delivery.
+- **Asynchronous fan-out:** The notification worker consumes lifecycle events, fetches impacted students, and sends bulk emails without blocking the admin UI.
+
 ## 7. Architectural Decision Records
 
 ### ADR 001: Backend Language and Framework
