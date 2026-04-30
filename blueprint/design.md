@@ -357,6 +357,132 @@ sequenceDiagram
   - **Flyway (Migration Tool):** Migration-first schema management with deterministic, version-controlled deployments; Hibernate `ddl-auto=update` is explicitly disabled.
   - **HikariCP (Connection Pool):** Efficient JDBC connection management to prevent connection pool exhaustion under burst traffic.
 
+### 4.2. Entity-Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+  USERS {
+    uuid id PK
+    string email
+    string full_name
+    string role
+    string status
+    datetime created_at
+  }
+
+  WORKSHOPS {
+    uuid id PK
+    string title
+    string description
+    string status
+    int version
+    int capacity_total
+    int capacity_remaining
+    datetime start_time
+    datetime end_time
+    uuid organizer_id FK
+  }
+
+  WORKSHOP_SPEAKERS {
+    uuid id PK
+    uuid workshop_id FK
+    string speaker_name
+    string speaker_bio
+  }
+
+  REGISTRATIONS {
+    uuid id PK
+    uuid user_id FK
+    uuid workshop_id FK
+    string idempotency_key
+    string status
+    string ticket_type
+    string qr_code
+    datetime created_at
+  }
+
+  PAYMENTS {
+    uuid id PK
+    uuid registration_id FK
+    string provider
+    string provider_ref
+    string status
+    decimal amount
+    datetime created_at
+  }
+
+  ATTENDANCE {
+    uuid id PK
+    uuid registration_id FK
+    uuid workshop_id FK
+    datetime checked_in_at
+    string source
+  }
+
+  BROCHURES {
+    uuid id PK
+    uuid workshop_id FK
+    string storage_key
+    string status
+    datetime uploaded_at
+  }
+
+  AI_SUMMARIES {
+    uuid id PK
+    uuid workshop_id FK
+    text summary_text
+    string status
+    datetime updated_at
+  }
+
+  OUTBOX_EVENTS {
+    uuid id PK
+    string event_type
+    string aggregate_type
+    uuid aggregate_id
+    json payload
+    string status
+    datetime created_at
+  }
+
+  IDEMPOTENCY_KEYS {
+    uuid id PK
+    string idempotency_key
+    string request_hash
+    string status
+    datetime expires_at
+  }
+
+  STUDENT_IMPORT_BATCHES {
+    uuid id PK
+    string source_file
+    string status
+    int total_rows
+    int quarantined_rows
+    datetime created_at
+  }
+
+  STUDENT_IMPORT_ERRORS {
+    uuid id PK
+    uuid batch_id FK
+    int row_number
+    string error_reason
+    string raw_row
+  }
+
+  USERS ||--o{ REGISTRATIONS : registers
+  USERS ||--o{ WORKSHOPS : organizes
+  WORKSHOPS ||--o{ REGISTRATIONS : has
+  WORKSHOPS ||--o{ WORKSHOP_SPEAKERS : includes
+  WORKSHOPS ||--o{ BROCHURES : has
+  WORKSHOPS ||--o{ AI_SUMMARIES : summarizes
+  REGISTRATIONS ||--|| ATTENDANCE : results_in
+  REGISTRATIONS ||--o| PAYMENTS : paid_by
+  STUDENT_IMPORT_BATCHES ||--o{ STUDENT_IMPORT_ERRORS : contains
+```
+
+The schema separates core domain tables (users, workshops, registrations, payments, attendance) from technical pattern tables (outbox events and idempotency keys) to keep business logic clean while enabling resilience patterns. Workshop content artifacts (brochures and AI summaries) are modeled as first-class entities for lifecycle tracking, while import batches and errors capture CSV ingestion outcomes without polluting the core domain. This separation supports high-concurrency workflows, reliable async processing, and offline check-in reconciliation without coupling operational metadata directly to transactional records.
+
 ## 7. Architectural Decision Records
 
 ### ADR 001: Backend Language and Framework
