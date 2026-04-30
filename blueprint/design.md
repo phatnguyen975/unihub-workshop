@@ -267,17 +267,33 @@ This flowchart represents the nightly batch pipeline, showing fault-tolerant par
 
 ```mermaid
 flowchart TD
-  Legacy[Legacy Student System] --> S3[S3 CSV Drop]
   Scheduler[Scheduler] --> Job[Spring Batch Job]
-  Job --> Fetch[Fetch CSV from S3]
-  Fetch --> Parse[Parse rows]
-  Parse --> Validate[Validate row]
-  Validate -->|Valid| Dedup[Deduplicate]
-  Validate -->|Invalid| Quarantine[Quarantine row + error report]
-  Dedup --> Upsert[Upsert to PostgreSQL]
-  Quarantine --> Continue[Skip row and continue job]
-  Upsert --> Complete[Job complete with metrics]
+  Legacy[Legacy Student System] --> S3[S3 CSV Drop]
+  Job --> Fetch[Fetch CSV from S3 Drop]
+  Fetch --> FileValidate[File-Level Validation - headers and size]
+  FileValidate -->|Invalid| Abort[Abort Job]
+  Abort --> Alert[Publish Alert]
+  FileValidate -->|Valid| Parse[Parse rows]
+
+  Parse --> RowValidate[Validate row]
+  RowValidate -->|Invalid| Quarantine[Quarantine row + error report]
+  Quarantine --> Parse
+  RowValidate -->|Valid| Dedup[Deduplicate]
+  Dedup --> Chunk[Add to Chunk]
+  Chunk -->|Chunk Full| BulkUpsert[Bulk Upsert to PostgreSQL]
+  BulkUpsert --> Parse
+
+  Parse -->|All rows processed| Archive[Archive file in S3]
+  Archive --> Complete[Job complete with metrics]
+  Complete --> Publish[Publish Job Summary to RabbitMQ]
+  Publish --> Notify[Notify Admins]
 ```
+
+- **File-level guardrails:** Header and size validation prevents corrupted or malformed uploads from crashing the batch job.
+- **Chunk-oriented processing:** Valid rows are buffered and upserted in bulk to maximize throughput and avoid connection exhaustion.
+- **Fault tolerance & quarantining:** Invalid rows are isolated into a quarantine report while the job continues.
+- **Archiving strategy:** Processed files are moved to an archive folder to prevent accidental reprocessing.
+- **Proactive alerting:** Job summaries (success and quarantined counts) are published to RabbitMQ to notify administrators.
 
 ## 7. Architectural Decision Records
 
