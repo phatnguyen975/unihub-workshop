@@ -87,7 +87,7 @@ This structure ensures the system can scale horizontally under traffic spikes, m
 This diagram shows the production topology: horizontally scaled Spring Boot app servers behind an API gateway, Redis for cache and token bucket rate limiting, PostgreSQL primary-replica for write safety and read scalability, and dedicated workers for outbox relay, AI, and CSV ingestion. External integrations are modeled explicitly.
 
 <p align="center">
-  <img src="../docs/diagrams/system_architecture.png" style="width:90%;" alt="System Architecture">
+  <img src="../docs/diagrams/system_architecture.png" style="width:100%;" alt="System Architecture">
 </p>
 
 - **Traffic distribution:** Nginx load balances external HTTPS requests across horizontally scaled Spring Boot app servers.
@@ -96,7 +96,7 @@ This diagram shows the production topology: horizontally scaled Spring Boot app 
 - **Worker responsibilities:** Workers poll and lock outbox rows and write async results on the primary, while reading from the replica for batch validation workloads such as CSV ingestion.
 - **Broker integration:** Workers publish and consume tasks via RabbitMQ to drive AI summarization and notification delivery.
 
-### Workshop Registration Flow (Free & Paid)
+### Workshop Registration Flow
 
 This sequence captures the end-to-end registration flow, including concurrency control, idempotent payment retries, and outbox-driven notifications.
 
@@ -188,21 +188,32 @@ sequenceDiagram
   participant DB as PostgreSQL Primary
 
   Staff->>Mobile: Scan QR code
-  Mobile->>Local: Store check-in event (pending)
+  Mobile->>Local: Store check-in event (Pending)
   Note over Mobile,Local: Offline-first capture, no network required
 
   Mobile->>API: Sync batch when online
-  API->>DB: Validate and upsert attendance (idempotent key)
-  alt New attendance
-    DB-->>API: Inserted
-    API-->>Mobile: Ack (recorded)
-    Mobile->>Local: Mark synced
-  else Duplicate or conflict
-    DB-->>API: Already recorded
-    API-->>Mobile: Ack (existing)
-    Mobile->>Local: Mark synced with server status
+  loop For each record in Batch
+    API->>DB: Validate and upsert attendance (idempotent key)
+    alt Valid & New Attendance
+      DB-->>API: Inserted
+      API-->>Mobile: Ack (recorded)
+      Mobile->>Local: Mark Synced
+    else Duplicate (Idempotency)
+      DB-->>API: Already recorded
+      API-->>Mobile: Ack (existing)
+      Mobile->>Local: Mark Synced
+    else Invalid/Fake QR (Poison Pill Prevention)
+      DB-->>API: Invalid workshop/student
+      API-->>Mobile: Error (400/404)
+      Mobile->>Local: Mark Failed/Rejected
+    end
   end
 ```
+
+- **Offline-first capture:** The mobile app records scans locally to keep check-in operational during network drops.
+- **Batch synchronization:** Pending records are synced in batches when connectivity returns, reducing request overhead.
+- **Idempotent conflict resolution:** Duplicate records return a success acknowledgment so the client can safely clear them, even if a prior response was lost.
+- **Poison Pill prevention:** Invalid QR codes are deterministically rejected and marked failed locally, preventing infinite retry loops that waste bandwidth and battery.
 
 ### Async AI Summarization Flow
 
