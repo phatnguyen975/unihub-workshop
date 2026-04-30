@@ -345,7 +345,7 @@ sequenceDiagram
 
 ## 4. Database Design
 
-### 4.1. Database Technology Stack
+### Database Technology Stack
 
 - **Core Data Stores (Server-Side):**
   - **PostgreSQL (Primary System of Record):** Provides strict ACID guarantees, pessimistic row-level locking for the 60-seat race condition, and durable storage for Idempotency and Outbox patterns.
@@ -357,7 +357,7 @@ sequenceDiagram
   - **Flyway (Migration Tool):** Migration-first schema management with deterministic, version-controlled deployments; Hibernate `ddl-auto=update` is explicitly disabled.
   - **HikariCP (Connection Pool):** Efficient JDBC connection management to prevent connection pool exhaustion under burst traffic.
 
-### 4.2. Entity-Relationship Diagram (ERD)
+### Entity-Relationship Diagram (ERD)
 
 ```mermaid
 erDiagram
@@ -483,62 +483,62 @@ erDiagram
 
 The schema separates core domain tables (users, workshops, registrations, payments, attendance) from technical pattern tables (outbox events and idempotency keys) to keep business logic clean while enabling resilience patterns. Workshop content artifacts (brochures and AI summaries) are modeled as first-class entities for lifecycle tracking, while import batches and errors capture CSV ingestion outcomes without polluting the core domain. This separation supports high-concurrency workflows, reliable async processing, and offline check-in reconciliation without coupling operational metadata directly to transactional records.
 
-### 4.3. Core Schema & Data Dictionary
+### Core Schema & Data Dictionary
 
 **WORKSHOPS**
 
-| Field Name         | Data Type (PostgreSQL) | Business/Technical Purpose                                               |
-| :----------------- | :--------------------- | :----------------------------------------------------------------------- |
-| capacity_total     | INTEGER                | Fixed seat capacity used for demand planning and validations.            |
-| capacity_remaining | INTEGER                | Live seat counter updated under pessimistic lock to prevent overbooking. |
-| version            | INTEGER                | Optimistic locking for non-capacity edits (title, schedule).             |
-| status             | TEXT                   | Lifecycle state: `DRAFT`, `PUBLISHED`, `CANCELED`, `COMPLETED`.          |
+| Field Name           | Data Type (PostgreSQL) | Business/Technical Purpose                                               |
+| :------------------- | :--------------------- | :----------------------------------------------------------------------- |
+| `capacity_total`     | INTEGER                | Fixed seat capacity used for demand planning and validations.            |
+| `capacity_remaining` | INTEGER                | Live seat counter updated under pessimistic lock to prevent overbooking. |
+| `version`            | INTEGER                | Optimistic locking for non-capacity edits (title, schedule).             |
+| `status`             | TEXT                   | Lifecycle state: `DRAFT`, `PUBLISHED`, `CANCELED`, `COMPLETED`.          |
 
 **REGISTRATIONS**
 
-| Field Name      | Data Type (PostgreSQL) | Business/Technical Purpose                                                                     |
-| :-------------- | :--------------------- | :--------------------------------------------------------------------------------------------- |
-| idempotency_key | TEXT                   | Correlates retries to the same request for safe deduplication.                                 |
-| status          | TEXT                   | `PENDING`, `CONFIRMED`, `PAID`, `FAILED`, `CANCELED`; `FAILED` triggers capacity compensation. |
+| Field Name        | Data Type (PostgreSQL) | Business/Technical Purpose                                                                     |
+| :---------------- | :--------------------- | :--------------------------------------------------------------------------------------------- |
+| `idempotency_key` | TEXT                   | Correlates retries to the same request for safe deduplication.                                 |
+| `status`          | TEXT                   | `PENDING`, `CONFIRMED`, `PAID`, `FAILED`, `CANCELED`; `FAILED` triggers capacity compensation. |
 
 **PAYMENTS**
 
 | Field Name | Data Type (PostgreSQL) | Business/Technical Purpose                                     |
 | :--------- | :--------------------- | :------------------------------------------------------------- |
-| status     | TEXT                   | Payment lifecycle: `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED`. |
+| `status`   | TEXT                   | Payment lifecycle: `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED`. |
 
 **OUTBOX_EVENTS**
 
 | Field Name | Data Type (PostgreSQL) | Business/Technical Purpose                                         |
 | :--------- | :--------------------- | :----------------------------------------------------------------- |
-| payload    | JSONB                  | Flexible event payload for async processing and integration.       |
-| status     | TEXT                   | `PENDING`, `PROCESSED`, `FAILED`, `DEAD_LETTER` for relay control. |
+| `payload`  | JSONB                  | Flexible event payload for async processing and integration.       |
+| `status`   | TEXT                   | `PENDING`, `PROCESSED`, `FAILED`, `DEAD_LETTER` for relay control. |
 
 **IDEMPOTENCY_KEYS**
 
-| Field Name   | Data Type (PostgreSQL) | Business/Technical Purpose                                |
-| :----------- | :--------------------- | :-------------------------------------------------------- |
-| request_hash | TEXT                   | Unique fingerprint of the request payload for validation. |
-| expires_at   | TIMESTAMP              | TTL cutoff for cleanup to prevent table bloat.            |
+| Field Name     | Data Type (PostgreSQL) | Business/Technical Purpose                                |
+| :------------- | :--------------------- | :-------------------------------------------------------- |
+| `request_hash` | TEXT                   | Unique fingerprint of the request payload for validation. |
+| `expires_at`   | TIMESTAMP              | TTL cutoff for cleanup to prevent table bloat.            |
 
-### 4.4. Concurrency & Integrity Constraints
+### Concurrency & Integrity Constraints
 
 - **Capacity Protection (Race Condition Prevention):** Enforce `CHECK (capacity_remaining >= 0)` on `WORKSHOPS` and use `SELECT ... FOR UPDATE` to lock the workshop row during seat allocation to guarantee no overbooking.
 - **Idempotency Barrier (Double-Charge Prevention):** Apply `UNIQUE (idempotency_key)` on both `IDEMPOTENCY_KEYS.idempotency_key` and `REGISTRATIONS.idempotency_key` to prevent duplicate processing on client retries.
 - **Offline Sync Deduplication:** Add `UNIQUE (registration_id)` (or `UNIQUE (workshop_id, user_id)`) on `ATTENDANCE` to silently discard duplicate sync attempts from offline clients.
 - **Data Consistency:** Enforce `FOREIGN KEY ... ON DELETE RESTRICT` to prevent deleting a workshop that has existing registrations.
 
-### 4.5. Indexing Strategy
+### Indexing Strategy
 
-| Table            | Indexed Columns    | Index Type                                | Business/Performance Rationale                                 |
-| :--------------- | :----------------- | :---------------------------------------- | :------------------------------------------------------------- |
-| IDEMPOTENCY_KEYS | idempotency_key    | B-Tree                                    | Fast lookup during registration surges to deduplicate retries. |
-| OUTBOX_EVENTS    | status             | Partial B-Tree (WHERE status = 'PENDING') | Speeds relay worker polling for pending events.                |
-| WORKSHOPS        | status, start_time | Composite B-Tree                          | Accelerates schedule browsing and filtering.                   |
-| REGISTRATIONS    | user_id            | B-Tree                                    | Efficient per-user registration history lookups.               |
-| REGISTRATIONS    | workshop_id        | B-Tree                                    | Efficient workshop roster and capacity checks.                 |
+| Table              | Indexed Columns        | Index Type                                  | Business/Performance Rationale                                 |
+| :----------------- | :--------------------- | :------------------------------------------ | :------------------------------------------------------------- |
+| `IDEMPOTENCY_KEYS` | `idempotency_key`      | B-Tree                                      | Fast lookup during registration surges to deduplicate retries. |
+| `OUTBOX_EVENTS`    | `status`               | Partial B-Tree (`WHERE status = 'PENDING'`) | Speeds relay worker polling for pending events.                |
+| `WORKSHOPS`        | `status`, `start_time` | Composite B-Tree                            | Accelerates schedule browsing and filtering.                   |
+| `REGISTRATIONS`    | `user_id`              | B-Tree                                      | Efficient per-user registration history lookups.               |
+| `REGISTRATIONS`    | `workshop_id`          | B-Tree                                      | Efficient workshop roster and capacity checks.                 |
 
-### 4.6. Mobile Local Database (Room SQLite Schema)
+### Mobile Local Database (Room SQLite Schema)
 
 The mobile database is intentionally minimal and is not a replica of the server. It stores a read-only workshop cache for staff selection and a write-optimized event queue for offline check-ins.
 
@@ -561,7 +561,7 @@ erDiagram
 ```
 
 - **LocalWorkshop (Read-Only Cache):** Minimal fields required for staff to select a workshop; refreshed when online.
-- **PendingCheckIn (Event Queue):** Offline scans with `sync_status` values `PENDING`, `SYNCED`, or `FAILED` to drive deterministic reconciliation.
+- **PendingCheckIn (Event Queue):** Offline scans with `sync_status` values `PENDING`, `SYNCED`, `FAILED`, or `REJECTED` to drive deterministic reconciliation.
 
 ## 7. Architectural Decision Records
 
