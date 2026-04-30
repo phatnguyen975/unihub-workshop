@@ -521,6 +521,48 @@ The schema separates core domain tables (users, workshops, registrations, paymen
 | request_hash | TEXT                   | Unique fingerprint of the request payload for validation. |
 | expires_at   | TIMESTAMP              | TTL cutoff for cleanup to prevent table bloat.            |
 
+### 4.4. Concurrency & Integrity Constraints
+
+- **Capacity Protection (Race Condition Prevention):** Enforce `CHECK (capacity_remaining >= 0)` on `WORKSHOPS` and use `SELECT ... FOR UPDATE` to lock the workshop row during seat allocation to guarantee no overbooking.
+- **Idempotency Barrier (Double-Charge Prevention):** Apply `UNIQUE (idempotency_key)` on both `IDEMPOTENCY_KEYS.idempotency_key` and `REGISTRATIONS.idempotency_key` to prevent duplicate processing on client retries.
+- **Offline Sync Deduplication:** Add `UNIQUE (registration_id)` (or `UNIQUE (workshop_id, user_id)`) on `ATTENDANCE` to silently discard duplicate sync attempts from offline clients.
+- **Data Consistency:** Enforce `FOREIGN KEY ... ON DELETE RESTRICT` to prevent deleting a workshop that has existing registrations.
+
+### 4.5. Indexing Strategy
+
+| Table            | Indexed Columns    | Index Type                                | Business/Performance Rationale                                 |
+| :--------------- | :----------------- | :---------------------------------------- | :------------------------------------------------------------- |
+| IDEMPOTENCY_KEYS | idempotency_key    | B-Tree                                    | Fast lookup during registration surges to deduplicate retries. |
+| OUTBOX_EVENTS    | status             | Partial B-Tree (WHERE status = 'PENDING') | Speeds relay worker polling for pending events.                |
+| WORKSHOPS        | status, start_time | Composite B-Tree                          | Accelerates schedule browsing and filtering.                   |
+| REGISTRATIONS    | user_id            | B-Tree                                    | Efficient per-user registration history lookups.               |
+| REGISTRATIONS    | workshop_id        | B-Tree                                    | Efficient workshop roster and capacity checks.                 |
+
+### 4.6. Mobile Local Database (Room SQLite Schema)
+
+The mobile database is intentionally minimal and is not a replica of the server. It stores a read-only workshop cache for staff selection and a write-optimized event queue for offline check-ins.
+
+```mermaid
+erDiagram
+  LOCAL_WORKSHOPS {
+    string id PK
+    string title
+    datetime start_time
+    string capacity_info
+  }
+
+  PENDING_CHECKINS {
+    string id PK
+    string workshop_id
+    string qr_code_payload
+    datetime scanned_at
+    string sync_status
+  }
+```
+
+- **LocalWorkshop (Read-Only Cache):** Minimal fields required for staff to select a workshop; refreshed when online.
+- **PendingCheckIn (Event Queue):** Offline scans with `sync_status` values `PENDING`, `SYNCED`, or `FAILED` to drive deterministic reconciliation.
+
 ## 7. Architectural Decision Records
 
 ### ADR 001: Backend Language and Framework
