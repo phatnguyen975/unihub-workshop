@@ -230,6 +230,7 @@ sequenceDiagram
   participant Broker as RabbitMQ
   participant Worker as AI Worker
   participant AI as AI Service
+  participant DLQ as Dead Letter Queue
 
   Organizer->>Web: Upload brochure PDF
   Web->>API: POST /workshops/{id}/brochure
@@ -241,15 +242,24 @@ sequenceDiagram
   Relay->>Broker: Publish summarization event
   Broker->>Worker: Deliver job
   Worker->>S3: Fetch PDF
-  Worker->>AI: Extract and summarize
-  alt AI unavailable
-    AI-->>Worker: Error/Timeout
-    Worker-->>Broker: Retry with backoff
-  else Success
+  Worker->>Worker: Extract text locally (PDFBox)
+  Worker->>Worker: Clean and chunk text
+  Worker->>AI: Summarize processed chunks
+  alt Success
     AI-->>Worker: Summary
     Worker->>DB: Store summary result
+  else Transient Error (Timeout/5xx)
+    AI-->>Worker: Error/Timeout
+    Worker-->>Broker: Retry with backoff
+  else Max Retries Exceeded
+    Worker-->>DLQ: Route failed job for review
   end
 ```
+
+- **Decoupled processing:** The API persists the job and outbox entry, then returns 202 so heavy PDF processing runs asynchronously.
+- **Local preprocessing:** The worker extracts, cleans, and chunks text before calling the AI service to avoid oversized payloads and token limit errors.
+- **Fault tolerance:** Transient AI failures trigger backoff retries through the broker without blocking other jobs.
+- **Dead Letter Queue (DLQ):** Jobs that exceed retry limits are routed to the DLQ for manual review, keeping the main queue healthy.
 
 ### Nightly Legacy CSV Ingestion Flow
 
