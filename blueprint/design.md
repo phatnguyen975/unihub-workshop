@@ -82,63 +82,19 @@ This structure ensures the system can scale horizontally under traffic spikes, m
 
 ## 3. High-Level Architecture Diagram
 
-### High-Level Deployment & Integration Architecture
+### System Architecture
 
 This diagram shows the production topology: horizontally scaled Spring Boot app servers behind an API gateway, Redis for cache and token bucket rate limiting, PostgreSQL primary-replica for write safety and read scalability, and dedicated workers for outbox relay, AI, and CSV ingestion. External integrations are modeled explicitly.
 
-```mermaid
-flowchart TB
-  Client["Client (Web/Mobile)"] -- HTTPS --> Nginx["API Gateway / Load Balancer (Nginx)"]
-  Nginx -- Load Balancing --> App1["App Server 1 (Java Spring Boot)"] & App2["App Server 2 (Java Spring Boot)"]
+<p align="center">
+  <img src="../docs/diagrams/system_architecture.png" style="width:90%;" alt="System Architecture">
+</p>
 
-  App1 -. Cache/Rate Limit (Token Bucket) .-> Redis["Redis (Cache + Rate Limiting)"]
-  App2 -. Cache/Rate Limit (Token Bucket) .-> Redis
-
-  App1 -- Read (Cache Miss) --> Replica["PostgreSQL Replica"]
-  App2 -- Read (Cache Miss) --> Replica
-  App1 -- Write (Domain + Outbox) --> Primary["PostgreSQL Primary"]
-  App2 -- Write (Domain + Outbox) --> Primary
-  Primary -- Replication --> Replica
-
-  App1 -- Payment Requests --> Pay["Payment Gateway"]
-  App2 -- Payment Requests --> Pay
-
-  App1 -- Upload PDFs --> S3["S3 Object Storage"]
-  App2 -- Upload PDFs --> S3
-  Legacy["Legacy Student System"] -- Nightly CSV Drop --> S3
-
-  Worker["Background Workers (Spring Batch/Async)"] -- Poll Outbox --> Primary
-  Worker -- Publish/Consume --> Rabbit["RabbitMQ Broker"]
-  Worker -- Read PDFs/CSVs --> S3
-  Worker -- AI Requests --> AI["AI Summarization Service"]
-  Worker -- Notifications --> Notify["Notification Providers"]
-
-  Nginx@{ shape: hex }
-  Client:::client
-  Nginx:::nginx
-  App1:::app
-  App2:::app
-  Redis:::redis
-  Primary:::db
-  Replica:::db
-  Rabbit:::broker
-  Worker:::worker
-  S3:::storage
-  Pay:::external
-  AI:::external
-  Notify:::external
-  Legacy:::external
-
-  classDef client fill:#f0f7ff,stroke:#0052cc,stroke-width:1px
-  classDef nginx fill:#f6ffed,stroke:#52c41a,stroke-width:1px
-  classDef app fill:#e6f7ff,stroke:#1890ff,stroke-width:1px
-  classDef redis fill:#fff1f0,stroke:#f5222d,stroke-width:1px
-  classDef db fill:#f9f0ff,stroke:#722ed1,stroke-width:1px
-  classDef broker fill:#fff7e6,stroke:#fa8c16,stroke-width:1px
-  classDef worker fill:#f0f5ff,stroke:#2f54eb,stroke-width:1px
-  classDef storage fill:#f6ffed,stroke:#52c41a,stroke-width:1px
-  classDef external fill:#fff1f0,stroke:#a8071a,stroke-width:1px
-```
+- **Traffic distribution:** Nginx load balances external HTTPS requests across horizontally scaled Spring Boot app servers.
+- **Cache and rate limiting:** App servers use cache-aside reads with Redis and enforce Token Bucket rate limiting at the edge.
+- **Read/write separation:** App servers read from the PostgreSQL replica on cache misses and write domain data plus outbox events to the primary.
+- **Worker responsibilities:** Workers poll and lock outbox rows and write async results on the primary, while reading from the replica for batch validation workloads such as CSV ingestion.
+- **Broker integration:** Workers publish and consume tasks via RabbitMQ to drive AI summarization and notification delivery.
 
 ### Workshop Registration Flow (Free & Paid)
 
@@ -434,8 +390,8 @@ flowchart TD
 ### ADR 021: Rate Limiting Algorithm
 
 - **Context:** Registration can spike to 12,000 concurrent users within minutes, and the backend must ensure fair access while preventing overload.
-- **Decision:** Use a Token Bucket algorithm at the API gateway and Redis-backed counters for distributed enforcement.
-- **Rationale:** Token Bucket smooths bursts while allowing controlled short-term spikes, which aligns with the initial surge profile. Compared to Fixed Window, it avoids boundary spikes, and compared to Sliding Window, it is simpler and cheaper to compute at high scale while still providing fairness.
+- **Decision:** Use the Token Bucket algorithm implemented via the Bucket4j library in the Spring Boot backend, with distributed state stored in Redis.
+- **Rationale:** Token Bucket smooths bursts while allowing controlled short-term spikes, which aligns with the initial surge profile. Compared to Fixed Window, it avoids boundary spikes, and compared to Sliding Window, it is simpler and cheaper to compute at high scale while still providing fairness. Using Bucket4j provides production-ready, thread-safe integration with Redis without writing custom Lua scripts.
 - **Consequences:** Requires careful tuning of refill rates and burst sizes; if misconfigured, legitimate users may see throttling during peak demand.
 
 ### ADR 022: Circuit Breaker Implementation
