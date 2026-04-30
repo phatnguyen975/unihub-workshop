@@ -343,6 +343,20 @@ sequenceDiagram
 - **Transactional outbox:** The lifecycle change and outbox event are committed in the same transaction to guarantee consistent state and downstream notification delivery.
 - **Asynchronous fan-out:** The notification worker consumes lifecycle events, fetches impacted students, and sends bulk emails without blocking the admin UI.
 
+## 4. Database Design
+
+### 4.1. Database Technology Stack
+
+- **Core Data Stores (Server-Side):**
+  - **PostgreSQL (Primary System of Record):** Provides strict ACID guarantees, pessimistic row-level locking for the 60-seat race condition, and durable storage for Idempotency and Outbox patterns.
+  - **Redis (Cache & Rate Limiter):** High-throughput, low-latency storage for Token Bucket rate limiting and cache-aside workshop availability reads during the 12,000-user surge.
+  - **S3-Compatible Object Storage (Blob Store):** Cost-effective, scalable persistence for unstructured data, specifically used for storing Organizer-uploaded PDF brochures and nightly CSV drops from the legacy system.
+- **Mobile Data Store (Client-Side):**
+  - **SQLite via Room:** Local cache for workshop details and an event queue (`PendingCheckIn`) to support offline-first check-in.
+- **Database Tooling:**
+  - **Flyway (Migration Tool):** Migration-first schema management with deterministic, version-controlled deployments; Hibernate `ddl-auto=update` is explicitly disabled.
+  - **HikariCP (Connection Pool):** Efficient JDBC connection management to prevent connection pool exhaustion under burst traffic.
+
 ## 7. Architectural Decision Records
 
 ### ADR 001: Backend Language and Framework
@@ -498,3 +512,10 @@ sequenceDiagram
 - **Decision:** Use Resilience4j for circuit breakers in the Java/Spring Boot backend.
 - **Rationale:** Resilience4j is actively maintained, Spring Boot friendly, and supports Closed/Open/Half-Open states with metrics and fallback patterns. Compared to Netflix Hystrix (now in maintenance mode), Resilience4j offers lower overhead and modern integration without legacy constraints.
 - **Consequences:** Adds dependency configuration and requires explicit fallback design; incorrect thresholds can cause premature open states or delayed recovery.
+
+### ADR 023: Database Migration Tool
+
+- **Context:** Relying on Hibernate's `ddl-auto=update` is dangerous for production environments, especially under high concurrency, as it can lock tables or drop columns unexpectedly. We need a deterministic way to manage database schema changes (Migration-First approach).
+- **Decision:** Use Flyway for database migrations.
+- **Rationale:** Flyway uses plain SQL scripts (`.sql`), which are transparent, easier to review, and universally understood by DBAs and developers. Compared to Liquibase, which uses abstracted XML/YAML/JSON formats, Flyway aligns better with our desire for clear, readable database initialization scripts.
+- **Consequences:** Developers must write explicit SQL migration scripts (e.g., `V1__init_db.sql`). Hibernate ORM is restricted to `ddl-auto=validate` strictly for mapping data (DML), not modifying schemas (DDL).
