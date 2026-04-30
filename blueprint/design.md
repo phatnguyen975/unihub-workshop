@@ -122,28 +122,41 @@ sequenceDiagram
   else Allowed
     Redis-->>GW: Allow
     GW->>API: Forward request
-    API->>DB: Begin tx, lock workshop row
-    API->>DB: Check capacity
-    alt Workshop full
-      API-->>Web: 409 Sold out
-    else Seats available
-      alt Free workshop
-        API->>DB: Create registration + outbox event
+    API->>DB: Lookup idempotency key
+    alt Key exists
+      API-->>Web: Return cached success response
+    else New request
+      API->>DB: Begin tx, lock workshop row
+      API->>DB: Check capacity
+      alt Workshop full
+        API->>DB: Rollback
+        API-->>Web: 409 Sold out
+      else Seats available
+        API->>DB: Decrement capacity
+        API->>DB: Insert registration (PENDING)
         API->>DB: Commit
-        API-->>Web: 201 + QR code
-      else Paid workshop
-        API->>DB: Create pending registration + idempotency record
-        API->>Pay: Charge (idempotency key)
-        alt Payment success
-          Pay-->>API: Approved
-          API->>DB: Confirm registration + outbox event
+        alt Free workshop
+          API->>DB: Begin tx
+          API->>DB: Update registration (CONFIRMED) + outbox event
           API->>DB: Commit
           API-->>Web: 201 + QR code
-        else Timeout or failure
-          Pay-->>API: Timeout/Error
-          API->>DB: Mark payment pending/failed
-          API->>DB: Commit
-          API-->>Web: 202 Pending or 502 Error
+        else Paid workshop
+          API->>Pay: Charge (idempotency key)
+          alt Payment success
+            Pay-->>API: Approved
+            API->>DB: Begin tx
+            API->>DB: Update registration (PAID) + outbox event
+            API->>DB: Commit
+            API-->>Web: 201 + QR code
+          else Timeout or failure
+            Pay-->>API: Timeout/Error
+            Note over API,Pay: Resilience4j circuit breaker trips
+            API->>DB: Begin tx
+            API->>DB: Update registration (FAILED)
+            API->>DB: Increment capacity (compensating action)
+            API->>DB: Commit
+            API-->>Web: 502 or 202
+          end
         end
       end
     end
@@ -154,13 +167,13 @@ sequenceDiagram
     Relay->>Broker: Publish event
     Broker->>Notify: Deliver confirmation
   end
-
-  Note over Web,API: Client retry uses same idempotency key
-  Web->>GW: Retry registration request
-  GW->>API: Forward
-  API->>DB: Lookup idempotency record
-  API-->>Web: Return prior result (no double charge)
 ```
+
+- **Idempotency barrier:** The API checks the idempotency key before any reservation logic, returning a cached success response on retries to avoid double processing.
+- **Short-lived pessimistic locking:** The capacity lock is held only inside the reservation transaction and released before any payment call, preventing long-held locks and connection pool exhaustion.
+- **Compensating transactions:** Failed or timed-out payments transition the registration to `FAILED` and increment capacity, ensuring the final seat is not lost.
+- **Circuit breaker protection:** Resilience4j guards the payment call path and surfaces controlled failures when the gateway degrades.
+- **Outbox pattern:** Confirmation notifications are published asynchronously by the relay, decoupled from the synchronous user request.
 
 ### Offline Check-in & Synchronization Flow
 
