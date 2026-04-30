@@ -483,6 +483,44 @@ erDiagram
 
 The schema separates core domain tables (users, workshops, registrations, payments, attendance) from technical pattern tables (outbox events and idempotency keys) to keep business logic clean while enabling resilience patterns. Workshop content artifacts (brochures and AI summaries) are modeled as first-class entities for lifecycle tracking, while import batches and errors capture CSV ingestion outcomes without polluting the core domain. This separation supports high-concurrency workflows, reliable async processing, and offline check-in reconciliation without coupling operational metadata directly to transactional records.
 
+### 4.3. Core Schema & Data Dictionary
+
+**WORKSHOPS**
+
+| Field Name         | Data Type (PostgreSQL) | Business/Technical Purpose                                               |
+| :----------------- | :--------------------- | :----------------------------------------------------------------------- |
+| capacity_total     | INTEGER                | Fixed seat capacity used for demand planning and validations.            |
+| capacity_remaining | INTEGER                | Live seat counter updated under pessimistic lock to prevent overbooking. |
+| version            | INTEGER                | Optimistic locking for non-capacity edits (title, schedule).             |
+| status             | TEXT                   | Lifecycle state: `DRAFT`, `PUBLISHED`, `CANCELED`, `COMPLETED`.          |
+
+**REGISTRATIONS**
+
+| Field Name      | Data Type (PostgreSQL) | Business/Technical Purpose                                                                     |
+| :-------------- | :--------------------- | :--------------------------------------------------------------------------------------------- |
+| idempotency_key | TEXT                   | Correlates retries to the same request for safe deduplication.                                 |
+| status          | TEXT                   | `PENDING`, `CONFIRMED`, `PAID`, `FAILED`, `CANCELED`; `FAILED` triggers capacity compensation. |
+
+**PAYMENTS**
+
+| Field Name | Data Type (PostgreSQL) | Business/Technical Purpose                                     |
+| :--------- | :--------------------- | :------------------------------------------------------------- |
+| status     | TEXT                   | Payment lifecycle: `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED`. |
+
+**OUTBOX_EVENTS**
+
+| Field Name | Data Type (PostgreSQL) | Business/Technical Purpose                                         |
+| :--------- | :--------------------- | :----------------------------------------------------------------- |
+| payload    | JSONB                  | Flexible event payload for async processing and integration.       |
+| status     | TEXT                   | `PENDING`, `PROCESSED`, `FAILED`, `DEAD_LETTER` for relay control. |
+
+**IDEMPOTENCY_KEYS**
+
+| Field Name   | Data Type (PostgreSQL) | Business/Technical Purpose                                |
+| :----------- | :--------------------- | :-------------------------------------------------------- |
+| request_hash | TEXT                   | Unique fingerprint of the request payload for validation. |
+| expires_at   | TIMESTAMP              | TTL cutoff for cleanup to prevent table bloat.            |
+
 ## 7. Architectural Decision Records
 
 ### ADR 001: Backend Language and Framework
