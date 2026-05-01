@@ -563,165 +563,198 @@ erDiagram
 - **LocalWorkshop (Read-Only Cache):** Minimal fields required for staff to select a workshop; refreshed when online.
 - **PendingCheckIn (Event Queue):** Offline scans with `sync_status` values `PENDING`, `SYNCED`, `FAILED`, or `REJECTED` to drive deterministic reconciliation.
 
+## 5. Access Control Design
+
+### 5.1. RBAC Model & User Personas
+
+We use Role-Based Access Control (RBAC) with role claims enforced at the API and UI layers.
+
+| Role             | Access Rights                                                                                      |
+| :--------------- | :------------------------------------------------------------------------------------------------- |
+| `ROLE_STUDENT`   | View published workshops, register for workshops, view their own QR codes.                         |
+| `ROLE_ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
+| `ROLE_STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
+
 ## 7. Architectural Decision Records
 
-### ADR 001: Backend Language and Framework
+### Domain 1: Foundation
+
+#### ADR 001: Backend Language and Framework
 
 - **Context:** The backend must handle 12,000 concurrent users, enforce strict transactional integrity for seat allocation, and be delivered under rapid time-to-market requirements with optimized operational resources.
 - **Decision:** Use Java with Spring Boot in a modular monolith architecture.
 - **Rationale:** Java and Spring Boot provide mature concurrency support, strong ecosystem libraries for resilience patterns, and straightforward transaction management with PostgreSQL. Compared to Node.js, Java offers more predictable multi-threaded performance under sustained load and a larger set of battle-tested tooling for transactional workloads. Compared to Go, Spring Boot accelerates delivery due to richer scaffolding and familiarity while still meeting throughput requirements.
 - **Consequences:** Requires JVM tuning and disciplined module boundaries to avoid monolith sprawl, but reduces operational complexity and time-to-delivery.
 
-### ADR 002: Primary Database
-
-- **Context:** Seat allocation and payment confirmation must be ACID-compliant to prevent overbooking and double-charging.
-- **Decision:** Use PostgreSQL as the primary transactional database.
-- **Rationale:** PostgreSQL provides strong ACID guarantees, row-level locking, and mature indexing, which are critical for the 60-seat race condition. Compared to MongoDB, PostgreSQL offers more reliable transactional semantics and consistent constraints for concurrent seat allocation. This aligns with the requirement to prevent the final seat from being claimed by multiple users.
-- **Consequences:** Schema evolution requires migrations and careful modeling, but yields predictable consistency and safer concurrency controls.
-
-### ADR 003: Web Frontend Framework (React + TypeScript)
+#### ADR 002: Web Frontend Framework
 
 - **Context:** The web portal serves two roles (Students and Organizers) with distinct workflows and RBAC controls.
 - **Decision:** Use React with TypeScript for the web application.
 - **Rationale:** React provides strong component reuse for role-specific views and a broad ecosystem for routing and state management. TypeScript adds compile-time type safety and stronger IDE support, reducing runtime errors when handling complex API payloads and RBAC-driven UI states. Compared to plain React with JavaScript, TypeScript improves refactoring safety and long-term maintainability. Compared to Angular, React + TypeScript avoids the heavier framework surface while still delivering strong typing. Compared to Vue, it offers deeper enterprise tooling maturity and larger hiring pools.
 - **Consequences:** Requires disciplined state management and UI architecture to avoid complexity in multi-role experiences.
 
-### ADR 004: Mobile App Technology
+#### ADR 003: Mobile App Technology
 
 - **Context:** Check-in staff need fast camera scanning and reliable offline-first persistence under poor connectivity.
 - **Decision:** Build the mobile app as Android Native using Java and XML.
 - **Rationale:** Native Android provides direct access to camera APIs and fine-grained control of scanning performance. Compared to Flutter or React Native, native Java/XML avoids bridging overhead and offers deeper integration with offline storage and background sync constraints. This is essential for rapid QR scanning and deterministic offline behavior.
 - **Consequences:** Limits cross-platform reuse, but delivers the highest reliability for the dedicated Android staff workflow.
 
-### ADR 005: Message Broker
-
-- **Context:** Notifications, AI summarization, and CSV ingestion must run asynchronously without blocking registration flows.
-- **Decision:** Use RabbitMQ as the message broker.
-- **Rationale:** RabbitMQ provides straightforward queue semantics, reliable delivery, and reduced operational overhead. Compared to Kafka, RabbitMQ has lower operational overhead and fits the task-queue model of notifications and ingestion. Kafka is more suitable for high-throughput event streaming, which is not the primary requirement here.
-- **Consequences:** Lower throughput than Kafka for stream-heavy workloads, but adequate for async tasks and easier to operate.
-
-### ADR 006: Caching and Rate Limiting Storage
-
-- **Context:** The system must absorb a 12,000-user traffic spike and enforce fair rate limiting.
-- **Decision:** Use Redis for caching and rate-limiting counters.
-- **Rationale:** Redis provides atomic operations, expiring keys, and high throughput for token bucket counters. Compared to Memcached, Redis offers richer data structures and persistence options that simplify rate limiting and short-lived availability caching.
-- **Consequences:** Requires memory sizing and eviction policy tuning, but offers reliable performance under peak load.
-
-### ADR 007: Mobile Local Database
-
-- **Context:** Offline-first check-in requires durable local storage and deterministic sync.
-- **Decision:** Use SQLite via Room persistence library.
-- **Rationale:** Room offers compile-time schema validation and structured queries over SQLite, which is robust for offline records. Compared to Realm or custom file storage, Room provides predictable query behavior and easier conflict handling, aligning with the need for reliable reconciliation.
-- **Consequences:** Requires schema migrations on mobile, but improves data integrity and maintainability.
-
-### ADR 008: API Design Style
+#### ADR 004: API Design Style
 
 - **Context:** Two clients (web and mobile) must integrate quickly and reliably under accelerated delivery requirements.
 - **Decision:** Use RESTful APIs for core services.
 - **Rationale:** REST offers clear resource modeling, easier caching, and simpler client integration. Compared to GraphQL, REST avoids additional schema management and resolver performance pitfalls, reducing delivery risk through streamlined development and operations. GraphQL can be introduced later if client flexibility becomes a stronger need.
 - **Consequences:** May require multiple endpoints for complex UI screens, but simplifies initial delivery and observability.
 
-### ADR 009: Authentication Mechanism
+### Domain 2: Security & Identity
+
+#### ADR 005: Authentication Mechanism
 
 - **Context:** The system must scale under traffic spikes and support multiple client platforms.
 - **Decision:** Use stateless JWT-based authentication with role claims.
 - **Rationale:** JWTs reduce server-side session storage and scale horizontally behind a load balancer. Compared to stateful sessions, JWTs avoid shared session stores and simplify API scaling during peak load. RBAC claims embedded in tokens support quick authorization decisions.
 - **Consequences:** Requires token rotation and revocation strategy, and careful token lifetime management for security.
 
-### ADR 010: Object Storage
+#### ADR 006: Authorization Model
 
-- **Context:** The system must store PDF brochures and nightly CSV drops reliably and cheaply.
-- **Decision:** Use S3-compatible object storage.
-- **Rationale:** Object storage is cost-effective for large immutable files and integrates well with background processing. Compared to storing files in PostgreSQL, object storage avoids database bloat and improves IO performance for large files.
-- **Consequences:** Requires access controls and lifecycle policies, but improves scalability and operational clarity.
+- **Context:** The system must enforce clear permissions for three fixed personas across web, admin, and check-in workflows.
+- **Decision:** Use Role-Based Access Control (RBAC) with role claims in stateless JWTs and row-level ownership checks in the API.
+- **Rationale:** RBAC matches the fixed personas and enables O(1) permission checks during the 12,000-user surge. Compared to ABAC, RBAC avoids complex policy evaluation overhead while still supporting row-level ownership constraints for organizer-scoped data.
+- **Consequences:** Less flexible than ABAC for fine-grained policy growth and requires careful role governance as permissions expand.
 
-### ADR 011: Database Connection Pooling Strategy
+### Domain 3: Data Infrastructure
+
+#### ADR 007: Primary Database
+
+- **Context:** Seat allocation and payment confirmation must be ACID-compliant to prevent overbooking and double-charging.
+- **Decision:** Use PostgreSQL as the primary transactional database.
+- **Rationale:** PostgreSQL provides strong ACID guarantees, row-level locking, and mature indexing, which are critical for the 60-seat race condition. Compared to MongoDB, PostgreSQL offers more reliable transactional semantics and consistent constraints for concurrent seat allocation. This aligns with the requirement to prevent the final seat from being claimed by multiple users.
+- **Consequences:** Schema evolution requires migrations and careful modeling, but yields predictable consistency and safer concurrency controls.
+
+#### ADR 008: Database Migration Tool
+
+- **Context:** Relying on Hibernate's `ddl-auto=update` is dangerous for production environments, especially under high concurrency, as it can lock tables or drop columns unexpectedly. We need a deterministic way to manage database schema changes (Migration-First approach).
+- **Decision:** Use Flyway for database migrations.
+- **Rationale:** Flyway uses plain SQL scripts (`.sql`), which are transparent, easier to review, and universally understood by DBAs and developers. Compared to Liquibase, which uses abstracted XML/YAML/JSON formats, Flyway aligns better with our desire for clear, readable database initialization scripts.
+- **Consequences:** Developers must write explicit SQL migration scripts (e.g., `V1__init_db.sql`). Hibernate ORM is restricted to `ddl-auto=validate` strictly for mapping data (DML), not modifying schemas (DDL).
+
+#### ADR 009: Database Connection Pooling Strategy
 
 - **Context:** High concurrency requires efficient database connection management to prevent saturation.
 - **Decision:** Use HikariCP for JDBC connection pooling.
 - **Rationale:** HikariCP offers low-latency pooling and strong observability. Compared to default or older pools, it provides better performance under bursty load, aligning with the 12,000-user surge window.
 - **Consequences:** Requires careful tuning of pool sizes to avoid exhausting PostgreSQL resources.
 
-### ADR 012: Event Outbox Pattern
+#### ADR 010: Caching and Rate Limiting Storage
 
-- **Context:** Async processing must remain consistent with transactional writes to prevent lost events.
-- **Decision:** Implement a transactional outbox pattern for event publishing.
-- **Rationale:** The outbox pattern ensures events are stored with the same transaction as domain changes and later published reliably. Compared to direct broker writes from request threads, it avoids inconsistency when failures occur between database commit and broker publish.
-- **Consequences:** Adds a background relay process and operational monitoring for outbox lag.
+- **Context:** The system must absorb a 12,000-user traffic spike and enforce fair rate limiting.
+- **Decision:** Use Redis for caching and rate-limiting counters.
+- **Rationale:** Redis provides atomic operations, expiring keys, and high throughput for token bucket counters. Compared to Memcached, Redis offers richer data structures and persistence options that simplify rate limiting and short-lived availability caching.
+- **Consequences:** Requires memory sizing and eviction policy tuning, but offers reliable performance under peak load.
 
-### ADR 013: AI Summarization Integration
+#### ADR 011: Object Storage
 
-- **Context:** Workshop summaries must be generated from PDFs without blocking admin workflows.
-- **Decision:** Use an async worker pipeline that extracts text, cleans it, and calls the AI service.
-- **Rationale:** An async pipeline isolates AI latency and external failures from the user experience. Compared to synchronous in-request processing, it prevents timeouts and improves reliability under traffic spikes.
-- **Consequences:** Introduces eventual consistency for summaries and requires status tracking for processing jobs.
+- **Context:** The system must store PDF brochures and nightly CSV drops reliably and cheaply.
+- **Decision:** Use S3-compatible object storage.
+- **Rationale:** Object storage is cost-effective for large immutable files and integrates well with background processing. Compared to storing files in PostgreSQL, object storage avoids database bloat and improves IO performance for large files.
+- **Consequences:** Requires access controls and lifecycle policies, but improves scalability and operational clarity.
 
-### ADR 014: Database Locking Strategy
+### Domain 4: Data Integrity & Concurrency
+
+#### ADR 012: Database Locking Strategy
 
 - **Context:** High-demand workshops can receive hundreds of simultaneous registration attempts for the final seats, and overbooking must be prevented.
 - **Decision:** Use pessimistic row-level locking for seat allocation (for example, `SELECT ... FOR UPDATE` on the workshop capacity row).
 - **Rationale:** Pessimistic locking serializes competing transactions for the same workshop, guaranteeing only one transaction can claim the final seat. Compared to optimistic locking with version checks, pessimistic locking avoids excessive retries during the 12,000-user spike where contention is expected to be high.
 - **Consequences:** Increases lock contention under heavy load and requires careful transaction scoping to keep locks short-lived.
 
-### ADR 015: Database Replication Strategy
-
-- **Context:** Read-heavy browse traffic during the surge can overload the primary database if reads and writes are co-located.
-- **Decision:** Use a primary-replica PostgreSQL topology with read/write separation.
-- **Rationale:** Read replicas offload workshop browsing and analytics queries from the primary, preserving write performance for registration and payments. Compared to a single primary, this reduces contention during traffic spikes. Replication lag is acceptable for browse views, while transactional writes remain on the primary.
-- **Consequences:** Introduces eventual consistency on read replicas and requires routing logic to avoid stale reads for critical operations.
-
-### ADR 016: Caching Strategy Pattern
-
-- **Context:** Workshop browsing and availability checks are read-heavy, especially during the initial surge.
-- **Decision:** Use the cache-aside pattern with Redis for workshop listings and non-critical availability reads.
-- **Rationale:** Cache-aside allows the backend to control freshness and avoids stale writes. Compared to write-through caching, cache-aside reduces write amplification and keeps the critical write path simple. Stale reads are mitigated with short TTLs and explicit invalidation after capacity updates.
-- **Consequences:** Requires cache invalidation logic and accepts brief inconsistencies for non-critical reads.
-
-### ADR 017: Idempotency Mechanism
+#### ADR 013: Idempotency Mechanism
 
 - **Context:** Payment retries and gateway timeouts can cause duplicate charges without strict idempotency control.
 - **Decision:** Use idempotency keys stored in PostgreSQL with a unique constraint and a TTL window (for example, 24 hours).
 - **Rationale:** Persisting idempotency records in PostgreSQL ensures durability across restarts and aligns with transactional workflows. Compared to Redis-only storage, PostgreSQL avoids data loss that could lead to double-charging. Keys are hashed with request fingerprints and stored alongside status to safely replay responses.
 - **Consequences:** Adds storage overhead and requires cleanup of expired keys, but guarantees exactly-once payment execution.
 
-### ADR 018: Batch Processing Strategy
+#### ADR 014: Database Replication Strategy
 
-- **Context:** Nightly CSV ingestion must tolerate malformed rows and duplicates without failing the entire pipeline.
-- **Decision:** Use Spring Batch with chunk processing, skip policies, and error quarantining.
-- **Rationale:** Spring Batch provides structured retries, per-row validation, and fault-tolerant processing. Compared to ad-hoc scripts, it prevents a single bad row from crashing the job and enables reporting on skipped records for audit.
-- **Consequences:** Adds configuration complexity and requires job monitoring, but delivers robust ingestion for the legacy system.
+- **Context:** Read-heavy browse traffic during the surge can overload the primary database if reads and writes are co-located.
+- **Decision:** Use a primary-replica PostgreSQL topology with read/write separation.
+- **Rationale:** Read replicas offload workshop browsing and analytics queries from the primary, preserving write performance for registration and payments. Compared to a single primary, this reduces contention during traffic spikes. Replication lag is acceptable for browse views, while transactional writes remain on the primary.
+- **Consequences:** Introduces eventual consistency on read replicas and requires routing logic to avoid stale reads for critical operations.
 
-### ADR 019: Pluggable Notification Architecture
+#### ADR 015: Caching Strategy Pattern
 
-- **Context:** The system must support immediate notifications and allow future channels (for example, Telegram) without core changes.
-- **Decision:** Use a provider abstraction with strategy-based adapters for notification channels.
-- **Rationale:** A pluggable interface decouples core workflows from delivery mechanisms. Compared to hard-coded email logic, adapters allow new channels to be introduced with minimal changes and consistent retry behavior.
-- **Consequences:** Requires adapter contracts and configuration management, but prevents vendor lock-in and reduces future integration cost.
+- **Context:** Workshop browsing and availability checks are read-heavy, especially during the initial surge.
+- **Decision:** Use the cache-aside pattern with Redis for workshop listings and non-critical availability reads.
+- **Rationale:** Cache-aside allows the backend to control freshness and avoids stale writes. Compared to write-through caching, cache-aside reduces write amplification and keeps the critical write path simple. Stale reads are mitigated with short TTLs and explicit invalidation after capacity updates.
+- **Consequences:** Requires cache invalidation logic and accepts brief inconsistencies for non-critical reads.
 
-### ADR 020: Offline Sync Conflict Resolution
+### Domain 5: Async & Event-Driven
 
-- **Context:** Offline check-in must preserve attendance records and reconcile safely when connectivity returns.
-- **Decision:** Use server-authoritative reconciliation with idempotent check-in events keyed by workshop and student identifiers.
-- **Rationale:** Server-authoritative reconciliation avoids conflicting outcomes when multiple offline devices sync the same attendee. Compared to client-wins merging, idempotent server-side upserts ensure no duplicate attendance is recorded and preserve auditability.
-- **Consequences:** Requires careful event modeling and unique constraints, but guarantees consistent attendance records after offline periods.
+#### ADR 016: Message Broker
 
-### ADR 021: Rate Limiting Algorithm
+- **Context:** Notifications, AI summarization, and CSV ingestion must run asynchronously without blocking registration flows.
+- **Decision:** Use RabbitMQ as the message broker.
+- **Rationale:** RabbitMQ provides straightforward queue semantics, reliable delivery, and reduced operational overhead. Compared to Kafka, RabbitMQ has lower operational overhead and fits the task-queue model of notifications and ingestion. Kafka is more suitable for high-throughput event streaming, which is not the primary requirement here.
+- **Consequences:** Lower throughput than Kafka for stream-heavy workloads, but adequate for async tasks and easier to operate.
+
+#### ADR 017: Event Outbox Pattern
+
+- **Context:** Async processing must remain consistent with transactional writes to prevent lost events.
+- **Decision:** Implement a transactional outbox pattern for event publishing.
+- **Rationale:** The outbox pattern ensures events are stored with the same transaction as domain changes and later published reliably. Compared to direct broker writes from request threads, it avoids inconsistency when failures occur between database commit and broker publish.
+- **Consequences:** Adds a background relay process and operational monitoring for outbox lag.
+
+### Domain 6: Resilience & Traffic Management
+
+#### ADR 018: Rate Limiting Algorithm
 
 - **Context:** Registration can spike to 12,000 concurrent users within minutes, and the backend must ensure fair access while preventing overload.
 - **Decision:** Use the Token Bucket algorithm implemented via the Bucket4j library in the Spring Boot backend, with distributed state stored in Redis.
 - **Rationale:** Token Bucket smooths bursts while allowing controlled short-term spikes, which aligns with the initial surge profile. Compared to Fixed Window, it avoids boundary spikes, and compared to Sliding Window, it is simpler and cheaper to compute at high scale while still providing fairness. Using Bucket4j provides production-ready, thread-safe integration with Redis without writing custom Lua scripts.
 - **Consequences:** Requires careful tuning of refill rates and burst sizes; if misconfigured, legitimate users may see throttling during peak demand.
 
-### ADR 022: Circuit Breaker Implementation
+#### ADR 019: Circuit Breaker Implementation
 
 - **Context:** Payment gateways can fail or time out; the system must protect core functionality and prevent cascading failures during outages.
 - **Decision:** Use Resilience4j for circuit breakers in the Java/Spring Boot backend.
 - **Rationale:** Resilience4j is actively maintained, Spring Boot friendly, and supports Closed/Open/Half-Open states with metrics and fallback patterns. Compared to Netflix Hystrix (now in maintenance mode), Resilience4j offers lower overhead and modern integration without legacy constraints.
 - **Consequences:** Adds dependency configuration and requires explicit fallback design; incorrect thresholds can cause premature open states or delayed recovery.
 
-### ADR 023: Database Migration Tool
+### Domain 7: Specific Workflows
 
-- **Context:** Relying on Hibernate's `ddl-auto=update` is dangerous for production environments, especially under high concurrency, as it can lock tables or drop columns unexpectedly. We need a deterministic way to manage database schema changes (Migration-First approach).
-- **Decision:** Use Flyway for database migrations.
-- **Rationale:** Flyway uses plain SQL scripts (`.sql`), which are transparent, easier to review, and universally understood by DBAs and developers. Compared to Liquibase, which uses abstracted XML/YAML/JSON formats, Flyway aligns better with our desire for clear, readable database initialization scripts.
-- **Consequences:** Developers must write explicit SQL migration scripts (e.g., `V1__init_db.sql`). Hibernate ORM is restricted to `ddl-auto=validate` strictly for mapping data (DML), not modifying schemas (DDL).
+#### ADR 020: Mobile Local Database
+
+- **Context:** Offline-first check-in requires durable local storage and deterministic sync.
+- **Decision:** Use SQLite via Room persistence library.
+- **Rationale:** Room offers compile-time schema validation and structured queries over SQLite, which is robust for offline records. Compared to Realm or custom file storage, Room provides predictable query behavior and easier conflict handling, aligning with the need for reliable reconciliation.
+- **Consequences:** Requires schema migrations on mobile, but improves data integrity and maintainability.
+
+#### ADR 021: Offline Sync Conflict Resolution
+
+- **Context:** Offline check-in must preserve attendance records and reconcile safely when connectivity returns.
+- **Decision:** Use server-authoritative reconciliation with idempotent check-in events keyed by workshop and student identifiers.
+- **Rationale:** Server-authoritative reconciliation avoids conflicting outcomes when multiple offline devices sync the same attendee. Compared to client-wins merging, idempotent server-side upserts ensure no duplicate attendance is recorded and preserve auditability.
+- **Consequences:** Requires careful event modeling and unique constraints, but guarantees consistent attendance records after offline periods.
+
+#### ADR 022: Batch Processing Strategy
+
+- **Context:** Nightly CSV ingestion must tolerate malformed rows and duplicates without failing the entire pipeline.
+- **Decision:** Use Spring Batch with chunk processing, skip policies, and error quarantining.
+- **Rationale:** Spring Batch provides structured retries, per-row validation, and fault-tolerant processing. Compared to ad-hoc scripts, it prevents a single bad row from crashing the job and enables reporting on skipped records for audit.
+- **Consequences:** Adds configuration complexity and requires job monitoring, but delivers robust ingestion for the legacy system.
+
+#### ADR 023: AI Summarization Integration
+
+- **Context:** Workshop summaries must be generated from PDFs without blocking admin workflows.
+- **Decision:** Use an async worker pipeline that extracts text, cleans it, and calls the AI service.
+- **Rationale:** An async pipeline isolates AI latency and external failures from the user experience. Compared to synchronous in-request processing, it prevents timeouts and improves reliability under traffic spikes.
+- **Consequences:** Introduces eventual consistency for summaries and requires status tracking for processing jobs.
+
+#### ADR 024: Pluggable Notification Architecture
+
+- **Context:** The system must support immediate notifications and allow future channels (for example, Telegram) without core changes.
+- **Decision:** Use a provider abstraction with strategy-based adapters for notification channels.
+- **Rationale:** A pluggable interface decouples core workflows from delivery mechanisms. Compared to hard-coded email logic, adapters allow new channels to be introduced with minimal changes and consistent retry behavior.
+- **Consequences:** Requires adapter contracts and configuration management, but prevents vendor lock-in and reduces future integration cost.
