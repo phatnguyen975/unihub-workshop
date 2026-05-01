@@ -575,6 +575,31 @@ We use Role-Based Access Control (RBAC) with role claims enforced at the API and
 | `ROLE_ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
 | `ROLE_STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
 
+### 5.2. Stateless JWT & Role Claims
+
+The API Gateway and Backend Services do not query PostgreSQL for permissions on every request. They trust a cryptographically signed JWT and perform `O(1)` authorization checks using the embedded role claim.
+
+**Example decoded JWT payload:**
+
+```json
+{
+  "sub": "1b8f8c7b-2e4b-4f6c-9b3b-6b8d2f0c9a12",
+  "role": "ROLE_ORGANIZER",
+  "iat": 1767225600,
+  "exp": 1767229200,
+  "jti": "9c1f6c23-0f5d-4f8b-9f51-2d5f3a2f1d9e"
+}
+```
+
+- **Client usage (React/Android):** The client decodes the `role` claim to drive the UI, such as hiding the "Create Workshop" action for `ROLE_STUDENT`.
+- **Server usage (Spring Boot):** The API enforces access via the `role` claim (for example, `@PreAuthorize("hasRole('ORGANIZER')")`) and uses `sub` for row-level ownership checks.
+
+### 5.3. Multi-Layer Enforcement Points
+
+- **Layer 1: UI/Client Layer (React & Mobile):** The client decodes the JWT to gate UI elements (hide menus, disable routes) for user experience. This improves UX but is not a security control.
+- **Layer 2: API Gateway & Controller Layer (Endpoint Security):** Requests are intercepted, JWT signatures are verified, and endpoint access is enforced by role claims (for example, `@PreAuthorize`). This blocks a Student from calling Organizer endpoints directly.
+- **Layer 3: Business/Data Layer (Data Ownership):** Services enforce ownership checks beyond role validation. For example, `PUT /workshops/{id}` verifies `ROLE_ORGANIZER` and confirms `workshops.organizer_id == jwt.sub` to prevent cross-tenant tampering.
+
 ## 7. Architectural Decision Records
 
 ### Domain 1: Foundation
