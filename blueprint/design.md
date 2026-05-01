@@ -565,7 +565,7 @@ erDiagram
 
 ## 5. Access Control Design
 
-### 5.1. RBAC Model & User Personas
+### RBAC Model & User Personas
 
 We use Role-Based Access Control (RBAC) with role claims enforced at the API and UI layers.
 
@@ -575,7 +575,7 @@ We use Role-Based Access Control (RBAC) with role claims enforced at the API and
 | `ROLE_ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
 | `ROLE_STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
 
-### 5.2. Stateless JWT & Role Claims
+### Stateless JWT & Role Claims
 
 The API Gateway and Backend Services do not query PostgreSQL for permissions on every request. They trust a cryptographically signed JWT and perform `O(1)` authorization checks using the embedded role claim.
 
@@ -594,11 +594,49 @@ The API Gateway and Backend Services do not query PostgreSQL for permissions on 
 - **Client usage (React/Android):** The client decodes the `role` claim to drive the UI, such as hiding the "Create Workshop" action for `ROLE_STUDENT`.
 - **Server usage (Spring Boot):** The API enforces access via the `role` claim (for example, `@PreAuthorize("hasRole('ORGANIZER')")`) and uses `sub` for row-level ownership checks.
 
-### 5.3. Multi-Layer Enforcement Points
+### Multi-Layer Enforcement Points
 
 - **Layer 1: UI/Client Layer (React & Mobile):** The client decodes the JWT to gate UI elements (hide menus, disable routes) for user experience. This improves UX but is not a security control.
 - **Layer 2: API Gateway & Controller Layer (Endpoint Security):** Requests are intercepted, JWT signatures are verified, and endpoint access is enforced by role claims (for example, `@PreAuthorize`). This blocks a Student from calling Organizer endpoints directly.
 - **Layer 3: Business/Data Layer (Data Ownership):** Services enforce ownership checks beyond role validation. For example, `PUT /workshops/{id}` verifies `ROLE_ORGANIZER` and confirms `workshops.organizer_id == jwt.sub` to prevent cross-tenant tampering.
+
+### Authorization Sequence Diagram
+
+This diagram illustrates the defense-in-depth strategy using an Organizer attempting to edit a workshop, showing how each layer prevents unauthorized access.
+
+```mermaid
+sequenceDiagram
+  actor Organizer
+  participant Web as Web App
+  participant API as API Gateway / Spring Security
+  participant Service as Workshop Service
+  participant DB as PostgreSQL
+
+  Organizer->>Web: Click "Edit Workshop"
+  alt Role not ORGANIZER (Layer 1)
+    Web-->>Organizer: Block action (UI error)
+  else Role ORGANIZER
+    Web->>API: PUT /workshops/{id} (JWT)
+    alt JWT invalid or role not allowed (Layer 2)
+      API-->>Web: 403 Forbidden
+    else JWT valid and role allowed
+      API->>Service: Forward request
+      Service->>DB: Load workshop by id
+      alt organizer_id != jwt.sub (Layer 3)
+        Service-->>API: 403 Forbidden
+        API-->>Web: 403 Forbidden
+      else organizer_id == jwt.sub
+        Service->>DB: Update workshop
+        Service-->>API: 200 OK
+        API-->>Web: 200 OK
+      end
+    end
+  end
+```
+
+- **Layer 1 (UX/UI Gating):** Provides immediate feedback and hides restricted features from unauthorized users, but is cosmetic and can be bypassed.
+- **Layer 2 (Endpoint Gating):** The API gateway and Spring Security boundary require a `ROLE_ORGANIZER` claim for `PUT /workshops/{id}`.
+- **Layer 3 (Data Gating):** The service enforces ownership by matching `workshops.organizer_id` with `jwt.sub`, preventing IDOR attacks.
 
 ## 7. Architectural Decision Records
 
