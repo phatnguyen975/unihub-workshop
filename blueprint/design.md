@@ -640,7 +640,7 @@ sequenceDiagram
 
 ## 6. System Protection Mechanisms
 
-### 6.1. Traffic Spike Management
+### Traffic Spike Management
 
 Registration demand peaks at 12,000 concurrent users within the first 10 minutes, with 60% concentrated in the initial 3-minute window. To keep the backend stable under that burst, the API Gateway enforces a distributed **Token Bucket** rate limiter using **Bucket4j** with **Redis** as the shared state store.
 
@@ -661,7 +661,7 @@ flowchart TD
   Drop --> Throttle[Return 429 Too Many Requests]
 ```
 
-### 6.2. Third-Party Service Resilience
+### Third-Party Service Resilience
 
 External payment gateways are inherently unreliable due to network latency, timeouts, and partial outages. If the backend waits on slow payment calls, request threads queue up and can exhaust the Spring Boot thread pool, causing a cascading failure across the UniHub system.
 
@@ -676,6 +676,38 @@ stateDiagram-v2
   OPEN --> HALF_OPEN: Wait duration elapsed
   HALF_OPEN --> CLOSED: Test calls succeed
   HALF_OPEN --> OPEN: Test calls fail
+```
+
+### Transaction Idempotency
+
+Client retries caused by network drops or impatient clicks can create duplicate `POST /registrations` requests, risking double-booking or double-charging. The system enforces exactly-once processing with an idempotency key strategy backed by PostgreSQL.
+
+- **Key generation and transmission:** The React/Android client generates a UUIDv4 and sends it in the `Idempotency-Key` header.
+- **Storage and duplicate detection:** The backend stores keys in `IDEMPOTENCY_KEYS` with a `UNIQUE` constraint, creating a database-level barrier against race conditions.
+- **Workflow:** On the first attempt, the key is inserted, the payment is processed, and the final response payload is serialized and stored with the key. On a retry, the API finds the existing key and immediately returns the cached response, bypassing the payment gateway and write logic.
+- **TTL configuration:** Each key includes an `expires_at` timestamp (for example, 24 hours), and a scheduled cleanup job deletes expired records to prevent table bloat.
+
+```mermaid
+sequenceDiagram
+  actor Client
+  participant GW as API Gateway
+  participant DB as PostgreSQL
+  participant Pay as Payment Gateway
+
+  Client->>GW: POST /registrations (Idempotency-Key: A)
+  GW->>DB: Lookup key A
+  alt Initial Request
+    DB-->>GW: Not found
+    GW->>DB: Insert key A (lock)
+    GW->>Pay: Charge payment
+    Pay-->>GW: Approved
+    GW->>DB: Store final response for key A
+    GW-->>Client: 200 OK (success)
+  else Retry Request (Network drop)
+    DB-->>GW: Found key A
+    GW->>DB: Load cached response
+    GW-->>Client: 200 OK (cached)
+  end
 ```
 
 ## 7. Architectural Decision Records
