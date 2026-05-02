@@ -567,7 +567,7 @@ erDiagram
 
 ### RBAC Model & User Personas
 
-We use Role-Based Access Control (RBAC) with role claims enforced at the API and UI layers.
+We use **Role-Based Access Control (RBAC)** with role claims enforced at the API and UI layers.
 
 | Role             | Access Rights                                                                                      |
 | :--------------- | :------------------------------------------------------------------------------------------------- |
@@ -637,6 +637,29 @@ sequenceDiagram
 - **Layer 1 (UX/UI Gating):** Provides immediate feedback and hides restricted features from unauthorized users, but is cosmetic and can be bypassed.
 - **Layer 2 (Endpoint Gating):** The API gateway and Spring Security boundary require a `ROLE_ORGANIZER` claim for `PUT /workshops/{id}`.
 - **Layer 3 (Data Gating):** The service enforces ownership by matching `workshops.organizer_id` with `jwt.sub`, preventing IDOR attacks.
+
+## 6. System Protection Mechanisms
+
+### 6.1. Traffic Spike Management
+
+Registration demand peaks at 12,000 concurrent users within the first 10 minutes, with 60% concentrated in the initial 3-minute window. To keep the backend stable under that burst, the API Gateway enforces a distributed **Token Bucket** rate limiter using **Bucket4j** with **Redis** as the shared state store.
+
+Each user or IP is assigned a bucket with a fixed capacity of tokens. Every `POST /registrations` request consumes a token, and tokens refill at a steady rate. This allows short bursts during the first 3 minutes while still capping sustained throughput, preventing the registration service and database from being overwhelmed.
+
+When a bucket is empty, the gateway rejects the request with HTTP `429 Too Many Requests`. The frontend shows a simple "Please wait" message and retries with backoff, protecting the system while keeping the user informed.
+
+```mermaid
+flowchart TD
+  Client[Client] --> Gateway[API Gateway: POST /registrations]
+  Gateway --> Redis[Redis: Check Token Bucket]
+  Redis --> Decision{Tokens available?}
+  Decision -->|Yes| Consume[Consume token]
+  Consume --> API[Backend API]
+  API --> DB[Process DB transaction]
+  DB --> Success[Return success]
+  Decision -->|No| Drop[Drop request]
+  Drop --> Throttle[Return 429 Too Many Requests]
+```
 
 ## 7. Architectural Decision Records
 
