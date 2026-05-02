@@ -270,12 +270,12 @@ flowchart TD
   Scheduler[Scheduler] --> Job[Spring Batch Job]
   Legacy[Legacy Student System] --> S3[S3 CSV Drop]
   Job --> Fetch[Fetch CSV from S3 Drop]
-  Fetch --> FileValidate[File-Level Validation - headers and size]
+  Fetch --> FileValidate{File-Level Validation}
   FileValidate -->|Invalid| Abort[Abort Job]
   Abort --> Alert[Publish Alert]
   FileValidate -->|Valid| Parse[Parse rows]
 
-  Parse --> RowValidate[Validate row]
+  Parse --> RowValidate{Validate row}
   RowValidate -->|Invalid| Quarantine[Quarantine row + error report]
   Quarantine --> Parse
   RowValidate -->|Valid| Dedup[Deduplicate]
@@ -659,6 +659,23 @@ flowchart TD
   DB --> Success[Return success]
   Decision -->|No| Drop[Drop request]
   Drop --> Throttle[Return 429 Too Many Requests]
+```
+
+### 6.2. Third-Party Service Resilience
+
+External payment gateways are inherently unreliable due to network latency, timeouts, and partial outages. If the backend waits on slow payment calls, request threads queue up and can exhaust the Spring Boot thread pool, causing a cascading failure across the UniHub system.
+
+To prevent this, the payment integration uses a Circuit Breaker implemented with Resilience4j. The breaker continuously tracks failure rate and slow-call rate; when thresholds are exceeded, it opens and blocks further payment calls.
+
+When the circuit is open, the system fails fast instead of hanging. It returns an immediate error or places the registration in a "Payment Pending" state so users can retry later, while free workshop registration and browsing remain fully operational.
+
+```mermaid
+stateDiagram-v2
+  [*] --> CLOSED
+  CLOSED --> OPEN: Failure/timeout threshold exceeded
+  OPEN --> HALF_OPEN: Wait duration elapsed
+  HALF_OPEN --> CLOSED: Test calls succeed
+  HALF_OPEN --> OPEN: Test calls fail
 ```
 
 ## 7. Architectural Decision Records
