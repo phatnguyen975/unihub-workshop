@@ -1114,7 +1114,7 @@ All REST responses must use a single, global JSON envelope with a strict, predic
 
 All fields must be present in every response. If a field is not applicable (for example, `data` on an error response or `error` on a success response), it must be set to `null` to avoid client parsing exceptions.
 
-#### Success (Single Resource)
+#### Success Response (Single Resource)
 
 ```json
 {
@@ -1133,7 +1133,7 @@ All fields must be present in every response. If a field is not applicable (for 
 }
 ```
 
-#### Success (List / Pagination)
+#### Success Response (List / Pagination)
 
 ```json
 {
@@ -1184,4 +1184,25 @@ All fields must be present in every response. If a field is not applicable (for 
     ]
   }
 }
+```
+
+### Observability & Logging Strategy
+
+To keep operational complexity low during initial launch, the system relies exclusively on structured console logging (stdout/stderr) rather than heavy external telemetry stacks.
+
+#### API Request Logs
+
+Every incoming API request is intercepted and logged on completion using a strict format: `[Method] [Endpoint] [Code] - [ResponseTime] - [Message]`.
+
+```text
+[INFO] POST /api/v1/registrations 201 - 45ms - Workshop registered successfully
+[ERROR] POST /api/v1/registrations 409 - 120ms - Workshop capacity exceeded
+```
+
+#### System & Worker Logs
+
+Background processes (Outbox Relay, AI Summarization, CSV Ingestion) emit state changes directly to the console for traceability.
+
+```text
+[INFO] [OutboxRelay] - Processed 5 pending notification events
 ```
