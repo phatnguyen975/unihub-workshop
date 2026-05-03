@@ -985,9 +985,10 @@ web/
 │   │   ├── registration/
 │   │   │   ├── components/                 # Feature-scoped UI to avoid global coupling
 │   │   │   ├── hooks/                      # Local hooks keep registration state isolated
-│   │   │   ├── api/registrationApi.ts      # Feature API prevents global client sprawl
-│   │   │   ├── state/registrationSlice.ts  # Encapsulated state avoids cross-feature leakage
-│   │   │   └── pages/RegistrationPage.tsx  # Route-level composition for the feature
+│   │   │   ├── schemas/                    # Zod schemas to validate form inputs before API calls
+│   │   │   ├── api/                        # Feature API prevents global client sprawl
+│   │   │   ├── state/                      # Encapsulated state avoids cross-feature leakage
+│   │   │   └── pages/                      # Route-level composition for the feature
 │   │   ├── admin_dashboard/
 │   │   ├── workshops/
 │   │   ├── auth/
@@ -1061,3 +1062,56 @@ flowchart TD
 
 - **MVVM + Clean Architecture flow:** UI -> ViewModel -> Domain use case -> Domain port -> Data implementation.
 - **Offline-first repository pattern:** The Domain layer is unaware of SQLite or Retrofit; `RepositoryImpl` handles local persistence first, then syncs with the server in the background.
+
+### 8.2. Core Frameworks & Dependencies
+
+These libraries form the foundational stack that supports the modular monolith, clean architecture boundaries, and high-concurrency resilience requirements.
+
+**Backend (Java / Spring Boot)**
+
+| Library                  | Category                 | Architectural Purpose                                                                                                     |
+| :----------------------- | :----------------------- | :------------------------------------------------------------------------------------------------------------------------ |
+| Java                     | Language                 | Primary runtime for the modular monolith and concurrency model.                                                           |
+| Spring Boot              | Core Framework           | Application bootstrap, dependency injection, and web runtime.                                                             |
+| Spring Modulith          | Architecture Enforcement | Enforces module boundaries and supports modular monolith testing.                                                         |
+| PostgreSQL JDBC Driver   | Database                 | Low-level connectivity to the PostgreSQL/Neon datastore.                                                                  |
+| Flyway                   | Schema Migration         | Migration-first database evolution and versioning.                                                                        |
+| HikariCP                 | Connection Pooling       | Efficient JDBC pooling under burst traffic.                                                                               |
+| Resilience4j             | Circuit Breaker          | Protects calls to unstable third-party services.                                                                          |
+| Bucket4j + Redis         | Rate Limiting            | Distributed token-bucket throttling at the gateway.                                                                       |
+| Spring AMQP / RabbitMQ   | Messaging                | Asynchronous event and task delivery for workers.                                                                         |
+| JJWT                     | Security                 | JWT validation and claim parsing for stateless auth.                                                                      |
+| Lombok                   | Code Generation          | Reduces Java boilerplate (Getters, Setters, Builders) for domain entities and DTOs.                                       |
+| Hibernate Validator      | Validation               | Enforces input constraints (e.g., `@NotNull`, `@Email`) on DTOs at the controller/application boundary before processing. |
+| Spring Boot Starter Mail | Notifications            | Pluggable interface for sending asynchronous email confirmations.                                                         |
+| Spring Security          | Security                 | Secures endpoints and enforces Role-Based Access Control (RBAC).                                                          |
+| AWS SDK for Java (S3)    | Storage                  | Integrates with S3-compatible blob storage for PDF brochures and CSV drops.                                               |
+
+**Web Frontend (React / TypeScript)**
+
+| Library                 | Category                | Architectural Purpose                                                                      |
+| :---------------------- | :---------------------- | :----------------------------------------------------------------------------------------- |
+| React + ReactDOM        | Core                    | Component rendering and UI composition.                                                    |
+| TypeScript              | Language                | Type safety and contract correctness for API usage.                                        |
+| Vite                    | Build Tool              | Fast dev server and optimized production bundling.                                         |
+| TailwindCSS             | Styling                 | Utility-first styling for consistent design system.                                        |
+| React Router            | Routing                 | Route management and role-based navigation.                                                |
+| Axios + TanStack Query  | Data Fetching & Caching | API access with caching, retries, and background refresh.                                  |
+| React Hook Form + Zod   | Form State & Validation | Manages complex form state and provides type-safe schema validation before API submission. |
+| Radix UI / shadcn/ui    | UI Primitives           | Accessible, unstyled UI components configured via Tailwind for consistent design.          |
+| Redux Toolkit / Zustand | State Management        | Manages global application state and feature-level slices (e.g., auth state).              |
+| jwt-decode              | Security Utility        | Decodes the stateless JWT on the client to extract RBAC claims for UI gating.              |
+
+**Mobile (Android Native / Java)**
+
+| Library                          | Category             | Architectural Purpose                                                      |
+| :------------------------------- | :------------------- | :------------------------------------------------------------------------- |
+| Java / Android SDK               | Core                 | Native Android runtime and platform APIs.                                  |
+| Material Components              | UI                   | Consistent Android UI components and theming.                              |
+| Room Database                    | Offline Storage      | Local persistence for offline-first check-in.                              |
+| Retrofit + Gson                  | Network/API Client   | Structured HTTP client with JSON serialization.                            |
+| Android Lifecycle / ViewModel    | Presentation Logic   | MVVM state handling and lifecycle-safe UI logic.                           |
+| Google ML Kit (Barcode Scanning) | Hardware Feature     | High-performance, offline-capable QR code scanning for workshop check-ins. |
+| Dagger / Hilt                    | Dependency Injection | Manages object creation and wires Clean Architecture layers together.      |
+| RxJava3 / RxAndroid              | Reactive Async       | Manages complex background threading for offline-first repository sync.    |
+| Glide                            | Image Loading        | Asynchronous image loading and caching for workshop banners and avatars.   |
