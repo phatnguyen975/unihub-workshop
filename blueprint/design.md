@@ -893,3 +893,171 @@ sequenceDiagram
 - **Decision:** Use a provider abstraction with strategy-based adapters for notification channels.
 - **Rationale:** A pluggable interface decouples core workflows from delivery mechanisms. Compared to hard-coded email logic, adapters allow new channels to be introduced with minimal changes and consistent retry behavior.
 - **Consequences:** Requires adapter contracts and configuration management, but prevents vendor lock-in and reduces future integration cost.
+
+## 8. Project Structure & API Standards
+
+### 8.1. Project Directory Structure
+
+#### Backend (Java 25 / Spring Boot, Modular Monolith)
+
+```text
+backend/
+├── build.gradle
+├── src/
+│   ├── main/
+│   │   ├── java/com/unihub/workshop/
+│   │   │   ├── UniHubApplication.java                     # Spring Boot entrypoint
+│   │   │   ├── shared/
+│   │   │   │   ├── events/
+│   │   │   │   ├── security/
+│   │   │   │   └── utils/
+│   │   │   ├── registration/                              # Bounded context root; no cross-module deps
+│   │   │   │   ├── contracts/                             # Public API for other modules; no infra deps
+│   │   │   │   │   └── RegistrationFacade.java            # Interface for sync calls into registration
+│   │   │   │   ├── domain/                                # Pure domain model; depends on nothing else
+│   │   │   │   │   ├── model/                             # Entities and value objects; no frameworks
+│   │   │   │   │   ├── events/                            # Domain events emitted by domain rules
+│   │   │   │   │   └── repository/                        # Ports (interfaces) for persistence/gateways
+│   │   │   │   ├── application/                           # Use cases; depends on domain + contracts only
+│   │   │   │   │   ├── usecases/                          # Orchestrates transactions; no web/DB
+│   │   │   │   │   └── dto/                               # Input/output models for use cases
+│   │   │   │   ├── infrastructure/                        # Adapters implementing ports; depends on domain
+│   │   │   │   │   ├── persistence/                       # JPA repositories and mappings
+│   │   │   │   │   ├── outbox/                            # Writes outbox rows for async delivery
+│   │   │   │   │   └── payment/                           # External payment gateway client
+│   │   │   │   └── presentation/                          # Web layer; depends on application only
+│   │   │   │       ├── controller/                        # REST controllers and request mapping
+│   │   │   │       └── mapper/                            # HTTP <-> DTO mapping
+│   │   │   ├── payment/
+│   │   │   ├── checkin/
+│   │   │   ├── notifications/
+│   │   │   ├── ingestion/
+│   │   │   ├── workshops/
+│   │   │   ├── admin/
+│   │   │   └── users/
+│   │   └── resources/
+│   │       ├── application.yml
+│   │       └── db/migration/
+│   │           └── V1__init_schema.sql
+│   └── test/
+│       └── java/com/unihub/workshop/
+│           └── ModulithArchitectureTest.java              # Spring Modulith module boundary tests
+└── settings.gradle
+```
+
+```mermaid
+flowchart TD
+  subgraph ModuleA["Module A: registration"]
+    A_Presentation["Presentation (Controllers)"] -->|calls| A_Application["Application (Use Cases)"]
+    A_Application -->|invokes port| A_Domain["Domain (Model + Ports)"]
+    A_Infrastructure["Infrastructure (Adapters)"] -->|implements port| A_Domain
+  end
+
+  subgraph ModuleB["Module B: workshops"]
+    B_Application["Application (Use Cases)"] -->|implements| B_Contracts["Contracts (Public API)"]
+    B_Application --> B_Domain["Domain (Model + Ports)"]
+    B_Infrastructure["Infrastructure (Adapters)"] --> B_Domain
+  end
+
+  A_Application -->|sync via contracts| B_Contracts
+  A_Domain -->|domain event| Outbox["Outbox Table"]
+  Outbox --> Broker["Message Broker"]
+  Broker --> B_Application
+
+  classDef contract fill:#eef7ff,stroke:#4a90e2,stroke-width:1px;
+  classDef async fill:#fff7e6,stroke:#f5a623,stroke-width:1px;
+  class B_Contracts contract;
+  class Outbox,Broker async;
+```
+
+- **Intra-module flow (Dependency Inversion):** Presentation calls Application, Application depends on Domain ports, and Infrastructure implements those ports. All source code dependencies point inward toward the Domain.
+- **Inter-module flow (Strict boundaries):** This structure follows Spring Modulith conventions where top-level packages are modules, and boundary tests enforce the diagram rules. Modules communicate synchronously only through `contracts/` and asynchronously via domain events routed through the Outbox and message broker. Direct access to another module's domain, infrastructure, presentation, or database tables is forbidden.
+
+#### Web Frontend (React / TypeScript, Feature-Based)
+
+```text
+web/
+├── src/
+│   ├── app/
+│   │   ├── routes/
+│   │   └── providers/
+│   ├── features/
+│   │   ├── registration/
+│   │   │   ├── components/                 # Feature-scoped UI to avoid global coupling
+│   │   │   ├── hooks/                      # Local hooks keep registration state isolated
+│   │   │   ├── api/registrationApi.ts      # Feature API prevents global client sprawl
+│   │   │   ├── state/registrationSlice.ts  # Encapsulated state avoids cross-feature leakage
+│   │   │   └── pages/RegistrationPage.tsx  # Route-level composition for the feature
+│   │   ├── admin_dashboard/
+│   │   ├── workshops/
+│   │   ├── auth/
+│   │   └── profile/
+│   ├── shared/
+│   │   ├── ui/                             # Reusable primitives only; no feature logic here
+│   │   ├── hooks/                          # Cross-cutting hooks shared by multiple features
+│   │   ├── api/                            # Base API client + interceptors (no feature state)
+│   │   ├── auth/                           # Global auth context and token handling
+│   │   └── utils/                          # Pure helpers with no feature dependencies
+│   └── assets/
+└── package.json
+```
+
+```mermaid
+flowchart TD
+  App["App (Routing/Providers)"] --> FeatureA["Feature A"]
+  App --> FeatureB["Feature B"]
+  FeatureA --> Shared["Shared (UI, Utils, Base API)"]
+  FeatureB --> Shared
+
+  FeatureA -. "no cross-import" .- FeatureB
+
+  subgraph FeatureDetail["Feature A internals"]
+    Page["Page"] --> Components["Components"] --> Hooks["Hooks"] --> ApiState["API / State"]
+  end
+```
+
+- **Unidirectional dependency:** Imports flow downward only (`app` -> `features` -> `shared`). The `shared` layer never imports from `features`.
+- **Strict feature isolation:** Features are cohesive and loosely coupled; no feature can import another feature's internal components, hooks, or state.
+
+#### Mobile (Android Native / Java, MVVM + Clean Architecture)
+
+```text
+mobile/
+├── app/
+│   ├── build.gradle
+│   └── src/
+│       └── main/
+│           ├── AndroidManifest.xml
+│           ├── java/com/unihub/workshop/
+│           │   ├── core/                     # Cross-cutting services (network, db, utils)
+│           │   └── features/                 # Feature boundaries (MVVM + Clean Architecture)
+│           │       ├── checkin/              # Offline-first check-in feature
+│           │       │   ├── data/             # Repository implementations and data sources
+│           │       │   │   ├── local/        # Room-backed local persistence (DAOs, Entities)
+│           │       │   │   ├── remote/       # Retrofit API access and DTO mapping
+│           │       │   │   └── repository/   # Orchestrates local-first read/write + sync
+│           │       │   ├── domain/           # Pure business rules with no Android deps
+│           │       │   │   ├── model/        # Domain entities and value objects
+│           │       │   │   └── usecase/      # Use cases exposed to ViewModel
+│           │       │   └── presentation/     # UI state and MVVM presentation logic
+│           │       ├── workshops/
+│           │       └── auth/
+│           └── res/
+│               ├── layout/
+│               └── values/
+├── build.gradle
+└── settings.gradle
+```
+
+```mermaid
+flowchart TD
+  UI["Fragment/Activity (Presentation)"] --> VM["ViewModel (Presentation)"]
+  VM --> UC["UseCase (Domain)"]
+  UC --> Port["Repository Interface (Domain)"]
+  Repo["RepositoryImpl (Data)"] --> Port
+  Repo -->|"write/read first"| Room["Room DAO (Local DB)"]
+  Repo -->|"background sync"| Api["Retrofit API (Remote Network)"]
+```
+
+- **MVVM + Clean Architecture flow:** UI -> ViewModel -> Domain use case -> Domain port -> Data implementation.
+- **Offline-first repository pattern:** The Domain layer is unaware of SQLite or Retrofit; `RepositoryImpl` handles local persistence first, then syncs with the server in the background.
