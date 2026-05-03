@@ -763,9 +763,9 @@ sequenceDiagram
 #### ADR 007: Primary Database
 
 - **Context:** Seat allocation and payment confirmation must be ACID-compliant to prevent overbooking and double-charging.
-- **Decision:** Use PostgreSQL as the primary transactional database.
-- **Rationale:** PostgreSQL provides strong ACID guarantees, row-level locking, and mature indexing, which are critical for the 60-seat race condition. Compared to MongoDB, PostgreSQL offers more reliable transactional semantics and consistent constraints for concurrent seat allocation. This aligns with the requirement to prevent the final seat from being claimed by multiple users.
-- **Consequences:** Schema evolution requires migrations and careful modeling, but yields predictable consistency and safer concurrency controls.
+- **Decision:** Use PostgreSQL hosted on Neon (Serverless Postgres) as the primary transactional database.
+- **Rationale:** PostgreSQL provides strong ACID guarantees, row-level locking, and mature indexing, which are critical for the 60-seat race condition. Neon preserves these guarantees while eliminating local database setup friction and enabling a shared, always-available development database so team members can collaborate on a consistent state without manual synchronization. Compared to MongoDB, PostgreSQL offers more reliable transactional semantics and consistent constraints for concurrent seat allocation. This aligns with the requirement to prevent the final seat from being claimed by multiple users.
+- **Consequences:** The team depends on managed Neon availability and must manage credentials and network access, but collaboration improves through a shared environment and reduced local setup burden. Schema evolution still requires migrations and careful modeling to preserve consistency under load.
 
 #### ADR 008: Database Migration Tool
 

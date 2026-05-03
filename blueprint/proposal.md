@@ -66,8 +66,9 @@ Deliver a secure, scalable UniHub Workshop system that digitizes the full worksh
 ### In-Scope
 
 - Dual-client architecture: **React Web App** (Students/Admins) and **Android Native App (Java/XML)** for check-in staff.
-- Java backend with PostgreSQL as the primary transactional data store.
+- Java backend with Neon (Serverless Postgres) as the primary transactional data store.
 - Pluggable notification architecture (email/in-app now, extensible to Telegram/SMS later).
+- Async processing via RabbitMQ and outbox workers for notifications, AI summarization, and CSV ingestion.
 - Offline-first check-in with local mobile database and server reconciliation.
 - AI-powered summarization for uploaded PDF workshop brochures.
 - Nightly CSV ingestion pipeline for legacy student data synchronization.
@@ -93,6 +94,16 @@ Deliver a secure, scalable UniHub Workshop system that digitizes the full worksh
 - **Offline data integrity:** Check-in data captured offline must be safely reconciled without duplicates or missed attendance.
 - **Unidirectional legacy integration:** CSV ingestion must tolerate malformed rows and duplicates without disrupting production data.
 
+### Technical Constraints
+
+- **Backend:** Java with Spring Boot.
+- **Web Client:** React with TypeScript.
+- **Mobile Client:** Android Native (Java/XML).
+- **Primary Database:** Neon (Serverless Postgres).
+- **Cache & Rate Limiting:** Redis.
+- **Async Messaging:** RabbitMQ.
+- **Object Storage:** S3-compatible storage for PDFs and CSV drops.
+
 ### Operational Constraints
 
 - **Aggressive Delivery Timeline:** The project is bound by a strict and non-negotiable delivery schedule. This requires highly efficient, tightly sequenced development phases, and strict scope management to ensure timely deployment without compromising system resilience.
@@ -107,9 +118,12 @@ Deliver a secure, scalable UniHub Workshop system that digitizes the full worksh
 
 ### Performance Benchmarks
 
-- System processes **12,000+ requests per minute** during peak registration windows without crashing or data corruption.
+- System sustains **12,000 concurrent users in the first 10 minutes**, with **60% within the first 3 minutes**, without crashing or corrupting data.
+- Token Bucket rate limiting absorbs bursts and returns controlled `429` responses rather than overwhelming the backend.
 
 ### Technical Quality
 
 - **Circuit Breakers**, **Idempotency Keys**, and **Rate Limiting** are implemented in production code (not mocked).
+- **No duplicate payments** under retry testing through idempotency key enforcement.
+- Core browsing and free registrations remain available during payment gateway outages via circuit breaker fail-fast behavior.
 - Verified prevention of overbooking under concurrent registration stress.
