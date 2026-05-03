@@ -896,7 +896,7 @@ sequenceDiagram
 
 ## 8. Project Structure & API Standards
 
-### 8.1. Project Directory Structure
+### Project Directory Structure
 
 #### Backend (Java 25 / Spring Boot, Modular Monolith)
 
@@ -1063,55 +1063,125 @@ flowchart TD
 - **MVVM + Clean Architecture flow:** UI -> ViewModel -> Domain use case -> Domain port -> Data implementation.
 - **Offline-first repository pattern:** The Domain layer is unaware of SQLite or Retrofit; `RepositoryImpl` handles local persistence first, then syncs with the server in the background.
 
-### 8.2. Core Frameworks & Dependencies
+### API Design & Versioning Standards
 
-These libraries form the foundational stack that supports the modular monolith, clean architecture boundaries, and high-concurrency resilience requirements.
+This section defines a predictable, robust contract between the clients and the backend to keep integrations stable as the system evolves.
 
-**Backend (Java / Spring Boot)**
+#### Versioning Strategy
 
-| Library                  | Category                 | Architectural Purpose                                                                                                     |
-| :----------------------- | :----------------------- | :------------------------------------------------------------------------------------------------------------------------ |
-| Java                     | Language                 | Primary runtime for the modular monolith and concurrency model.                                                           |
-| Spring Boot              | Core Framework           | Application bootstrap, dependency injection, and web runtime.                                                             |
-| Spring Modulith          | Architecture Enforcement | Enforces module boundaries and supports modular monolith testing.                                                         |
-| PostgreSQL JDBC Driver   | Database                 | Low-level connectivity to the PostgreSQL/Neon datastore.                                                                  |
-| Flyway                   | Schema Migration         | Migration-first database evolution and versioning.                                                                        |
-| HikariCP                 | Connection Pooling       | Efficient JDBC pooling under burst traffic.                                                                               |
-| Resilience4j             | Circuit Breaker          | Protects calls to unstable third-party services.                                                                          |
-| Bucket4j + Redis         | Rate Limiting            | Distributed token-bucket throttling at the gateway.                                                                       |
-| Spring AMQP / RabbitMQ   | Messaging                | Asynchronous event and task delivery for workers.                                                                         |
-| JJWT                     | Security                 | JWT validation and claim parsing for stateless auth.                                                                      |
-| Lombok                   | Code Generation          | Reduces Java boilerplate (Getters, Setters, Builders) for domain entities and DTOs.                                       |
-| Hibernate Validator      | Validation               | Enforces input constraints (e.g., `@NotNull`, `@Email`) on DTOs at the controller/application boundary before processing. |
-| Spring Boot Starter Mail | Notifications            | Pluggable interface for sending asynchronous email confirmations.                                                         |
-| Spring Security          | Security                 | Secures endpoints and enforces Role-Based Access Control (RBAC).                                                          |
-| AWS SDK for Java (S3)    | Storage                  | Integrates with S3-compatible blob storage for PDF brochures and CSV drops.                                               |
+We use URI path versioning (for example, `/api/v1/...`) because it is explicit, cache-friendly, and easily routable at the API Gateway compared to header-based versioning.
 
-**Web Frontend (React / TypeScript)**
+#### Pagination & Filtering
 
-| Library                 | Category                | Architectural Purpose                                                                      |
-| :---------------------- | :---------------------- | :----------------------------------------------------------------------------------------- |
-| React + ReactDOM        | Core                    | Component rendering and UI composition.                                                    |
-| TypeScript              | Language                | Type safety and contract correctness for API usage.                                        |
-| Vite                    | Build Tool              | Fast dev server and optimized production bundling.                                         |
-| TailwindCSS             | Styling                 | Utility-first styling for consistent design system.                                        |
-| React Router            | Routing                 | Route management and role-based navigation.                                                |
-| Axios + TanStack Query  | Data Fetching & Caching | API access with caching, retries, and background refresh.                                  |
-| React Hook Form + Zod   | Form State & Validation | Manages complex form state and provides type-safe schema validation before API submission. |
-| Radix UI / shadcn/ui    | UI Primitives           | Accessible, unstyled UI components configured via Tailwind for consistent design.          |
-| Redux Toolkit / Zustand | State Management        | Manages global application state and feature-level slices (e.g., auth state).              |
-| jwt-decode              | Security Utility        | Decodes the stateless JWT on the client to extract RBAC claims for UI gating.              |
+Collection endpoints use offset/limit pagination with explicit query parameters (for example, `?page=0&size=20`). Filters are passed as query parameters and are always optional.
 
-**Mobile (Android Native / Java)**
+#### HTTP Status Codes
 
-| Library                          | Category             | Architectural Purpose                                                      |
-| :------------------------------- | :------------------- | :------------------------------------------------------------------------- |
-| Java / Android SDK               | Core                 | Native Android runtime and platform APIs.                                  |
-| Material Components              | UI                   | Consistent Android UI components and theming.                              |
-| Room Database                    | Offline Storage      | Local persistence for offline-first check-in.                              |
-| Retrofit + Gson                  | Network/API Client   | Structured HTTP client with JSON serialization.                            |
-| Android Lifecycle / ViewModel    | Presentation Logic   | MVVM state handling and lifecycle-safe UI logic.                           |
-| Google ML Kit (Barcode Scanning) | Hardware Feature     | High-performance, offline-capable QR code scanning for workshop check-ins. |
-| Dagger / Hilt                    | Dependency Injection | Manages object creation and wires Clean Architecture layers together.      |
-| RxJava3 / RxAndroid              | Reactive Async       | Manages complex background threading for offline-first repository sync.    |
-| Glide                            | Image Loading        | Asynchronous image loading and caching for workshop banners and avatars.   |
+Standard responses include: `200 OK`, `201 Created`, `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `409 Conflict`, `429 Too Many Requests`, and `500 Internal Server Error`.
+
+#### Mandatory Headers
+
+- `Authorization: Bearer <token>`
+- `Idempotency-Key`
+- `X-RateLimit-Remaining` and `X-RateLimit-Retry-After` are returned on Bucket4j-protected endpoints.
+
+### Standard JSON Payloads
+
+All REST responses must use a single, global JSON envelope with a strict, predictable schema. Transport and system metadata stays in the root `metadata` object, while all domain data (including pagination details) must live inside `data`.
+
+```typescript
+{
+  "success": boolean,
+  "message": string,
+  "data": object | object[] | null,
+  "metadata": {
+    "statusCode": number,
+    "processedBy": string,
+    "timestamp": string
+  },
+  "error": object | null
+}
+```
+
+- `success`: Boolean flag indicating overall request success.
+- `message`: Human-readable summary intended for logs and UI messages.
+- `data`: Domain payload (single object, list, or pagination container). `null` for errors.
+- `metadata`: Transport/system metadata for observability and routing.
+  - `metadata.statusCode`: HTTP status code returned by the backend for this response.
+  - `metadata.processedBy`: Hostname or ID of the specific Spring Boot app server node (for example, `unihub-app-1`) that handled the request behind the Nginx round-robin load balancer.
+  - `metadata.timestamp`: ISO 8601 timestamp when the response was generated.
+- `error`: RFC 7807 Problem Details object on failures; `null` on success.
+
+All fields must be present in every response. If a field is not applicable (for example, `data` on an error response or `error` on a success response), it must be set to `null` to avoid client parsing exceptions.
+
+#### Success (Single Resource)
+
+```json
+{
+  "success": true,
+  "message": "Workshop retrieved",
+  "data": {
+    "id": "8e4b9b3b-9c1a-4a8d-9f6b-3c8b7f9f2c10",
+    "title": "Career Sprint 101"
+  },
+  "metadata": {
+    "statusCode": 200,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-03T12:00:00Z"
+  },
+  "error": null
+}
+```
+
+#### Success (List / Pagination)
+
+```json
+{
+  "success": true,
+  "message": "Workshops page",
+  "data": {
+    "items": [
+      {
+        "id": "b2a3f0b8-22f9-4b6a-9a54-1a8d8d1f20f4",
+        "title": "Design Systems"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "total": 120,
+    "hasPrev": false,
+    "hasNext": true
+  },
+  "metadata": {
+    "statusCode": 200,
+    "processedBy": "unihub-app-2",
+    "timestamp": "2026-05-03T12:00:00Z"
+  },
+  "error": null
+}
+```
+
+#### Error Response
+
+```json
+{
+  "success": false,
+  "message": "Invalid request payload",
+  "data": null,
+  "metadata": {
+    "statusCode": 400,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-03T12:00:00Z"
+  },
+  "error": {
+    "type": "urn:unihub:error:validation",
+    "title": "Validation Error",
+    "detail": "One or more fields failed validation.",
+    "instance": "/api/v1/registrations",
+    "validation_errors": [
+      "email: must be a valid email address",
+      "workshopId: is required"
+    ]
+  }
+}
+```
