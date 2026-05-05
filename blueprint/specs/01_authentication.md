@@ -108,14 +108,14 @@ Defines token validation and role enforcement at the boundary.
 
 Defines ownership checks for protected resource mutations.
 
-| Field               | Details                                                                                                                                                                                                                                                       |
-| :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Use Case Name       | Data Ownership Validation (Internal)                                                                                                                                                                                                                          |
-| Description         | Ensures resource mutations are limited to the owning user.                                                                                                                                                                                                    |
-| Main Flow           | 1. Load target resource after RBAC check.<br>2. Retrieve user identity (`sub`) and role from the Request/Security Context.<br>3. Compare identity with resource `owner_id`.<br>4. Allow mutation if matched or if the user holds an overarching `ADMIN` role. |
-| Error Scenarios     | - Ownership mismatch returns 403.<br>- Resource not found returns 404.                                                                                                                                                                                        |
-| Constraints         | - Ownership checks are required for organizer-scoped mutations.<br>- Global admin roles bypass ownership checks.<br>- No cross-tenant data access is allowed.                                                                                                 |
-| Acceptance Criteria | - Owner can update resource successfully.<br>- Non-owner without `ADMIN` privileges receives 403.<br>- User with `ADMIN` role bypasses ownership check successfully.                                                                                          |
+| Field               | Details                                                                                                                                                                                                                    |
+| :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use Case Name       | Data Ownership Validation (Internal)                                                                                                                                                                                       |
+| Description         | Ensures resource mutations are limited to the owning user.                                                                                                                                                                 |
+| Main Flow           | 1. Load target resource after RBAC check.<br>2. Retrieve user identity (`sub`) and role from the Request/Security Context.<br>3. Compare identity with resource `owner_id`.<br>4. Allow mutation strictly only if matched. |
+| Error Scenarios     | - Ownership mismatch returns 403.<br>- Resource not found returns 404.                                                                                                                                                     |
+| Constraints         | - Ownership checks are required for organizer-scoped mutations.<br>- No cross-tenant data access is allowed.                                                                                                               |
+| Acceptance Criteria | - Owner can update resource successfully.<br>- Non-owner strictly receives 403 Forbidden.                                                                                                                                  |
 
 ## 10. Rate Limiting (Token Bucket)
 
