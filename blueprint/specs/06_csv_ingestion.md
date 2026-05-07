@@ -1,0 +1,85 @@
+# UniHub Workshop - CSV Ingestion Specs
+
+## 1. Trigger Manual Ingestion
+
+Defines a manual API trigger for the CSV ingestion batch job.
+
+| Field               | Details                                                                                                                                                                                                                                                                                                                             |
+| :------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use Case Name       | Trigger Manual Ingestion                                                                                                                                                                                                                                                                                                            |
+| Description         | Manually triggers a CSV ingestion job for a specified S3 file.                                                                                                                                                                                                                                                                      |
+| Actors              | Organizer                                                                                                                                                                                                                                                                                                                           |
+| Main Flow           | 1. Validate request payload and S3 object reference.<br>2. Check for an existing running ingestion job; if present, return 409.<br>3. Create a new batch record in `STUDENT_IMPORT_BATCHES` with status `PROCESSING`.<br>4. Trigger the Spring Batch job with the target file reference.<br>5. Return 202 Accepted with `batch_id`. |
+| Error Scenarios     | - Job already running returns 409.<br>- Invalid S3 reference returns 400.<br>- Unauthorized access returns 401.                                                                                                                                                                                                                     |
+| Constraints         | - Only one ingestion job may run at a time.<br>- API returns 202 Accepted when job is queued.                                                                                                                                                                                                                                       |
+| Acceptance Criteria | - A valid request starts a batch and returns `batch_id`.<br>- Overlapping requests are rejected with 409.                                                                                                                                                                                                                           |
+
+## 2. Get Batch Status & Report
+
+Defines batch status retrieval and error reporting.
+
+| Field               | Details                                                                                                                                                                                                                                                                     |
+| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use Case Name       | Get Batch Status & Report                                                                                                                                                                                                                                                   |
+| Description         | Returns the batch status and quarantine report for a specific ingestion run.                                                                                                                                                                                                |
+| Actors              | Organizer                                                                                                                                                                                                                                                                   |
+| Main Flow           | 1. Validate batch ID format and pagination parameters.<br>2. Query `STUDENT_IMPORT_BATCHES` for status and counts.<br>3. Query `STUDENT_IMPORT_ERRORS` with pagination for quarantined rows and reasons.<br>4. Return status, processed totals, and a paginated error list. |
+| Error Scenarios     | - Batch not found returns 404.<br>- Unauthorized access returns 401.                                                                                                                                                                                                        |
+| Constraints         | - Status must be one of `PROCESSING`, `COMPLETED`, `FAILED`.<br>- Pagination is strictly mandatory for the error report list to prevent OOM errors on large fail-batches.<br>- Error report is read-only and immutable.                                                     |
+| Acceptance Criteria | - Status and counts match persisted batch records.<br>- Quarantined rows are returned as a deterministically paginated list.                                                                                                                                                |
+
+## 3. Nightly Scheduled Cronjob Trigger
+
+Defines the automated nightly trigger for CSV ingestion.
+
+| Field               | Details                                                                                                                                                                                                                                                    |
+| :------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use Case Name       | Nightly Scheduled Cronjob Trigger                                                                                                                                                                                                                          |
+| Description         | Schedules a nightly ingestion run to pull new CSV drops.                                                                                                                                                                                                   |
+| Actors              | Internal System                                                                                                                                                                                                                                            |
+| Main Flow           | 1. At the configured off-peak time, start the ingestion workflow.<br>2. Check for new CSV drops in the S3 bucket.<br>3. If a file is found, enqueue the Spring Batch job with the file reference.<br>4. Record a new batch entry with status `PROCESSING`. |
+| Error Scenarios     | - S3 unavailable returns internal error.<br>- Job scheduler failure returns internal error.                                                                                                                                                                |
+| Constraints         | - Scheduler must run at a fixed off-peak time (for example, 2:00 AM).<br>- Only one scheduled job executes per window.                                                                                                                                     |
+| Acceptance Criteria | - New CSV drops trigger an ingestion job.<br>- No duplicate batch entries are created for the same schedule window.                                                                                                                                        |
+
+## 4. CSV File Fetch & Validation
+
+Defines file-level validation before row processing begins.
+
+| Field               | Details                                                                                                                                                                                                       |
+| :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Use Case Name       | CSV File Fetch & Validation                                                                                                                                                                                   |
+| Description         | Fetches the CSV file from S3 and validates structure before processing.                                                                                                                                       |
+| Actors              | Internal System                                                                                                                                                                                               |
+| Main Flow           | 1. Connect to S3 and download the target CSV file.<br>2. Validate MIME type and size limits.<br>3. Validate required CSV headers and schema.<br>4. If validation fails, mark the batch as `FAILED` and abort. |
+| Error Scenarios     | - File not found returns failed batch state.<br>- Invalid headers or schema returns failed batch state.<br>- File size exceeds limits returns failed batch state.                                             |
+| Constraints         | - File-level validation must complete before any row processing.<br>- Invalid files abort the job safely.                                                                                                     |
+| Acceptance Criteria | - Valid files proceed to chunk processing.<br>- Invalid files are rejected and marked `FAILED`.                                                                                                               |
+
+## 5. Chunk Processing & Bulk Upsert
+
+Defines chunk-based row processing with transactional boundaries.
+
+| Field               | Details                                                                                                                                                                                                                                                                                                   |
+| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use Case Name       | Chunk Processing & Bulk Upsert                                                                                                                                                                                                                                                                            |
+| Description         | Processes the CSV in chunks and upserts student records into the database.                                                                                                                                                                                                                                |
+| Actors              | Internal System                                                                                                                                                                                                                                                                                           |
+| Main Flow           | 1. Read the CSV in fixed-size chunks (for example, 1000 rows).<br>2. Deduplicate rows in memory within the chunk.<br>3. Validate row-level fields (email format, required columns).<br>4. Bulk UPSERT into `USERS` table within a per-chunk transaction.<br>5. Commit the chunk transaction and continue. |
+| Error Scenarios     | - Database unavailable returns failed batch state.<br>- Chunk write failure triggers retry or abort per policy.                                                                                                                                                                                           |
+| Constraints         | - Transaction boundaries are per chunk to avoid OOM and connection exhaustion.<br>- UPSERT must be idempotent for repeated rows.                                                                                                                                                                          |
+| Acceptance Criteria | - Valid rows are inserted or updated correctly.<br>- Chunk processing continues across large files without exhausting resources.                                                                                                                                                                          |
+
+## 6. Error Quarantining & Archiving
+
+Defines row-level error handling and source file archival.
+
+| Field               | Details                                                                                                                                                                                                                                                                        |
+| :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use Case Name       | Error Quarantining & Archiving                                                                                                                                                                                                                                                 |
+| Description         | Isolates invalid rows and archives the source CSV after completion.                                                                                                                                                                                                            |
+| Actors              | Internal System                                                                                                                                                                                                                                                                |
+| Main Flow           | 1. On row validation failure, skip the row and capture error details.<br>2. Insert raw row data and error reason into `STUDENT_IMPORT_ERRORS`.<br>3. Continue processing remaining rows in the chunk.<br>4. After job completion, move the source CSV to an S3 archive folder. |
+| Error Scenarios     | - Error table insert failure returns internal error.<br>- Archive move failure returns internal error.                                                                                                                                                                         |
+| Constraints         | - Skip policy must allow processing to continue after bad rows.<br>- Source CSV must be archived to prevent reprocessing.                                                                                                                                                      |
+| Acceptance Criteria | - Invalid rows are quarantined with reasons.<br>- Processing completes and the source file is archived.                                                                                                                                                                        |
