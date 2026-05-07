@@ -109,6 +109,7 @@ sequenceDiagram
   participant API as Backend API
   participant DB as PostgreSQL Primary
   participant Pay as Payment Gateway
+  participant Sweeper as Payment Timeout Sweeper
   participant Relay as Outbox Relay Worker
   participant Broker as RabbitMQ
   participant Notify as Notification Provider
@@ -167,6 +168,10 @@ sequenceDiagram
     Relay->>Broker: Publish event
     Broker->>Notify: Deliver confirmation
   end
+
+  Note over Sweeper,DB: Background sweep for expired PENDING > 15m
+  Sweeper->>DB: Select PENDING registrations > 15m
+  Sweeper->>DB: Mark FAILED + increment capacity (compensate)
 ```
 
 - **Idempotency barrier:** The API checks the idempotency key before any reservation logic, returning a cached success response on retries to avoid double processing.
@@ -367,6 +372,7 @@ erDiagram
     string full_name
     string role
     string status
+    boolean is_temporary_password
     datetime created_at
   }
 
@@ -388,6 +394,12 @@ erDiagram
     uuid workshop_id FK
     string speaker_name
     string speaker_bio
+  }
+
+  WORKSHOP_ASSIGNMENTS {
+    uuid id PK
+    uuid workshop_id FK
+    uuid organization_id FK
   }
 
   REGISTRATIONS {
@@ -474,6 +486,8 @@ erDiagram
   USERS ||--o{ WORKSHOPS : organizes
   WORKSHOPS ||--o{ REGISTRATIONS : has
   WORKSHOPS ||--o{ WORKSHOP_SPEAKERS : includes
+  WORKSHOPS ||--o{ WORKSHOP_ASSIGNMENTS : assigned_to
+  WORKSHOP_ASSIGNMENTS }o--|| USERS : staff
   WORKSHOPS ||--o{ BROCHURES : has
   WORKSHOPS ||--o{ AI_SUMMARIES : summarizes
   REGISTRATIONS ||--|| ATTENDANCE : results_in
@@ -484,6 +498,19 @@ erDiagram
 The schema separates core domain tables (users, workshops, registrations, payments, attendance) from technical pattern tables (outbox events and idempotency keys) to keep business logic clean while enabling resilience patterns. Workshop content artifacts (brochures and AI summaries) are modeled as first-class entities for lifecycle tracking, while import batches and errors capture CSV ingestion outcomes without polluting the core domain. This separation supports high-concurrency workflows, reliable async processing, and offline check-in reconciliation without coupling operational metadata directly to transactional records.
 
 ### Core Schema & Data Dictionary
+
+**USERS**
+
+| Field Name              | Data Type (PostgreSQL) | Business/Technical Purpose                                      |
+| :---------------------- | :--------------------- | :-------------------------------------------------------------- |
+| `is_temporary_password` | BOOLEAN                | Forces password change on first login for provisioned accounts. |
+
+**WORKSHOP_ASSIGNMENTS**
+
+| Field Name        | Data Type (PostgreSQL) | Business/Technical Purpose                        |
+| :---------------- | :--------------------- | :------------------------------------------------ |
+| `workshop_id`     | UUID                   | Workshop being assigned to a staff organization.  |
+| `organization_id` | UUID                   | Organization responsible for check-in operations. |
 
 **WORKSHOPS**
 
@@ -551,6 +578,13 @@ erDiagram
     string capacity_info
   }
 
+  LOCAL_ATTENDEES {
+    string registration_id PK
+    string workshop_id
+    string full_name
+    string ticket_status
+  }
+
   PENDING_CHECKINS {
     string id PK
     string workshop_id
@@ -561,6 +595,7 @@ erDiagram
 ```
 
 - **LocalWorkshop (Read-Only Cache):** Minimal fields required for staff to select a workshop; refreshed when online.
+- **LocalAttendee (Read-Only Cache):** Read-only cache for the attendee roster, enabling offline search and verification without network.
 - **PendingCheckIn (Event Queue):** Offline scans with `sync_status` values `PENDING`, `SYNCED`, `FAILED`, or `REJECTED` to drive deterministic reconciliation.
 
 ## 5. Access Control Design
@@ -893,6 +928,12 @@ sequenceDiagram
 - **Decision:** Use a provider abstraction with strategy-based adapters for notification channels.
 - **Rationale:** A pluggable interface decouples core workflows from delivery mechanisms. Compared to hard-coded email logic, adapters allow new channels to be introduced with minimal changes and consistent retry behavior.
 - **Consequences:** Requires adapter contracts and configuration management, but prevents vendor lock-in and reduces future integration cost.
+
+#### ADR 025: Forced Password Change on First Login
+
+- **Context:** Staff accounts are provisioned by organizers and must enforce a secure first-login flow for accountability.
+- **Decision:** Use a temporary password with an `is_temporary_password` flag to require a password change on first login.
+- **Consequences:** The API and UI must redirect users to Change Password and restrict normal access until the flag is cleared.
 
 ## 8. Project Structure & API Standards
 
