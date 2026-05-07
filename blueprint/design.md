@@ -492,11 +492,11 @@ erDiagram
   USERS ||--o{ REGISTRATIONS : registers
   USERS ||--o{ WORKSHOPS : organizes
   USERS ||--o{ ORGANIZATIONS : manages
-  ORGANIZATIONS ||--o{ USERS : contains staff
+  ORGANIZATIONS ||--o{ USERS : "contains staff"
   WORKSHOPS ||--o{ REGISTRATIONS : has
   WORKSHOPS ||--o{ WORKSHOP_SPEAKERS : includes
-  WORKSHOPS ||--o{ WORKSHOP_ASSIGNMENTS : has assignments
-  ORGANIZATIONS ||--o{ WORKSHOP_ASSIGNMENTS : is assigned to
+  WORKSHOPS ||--o{ WORKSHOP_ASSIGNMENTS : "has assignments"
+  ORGANIZATIONS ||--o{ WORKSHOP_ASSIGNMENTS : "is assigned to"
   WORKSHOPS ||--o{ BROCHURES : has
   WORKSHOPS ||--o{ AI_SUMMARIES : summarizes
   REGISTRATIONS ||--|| ATTENDANCE : results_in
