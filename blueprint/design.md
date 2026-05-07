@@ -372,8 +372,15 @@ erDiagram
     string full_name
     string role
     string status
+    uuid organization_id FK
     boolean is_temporary_password
     datetime created_at
+  }
+
+  ORGANIZATIONS {
+    uuid id PK
+    string name
+    uuid organizer_id FK
   }
 
   WORKSHOPS {
@@ -484,10 +491,12 @@ erDiagram
 
   USERS ||--o{ REGISTRATIONS : registers
   USERS ||--o{ WORKSHOPS : organizes
+  USERS ||--o{ ORGANIZATIONS : manages
+  ORGANIZATIONS ||--o{ USERS : contains staff
   WORKSHOPS ||--o{ REGISTRATIONS : has
   WORKSHOPS ||--o{ WORKSHOP_SPEAKERS : includes
-  WORKSHOPS ||--o{ WORKSHOP_ASSIGNMENTS : assigned_to
-  WORKSHOP_ASSIGNMENTS }o--|| USERS : staff
+  WORKSHOPS ||--o{ WORKSHOP_ASSIGNMENTS : has assignments
+  ORGANIZATIONS ||--o{ WORKSHOP_ASSIGNMENTS : is assigned to
   WORKSHOPS ||--o{ BROCHURES : has
   WORKSHOPS ||--o{ AI_SUMMARIES : summarizes
   REGISTRATIONS ||--|| ATTENDANCE : results_in
@@ -503,7 +512,15 @@ The schema separates core domain tables (users, workshops, registrations, paymen
 
 | Field Name              | Data Type (PostgreSQL) | Business/Technical Purpose                                      |
 | :---------------------- | :--------------------- | :-------------------------------------------------------------- |
+| `organization_id`       | UUID                   | Links staff users to their organization for check-in grouping.  |
 | `is_temporary_password` | BOOLEAN                | Forces password change on first login for provisioned accounts. |
+
+**ORGANIZATIONS**
+
+| Field Name     | Data Type (PostgreSQL) | Business/Technical Purpose                      |
+| :------------- | :--------------------- | :---------------------------------------------- |
+| `name`         | TEXT                   | Human-readable organization or department name. |
+| `organizer_id` | UUID                   | Organizer that manages the organization.        |
 
 **WORKSHOP_ASSIGNMENTS**
 
