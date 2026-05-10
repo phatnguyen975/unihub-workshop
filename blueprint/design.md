@@ -20,15 +20,17 @@ This approach balances the high-traffic requirements with rapid time-to-market e
 
 ### Core Components
 
-| Component                       | Purpose                                                    | Notes                                                                  |
-| :------------------------------ | :--------------------------------------------------------- | :--------------------------------------------------------------------- |
-| React Web App                   | Student discovery/registration and Admin management portal | React + TypeScript UI with RBAC-guarded views                          |
-| Android Mobile App (Java / XML) | QR scanning and offline-first check-in                     | Room/SQLite local store with deterministic sync                        |
-| Java Backend API                | Central business logic and orchestration                   | Spring Boot modular monolith, HikariCP, Resilience4j, outbox relay     |
-| PostgreSQL                      | System of record                                           | Primary-replica topology with pessimistic locking and idempotency keys |
-| Message Broker                  | Async event processing                                     | RabbitMQ for notifications, AI, and ingestion events                   |
-| Cache / Rate Limiter            | Spike protection and fast reads                            | Redis token bucket and cache-aside workshop reads                      |
-| Object Storage                  | PDFs and ingestion files                                   | S3-compatible storage for brochures and CSV drops                      |
+| Component                       | Purpose                                                    | Notes                                                                                                         |
+| :------------------------------ | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |
+| React Web App                   | Student discovery/registration and Admin management portal | React + TypeScript UI with RBAC-guarded views                                                                 |
+| Android Mobile App (Java / XML) | QR scanning and offline-first check-in                     | Room/SQLite local store with deterministic sync                                                               |
+| Java Backend API                | Central business logic and orchestration                   | Spring Boot modular monolith, HikariCP, Resilience4j, outbox relay                                            |
+| PostgreSQL                      | System of record                                           | Primary-replica topology with pessimistic locking, idempotency keys, and native FTS (GIN) for workshop search |
+| Message Broker                  | Async event processing                                     | RabbitMQ for notifications, AI, and ingestion events                                                          |
+| Cache / Rate Limiter            | Spike protection and fast reads                            | Redis token bucket and cache-aside for workshop reads and search                                              |
+| Object Storage                  | PDFs and ingestion files                                   | S3-compatible storage for brochures and CSV drops                                                             |
+
+PostgreSQL also stores in-app notification inbox records and workshop room layout references so client-facing metadata remains consistent with transactional state.
 
 ### Communication Protocols
 
@@ -45,6 +47,7 @@ This approach balances the high-traffic requirements with rapid time-to-market e
 - **Strong consistency:** Pessimistic locking in PostgreSQL primary to prevent overbooking.
 - **Graceful degradation:** Resilience4j circuit breakers around payment and AI services.
 - **Idempotency:** Idempotency keys stored in PostgreSQL with TTL for payments and sync.
+- **Payment chaos testing:** Stripe sandbox integration plus a `ChaosMockAdapter` to validate circuit breaker behavior and capacity compensation paths.
 - **Offline-first safety:** Room/SQLite local persistence with server-side idempotent reconciliation.
 
 > [!NOTE]
@@ -348,6 +351,29 @@ sequenceDiagram
 - **Transactional outbox:** The lifecycle change and outbox event are committed in the same transaction to guarantee consistent state and downstream notification delivery.
 - **Asynchronous fan-out:** The notification worker consumes lifecycle events, fetches impacted students, and sends bulk emails without blocking the admin UI.
 
+### Workshop Search & Cache-Aside Flow
+
+```mermaid
+sequenceDiagram
+  actor Client
+  participant API as Backend API
+  participant Cache as Redis Cache
+  participant Replica as PostgreSQL Replica
+
+  Client->>API: GET /workshops/search?q=keyword
+  API->>Cache: GET search:{keyword}
+  alt Cache hit
+    Cache-->>API: Cached results
+    API-->>Client: 200 Results
+  else Cache miss
+    Cache-->>API: Miss
+    API->>Replica: Native FTS query (to_tsvector)
+    Replica-->>API: Result set
+    API->>Cache: SET search:{keyword} (short TTL)
+    API-->>Client: 200 Results
+  end
+```
+
 ## 4. Database Design
 
 ### Database Technology Stack
@@ -621,11 +647,13 @@ erDiagram
 
 We use **Role-Based Access Control (RBAC)** with role claims enforced at the API and UI layers.
 
-| Role             | Access Rights                                                                                      |
-| :--------------- | :------------------------------------------------------------------------------------------------- |
-| `ROLE_STUDENT`   | View published workshops, register for workshops, view their own QR codes.                         |
-| `ROLE_ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
-| `ROLE_STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
+| Role        | Access Rights                                                                                      |
+| :---------- | :------------------------------------------------------------------------------------------------- |
+| `STUDENT`   | View published workshops, register for workshops, view their own QR codes.                         |
+| `ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
+| `STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
+
+Database roles are stored as plain domain values; the authentication layer prepends `ROLE_` when issuing JWTs and constructing Spring Security authorities.
 
 ### Stateless JWT & Role Claims
 
@@ -847,30 +875,37 @@ sequenceDiagram
 - **Rationale:** Object storage is cost-effective for large immutable files and integrates well with background processing. Compared to storing files in PostgreSQL, object storage avoids database bloat and improves IO performance for large files.
 - **Consequences:** Requires access controls and lifecycle policies, but improves scalability and operational clarity.
 
+#### ADR 012: Native Full-Text Search vs. External Search Engine
+
+- **Context:** Workshop search is limited to titles and descriptions and must stay fast under read-heavy traffic while keeping operational overhead and memory footprint low.
+- **Decision:** Use PostgreSQL native full-text search with `to_tsvector` and GIN indexes instead of Elasticsearch.
+- **Rationale:** Native FTS avoids dual-write complexity, reduces operational cost, and keeps search results consistent with transactional data. It meets current scope for keyword search on workshop titles and descriptions while leveraging the existing primary-replica topology for read scaling.
+- **Consequences:** Advanced relevance tuning and typo tolerance are more limited than Elasticsearch; if search scope expands significantly, we may revisit an external search service.
+
 ### Domain 4: Data Integrity & Concurrency
 
-#### ADR 012: Database Locking Strategy
+#### ADR 013: Database Locking Strategy
 
 - **Context:** High-demand workshops can receive hundreds of simultaneous registration attempts for the final seats, and overbooking must be prevented.
 - **Decision:** Use pessimistic row-level locking for seat allocation (for example, `SELECT ... FOR UPDATE` on the workshop capacity row).
 - **Rationale:** Pessimistic locking serializes competing transactions for the same workshop, guaranteeing only one transaction can claim the final seat. Compared to optimistic locking with version checks, pessimistic locking avoids excessive retries during the 12,000-user spike where contention is expected to be high.
 - **Consequences:** Increases lock contention under heavy load and requires careful transaction scoping to keep locks short-lived.
 
-#### ADR 013: Idempotency Mechanism
+#### ADR 014: Idempotency Mechanism
 
 - **Context:** Payment retries and gateway timeouts can cause duplicate charges without strict idempotency control.
 - **Decision:** Use idempotency keys stored in PostgreSQL with a unique constraint and a TTL window (for example, 24 hours).
 - **Rationale:** Persisting idempotency records in PostgreSQL ensures durability across restarts and aligns with transactional workflows. Compared to Redis-only storage, PostgreSQL avoids data loss that could lead to double-charging. Keys are hashed with request fingerprints and stored alongside status to safely replay responses.
 - **Consequences:** Adds storage overhead and requires cleanup of expired keys, but guarantees exactly-once payment execution.
 
-#### ADR 014: Database Replication Strategy
+#### ADR 015: Database Replication Strategy
 
 - **Context:** Read-heavy browse traffic during the surge can overload the primary database if reads and writes are co-located.
 - **Decision:** Use a primary-replica PostgreSQL topology with read/write separation.
 - **Rationale:** Read replicas offload workshop browsing and analytics queries from the primary, preserving write performance for registration and payments. Compared to a single primary, this reduces contention during traffic spikes. Replication lag is acceptable for browse views, while transactional writes remain on the primary.
 - **Consequences:** Introduces eventual consistency on read replicas and requires routing logic to avoid stale reads for critical operations.
 
-#### ADR 015: Caching Strategy Pattern
+#### ADR 016: Caching Strategy Pattern
 
 - **Context:** Workshop browsing and availability checks are read-heavy, especially during the initial surge.
 - **Decision:** Use the cache-aside pattern with Redis for workshop listings and non-critical availability reads.
@@ -879,14 +914,14 @@ sequenceDiagram
 
 ### Domain 5: Async & Event-Driven
 
-#### ADR 016: Message Broker
+#### ADR 017: Message Broker
 
 - **Context:** Notifications, AI summarization, and CSV ingestion must run asynchronously without blocking registration flows.
 - **Decision:** Use RabbitMQ as the message broker.
 - **Rationale:** RabbitMQ provides straightforward queue semantics, reliable delivery, and reduced operational overhead. Compared to Kafka, RabbitMQ has lower operational overhead and fits the task-queue model of notifications and ingestion. Kafka is more suitable for high-throughput event streaming, which is not the primary requirement here.
 - **Consequences:** Lower throughput than Kafka for stream-heavy workloads, but adequate for async tasks and easier to operate.
 
-#### ADR 017: Event Outbox Pattern
+#### ADR 018: Event Outbox Pattern
 
 - **Context:** Async processing must remain consistent with transactional writes to prevent lost events.
 - **Decision:** Implement a transactional outbox pattern for event publishing.
@@ -895,58 +930,65 @@ sequenceDiagram
 
 ### Domain 6: Resilience & Traffic Management
 
-#### ADR 018: Rate Limiting Algorithm
+#### ADR 019: Rate Limiting Algorithm
 
 - **Context:** Registration can spike to 12,000 concurrent users within minutes, and the backend must ensure fair access while preventing overload.
 - **Decision:** Use the Token Bucket algorithm implemented via the Bucket4j library in the Spring Boot backend, with distributed state stored in Redis.
 - **Rationale:** Token Bucket smooths bursts while allowing controlled short-term spikes, which aligns with the initial surge profile. Compared to Fixed Window, it avoids boundary spikes, and compared to Sliding Window, it is simpler and cheaper to compute at high scale while still providing fairness. Using Bucket4j provides production-ready, thread-safe integration with Redis without writing custom Lua scripts.
 - **Consequences:** Requires careful tuning of refill rates and burst sizes; if misconfigured, legitimate users may see throttling during peak demand.
 
-#### ADR 019: Circuit Breaker Implementation
+#### ADR 020: Circuit Breaker Implementation
 
 - **Context:** Payment gateways can fail or time out; the system must protect core functionality and prevent cascading failures during outages.
 - **Decision:** Use Resilience4j for circuit breakers in the Java/Spring Boot backend.
 - **Rationale:** Resilience4j is actively maintained, Spring Boot friendly, and supports Closed/Open/Half-Open states with metrics and fallback patterns. Compared to Netflix Hystrix (now in maintenance mode), Resilience4j offers lower overhead and modern integration without legacy constraints.
 - **Consequences:** Adds dependency configuration and requires explicit fallback design; incorrect thresholds can cause premature open states or delayed recovery.
 
+#### ADR 021: Stripe Integration & Chaos Engineering Strategy
+
+- **Context:** Payment flows must be resilient under gateway failure scenarios, and the system needs a deterministic way to validate Resilience4j circuit breakers and capacity compensation logic during testing.
+- **Decision:** Adopt Stripe (Sandbox) as the primary payment gateway and implement a ChaosMockAdapter that injects controlled failures, latency, and timeouts for resilience testing.
+- **Rationale:** Stripe provides stable sandbox tooling and idempotency support, while the ChaosMockAdapter enables repeatable failure modes without relying on external outages. This allows targeted validation of circuit breakers, retries, and compensating transactions.
+- **Consequences:** Requires adapter selection logic and test environment discipline; production must lock the adapter to Stripe to avoid accidental chaos injection.
+
 ### Domain 7: Specific Workflows
 
-#### ADR 020: Mobile Local Database
+#### ADR 022: Mobile Local Database
 
 - **Context:** Offline-first check-in requires durable local storage and deterministic sync.
 - **Decision:** Use SQLite via Room persistence library.
 - **Rationale:** Room offers compile-time schema validation and structured queries over SQLite, which is robust for offline records. Compared to Realm or custom file storage, Room provides predictable query behavior and easier conflict handling, aligning with the need for reliable reconciliation.
 - **Consequences:** Requires schema migrations on mobile, but improves data integrity and maintainability.
 
-#### ADR 021: Offline Sync Conflict Resolution
+#### ADR 023: Offline Sync Conflict Resolution
 
 - **Context:** Offline check-in must preserve attendance records and reconcile safely when connectivity returns.
 - **Decision:** Use server-authoritative reconciliation with idempotent check-in events keyed by workshop and student identifiers.
 - **Rationale:** Server-authoritative reconciliation avoids conflicting outcomes when multiple offline devices sync the same attendee. Compared to client-wins merging, idempotent server-side upserts ensure no duplicate attendance is recorded and preserve auditability.
 - **Consequences:** Requires careful event modeling and unique constraints, but guarantees consistent attendance records after offline periods.
 
-#### ADR 022: Batch Processing Strategy
+#### ADR 024: Batch Processing Strategy
 
 - **Context:** Nightly CSV ingestion must tolerate malformed rows and duplicates without failing the entire pipeline.
 - **Decision:** Use Spring Batch with chunk processing, skip policies, and error quarantining.
 - **Rationale:** Spring Batch provides structured retries, per-row validation, and fault-tolerant processing. Compared to ad-hoc scripts, it prevents a single bad row from crashing the job and enables reporting on skipped records for audit.
 - **Consequences:** Adds configuration complexity and requires job monitoring, but delivers robust ingestion for the legacy system.
 
-#### ADR 023: AI Summarization Integration
+#### ADR 025: AI Summarization Integration
 
 - **Context:** Workshop summaries must be generated from PDFs without blocking admin workflows.
 - **Decision:** Use an async worker pipeline that extracts text, cleans it, and calls the AI service.
 - **Rationale:** An async pipeline isolates AI latency and external failures from the user experience. Compared to synchronous in-request processing, it prevents timeouts and improves reliability under traffic spikes.
 - **Consequences:** Introduces eventual consistency for summaries and requires status tracking for processing jobs.
 
-#### ADR 024: Pluggable Notification Architecture
+#### ADR 026: Pluggable Notification Architecture
 
 - **Context:** The system must support immediate notifications and allow future channels (for example, Telegram) without core changes.
 - **Decision:** Use a provider abstraction with strategy-based adapters for notification channels.
 - **Rationale:** A pluggable interface decouples core workflows from delivery mechanisms. Compared to hard-coded email logic, adapters allow new channels to be introduced with minimal changes and consistent retry behavior.
 - **Consequences:** Requires adapter contracts and configuration management, but prevents vendor lock-in and reduces future integration cost.
 
-#### ADR 025: Forced Password Change on First Login
+#### ADR 027: Forced Password Change on First Login
 
 - **Context:** Staff accounts are provisioned by organizers and must enforce a secure first-login flow for accountability.
 - **Decision:** Use a temporary password with an `is_temporary_password` flag to require a password change on first login.
@@ -964,12 +1006,12 @@ backend/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/unihub/workshop/
-│   │   │   ├── UniHubApplication.java                     # Spring Boot entrypoint
+│   │   │   ├── UniHubApplication.java
 │   │   │   ├── shared/
 │   │   │   │   ├── events/
 │   │   │   │   ├── security/
 │   │   │   │   └── utils/
-│   │   │   ├── registration/                              # Bounded context root; no cross-module deps
+│   │   │   ├── registration/                              # Workshop registration and ticketing
 │   │   │   │   ├── contracts/                             # Public API for other modules; no infra deps
 │   │   │   │   │   └── RegistrationFacade.java            # Interface for sync calls into registration
 │   │   │   │   ├── domain/                                # Pure domain model; depends on nothing else
@@ -986,13 +1028,15 @@ backend/
 │   │   │   │   └── presentation/                          # Web layer; depends on application only
 │   │   │   │       ├── controller/                        # REST controllers and request mapping
 │   │   │   │       └── mapper/                            # HTTP <-> DTO mapping
-│   │   │   ├── payment/
-│   │   │   ├── checkin/
-│   │   │   ├── notifications/
-│   │   │   ├── ingestion/
-│   │   │   ├── workshops/
-│   │   │   ├── admin/
-│   │   │   └── users/
+│   │   │   ├── payment/                                   # Payment workflows and gateway adapters
+│   │   │   ├── checkin/                                   # Offline check-in and attendance sync
+│   │   │   ├── notifications/                             # Delivery orchestration and logging
+│   │   │   ├── ingestion/                                 # CSV batch ingestion and quarantine
+│   │   │   ├── workshops/                                 # Workshop lifecycle and search
+│   │   │   ├── organizations/                             # Organization and staff management
+│   │   │   ├── ai/                                        # AI summarization pipeline
+│   │   │   ├── admin/                                     # Admin controls and system operations
+│   │   │   └── users/                                     # User profile and account lifecycle
 │   │   └── resources/
 │   │       ├── application.yml
 │   │       └── db/migration/
@@ -1040,17 +1084,21 @@ web/
 │   │   ├── routes/
 │   │   └── providers/
 │   ├── features/
-│   │   ├── registration/
+│   │   ├── registration/                   # Workshop registration and ticketing
 │   │   │   ├── components/                 # Feature-scoped UI to avoid global coupling
 │   │   │   ├── hooks/                      # Local hooks keep registration state isolated
 │   │   │   ├── schemas/                    # Zod schemas to validate form inputs before API calls
 │   │   │   ├── api/                        # Feature API prevents global client sprawl
 │   │   │   ├── state/                      # Encapsulated state avoids cross-feature leakage
 │   │   │   └── pages/                      # Route-level composition for the feature
-│   │   ├── admin_dashboard/
-│   │   ├── workshops/
-│   │   ├── auth/
-│   │   └── profile/
+│   │   ├── admin_dashboard/                # Organizer admin overview and analytics
+│   │   ├── organizations/                  # Organization and staff assignment
+│   │   ├── workshops/                      # Workshop browse, detail, and management
+│   │   ├── ai_summaries/                   # AI summary status and review
+│   │   ├── ingestion/                      # CSV ingestion status and reports
+│   │   ├── notifications/                  # In-app notifications and delivery status
+│   │   ├── auth/                           # Login, register, and password flows
+│   │   └── profile/                        # User profile and settings
 │   ├── shared/
 │   │   ├── ui/                             # Reusable primitives only; no feature logic here
 │   │   ├── hooks/                          # Cross-cutting hooks shared by multiple features

@@ -569,5 +569,6 @@ erDiagram
 - Enforce capacity integrity with `CHECK (capacity_remaining >= 0 AND capacity_remaining <= capacity_total)` and lock workshops with `SELECT ... FOR UPDATE` during seat allocation.
 - **Add cleanup jobs for TTL-bound tables:** `idempotency_keys.expires_at`, `password_reset_tokens.expires_at`, `refresh_tokens.expires_at`.
 - Create a partial index for `outbox_events` where `status = 'PENDING'` to speed relay polling and avoid full scans.
+- **Full-Text Search:** Create a composite GIN index on the workshops table to search both title and description simultaneously: `CREATE INDEX idx_workshops_fts ON workshops USING GIN (to_tsvector('simple', title || ' ' || coalesce(description, '')));`
 - **Template versioning:** Use a partial unique index to ensure exactly one active version per event type: `CREATE UNIQUE INDEX idx_active_template ON notification_templates (event_type) WHERE is_active = true;`
 - **Read replica safety:** Route browse queries to replicas; avoid read-after-write for registrations and payments to prevent stale reads.
