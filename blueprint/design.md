@@ -1006,37 +1006,136 @@ backend/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/unihub/workshop/
-│   │   │   ├── UniHubApplication.java
-│   │   │   ├── shared/
-│   │   │   │   ├── events/
-│   │   │   │   ├── security/
-│   │   │   │   └── utils/
-│   │   │   ├── registration/                              # Workshop registration and ticketing
-│   │   │   │   ├── contracts/                             # Public API for other modules; no infra deps
-│   │   │   │   │   └── RegistrationFacade.java            # Interface for sync calls into registration
-│   │   │   │   ├── domain/                                # Pure domain model; depends on nothing else
-│   │   │   │   │   ├── model/                             # Entities and value objects; no frameworks
-│   │   │   │   │   ├── events/                            # Domain events emitted by domain rules
-│   │   │   │   │   └── repository/                        # Ports (interfaces) for persistence/gateways
-│   │   │   │   ├── application/                           # Use cases; depends on domain + contracts only
-│   │   │   │   │   ├── usecases/                          # Orchestrates transactions; no web/DB
-│   │   │   │   │   └── dto/                               # Input/output models for use cases
-│   │   │   │   ├── infrastructure/                        # Adapters implementing ports; depends on domain
+│   │   │   ├── WorkshopApplication.java
+│   │   │   │
+│   │   │   ├── shared/                                    # Cross-cutting kernel
+│   │   │   │   ├── events/                                # Outbox primitives and base event contracts
+│   │   │   │   ├── security/                              # JWT filters, RBAC, crypto utilities
+│   │   │   │   ├── exception/                             # Global error handling and problem details
+│   │   │   │   ├── observability/                         # Logging, audit, and request context
+│   │   │   │   └── config/                                # Infra config (Redis, RabbitMQ, MinIO, SpringDoc)
+│   │   │   │
+│   │   │   ├── iam/                                       # Identity and access management (users, auth, orgs, admin)
+│   │   │   │   ├── contracts/                             # Public facades for other modules
+│   │   │   │   ├── domain/                                # Identity aggregates and policies
+│   │   │   │   │   ├── model/                             # Users, orgs, roles, credentials
+│   │   │   │   │   ├── events/                            # Account and security lifecycle events
+│   │   │   │   │   └── repository/                        # Ports for persistence and external services
+│   │   │   │   ├── application/                           # Use cases (login, otp, provisioning)
+│   │   │   │   │   ├── usecases/                          # Orchestrates IAM workflows
+│   │   │   │   │   └── dto/                               # Request/response models
+│   │   │   │   ├── infrastructure/                        # Adapters for DB, Redis, mail, JWT
 │   │   │   │   │   ├── persistence/                       # JPA repositories and mappings
-│   │   │   │   │   ├── outbox/                            # Writes outbox rows for async delivery
-│   │   │   │   │   └── payment/                           # External payment gateway client
-│   │   │   │   └── presentation/                          # Web layer; depends on application only
-│   │   │   │       ├── controller/                        # REST controllers and request mapping
-│   │   │   │       └── mapper/                            # HTTP <-> DTO mapping
-│   │   │   ├── payment/                                   # Payment workflows and gateway adapters
-│   │   │   ├── checkin/                                   # Offline check-in and attendance sync
-│   │   │   ├── notifications/                             # Delivery orchestration and logging
-│   │   │   ├── ingestion/                                 # CSV batch ingestion and quarantine
-│   │   │   ├── workshops/                                 # Workshop lifecycle and search
-│   │   │   ├── organizations/                             # Organization and staff management
-│   │   │   ├── ai/                                        # AI summarization pipeline
-│   │   │   ├── admin/                                     # Admin controls and system operations
-│   │   │   └── users/                                     # User profile and account lifecycle
+│   │   │   │   │   ├── security/                          # Token issuance, hashing, blocklists
+│   │   │   │   │   └── outbox/                            # Emits verification and reset events
+│   │   │   │   └── presentation/                          # Controllers and API mappers
+│   │   │   │       ├── controller/
+│   │   │   │       └── mapper/
+│   │   │   │
+│   │   │   ├── workshops/                                 # Workshop lifecycle, search, brochures, assignments
+│   │   │   │   ├── contracts/                             # Public facades for other modules
+│   │   │   │   ├── domain/                                # Workshop aggregates and invariants
+│   │   │   │   │   ├── model/                             # Workshops, speakers, assignments
+│   │   │   │   │   ├── events/                            # Lifecycle and brochure events
+│   │   │   │   │   └── repository/                        # Ports for persistence and storage
+│   │   │   │   ├── application/                           # Use cases (draft, publish, search)
+│   │   │   │   │   ├── usecases/                          # Orchestrates workshop flows
+│   │   │   │   │   └── dto/                               # Request/response models
+│   │   │   │   ├── infrastructure/                        # DB, FTS, S3, outbox adapters
+│   │   │   │   │   ├── persistence/
+│   │   │   │   │   ├── storage/                           # MinIO client and brochure storage
+│   │   │   │   │   ├── search/                            # Postgres FTS adapters
+│   │   │   │   │   └── outbox/
+│   │   │   │   └── presentation/
+│   │   │   │       ├── controller/
+│   │   │   │       └── mapper/
+│   │   │   │
+│   │   │   ├── registration/                              # Seat allocation, payments, tickets, idempotency
+│   │   │   │   ├── contracts/                             # Public facades for other modules
+│   │   │   │   ├── domain/                                # Registration aggregates and rules
+│   │   │   │   │   ├── model/                             # Registrations, payments, idempotency
+│   │   │   │   │   ├── events/                            # Registration lifecycle events
+│   │   │   │   │   └── repository/                        # Ports for persistence and payment gateway
+│   │   │   │   ├── application/                           # Use cases (register, cancel, qr)
+│   │   │   │   │   ├── usecases/                          # Orchestrates payment and seat logic
+│   │   │   │   │   └── dto/                               # Request/response models
+│   │   │   │   ├── infrastructure/                        # DB, outbox, payment adapter
+│   │   │   │   │   ├── persistence/
+│   │   │   │   │   ├── outbox/
+│   │   │   │   │   └── payment/                           # Stripe + ChaosMock adapter
+│   │   │   │   └── presentation/
+│   │   │   │       ├── controller/
+│   │   │   │       └── mapper/
+│   │   │   │
+│   │   │   ├── attendance/                                # Check-in, offline sync, real-time metrics
+│   │   │   │   ├── contracts/                             # Public facades for other modules
+│   │   │   │   ├── domain/                                # Attendance invariants and QR rules
+│   │   │   │   │   ├── model/                             # Attendance records and scan events
+│   │   │   │   │   ├── events/                            # Check-in lifecycle events
+│   │   │   │   │   └── repository/                        # Ports for persistence and QR verification
+│   │   │   │   ├── application/                           # Use cases (sync, roster, stats)
+│   │   │   │   │   ├── usecases/
+│   │   │   │   │   └── dto/
+│   │   │   │   ├── infrastructure/                        # DB, QR verification, outbox
+│   │   │   │   │   ├── persistence/
+│   │   │   │   │   ├── qr/
+│   │   │   │   │   └── outbox/
+│   │   │   │   └── presentation/
+│   │   │   │       ├── controller/
+│   │   │   │       └── mapper/
+│   │   │   │
+│   │   │   ├── notifications/                             # Templates, in-app inbox, delivery orchestration
+│   │   │   │   ├── contracts/                             # Public facades for other modules
+│   │   │   │   ├── domain/                                # Notification policies and templates
+│   │   │   │   │   ├── model/
+│   │   │   │   │   ├── events/
+│   │   │   │   │   └── repository/
+│   │   │   │   ├── application/                           # Use cases (send, retry, log)
+│   │   │   │   │   ├── usecases/
+│   │   │   │   │   └── dto/
+│   │   │   │   ├── infrastructure/                        # Providers, templating, inbox storage
+│   │   │   │   │   ├── persistence/
+│   │   │   │   │   ├── providers/                          # Email and future channels
+│   │   │   │   │   └── outbox/
+│   │   │   │   └── presentation/
+│   │   │   │       ├── controller/
+│   │   │   │       └── mapper/
+│   │   │   │
+│   │   │   ├── ai/                                        # Async summarization pipeline
+│   │   │   │   ├── contracts/                             # Public facades for other modules
+│   │   │   │   ├── domain/                                # Summary job state and policies
+│   │   │   │   │   ├── model/
+│   │   │   │   │   ├── events/
+│   │   │   │   │   └── repository/
+│   │   │   │   ├── application/                           # Use cases (enqueue, poll, store)
+│   │   │   │   │   ├── usecases/
+│   │   │   │   │   └── dto/
+│   │   │   │   ├── infrastructure/                        # AI client, storage, worker adapters
+│   │   │   │   │   ├── persistence/
+│   │   │   │   │   ├── ai_client/
+│   │   │   │   │   └── outbox/
+│   │   │   │   └── presentation/
+│   │   │   │       ├── controller/
+│   │   │   │       └── mapper/
+│   │   │   │
+│   │   │   └── ingestion/                                 # CSV ingestion, quarantine, alerts
+│   │   │       ├── contracts/                             # Public facades for other modules
+│   │   │       ├── domain/                                # Batch state and validation rules
+│   │   │       │   ├── model/
+│   │   │       │   ├── events/
+│   │   │       │   └── repository/
+│   │   │       ├── application/                           # Use cases (trigger, report)
+│   │   │       │   ├── usecases/
+│   │   │       │   └── dto/
+│   │   │       ├── infrastructure/                        # Spring Batch, S3, outbox adapters
+│   │   │       │   ├── persistence/
+│   │   │       │   ├── batch/
+│   │   │       │   ├── storage/
+│   │   │       │   └── outbox/
+│   │   │       └── presentation/
+│   │   │           ├── controller/
+│   │   │           └── mapper/
+│   │   │
 │   │   └── resources/
 │   │       ├── application.yml
 │   │       └── db/migration/
@@ -1049,31 +1148,77 @@ backend/
 
 ```mermaid
 flowchart TD
-  subgraph ModuleA["Module A: registration"]
-    A_Presentation["Presentation (Controllers)"] -->|calls| A_Application["Application (Use Cases)"]
-    A_Application -->|invokes port| A_Domain["Domain (Model + Ports)"]
-    A_Infrastructure["Infrastructure (Adapters)"] -->|implements port| A_Domain
+  subgraph IAM["Module: iam"]
+    IAM_P["Presentation"] --> IAM_A["Application"]
+    IAM_A --> IAM_D["Domain"]
+    IAM_I["Infrastructure"] --> IAM_D
+    IAM_C["contracts"]
   end
 
-  subgraph ModuleB["Module B: workshops"]
-    B_Application["Application (Use Cases)"] -->|implements| B_Contracts["Contracts (Public API)"]
-    B_Application --> B_Domain["Domain (Model + Ports)"]
-    B_Infrastructure["Infrastructure (Adapters)"] --> B_Domain
+  subgraph WORK["Module: workshops"]
+    WORK_P["Presentation"] --> WORK_A["Application"]
+    WORK_A --> WORK_D["Domain"]
+    WORK_I["Infrastructure"] --> WORK_D
+    WORK_C["contracts"]
   end
 
-  A_Application -->|sync via contracts| B_Contracts
-  A_Domain -->|domain event| Outbox["Outbox Table"]
+  subgraph REG["Module: registration"]
+    REG_P["Presentation"] --> REG_A["Application"]
+    REG_A --> REG_D["Domain"]
+    REG_I["Infrastructure"] --> REG_D
+    REG_C["contracts"]
+  end
+
+  subgraph ATT["Module: attendance"]
+    ATT_P["Presentation"] --> ATT_A["Application"]
+    ATT_A --> ATT_D["Domain"]
+    ATT_I["Infrastructure"] --> ATT_D
+    ATT_C["contracts"]
+  end
+
+  subgraph NOTIF["Module: notifications"]
+    NOTIF_P["Presentation"] --> NOTIF_A["Application"]
+    NOTIF_A --> NOTIF_D["Domain"]
+    NOTIF_I["Infrastructure"] --> NOTIF_D
+    NOTIF_C["contracts"]
+  end
+
+  subgraph AI["Module: ai"]
+    AI_P["Presentation"] --> AI_A["Application"]
+    AI_A --> AI_D["Domain"]
+    AI_I["Infrastructure"] --> AI_D
+    AI_C["contracts"]
+  end
+
+  subgraph ING["Module: ingestion"]
+    ING_P["Presentation"] --> ING_A["Application"]
+    ING_A --> ING_D["Domain"]
+    ING_I["Infrastructure"] --> ING_D
+    ING_C["contracts"]
+  end
+
+  REG_A -->|sync via contracts| IAM_C
+  REG_A -->|sync via contracts| WORK_C
+  ATT_A -->|sync via contracts| REG_C
+  ING_A -->|sync via contracts| IAM_C
+
+  IAM_D --> Outbox["Outbox Table"]
+  WORK_D --> Outbox
+  REG_D --> Outbox
+  ING_D --> Outbox
   Outbox --> Broker["Message Broker"]
-  Broker --> B_Application
+
+  Broker --> NOTIF_A
+  Broker --> AI_A
 
   classDef contract fill:#eef7ff,stroke:#4a90e2,stroke-width:1px;
   classDef async fill:#fff7e6,stroke:#f5a623,stroke-width:1px;
-  class B_Contracts contract;
+  class IAM_C,WORK_C,REG_C,ATT_C,NOTIF_C,AI_C,ING_C contract;
   class Outbox,Broker async;
 ```
 
 - **Intra-module flow (Dependency Inversion):** Presentation calls Application, Application depends on Domain ports, and Infrastructure implements those ports. All source code dependencies point inward toward the Domain.
-- **Inter-module flow (Strict boundaries):** This structure follows Spring Modulith conventions where top-level packages are modules, and boundary tests enforce the diagram rules. Modules communicate synchronously only through `contracts/` and asynchronously via domain events routed through the Outbox and message broker. Direct access to another module's domain, infrastructure, presentation, or database tables is forbidden.
+- **Inter-module flow (Strict boundaries):** Bounded contexts are consolidated into `iam`, `workshops`, `registration`, `attendance`, `notifications`, `ai`, and `ingestion`. Synchronous calls are allowed only from the application layer through `contracts/` facades, while async integration uses domain events routed through the Outbox and broker (consumed by notifications and ai). Payment is kept as an infrastructure adapter inside registration, and attendance validates QR and roster data through registration contracts only.
 
 #### Web Frontend (React / TypeScript, Feature-Based)
 
