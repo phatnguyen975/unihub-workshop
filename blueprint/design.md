@@ -47,7 +47,7 @@ PostgreSQL also stores in-app notification inbox records and workshop room layou
 - **Strong consistency:** Pessimistic locking in PostgreSQL primary to prevent overbooking.
 - **Graceful degradation:** Resilience4j circuit breakers around payment and AI services.
 - **Idempotency:** Idempotency keys stored in PostgreSQL with TTL for payments and sync.
-- **Event durability:** Spring Modulith Event Publication registry persists domain events transactionally and externalizes them to RabbitMQ.
+- **Event durability:** Spring Modulith Event Publication registry persists domain events transactionally and externalizes them to RabbitMQ, tracking retry attempts, last resubmission timestamps, and publication status for observability.
 - **Payment chaos testing:** Stripe sandbox integration plus a `ChaosMockAdapter` to validate circuit breaker behavior and capacity compensation paths.
 - **Offline-first safety:** Room/SQLite local persistence with server-side idempotent reconciliation.
 
@@ -481,10 +481,13 @@ erDiagram
   EVENT_PUBLICATION {
     uuid id PK
     datetime completion_date
+    int completion_attempts
     string event_type
     string listener_id
     datetime publication_date
+    datetime last_resubmission_date
     string serialized_event
+    string status
   }
 
   IDEMPOTENCY_KEYS {
@@ -576,13 +579,16 @@ The schema separates core domain tables (users, workshops, registrations, paymen
 
 **EVENT_PUBLICATION**
 
-| Field Name         | Data Type (PostgreSQL) | Business/Technical Purpose                                            |
-| :----------------- | :--------------------- | :-------------------------------------------------------------------- |
-| `event_type`       | TEXT                   | Published event type recorded by Spring Modulith.                     |
-| `listener_id`      | TEXT                   | Target listener identifier for publication routing.                   |
-| `publication_date` | TIMESTAMP              | When the event was registered for publication.                        |
-| `completion_date`  | TIMESTAMP              | When the publication completed for the listener (null if pending).    |
-| `serialized_event` | TEXT                   | Serialized event payload persisted by the Event Publication registry. |
+| Field Name               | Data Type (PostgreSQL) | Business/Technical Purpose                                                       |
+| :----------------------- | :--------------------- | :------------------------------------------------------------------------------- |
+| `event_type`             | TEXT                   | Published event type recorded by Spring Modulith.                                |
+| `listener_id`            | TEXT                   | Target listener identifier for publication routing.                              |
+| `publication_date`       | TIMESTAMP              | When the event was registered for publication.                                   |
+| `completion_date`        | TIMESTAMP              | When the publication completed for the listener (null if pending).               |
+| `completion_attempts`    | INTEGER                | Tracks the number of retry attempts for the event publication.                   |
+| `last_resubmission_date` | TIMESTAMP              | Timestamp of the last attempt to resubmit the event for publication.             |
+| `serialized_event`       | TEXT                   | Serialized event payload persisted by the Event Publication registry.            |
+| `status`                 | TEXT                   | Lifecycle status of the event publication (e.g., INCOMPLETE, COMPLETED, FAILED). |
 
 **IDEMPOTENCY_KEYS**
 

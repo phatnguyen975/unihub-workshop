@@ -140,10 +140,13 @@ erDiagram
   event_publication {
     uuid id PK
     datetime completion_date
+    int completion_attempts
     varchar event_type
     varchar listener_id
     datetime publication_date
+    datetime last_resubmission_date
     text serialized_event
+    varchar status
   }
 
   idempotency_keys {
@@ -422,14 +425,17 @@ erDiagram
 
 ### `event_publication` Table
 
-| Attribute        | Type         | Constraint | Default Value     | Indexing                  | Description                                    |
-| :--------------- | :----------- | :--------- | :---------------- | :------------------------ | :--------------------------------------------- |
-| id               | UUID         | PK         | gen_random_uuid() | UNIQUE B-Tree (id)        | Primary key.                                   |
-| completion_date  | TIMESTAMPTZ  | NULL       | NULL              | B-Tree (completion_date)  | When publication completed for a listener.     |
-| event_type       | VARCHAR(255) | NOT NULL   | None              | B-Tree (event_type)       | Published event type.                          |
-| listener_id      | VARCHAR(255) | NOT NULL   | None              | B-Tree (listener_id)      | Spring Modulith listener identifier.           |
-| publication_date | TIMESTAMPTZ  | NOT NULL   | now()             | B-Tree (publication_date) | When the event was registered for publication. |
-| serialized_event | TEXT         | NOT NULL   | None              | None                      | Serialized event payload stored by Modulith.   |
+| Attribute              | Type         | Constraint                                 | Default Value     | Indexing                  | Description                                                                      |
+| :--------------------- | :----------- | :----------------------------------------- | :---------------- | :------------------------ | :------------------------------------------------------------------------------- |
+| id                     | UUID         | PK                                         | gen_random_uuid() | UNIQUE B-Tree (id)        | Primary key.                                                                     |
+| completion_date        | TIMESTAMPTZ  | NULL                                       | NULL              | B-Tree (completion_date)  | When publication completed for a listener.                                       |
+| completion_attempts    | INT          | NOT NULL, CHECK (completion_attempts >= 0) | 0                 | None                      | Tracks the number of retry attempts for the event publication.                   |
+| event_type             | VARCHAR(255) | NOT NULL                                   | None              | B-Tree (event_type)       | Published event type.                                                            |
+| listener_id            | VARCHAR(255) | NOT NULL                                   | None              | B-Tree (listener_id)      | Spring Modulith listener identifier.                                             |
+| publication_date       | TIMESTAMPTZ  | NOT NULL                                   | now()             | B-Tree (publication_date) | When the event was registered for publication.                                   |
+| last_resubmission_date | TIMESTAMPTZ  | NULL                                       | NULL              | None                      | Timestamp of the last attempt to resubmit the event for publication.             |
+| serialized_event       | TEXT         | NOT NULL                                   | None              | None                      | Serialized event payload stored by Modulith.                                     |
+| status                 | VARCHAR(255) | NULL                                       | NULL              | None                      | Lifecycle status of the event publication (e.g., INCOMPLETE, COMPLETED, FAILED). |
 
 ### `idempotency_keys` Table
 
