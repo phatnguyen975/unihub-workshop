@@ -1429,7 +1429,7 @@ All fields must be present in every response. If a field is not applicable (for 
     "title": "Validation Error",
     "detail": "One or more fields failed validation.",
     "instance": "/api/v1/registrations",
-    "validation_errors": [
+    "validationErrors": [
       "email: must be a valid email address",
       "workshopId: is required"
     ]
