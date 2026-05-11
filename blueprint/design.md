@@ -6,7 +6,7 @@
 
 **Chosen architecture:** Modular Monolith with event-driven components and Clean Architecture boundaries.
 
-This approach balances the high-traffic requirements with rapid time-to-market expectations and optimized operational overhead. A modular monolith keeps operational complexity low while enforcing strong internal boundaries (registration, payments, check-in, notifications, ingestion, admin). Event-driven components (via a broker and outbox pattern) handle asynchronous workloads like notifications, AI summarization, and CSV ingestion without blocking core transactions.
+This approach balances the high-traffic requirements with rapid time-to-market expectations and optimized operational overhead. A modular monolith keeps operational complexity low while enforcing strong internal boundaries (registration, payments, check-in, notifications, ingestion, admin). Event-driven components (via a broker and Spring Modulith Event Publication registry) handle asynchronous workloads like notifications, AI summarization, and CSV ingestion without blocking core transactions.
 
 **Why this is the best fit now:**
 
@@ -24,7 +24,7 @@ This approach balances the high-traffic requirements with rapid time-to-market e
 | :------------------------------ | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |
 | React Web App                   | Student discovery/registration and Admin management portal | React + TypeScript UI with RBAC-guarded views                                                                 |
 | Android Mobile App (Java / XML) | QR scanning and offline-first check-in                     | Room/SQLite local store with deterministic sync                                                               |
-| Java Backend API                | Central business logic and orchestration                   | Spring Boot modular monolith, HikariCP, Resilience4j, outbox relay                                            |
+| Java Backend API                | Central business logic and orchestration                   | Spring Boot modular monolith, HikariCP, Resilience4j, Spring Modulith event publication registry              |
 | PostgreSQL                      | System of record                                           | Primary-replica topology with pessimistic locking, idempotency keys, and native FTS (GIN) for workshop search |
 | Message Broker                  | Async event processing                                     | RabbitMQ for notifications, AI, and ingestion events                                                          |
 | Cache / Rate Limiter            | Spike protection and fast reads                            | Redis token bucket and cache-aside for workshop reads and search                                              |
@@ -47,6 +47,7 @@ PostgreSQL also stores in-app notification inbox records and workshop room layou
 - **Strong consistency:** Pessimistic locking in PostgreSQL primary to prevent overbooking.
 - **Graceful degradation:** Resilience4j circuit breakers around payment and AI services.
 - **Idempotency:** Idempotency keys stored in PostgreSQL with TTL for payments and sync.
+- **Event durability:** Spring Modulith Event Publication registry persists domain events transactionally and externalizes them to RabbitMQ.
 - **Payment chaos testing:** Stripe sandbox integration plus a `ChaosMockAdapter` to validate circuit breaker behavior and capacity compensation paths.
 - **Offline-first safety:** Room/SQLite local persistence with server-side idempotent reconciliation.
 
@@ -58,8 +59,8 @@ PostgreSQL also stores in-app notification inbox records and workshop room layou
 ### 2.1. Level 1 - System Context
 
 <p align="center">
-  <img src="../docs/diagrams/c4_system_context.png" style="width:80%;" alt="System Context Diagram">
-  <img src="../docs/diagrams/c4_system_context_key.png" style="width:80%;" alt="System Context Diagram Key">
+  <img src="./diagrams/c4_system_context.png" style="width:80%;" alt="System Context Diagram">
+  <img src="./diagrams/c4_system_context_key.png" style="width:80%;" alt="System Context Diagram Key">
 </p>
 
 The system context view positions UniHub Workshop as the central platform coordinating all workshop lifecycle activities. Three primary personas interact with the system. **Students** browse schedules, register for sessions, and receive QR confirmations. **Organizers** use the system for operational control, including workshop creation, rescheduling, and analytics. **Check-in staff** rely on the system for attendance validation through the mobile app.
@@ -71,8 +72,8 @@ This context emphasizes clear trust boundaries: all users interact through secur
 ### 2.2. Level 2 - Container
 
 <p align="center">
-  <img src="../docs/diagrams/c4_container.png" style="width:80%;" alt="Container Diagram">
-  <img src="../docs/diagrams/c4_container_key.png" style="width:80%;" alt="Container Diagram Key">
+  <img src="./diagrams/c4_container.png" style="width:80%;" alt="Container Diagram">
+  <img src="./diagrams/c4_container_key.png" style="width:80%;" alt="Container Diagram Key">
 </p>
 
 The container view decomposes UniHub into client apps, backend components, and infrastructure services aligned with the modular monolith strategy. The **React + TypeScript Web App** serves Students and Organizers with distinct RBAC-guarded experiences. The **Android Mobile App** is dedicated to check-in staff and includes a local database for offline-first scanning and later synchronization.
@@ -87,21 +88,21 @@ This structure ensures the system can scale horizontally under traffic spikes, m
 
 ### System Architecture
 
-This diagram shows the production topology: horizontally scaled Spring Boot app servers behind an API gateway, Redis for cache and token bucket rate limiting, PostgreSQL primary-replica for write safety and read scalability, and dedicated workers for outbox relay, AI, and CSV ingestion. External integrations are modeled explicitly.
+This diagram shows the production topology: horizontally scaled Spring Boot app servers behind an API gateway, Redis for cache and token bucket rate limiting, PostgreSQL primary-replica for write safety and read scalability, and Spring Modulith event publication registry with dedicated workers for AI and CSV ingestion. External integrations are modeled explicitly.
 
 <p align="center">
-  <img src="../docs/diagrams/system_architecture.png" style="width:100%;" alt="System Architecture">
+  <img src="./diagrams/system_architecture.png" style="width:100%;" alt="System Architecture">
 </p>
 
 - **Traffic distribution:** Nginx load balances external HTTPS requests across horizontally scaled Spring Boot app servers.
 - **Cache and rate limiting:** App servers use cache-aside reads with Redis and enforce Token Bucket rate limiting at the edge.
-- **Read/write separation:** App servers read from the PostgreSQL replica on cache misses and write domain data plus outbox events to the primary.
-- **Worker responsibilities:** Workers poll and lock outbox rows and write async results on the primary, while reading from the replica for batch validation workloads such as CSV ingestion.
-- **Broker integration:** Workers publish and consume tasks via RabbitMQ to drive AI summarization and notification delivery.
+- **Read/write separation:** App servers read from the PostgreSQL replica on cache misses and write domain data plus event publications to the primary.
+- **Worker responsibilities:** Spring Modulith persists event publications and externalizes them to RabbitMQ, while workers write async results on the primary and read from the replica for batch validation workloads such as CSV ingestion.
+- **Broker integration:** Spring Modulith externalizes published events to RabbitMQ, and workers consume tasks for AI summarization and notification delivery.
 
 ### Workshop Registration Flow
 
-This sequence captures the end-to-end registration flow, including concurrency control, idempotent payment retries, and outbox-driven notifications.
+This sequence captures the end-to-end registration flow, including concurrency control, idempotent payment retries, and event publication-driven notifications.
 
 ```mermaid
 sequenceDiagram
@@ -113,7 +114,7 @@ sequenceDiagram
   participant DB as PostgreSQL Primary
   participant Pay as Payment Gateway
   participant Sweeper as Payment Timeout Sweeper
-  participant Relay as Outbox Relay Worker
+  participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
   participant Notify as Notification Provider
 
@@ -141,7 +142,7 @@ sequenceDiagram
         API->>DB: Commit
         alt Free workshop
           API->>DB: Begin tx
-          API->>DB: Update registration (CONFIRMED) + outbox event
+          API->>DB: Update registration (CONFIRMED) + event publication
           API->>DB: Commit
           API-->>Web: 201 + QR code
         else Paid workshop
@@ -149,7 +150,7 @@ sequenceDiagram
           alt Payment success
             Pay-->>API: Approved
             API->>DB: Begin tx
-            API->>DB: Update registration (PAID) + outbox event
+            API->>DB: Update registration (PAID) + event publication
             API->>DB: Commit
             API-->>Web: 201 + QR code
           else Timeout or failure
@@ -166,9 +167,8 @@ sequenceDiagram
     end
   end
 
-  par Outbox publish and notify
-    Relay->>DB: Poll outbox table
-    Relay->>Broker: Publish event
+  par Event publication and notify
+    Registry->>Broker: Externalize event
     Broker->>Notify: Deliver confirmation
   end
 
@@ -181,7 +181,7 @@ sequenceDiagram
 - **Short-lived pessimistic locking:** The capacity lock is held only inside the reservation transaction and released before any payment call, preventing long-held locks and connection pool exhaustion.
 - **Compensating transactions:** Failed or timed-out payments transition the registration to `FAILED` and increment capacity, ensuring the final seat is not lost.
 - **Circuit breaker protection:** Resilience4j guards the payment call path and surfaces controlled failures when the gateway degrades.
-- **Outbox pattern:** Confirmation notifications are published asynchronously by the relay, decoupled from the synchronous user request.
+- **Event publication registry:** Confirmation notifications are persisted and externalized by Spring Modulith, decoupled from the synchronous user request.
 
 ### Offline Check-in & Synchronization Flow
 
@@ -225,7 +225,7 @@ sequenceDiagram
 
 ### Async AI Summarization Flow
 
-This sequence shows the asynchronous pipeline for PDF processing using the outbox pattern and brokered workers, including error handling when the AI service is unavailable.
+This sequence shows the asynchronous pipeline for PDF processing using the Spring Modulith event publication registry and brokered workers, including error handling when the AI service is unavailable.
 
 ```mermaid
 sequenceDiagram
@@ -234,7 +234,7 @@ sequenceDiagram
   participant API as Backend API
   participant DB as PostgreSQL Primary
   participant S3 as S3 Object Storage
-  participant Relay as Outbox Relay Worker
+  participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
   participant Worker as AI Worker
   participant AI as AI Service
@@ -243,11 +243,10 @@ sequenceDiagram
   Organizer->>Web: Upload brochure PDF
   Web->>API: POST /workshops/{id}/brochure
   API->>S3: Store PDF
-  API->>DB: Create summary job + outbox event
+  API->>DB: Create summary job + event publication
   API-->>Web: 202 Accepted
 
-  Relay->>DB: Poll outbox table
-  Relay->>Broker: Publish summarization event
+  Registry->>Broker: Externalize summarization event
   Broker->>Worker: Deliver job
   Worker->>S3: Fetch PDF
   Worker->>Worker: Extract text locally (PDFBox)
@@ -264,7 +263,7 @@ sequenceDiagram
   end
 ```
 
-- **Decoupled processing:** The API persists the job and outbox entry, then returns 202 so heavy PDF processing runs asynchronously.
+- **Decoupled processing:** The API persists the job and event publication entry, then returns 202 so heavy PDF processing runs asynchronously.
 - **Local preprocessing:** The worker extracts, cleans, and chunks text before calling the AI service to avoid oversized payloads and token limit errors.
 - **Fault tolerance:** Transient AI failures trigger backoff retries through the broker without blocking other jobs.
 - **Dead Letter Queue (DLQ):** Jobs that exceed retry limits are routed to the DLQ for manual review, keeping the main queue healthy.
@@ -313,7 +312,7 @@ sequenceDiagram
   participant Web as Admin Web App
   participant API as Backend API
   participant DB as PostgreSQL Primary
-  participant Relay as Outbox Relay Worker
+  participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
   participant NotifWorker as Notification Worker
   participant Notify as Notification Providers
@@ -324,23 +323,22 @@ sequenceDiagram
   API->>DB: Validate and persist lifecycle change
   alt Create
     API->>DB: Insert workshop record
-    API->>DB: Insert outbox event (WorkshopCreated)
+    API->>DB: Insert event publication (WorkshopCreated)
   else Update
     API->>DB: Update workshop details
-    API->>DB: Insert outbox event (WorkshopUpdated)
+    API->>DB: Insert event publication (WorkshopUpdated)
   else Reschedule
     API->>DB: Update schedule/venue
-    API->>DB: Insert outbox event (WorkshopRescheduled)
+    API->>DB: Insert event publication (WorkshopRescheduled)
   else Cancel
     API->>DB: Mark workshop as canceled
-    API->>DB: Insert outbox event (WorkshopCanceled)
+    API->>DB: Insert event publication (WorkshopCanceled)
   end
   API->>DB: Commit
   API-->>Web: 200/201 Response
 
-  par Outbox fan-out
-    Relay->>DB: Poll outbox table
-    Relay->>Broker: Publish lifecycle event
+  par Event publication fan-out
+    Registry->>Broker: Externalize lifecycle event
     Broker->>NotifWorker: Consume lifecycle event
     NotifWorker->>DB: Fetch registered students (if Rescheduled/Canceled)
     NotifWorker->>Notify: Send bulk notifications (Email/SMS)
@@ -348,7 +346,7 @@ sequenceDiagram
 ```
 
 - **Lifecycle coverage:** Admins can create, update, reschedule, or cancel workshops through the web portal.
-- **Transactional outbox:** The lifecycle change and outbox event are committed in the same transaction to guarantee consistent state and downstream notification delivery.
+- **Transactional event publication:** The lifecycle change and event publication are committed in the same transaction to guarantee consistent state and downstream notification delivery.
 - **Asynchronous fan-out:** The notification worker consumes lifecycle events, fetches impacted students, and sends bulk emails without blocking the admin UI.
 
 ### Workshop Search & Cache-Aside Flow
@@ -379,7 +377,7 @@ sequenceDiagram
 ### Database Technology Stack
 
 - **Core Data Stores (Server-Side):**
-  - **PostgreSQL (Primary System of Record):** Provides strict ACID guarantees, pessimistic row-level locking for the 60-seat race condition, and durable storage for Idempotency and Outbox patterns.
+  - **PostgreSQL (Primary System of Record):** Provides strict ACID guarantees, pessimistic row-level locking for the 60-seat race condition, and durable storage for Idempotency and Spring Modulith Event Publication records.
   - **Redis (Cache & Rate Limiter):** High-throughput, low-latency storage for Token Bucket rate limiting and cache-aside workshop availability reads during the 12,000-user surge.
   - **S3-Compatible Object Storage (Blob Store):** Cost-effective, scalable persistence for unstructured data, specifically used for storing Organizer-uploaded PDF brochures and nightly CSV drops from the legacy system.
 - **Mobile Data Store (Client-Side):**
@@ -480,14 +478,13 @@ erDiagram
     datetime updated_at
   }
 
-  OUTBOX_EVENTS {
+  EVENT_PUBLICATION {
     uuid id PK
+    datetime completion_date
     string event_type
-    string aggregate_type
-    uuid aggregate_id
-    json payload
-    string status
-    datetime created_at
+    string listener_id
+    datetime publication_date
+    string serialized_event
   }
 
   IDEMPOTENCY_KEYS {
@@ -530,7 +527,7 @@ erDiagram
   STUDENT_IMPORT_BATCHES ||--o{ STUDENT_IMPORT_ERRORS : contains
 ```
 
-The schema separates core domain tables (users, workshops, registrations, payments, attendance) from technical pattern tables (outbox events and idempotency keys) to keep business logic clean while enabling resilience patterns. Workshop content artifacts (brochures and AI summaries) are modeled as first-class entities for lifecycle tracking, while import batches and errors capture CSV ingestion outcomes without polluting the core domain. This separation supports high-concurrency workflows, reliable async processing, and offline check-in reconciliation without coupling operational metadata directly to transactional records.
+The schema separates core domain tables (users, workshops, registrations, payments, attendance) from technical pattern tables (event publications and idempotency keys) to keep business logic clean while enabling resilience patterns. Workshop content artifacts (brochures and AI summaries) are modeled as first-class entities for lifecycle tracking, while import batches and errors capture CSV ingestion outcomes without polluting the core domain. This separation supports high-concurrency workflows, reliable async processing, and offline check-in reconciliation without coupling operational metadata directly to transactional records.
 
 ### Core Schema & Data Dictionary
 
@@ -577,12 +574,15 @@ The schema separates core domain tables (users, workshops, registrations, paymen
 | :--------- | :--------------------- | :------------------------------------------------------------- |
 | `status`   | TEXT                   | Payment lifecycle: `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED`. |
 
-**OUTBOX_EVENTS**
+**EVENT_PUBLICATION**
 
-| Field Name | Data Type (PostgreSQL) | Business/Technical Purpose                                         |
-| :--------- | :--------------------- | :----------------------------------------------------------------- |
-| `payload`  | JSONB                  | Flexible event payload for async processing and integration.       |
-| `status`   | TEXT                   | `PENDING`, `PROCESSED`, `FAILED`, `DEAD_LETTER` for relay control. |
+| Field Name         | Data Type (PostgreSQL) | Business/Technical Purpose                                            |
+| :----------------- | :--------------------- | :-------------------------------------------------------------------- |
+| `event_type`       | TEXT                   | Published event type recorded by Spring Modulith.                     |
+| `listener_id`      | TEXT                   | Target listener identifier for publication routing.                   |
+| `publication_date` | TIMESTAMP              | When the event was registered for publication.                        |
+| `completion_date`  | TIMESTAMP              | When the publication completed for the listener (null if pending).    |
+| `serialized_event` | TEXT                   | Serialized event payload persisted by the Event Publication registry. |
 
 **IDEMPOTENCY_KEYS**
 
@@ -600,13 +600,13 @@ The schema separates core domain tables (users, workshops, registrations, paymen
 
 ### Indexing Strategy
 
-| Table              | Indexed Columns        | Index Type                                  | Business/Performance Rationale                                 |
-| :----------------- | :--------------------- | :------------------------------------------ | :------------------------------------------------------------- |
-| `IDEMPOTENCY_KEYS` | `idempotency_key`      | B-Tree                                      | Fast lookup during registration surges to deduplicate retries. |
-| `OUTBOX_EVENTS`    | `status`               | Partial B-Tree (`WHERE status = 'PENDING'`) | Speeds relay worker polling for pending events.                |
-| `WORKSHOPS`        | `status`, `start_time` | Composite B-Tree                            | Accelerates schedule browsing and filtering.                   |
-| `REGISTRATIONS`    | `user_id`              | B-Tree                                      | Efficient per-user registration history lookups.               |
-| `REGISTRATIONS`    | `workshop_id`          | B-Tree                                      | Efficient workshop roster and capacity checks.                 |
+| Table               | Indexed Columns        | Index Type                                       | Business/Performance Rationale                                 |
+| :------------------ | :--------------------- | :----------------------------------------------- | :------------------------------------------------------------- |
+| `IDEMPOTENCY_KEYS`  | `idempotency_key`      | B-Tree                                           | Fast lookup during registration surges to deduplicate retries. |
+| `EVENT_PUBLICATION` | `completion_date`      | Partial B-Tree (`WHERE completion_date IS NULL`) | Speeds pending publication scans.                              |
+| `WORKSHOPS`         | `status`, `start_time` | Composite B-Tree                                 | Accelerates schedule browsing and filtering.                   |
+| `REGISTRATIONS`     | `user_id`              | B-Tree                                           | Efficient per-user registration history lookups.               |
+| `REGISTRATIONS`     | `workshop_id`          | B-Tree                                           | Efficient workshop roster and capacity checks.                 |
 
 ### Mobile Local Database (Room SQLite Schema)
 
@@ -921,12 +921,12 @@ sequenceDiagram
 - **Rationale:** RabbitMQ provides straightforward queue semantics, reliable delivery, and reduced operational overhead. Compared to Kafka, RabbitMQ has lower operational overhead and fits the task-queue model of notifications and ingestion. Kafka is more suitable for high-throughput event streaming, which is not the primary requirement here.
 - **Consequences:** Lower throughput than Kafka for stream-heavy workloads, but adequate for async tasks and easier to operate.
 
-#### ADR 018: Event Outbox Pattern
+#### ADR 018: Spring Modulith Event Publication Registry
 
 - **Context:** Async processing must remain consistent with transactional writes to prevent lost events.
-- **Decision:** Implement a transactional outbox pattern for event publishing.
-- **Rationale:** The outbox pattern ensures events are stored with the same transaction as domain changes and later published reliably. Compared to direct broker writes from request threads, it avoids inconsistency when failures occur between database commit and broker publish.
-- **Consequences:** Adds a background relay process and operational monitoring for outbox lag.
+- **Decision:** Use Spring Modulith's Event Publication registry for transactional event persistence and externalization.
+- **Rationale:** The registry ensures events are stored with the same transaction as domain changes and then automatically externalized to RabbitMQ. Compared to direct broker writes from request threads, it avoids inconsistencies between database commit and broker publish while reducing custom relay code.
+- **Consequences:** Requires monitoring publication lag within the registry, but eliminates a bespoke relay service.
 
 ### Domain 6: Resilience & Traffic Management
 
@@ -1009,7 +1009,7 @@ backend/
 │   │   │   ├── WorkshopApplication.java
 │   │   │   │
 │   │   │   ├── shared/                                    # Cross-cutting kernel
-│   │   │   │   ├── events/                                # Outbox primitives and base event contracts
+│   │   │   │   ├── events/                                # Event publication primitives and base event contracts
 │   │   │   │   ├── security/                              # JWT filters, RBAC, crypto utilities
 │   │   │   │   ├── exception/                             # Global error handling and problem details
 │   │   │   │   ├── observability/                         # Logging, audit, and request context
@@ -1027,7 +1027,7 @@ backend/
 │   │   │   │   ├── infrastructure/                        # Adapters for DB, Redis, mail, JWT
 │   │   │   │   │   ├── persistence/                       # JPA repositories and mappings
 │   │   │   │   │   ├── security/                          # Token issuance, hashing, blocklists
-│   │   │   │   │   └── outbox/                            # Emits verification and reset events
+│   │   │   │   │   └── event_publication/                 # Emits verification and reset events
 │   │   │   │   └── presentation/                          # Controllers and API mappers
 │   │   │   │       ├── controller/
 │   │   │   │       └── mapper/
@@ -1041,11 +1041,11 @@ backend/
 │   │   │   │   ├── application/                           # Use cases (draft, publish, search)
 │   │   │   │   │   ├── usecases/                          # Orchestrates workshop flows
 │   │   │   │   │   └── dto/                               # Request/response models
-│   │   │   │   ├── infrastructure/                        # DB, FTS, S3, outbox adapters
+│   │   │   │   ├── infrastructure/                        # DB, FTS, S3, event publication adapters
 │   │   │   │   │   ├── persistence/
 │   │   │   │   │   ├── storage/                           # MinIO client and brochure storage
 │   │   │   │   │   ├── search/                            # Postgres FTS adapters
-│   │   │   │   │   └── outbox/
+│   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
 │   │   │   │       ├── controller/
 │   │   │   │       └── mapper/
@@ -1059,9 +1059,9 @@ backend/
 │   │   │   │   ├── application/                           # Use cases (register, cancel, qr)
 │   │   │   │   │   ├── usecases/                          # Orchestrates payment and seat logic
 │   │   │   │   │   └── dto/                               # Request/response models
-│   │   │   │   ├── infrastructure/                        # DB, outbox, payment adapter
+│   │   │   │   ├── infrastructure/                        # DB, event publication, payment adapter
 │   │   │   │   │   ├── persistence/
-│   │   │   │   │   ├── outbox/
+│   │   │   │   │   ├── event_publication/
 │   │   │   │   │   └── payment/                           # Stripe + ChaosMock adapter
 │   │   │   │   └── presentation/
 │   │   │   │       ├── controller/
@@ -1076,10 +1076,10 @@ backend/
 │   │   │   │   ├── application/                           # Use cases (sync, roster, stats)
 │   │   │   │   │   ├── usecases/
 │   │   │   │   │   └── dto/
-│   │   │   │   ├── infrastructure/                        # DB, QR verification, outbox
+│   │   │   │   ├── infrastructure/                        # DB, QR verification, event publication
 │   │   │   │   │   ├── persistence/
 │   │   │   │   │   ├── qr/
-│   │   │   │   │   └── outbox/
+│   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
 │   │   │   │       ├── controller/
 │   │   │   │       └── mapper/
@@ -1095,8 +1095,8 @@ backend/
 │   │   │   │   │   └── dto/
 │   │   │   │   ├── infrastructure/                        # Providers, templating, inbox storage
 │   │   │   │   │   ├── persistence/
-│   │   │   │   │   ├── providers/                          # Email and future channels
-│   │   │   │   │   └── outbox/
+│   │   │   │   │   ├── providers/                         # Email and future channels
+│   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
 │   │   │   │       ├── controller/
 │   │   │   │       └── mapper/
@@ -1113,7 +1113,7 @@ backend/
 │   │   │   │   ├── infrastructure/                        # AI client, storage, worker adapters
 │   │   │   │   │   ├── persistence/
 │   │   │   │   │   ├── ai_client/
-│   │   │   │   │   └── outbox/
+│   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
 │   │   │   │       ├── controller/
 │   │   │   │       └── mapper/
@@ -1127,11 +1127,11 @@ backend/
 │   │   │       ├── application/                           # Use cases (trigger, report)
 │   │   │       │   ├── usecases/
 │   │   │       │   └── dto/
-│   │   │       ├── infrastructure/                        # Spring Batch, S3, outbox adapters
+│   │   │       ├── infrastructure/                        # Spring Batch, S3, event publication adapters
 │   │   │       │   ├── persistence/
 │   │   │       │   ├── batch/
 │   │   │       │   ├── storage/
-│   │   │       │   └── outbox/
+│   │   │       │   └── event_publication/
 │   │   │       └── presentation/
 │   │   │           ├── controller/
 │   │   │           └── mapper/
@@ -1202,11 +1202,11 @@ flowchart TD
   ATT_A -->|sync via contracts| REG_C
   ING_A -->|sync via contracts| IAM_C
 
-  IAM_D --> Outbox["Outbox Table"]
-  WORK_D --> Outbox
-  REG_D --> Outbox
-  ING_D --> Outbox
-  Outbox --> Broker["Message Broker"]
+  IAM_D --> Registry["Event Publication Registry"]
+  WORK_D --> Registry
+  REG_D --> Registry
+  ING_D --> Registry
+  Registry --> Broker["Message Broker"]
 
   Broker --> NOTIF_A
   Broker --> AI_A
@@ -1214,11 +1214,11 @@ flowchart TD
   classDef contract fill:#eef7ff,stroke:#4a90e2,stroke-width:1px;
   classDef async fill:#fff7e6,stroke:#f5a623,stroke-width:1px;
   class IAM_C,WORK_C,REG_C,ATT_C,NOTIF_C,AI_C,ING_C contract;
-  class Outbox,Broker async;
+  class Registry,Broker async;
 ```
 
 - **Intra-module flow (Dependency Inversion):** Presentation calls Application, Application depends on Domain ports, and Infrastructure implements those ports. All source code dependencies point inward toward the Domain.
-- **Inter-module flow (Strict boundaries):** Bounded contexts are consolidated into `iam`, `workshops`, `registration`, `attendance`, `notifications`, `ai`, and `ingestion`. Synchronous calls are allowed only from the application layer through `contracts/` facades, while async integration uses domain events routed through the Outbox and broker (consumed by notifications and ai). Payment is kept as an infrastructure adapter inside registration, and attendance validates QR and roster data through registration contracts only.
+- **Inter-module flow (Strict boundaries):** Bounded contexts are consolidated into `iam`, `workshops`, `registration`, `attendance`, `notifications`, `ai`, and `ingestion`. Synchronous calls are allowed only from the application layer through `contracts/` facades, while async integration uses domain events routed through the Spring Modulith Event Publication registry and broker (consumed by notifications and ai). Payment is kept as an infrastructure adapter inside registration, and attendance validates QR and roster data through registration contracts only.
 
 #### Web Frontend (React / TypeScript, Feature-Based)
 
@@ -1452,8 +1452,8 @@ Every incoming API request is intercepted and logged on completion using a stric
 
 #### System & Worker Logs
 
-Background processes (Outbox Relay, AI Summarization, CSV Ingestion) emit state changes directly to the console for traceability.
+Background processes (Event Publication Registry, AI Summarization, CSV Ingestion) emit state changes directly to the console for traceability.
 
 ```text
-[INFO] [OutboxRelay] - Processed 5 pending notification events
+[INFO] [EventPublicationRegistry] - Externalized 5 pending notification events
 ```

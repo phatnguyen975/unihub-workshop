@@ -137,20 +137,13 @@ erDiagram
     datetime updated_at
   }
 
-  outbox_events {
+  event_publication {
     uuid id PK
+    datetime completion_date
     varchar event_type
-    varchar aggregate_type
-    uuid aggregate_id
-    json payload
-    varchar status
-    int attempts
-    datetime next_attempt_at
-    datetime locked_at
-    varchar locked_by
-    text last_error
-    datetime created_at
-    datetime updated_at
+    varchar listener_id
+    datetime publication_date
+    text serialized_event
   }
 
   idempotency_keys {
@@ -427,23 +420,16 @@ erDiagram
 | created_at      | TIMESTAMPTZ | NOT NULL                                                        | now()             | B-Tree (created_at)         | Audit timestamp.                 |
 | updated_at      | TIMESTAMPTZ | NOT NULL                                                        | now()             | B-Tree (updated_at)         | Audit timestamp.                 |
 
-### `outbox_events` Table
+### `event_publication` Table
 
-| Attribute       | Type         | Constraint                                                                 | Default Value     | Indexing                 | Description                     |
-| :-------------- | :----------- | :------------------------------------------------------------------------- | :---------------- | :----------------------- | :------------------------------ |
-| id              | UUID         | PK                                                                         | gen_random_uuid() | UNIQUE B-Tree (id)       | Primary key.                    |
-| event_type      | VARCHAR(100) | NOT NULL                                                                   | None              | B-Tree (event_type)      | Domain event name.              |
-| aggregate_type  | VARCHAR(100) | NOT NULL                                                                   | None              | B-Tree (aggregate_type)  | Aggregate model type.           |
-| aggregate_id    | UUID         | NOT NULL                                                                   | None              | B-Tree (aggregate_id)    | Aggregate identifier.           |
-| payload         | JSONB        | NOT NULL                                                                   | None              | GIN (payload)            | Event payload.                  |
-| status          | VARCHAR(20)  | NOT NULL, CHECK (status IN ('PENDING','PROCESSED','FAILED','DEAD_LETTER')) | 'PENDING'         | Partial B-Tree (status)  | Relay state.                    |
-| attempts        | INT          | NOT NULL, CHECK (attempts >= 0)                                            | 0                 | None                     | Delivery attempts.              |
-| next_attempt_at | TIMESTAMPTZ  | NULL                                                                       | NULL              | B-Tree (next_attempt_at) | Retry scheduling.               |
-| locked_at       | TIMESTAMPTZ  | NULL                                                                       | NULL              | None                     | Row lock timestamp for workers. |
-| locked_by       | VARCHAR(100) | NULL                                                                       | NULL              | None                     | Worker identifier.              |
-| last_error      | TEXT         | NULL                                                                       | NULL              | None                     | Last failure reason.            |
-| created_at      | TIMESTAMPTZ  | NOT NULL                                                                   | now()             | B-Tree (created_at)      | Audit timestamp.                |
-| updated_at      | TIMESTAMPTZ  | NOT NULL                                                                   | now()             | B-Tree (updated_at)      | Audit timestamp.                |
+| Attribute        | Type         | Constraint | Default Value     | Indexing                  | Description                                    |
+| :--------------- | :----------- | :--------- | :---------------- | :------------------------ | :--------------------------------------------- |
+| id               | UUID         | PK         | gen_random_uuid() | UNIQUE B-Tree (id)        | Primary key.                                   |
+| completion_date  | TIMESTAMPTZ  | NULL       | NULL              | B-Tree (completion_date)  | When publication completed for a listener.     |
+| event_type       | VARCHAR(255) | NOT NULL   | None              | B-Tree (event_type)       | Published event type.                          |
+| listener_id      | VARCHAR(255) | NOT NULL   | None              | B-Tree (listener_id)      | Spring Modulith listener identifier.           |
+| publication_date | TIMESTAMPTZ  | NOT NULL   | now()             | B-Tree (publication_date) | When the event was registered for publication. |
+| serialized_event | TEXT         | NOT NULL   | None              | None                      | Serialized event payload stored by Modulith.   |
 
 ### `idempotency_keys` Table
 
@@ -568,7 +554,7 @@ erDiagram
 - **Use a partial unique index to enforce one active registration per user and workshop:** `UNIQUE (user_id, workshop_id) WHERE status IN ('PENDING','REGISTERED','CONFIRMED','PAID','CHECKED_IN')`.
 - Enforce capacity integrity with `CHECK (capacity_remaining >= 0 AND capacity_remaining <= capacity_total)` and lock workshops with `SELECT ... FOR UPDATE` during seat allocation.
 - **Add cleanup jobs for TTL-bound tables:** `idempotency_keys.expires_at`, `password_reset_tokens.expires_at`, `refresh_tokens.expires_at`.
-- Create a partial index for `outbox_events` where `status = 'PENDING'` to speed relay polling and avoid full scans.
+- Create a partial index for `event_publication` where `completion_date IS NULL` to speed pending publication scans.
 - **Full-Text Search:** Create a composite GIN index on the workshops table to search both title and description simultaneously: `CREATE INDEX idx_workshops_fts ON workshops USING GIN (to_tsvector('simple', title || ' ' || coalesce(description, '')));`
 - **Template versioning:** Use a partial unique index to ensure exactly one active version per event type: `CREATE UNIQUE INDEX idx_active_template ON notification_templates (event_type) WHERE is_active = true;`
 - **Read replica safety:** Route browse queries to replicas; avoid read-after-write for registrations and payments to prevent stale reads.
