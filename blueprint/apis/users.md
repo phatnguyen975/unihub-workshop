@@ -1,4 +1,4 @@
-# UniHub Workshop - User API Contracts
+# UniHub Workshop - Users API Contracts
 
 ## 1. Conventions
 
@@ -19,13 +19,37 @@
 }
 ```
 
-- Error payloads use RFC 7807 inside `error`.
+- Error payloads use RFC 7807 inside `error`:
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "data": null,
+  "metadata": {
+    "statusCode": 400,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-11T10:00:00Z"
+  },
+  "error": {
+    "type": "https://api.unihub.local/problems/validation",
+    "title": "Bad Request",
+    "detail": "One or more fields are invalid.",
+    "instance": "/api/v1/auth/register",
+    "validationErrors": [
+      "email: must be a well-formed email address",
+      "password: must be at least 8 characters"
+    ]
+  }
+}
+```
+
 - **Required headers:** `Authorization: Bearer <token>`.
 - All JSON keys are **camelCase**.
 
 ## 2. Contracts
 
-### POST /api/v1/users/logout
+### POST /api/v1/users/me/logout
 
 **Security:** Bearer Token (Student, Organizer, Staff)
 
@@ -37,9 +61,9 @@
 }
 ```
 
-| Field        | Type   | Required | Constraints / Business Rules   |
-| :----------- | :----- | :------- | :----------------------------- |
-| refreshToken | string | Yes      | Must be a valid refresh token. |
+| Field        | Type   | Required | Constraints / Business Rules                             |
+| :----------- | :----- | :------- | :------------------------------------------------------- |
+| refreshToken | string | No       | If provided, it will be explicitly invalidated in Redis. |
 
 **Success Response (200):**
 
@@ -59,10 +83,10 @@
 
 **Common Errors:**
 
-- 400 Bad Request (missing or malformed refresh token).
+- 400 Bad Request (malformed refresh token).
 - 401 Unauthorized (missing/invalid token).
 
-### PUT /api/v1/users/change-password
+### PUT /api/v1/users/me/password
 
 **Security:** Bearer Token (Student, Organizer, Staff)
 
@@ -153,10 +177,10 @@
 }
 ```
 
-| Field    | Type   | Required | Constraints / Business Rules                                                                  |
-| :------- | :----- | :------- | :-------------------------------------------------------------------------------------------- |
-| fullName | string | No       | If provided, must be non-empty. At least one of `fullName` or `phone` is required.            |
-| phone    | string | No       | If provided, must be a valid phone format. At least one of `fullName` or `phone` is required. |
+| Field    | Type   | Required | Constraints / Business Rules                                                                               |
+| :------- | :----- | :------- | :--------------------------------------------------------------------------------------------------------- |
+| fullName | string | No       | If provided, must be non-empty string. Cannot be set to null.                                              |
+| phone    | string | No       | If provided, must be a valid phone format. If explicitly sent as `null`, the phone number will be cleared. |
 
 **Success Response (200):**
 

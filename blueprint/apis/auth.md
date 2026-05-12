@@ -45,8 +45,8 @@
 ```
 
 - **Required headers:**
-  - `Authorization: Bearer <token>` for protected endpoints.
   - Rate-limited endpoints may return `X-RateLimit-Remaining` and `X-RateLimit-Retry-After`.
+  - **Note:** All endpoints in this module are public and DO NOT require an Authorization header.
 - **Security notes:** `refreshToken` is returned in the JSON body for cross-platform parity (Web + Android). Web clients must store it securely (avoid plain `LocalStorage` when possible) to mitigate XSS risk.
 - All JSON keys are **camelCase**.
 
@@ -188,6 +188,47 @@
 - 409 Conflict (user state incompatible with intent).
 - 429 Too Many Requests (too many OTP attempts).
 
+### POST /api/v1/auth/resend-otp
+
+**Security:** Public (Guest)
+
+**Request Body:**
+
+```json
+{
+  "email": "student@unihub.edu",
+  "intent": "REGISTER"
+}
+```
+
+| Field  | Type   | Required | Constraints / Business Rules         |
+| :----- | :----- | :------- | :----------------------------------- |
+| email  | string | Yes      | Must be a valid email format.        |
+| intent | string | Yes      | One of `REGISTER`, `RESET_PASSWORD`. |
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "A new OTP has been sent",
+  "data": null,
+  "metadata": {
+    "statusCode": 200,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-11T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+**Common Errors:**
+
+- 400 Bad Request (validation).
+- 404 Not Found (email not found or user state incompatible with intent).
+- 429 Too Many Requests (OTP cooldown active - please wait before requesting again).
+- 503 Service Unavailable (Redis/event publication failure).
+
 ### POST /api/v1/auth/login
 
 **Security:** Public (Guest)
@@ -223,6 +264,7 @@
       "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
       "email": "student@unihub.edu",
       "fullName": "Ava Student",
+      "phone": "+1-555-0100",
       "role": "STUDENT",
       "status": "ACTIVE",
       "organizationId": null,
@@ -257,6 +299,7 @@
       "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
       "email": "staff@unihub.edu",
       "fullName": "Riley Staff",
+      "phone": null,
       "role": "STAFF",
       "status": "ACTIVE",
       "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
