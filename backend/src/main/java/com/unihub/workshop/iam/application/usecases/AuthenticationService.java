@@ -1,0 +1,470 @@
+package com.unihub.workshop.iam.application.usecases;
+
+import com.unihub.workshop.iam.application.dto.LoginRequest;
+import com.unihub.workshop.iam.application.dto.LoginResponse;
+import com.unihub.workshop.iam.application.dto.LoginUserResponse;
+import com.unihub.workshop.iam.application.dto.RefreshRequest;
+import com.unihub.workshop.iam.application.dto.RefreshResponse;
+import com.unihub.workshop.iam.application.dto.LogoutRequest;
+import com.unihub.workshop.iam.application.dto.ForgotPasswordRequest;
+import com.unihub.workshop.iam.application.dto.ForgotPasswordResponse;
+import com.unihub.workshop.iam.application.dto.ResetPasswordRequest;
+import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
+import com.unihub.workshop.iam.application.dto.RegisterRequest;
+import com.unihub.workshop.iam.application.dto.RegisterResponse;
+import com.unihub.workshop.iam.application.dto.VerifyOtpRequest;
+import com.unihub.workshop.iam.application.dto.VerifyOtpResponse;
+import com.unihub.workshop.iam.domain.events.PasswordResetRequestedEvent;
+import com.unihub.workshop.iam.domain.events.UserRegisteredEvent;
+import com.unihub.workshop.iam.domain.model.User;
+import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.iam.domain.model.UserStatus;
+import com.unihub.workshop.iam.domain.repository.OtpGenerator;
+import com.unihub.workshop.iam.domain.repository.OtpStore;
+import com.unihub.workshop.iam.domain.repository.TokenStore;
+import com.unihub.workshop.iam.domain.repository.UserRepository;
+import com.unihub.workshop.iam.infrastructure.security.JwtTokenProvider;
+import com.unihub.workshop.shared.exception.AppException;
+import io.jsonwebtoken.JwtException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.beans.factory.ListableBeanFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Service
+public class AuthenticationService implements AuthenticationUseCase {
+
+    private static final Duration OTP_TTL = Duration.ofMinutes(5);
+    private static final Duration OTP_COOLDOWN = Duration.ofSeconds(60);
+    private static final Duration OTP_ATTEMPT_WINDOW = Duration.ofMinutes(5);
+    private static final int MAX_OTP_ATTEMPTS = 5;
+    private static final int ACCESS_TOKEN_TTL_SECONDS = 900;
+    private static final int REFRESH_TOKEN_TTL_SECONDS = 2592000;
+    private static final int RESET_TOKEN_TTL_SECONDS = 900;
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final Duration LOGIN_LOCKOUT = Duration.ofMinutes(15);
+
+    private final UserRepository userRepository;
+    private final OtpStore otpStore;
+    private final OtpGenerator otpGenerator;
+    private final TokenStore tokenStore;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final PasswordEncoder passwordEncoder;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ListableBeanFactory beanFactory;
+
+    public AuthenticationService(
+            UserRepository userRepository,
+            OtpStore otpStore,
+            OtpGenerator otpGenerator,
+            TokenStore tokenStore,
+            JwtTokenProvider jwtTokenProvider,
+            PasswordEncoder passwordEncoder,
+            ApplicationEventPublisher eventPublisher,
+            ListableBeanFactory beanFactory) {
+        this.userRepository = userRepository;
+        this.otpStore = otpStore;
+        this.otpGenerator = otpGenerator;
+        this.tokenStore = tokenStore;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.passwordEncoder = passwordEncoder;
+        this.eventPublisher = eventPublisher;
+        this.beanFactory = beanFactory;
+    }
+
+    @Override
+    public UseCaseResult<RegisterResponse> register(RegisterRequest request) {
+        String email = normalizeEmail(request.email());
+        User existing = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (existing != null && existing.getStatus() == UserStatus.ACTIVE) {
+            throw new AppException(HttpStatus.CONFLICT, "Email already active", "email_active");
+        }
+
+        if (otpStore.isCooldownActive(email)) {
+            throw new AppException(HttpStatus.TOO_MANY_REQUESTS, "OTP cooldown active", "otp_cooldown");
+        }
+
+        User user = existing == null ? new User() : existing;
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (existing == null) {
+            user.setId(UUID.randomUUID());
+            user.setRole(UserRole.STUDENT);
+            user.setCreatedAt(now);
+            user.setFailedLoginAttempts(0);
+            user.setLockoutUntil(null);
+        }
+        user.setEmail(email);
+        user.setFullName(request.fullName());
+        user.setPhone(request.phone());
+        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setStatus(UserStatus.UNVERIFIED);
+        user.setTemporaryPassword(false);
+        user.setUpdatedAt(now);
+        userRepository.save(user);
+
+        String otp = otpGenerator.generateOtp();
+        try {
+            otpStore.saveOtp(email, otp, OTP_TTL);
+            otpStore.markCooldown(email, OTP_COOLDOWN);
+        } catch (Exception ex) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "OTP delivery failed", "otp_infra");
+        }
+
+        RegisterResponse response = new RegisterResponse(email, UserStatus.UNVERIFIED.name(), true);
+        try {
+            resolvePublisher().publishEvent(new UserRegisteredEvent(email, request.fullName()));
+            return new UseCaseResult<>(HttpStatus.CREATED, "Registration initiated", response);
+        } catch (Exception ex) {
+            return new UseCaseResult<>(HttpStatus.ACCEPTED, "Registration accepted; verification scheduled", response);
+        }
+    }
+
+    @Override
+    public UseCaseResult<VerifyOtpResponse> verifyOtp(VerifyOtpRequest request) {
+        String email = normalizeEmail(request.email());
+        String expectedOtp = otpStore.getOtp(email);
+        if (expectedOtp == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "OTP expired or missing", "otp_expired");
+        }
+
+        if (!expectedOtp.equals(request.otp())) {
+            int attempts = otpStore.incrementFailedAttempts(email, OTP_ATTEMPT_WINDOW);
+            if (attempts >= MAX_OTP_ATTEMPTS) {
+                otpStore.deleteOtp(email);
+                otpStore.resetFailedAttempts(email);
+                throw new AppException(HttpStatus.TOO_MANY_REQUESTS, "Too many OTP attempts", "otp_attempts");
+            }
+            throw new AppException(HttpStatus.UNAUTHORIZED, "OTP mismatch", "otp_mismatch");
+        }
+
+        otpStore.deleteOtp(email);
+        otpStore.resetFailedAttempts(email);
+
+        if ("REGISTER".equals(request.intent())) {
+            User user = userRepository.findByEmailIgnoreCase(email)
+                    .orElseThrow(() -> new AppException(HttpStatus.CONFLICT, "User state incompatible with intent",
+                            "otp_state"));
+            if (user.getStatus() != UserStatus.UNVERIFIED) {
+                throw new AppException(HttpStatus.CONFLICT, "User state incompatible with intent", "otp_state");
+            }
+            user.setStatus(UserStatus.ACTIVE);
+            userRepository.save(user);
+
+            VerifyOtpResponse response = new VerifyOtpResponse(email, UserStatus.ACTIVE.name(), null, null);
+            return new UseCaseResult<>(HttpStatus.OK, "Account verified", response);
+        }
+
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (user == null || (user.getStatus() != UserStatus.ACTIVE && user.getStatus() != UserStatus.LOCKED)) {
+            throw new AppException(HttpStatus.CONFLICT, "User state incompatible with intent", "otp_state");
+        }
+        String resetToken = UUID.randomUUID().toString();
+        try {
+            tokenStore.storeResetToken(resetToken, email, Duration.ofSeconds(RESET_TOKEN_TTL_SECONDS));
+        } catch (Exception ex) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Reset token unavailable", "reset_token");
+        }
+        VerifyOtpResponse response = new VerifyOtpResponse(null, null, resetToken, RESET_TOKEN_TTL_SECONDS);
+        return new UseCaseResult<>(HttpStatus.OK, "Reset token issued", response);
+    }
+
+    @Override
+    public UseCaseResult<LoginResponse> login(LoginRequest request) {
+        String email = normalizeEmail(request.email());
+        User user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(
+                        () -> new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials", "invalid_credentials"));
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AppException(HttpStatus.FORBIDDEN, "User status is not active", "user_status");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (user.getLockoutUntil() != null && user.getLockoutUntil().isAfter(now)) {
+            throw new AppException(HttpStatus.TOO_MANY_REQUESTS, "Temporary lockout active", "lockout");
+        }
+
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            int failures = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(failures);
+            if (failures >= MAX_LOGIN_ATTEMPTS) {
+                user.setLockoutUntil(now.plus(LOGIN_LOCKOUT));
+                userRepository.save(user);
+                throw new AppException(HttpStatus.TOO_MANY_REQUESTS, "Temporary lockout active", "lockout");
+            }
+            userRepository.save(user);
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials", "invalid_credentials");
+        }
+
+        if (user.isTemporaryPassword()) {
+            String accessToken = jwtTokenProvider.generateRestrictedAccessToken(user);
+            LoginResponse response = new LoginResponse(
+                    accessToken,
+                    null,
+                    "Bearer",
+                    ACCESS_TOKEN_TTL_SECONDS,
+                    null,
+                    true,
+                    toLoginUserResponse(user));
+            return new UseCaseResult<>(HttpStatus.OK, "Password change required", response);
+        }
+
+        user.setFailedLoginAttempts(0);
+        user.setLockoutUntil(null);
+        user.setLastLoginAt(now);
+        userRepository.save(user);
+
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user);
+        LoginResponse response = new LoginResponse(
+                accessToken,
+                refreshToken,
+                "Bearer",
+                ACCESS_TOKEN_TTL_SECONDS,
+                REFRESH_TOKEN_TTL_SECONDS,
+                false,
+                toLoginUserResponse(user));
+        return new UseCaseResult<>(HttpStatus.OK, "Login successful", response);
+    }
+
+    @Override
+    public UseCaseResult<RefreshResponse> refresh(RefreshRequest request) {
+        JwtTokenProvider.TokenClaims claims = parseRefreshToken(
+                request.refreshToken(),
+                HttpStatus.UNAUTHORIZED,
+                "Invalid refresh token",
+                "invalid_refresh_token");
+
+        if (tokenStore.isRefreshTokenBlacklisted(claims.jti())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid refresh token", "invalid_refresh_token");
+        }
+
+        Instant revokedAfter = tokenStore.getRefreshTokensRevokedAfter(claims.subject());
+        if (revokedAfter != null && (claims.issuedAt() == null || claims.issuedAt().isBefore(revokedAfter))) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid refresh token", "invalid_refresh_token");
+        }
+
+        User user = loadUserById(claims.subject(), HttpStatus.FORBIDDEN);
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AppException(HttpStatus.FORBIDDEN, "User status is not active", "user_status");
+        }
+
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user);
+        tokenStore.blacklistRefreshToken(claims.jti(), remainingTtl(claims.expiresAt()));
+
+        RefreshResponse response = new RefreshResponse(
+                accessToken,
+                refreshToken,
+                "Bearer",
+                ACCESS_TOKEN_TTL_SECONDS,
+                REFRESH_TOKEN_TTL_SECONDS,
+                true);
+        return new UseCaseResult<>(HttpStatus.OK, "Token refreshed", response);
+    }
+
+    @Override
+    public UseCaseResult<Void> logout(String userId, LogoutRequest request) {
+        JwtTokenProvider.TokenClaims claims = parseRefreshToken(
+                request.refreshToken(),
+                HttpStatus.BAD_REQUEST,
+                "Invalid refresh token",
+                "invalid_refresh_token");
+        if (userId == null || userId.isBlank() || !userId.equals(claims.subject())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid refresh token", "invalid_refresh_token");
+        }
+        tokenStore.blacklistRefreshToken(claims.jti(), remainingTtl(claims.expiresAt()));
+        return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);
+    }
+
+    @Override
+    public UseCaseResult<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request) {
+        String email = normalizeEmail(request.email());
+        if (otpStore.isCooldownActive(email)) {
+            throw new AppException(HttpStatus.TOO_MANY_REQUESTS, "OTP cooldown active", "otp_cooldown");
+        }
+
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (user == null || (user.getStatus() != UserStatus.ACTIVE && user.getStatus() != UserStatus.LOCKED)) {
+            return new UseCaseResult<>(
+                    HttpStatus.OK,
+                    "If the account exists, a reset code was sent",
+                    new ForgotPasswordResponse(true));
+        }
+
+        String otp = otpGenerator.generateOtp();
+        try {
+            otpStore.saveOtp(email, otp, OTP_TTL);
+            otpStore.markCooldown(email, OTP_COOLDOWN);
+        } catch (Exception ex) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "OTP delivery failed", "otp_infra");
+        }
+
+        try {
+            resolvePublisher().publishEvent(new PasswordResetRequestedEvent(email));
+            return new UseCaseResult<>(
+                    HttpStatus.OK,
+                    "If the account exists, a reset code was sent",
+                    new ForgotPasswordResponse(true));
+        } catch (Exception ex) {
+            return new UseCaseResult<>(
+                    HttpStatus.ACCEPTED,
+                    "If the account exists, a reset code was sent",
+                    new ForgotPasswordResponse(true));
+        }
+    }
+
+    @Override
+    public UseCaseResult<Void> resetPassword(ResetPasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Passwords do not match", "password_mismatch");
+        }
+
+        String email = tokenStore.consumeResetToken(request.resetToken());
+        if (email == null || email.isBlank()) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid or expired reset token", "reset_token");
+        }
+
+        User user = userRepository.findByEmailIgnoreCase(normalizeEmail(email)).orElse(null);
+        if (user == null) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid or expired reset token", "reset_token");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setTemporaryPassword(false);
+        user.setFailedLoginAttempts(0);
+        user.setLockoutUntil(null);
+        if (user.getStatus() == UserStatus.LOCKED) {
+            user.setStatus(UserStatus.ACTIVE);
+        }
+        user.setUpdatedAt(now);
+        userRepository.save(user);
+        revokeRefreshTokens(user);
+
+        return new UseCaseResult<>(HttpStatus.OK, "Password reset successful", null);
+    }
+
+    @Override
+    public UseCaseResult<Void> changePassword(String userId, ChangePasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Passwords do not match", "password_mismatch");
+        }
+        User user = loadUserById(userId, HttpStatus.UNAUTHORIZED);
+
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Current password mismatch", "invalid_credentials");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setTemporaryPassword(false);
+        user.setUpdatedAt(now);
+        userRepository.save(user);
+        revokeRefreshTokens(user);
+
+        return new UseCaseResult<>(HttpStatus.OK, "Password changed", null);
+    }
+
+    private LoginUserResponse toLoginUserResponse(User user) {
+        return new LoginUserResponse(
+                user.getId() == null ? null : user.getId().toString(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getRole() == null ? null : user.getRole().name(),
+                user.getStatus() == null ? null : user.getStatus().name(),
+                user.getOrganizationId() == null ? null : user.getOrganizationId().toString(),
+                user.getStudentId(),
+                user.isTemporaryPassword());
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private JwtTokenProvider.TokenClaims parseRefreshToken(
+            String refreshToken,
+            HttpStatus status,
+            String message,
+            String errorCode) {
+        JwtTokenProvider.TokenClaims claims = parseToken(refreshToken, status, message, errorCode);
+        if (!"refresh".equals(claims.type())) {
+            throw new AppException(status, message, errorCode);
+        }
+        return claims;
+    }
+
+    private JwtTokenProvider.TokenClaims parseToken(
+            String token,
+            HttpStatus status,
+            String message,
+            String errorCode) {
+        if (token == null || token.isBlank()) {
+            throw new AppException(status, message, errorCode);
+        }
+        try {
+            JwtTokenProvider.TokenClaims claims = jwtTokenProvider.parseToken(token);
+            if (claims.subject() == null || claims.subject().isBlank()
+                    || claims.jti() == null || claims.jti().isBlank()) {
+                throw new AppException(status, message, errorCode);
+            }
+            return claims;
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw new AppException(status, message, errorCode);
+        }
+    }
+
+    private User loadUserById(String rawId, HttpStatus missingStatus) {
+        if (rawId == null || rawId.isBlank()) {
+            throw new AppException(missingStatus, "Invalid token subject", "invalid_token");
+        }
+        try {
+            UUID userId = UUID.fromString(rawId);
+            return userRepository.findById(userId)
+                    .orElseThrow(() -> new AppException(missingStatus, "User not found", "user_not_found"));
+        } catch (IllegalArgumentException ex) {
+            throw new AppException(missingStatus, "Invalid token subject", "invalid_token");
+        }
+    }
+
+    private Duration remainingTtl(Instant expiresAt) {
+        if (expiresAt == null) {
+            return Duration.ZERO;
+        }
+        Instant now = Instant.now();
+        if (expiresAt.isBefore(now)) {
+            return Duration.ZERO;
+        }
+        return Duration.between(now, expiresAt);
+    }
+
+    private void revokeRefreshTokens(User user) {
+        if (user == null || user.getId() == null) {
+            return;
+        }
+        tokenStore.revokeRefreshTokens(
+                user.getId().toString(),
+                Instant.now(),
+                Duration.ofSeconds(REFRESH_TOKEN_TTL_SECONDS));
+    }
+
+    private ApplicationEventPublisher resolvePublisher() {
+        Map<String, ApplicationEventPublisher> publishers = beanFactory.getBeansOfType(ApplicationEventPublisher.class);
+        for (ApplicationEventPublisher publisher : publishers.values()) {
+            if (publisher != eventPublisher) {
+                return publisher;
+            }
+        }
+        if (!publishers.isEmpty()) {
+            return publishers.values().iterator().next();
+        }
+        return eventPublisher;
+    }
+}

@@ -1,0 +1,104 @@
+package com.unihub.workshop.iam.infrastructure.security;
+
+import com.unihub.workshop.iam.domain.repository.TokenStore;
+import java.time.Duration;
+import java.time.Instant;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.stereotype.Component;
+
+@Component
+public class RedisTokenStore implements TokenStore {
+
+    private static final String REFRESH_BLACKLIST_PREFIX = "auth:refresh:blacklist:";
+    private static final String REFRESH_REVOKED_AFTER_PREFIX = "auth:refresh:revoked-after:";
+    private static final String RESET_TOKEN_PREFIX = "auth:reset:";
+
+    private final StringRedisTemplate stringRedisTemplate;
+
+    public RedisTokenStore(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
+
+    @Override
+    public void blacklistRefreshToken(String jti, Duration ttl) {
+        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+            return;
+        }
+        stringRedisTemplate.opsForValue().set(refreshBlacklistKey(jti), "1", ttl);
+    }
+
+    @Override
+    public boolean isRefreshTokenBlacklisted(String jti) {
+        if (jti == null || jti.isBlank()) {
+            return false;
+        }
+        Boolean exists = stringRedisTemplate.hasKey(refreshBlacklistKey(jti));
+        return Boolean.TRUE.equals(exists);
+    }
+
+    @Override
+    public void revokeRefreshTokens(String userId, Instant revokedAfter, Duration ttl) {
+        if (userId == null || userId.isBlank() || revokedAfter == null) {
+            return;
+        }
+        Duration safeTtl = ttl == null ? Duration.ZERO : ttl;
+        if (safeTtl.isZero() || safeTtl.isNegative()) {
+            safeTtl = Duration.ofDays(30);
+        }
+        stringRedisTemplate.opsForValue().set(
+                refreshRevokedAfterKey(userId),
+                String.valueOf(revokedAfter.getEpochSecond()),
+                safeTtl);
+    }
+
+    @Override
+    public Instant getRefreshTokensRevokedAfter(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        String value = stringRedisTemplate.opsForValue().get(refreshRevokedAfterKey(userId));
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.ofEpochSecond(Long.parseLong(value));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    @Override
+    public void storeResetToken(String resetToken, String email, Duration ttl) {
+        if (resetToken == null || resetToken.isBlank() || email == null || email.isBlank()) {
+            return;
+        }
+        stringRedisTemplate.opsForValue().set(resetTokenKey(resetToken), email, ttl);
+    }
+
+    @Override
+    public String consumeResetToken(String resetToken) {
+        if (resetToken == null || resetToken.isBlank()) {
+            return null;
+        }
+        ValueOperations<String, String> ops = stringRedisTemplate.opsForValue();
+        String key = resetTokenKey(resetToken);
+        String value = ops.get(key);
+        if (value != null) {
+            stringRedisTemplate.delete(key);
+        }
+        return value;
+    }
+
+    private String refreshBlacklistKey(String jti) {
+        return REFRESH_BLACKLIST_PREFIX + jti;
+    }
+
+    private String refreshRevokedAfterKey(String userId) {
+        return REFRESH_REVOKED_AFTER_PREFIX + userId;
+    }
+
+    private String resetTokenKey(String resetToken) {
+        return RESET_TOKEN_PREFIX + resetToken;
+    }
+}

@@ -1,0 +1,102 @@
+package com.unihub.workshop.iam.presentation.controller;
+
+import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
+import com.unihub.workshop.iam.application.dto.LogoutRequest;
+import com.unihub.workshop.iam.application.dto.UpdateProfileRequest;
+import com.unihub.workshop.iam.application.dto.UserProfileResponse;
+import com.unihub.workshop.iam.application.usecases.AuthenticationUseCase;
+import com.unihub.workshop.iam.application.usecases.UseCaseResult;
+import com.unihub.workshop.iam.application.usecases.UserUseCase;
+import com.unihub.workshop.iam.presentation.mapper.UserMapper;
+import com.unihub.workshop.shared.exception.ApiResponse;
+import com.unihub.workshop.shared.exception.AppException;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(path = "/api/v1/users", produces = MediaType.APPLICATION_JSON_VALUE)
+public class UserController {
+
+    private final AuthenticationUseCase authenticationUseCase;
+    private final UserUseCase userUseCase;
+    private final UserMapper userMapper;
+
+    public UserController(
+            AuthenticationUseCase authenticationUseCase,
+            UserUseCase userUseCase,
+            UserMapper userMapper) {
+        this.authenticationUseCase = authenticationUseCase;
+        this.userUseCase = userUseCase;
+        this.userMapper = userMapper;
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @Valid @RequestBody LogoutRequest request) {
+        String userId = requireUserId();
+        UseCaseResult<Void> result = authenticationUseCase.logout(userId, request);
+        ApiResponse<Void> body = ApiResponse.success(
+                result.data(),
+                result.message(),
+                userMapper.toMetadata(result.status()));
+        return ResponseEntity.status(result.status()).body(body);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request) {
+        String userId = requireUserId();
+        UseCaseResult<Void> result = authenticationUseCase.changePassword(userId, request);
+        ApiResponse<Void> body = ApiResponse.success(
+                result.data(),
+                result.message(),
+                userMapper.toMetadata(result.status()));
+        return ResponseEntity.status(result.status()).body(body);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile() {
+        String userId = requireUserId();
+        UseCaseResult<UserProfileResponse> result = userUseCase.getProfile(userId);
+        ApiResponse<UserProfileResponse> body = ApiResponse.success(
+                result.data(),
+                result.message(),
+                userMapper.toMetadata(result.status()));
+        return ResponseEntity.status(result.status()).body(body);
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request) {
+        String userId = requireUserId();
+        UseCaseResult<UserProfileResponse> result = userUseCase.updateProfile(userId, request);
+        ApiResponse<UserProfileResponse> body = ApiResponse.success(
+                result.data(),
+                result.message(),
+                userMapper.toMetadata(result.status()));
+        return ResponseEntity.status(result.status()).body(body);
+    }
+
+    private String requireUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Missing authentication", "unauthorized");
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof String subject && !subject.isBlank()) {
+            return subject;
+        }
+        throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid authentication", "unauthorized");
+    }
+}
