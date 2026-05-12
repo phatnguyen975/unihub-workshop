@@ -7,9 +7,9 @@ import com.unihub.workshop.iam.application.dto.UserProfileResponse;
 import com.unihub.workshop.iam.application.usecases.AuthenticationUseCase;
 import com.unihub.workshop.iam.application.usecases.UseCaseResult;
 import com.unihub.workshop.iam.application.usecases.UserUseCase;
-import com.unihub.workshop.iam.presentation.mapper.UserMapper;
-import com.unihub.workshop.shared.exception.ApiResponse;
 import com.unihub.workshop.shared.exception.AppException;
+import com.unihub.workshop.shared.web.ApiResponse;
+import com.unihub.workshop.shared.web.ResponseFactory;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,38 +30,33 @@ public class UserController {
 
     private final AuthenticationUseCase authenticationUseCase;
     private final UserUseCase userUseCase;
-    private final UserMapper userMapper;
+    private final ResponseFactory responseFactory;
 
     public UserController(
             AuthenticationUseCase authenticationUseCase,
             UserUseCase userUseCase,
-            UserMapper userMapper) {
+            ResponseFactory responseFactory) {
         this.authenticationUseCase = authenticationUseCase;
         this.userUseCase = userUseCase;
-        this.userMapper = userMapper;
+        this.responseFactory = responseFactory;
     }
 
-    @PostMapping("/logout")
+    @PostMapping("/me/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             @Valid @RequestBody LogoutRequest request) {
         String userId = requireUserId();
         UseCaseResult<Void> result = authenticationUseCase.logout(userId, request);
-        ApiResponse<Void> body = ApiResponse.success(
-                result.data(),
-                result.message(),
-                userMapper.toMetadata(result.status()));
+        ApiResponse<Void> body = responseFactory.success(result.data(), result.message(), result.status());
+        SecurityContextHolder.clearContext();
         return ResponseEntity.status(result.status()).body(body);
     }
 
-    @PutMapping("/change-password")
+    @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request) {
         String userId = requireUserId();
         UseCaseResult<Void> result = authenticationUseCase.changePassword(userId, request);
-        ApiResponse<Void> body = ApiResponse.success(
-                result.data(),
-                result.message(),
-                userMapper.toMetadata(result.status()));
+        ApiResponse<Void> body = responseFactory.success(result.data(), result.message(), result.status());
         return ResponseEntity.status(result.status()).body(body);
     }
 
@@ -69,10 +64,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile() {
         String userId = requireUserId();
         UseCaseResult<UserProfileResponse> result = userUseCase.getProfile(userId);
-        ApiResponse<UserProfileResponse> body = ApiResponse.success(
-                result.data(),
-                result.message(),
-                userMapper.toMetadata(result.status()));
+        ApiResponse<UserProfileResponse> body = responseFactory.success(result.data(), result.message(), result.status());
         return ResponseEntity.status(result.status()).body(body);
     }
 
@@ -81,10 +73,7 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request) {
         String userId = requireUserId();
         UseCaseResult<UserProfileResponse> result = userUseCase.updateProfile(userId, request);
-        ApiResponse<UserProfileResponse> body = ApiResponse.success(
-                result.data(),
-                result.message(),
-                userMapper.toMetadata(result.status()));
+        ApiResponse<UserProfileResponse> body = responseFactory.success(result.data(), result.message(), result.status());
         return ResponseEntity.status(result.status()).body(body);
     }
 
@@ -94,7 +83,7 @@ public class UserController {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Missing authentication", "unauthorized");
         }
         Object principal = authentication.getPrincipal();
-        if (principal instanceof String subject && !subject.isBlank()) {
+        if (principal instanceof String subject && !subject.isBlank() && !"anonymousUser".equals(subject)) {
             return subject;
         }
         throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid authentication", "unauthorized");

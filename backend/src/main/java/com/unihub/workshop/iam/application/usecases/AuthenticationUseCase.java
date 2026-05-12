@@ -9,6 +9,7 @@ import com.unihub.workshop.iam.application.dto.ForgotPasswordRequest;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordResponse;
 import com.unihub.workshop.iam.application.dto.ResetPasswordRequest;
 import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
+import com.unihub.workshop.iam.application.dto.ResendOtpRequest;
 import com.unihub.workshop.iam.application.dto.RegisterRequest;
 import com.unihub.workshop.iam.application.dto.RegisterResponse;
 import com.unihub.workshop.iam.application.dto.VerifyOtpRequest;
@@ -19,6 +20,8 @@ public interface AuthenticationUseCase {
     UseCaseResult<RegisterResponse> register(RegisterRequest request);
 
     UseCaseResult<VerifyOtpResponse> verifyOtp(VerifyOtpRequest request);
+
+    UseCaseResult<Void> resendOtp(ResendOtpRequest request);
 
     UseCaseResult<LoginResponse> login(LoginRequest request);
 

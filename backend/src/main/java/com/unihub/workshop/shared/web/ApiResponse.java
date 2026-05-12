@@ -1,4 +1,4 @@
-package com.unihub.workshop.shared.exception;
+package com.unihub.workshop.shared.web;
 
 import java.util.List;
 

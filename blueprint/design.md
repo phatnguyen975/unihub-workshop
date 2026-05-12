@@ -1018,6 +1018,7 @@ backend/
 │   │   │   │   ├── events/                                # Event publication primitives and base event contracts
 │   │   │   │   ├── security/                              # JWT filters, RBAC, crypto utilities
 │   │   │   │   ├── exception/                             # Global error handling and problem details
+│   │   │   │   ├── web/                                   # Shared HTTP utilities, response factories, filters
 │   │   │   │   ├── observability/                         # Logging, audit, and request context
 │   │   │   │   └── config/                                # Infra config (Redis, RabbitMQ, MinIO, SpringDoc)
 │   │   │   │
@@ -1034,9 +1035,8 @@ backend/
 │   │   │   │   │   ├── persistence/                       # JPA repositories and mappings
 │   │   │   │   │   ├── security/                          # Token issuance, hashing, blocklists
 │   │   │   │   │   └── event_publication/                 # Emits verification and reset events
-│   │   │   │   └── presentation/                          # Controllers and API mappers
-│   │   │   │       ├── controller/
-│   │   │   │       └── mapper/
+│   │   │   │   └── presentation/                          # Controllers and API endpoints
+│   │   │   │       └── controller/
 │   │   │   │
 │   │   │   ├── workshops/                                 # Workshop lifecycle, search, brochures, assignments
 │   │   │   │   ├── contracts/                             # Public facades for other modules
@@ -1053,8 +1053,7 @@ backend/
 │   │   │   │   │   ├── search/                            # Postgres FTS adapters
 │   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
-│   │   │   │       ├── controller/
-│   │   │   │       └── mapper/
+│   │   │   │       └── controller/
 │   │   │   │
 │   │   │   ├── registration/                              # Seat allocation, payments, tickets, idempotency
 │   │   │   │   ├── contracts/                             # Public facades for other modules
@@ -1070,8 +1069,7 @@ backend/
 │   │   │   │   │   ├── event_publication/
 │   │   │   │   │   └── payment/                           # Stripe + ChaosMock adapter
 │   │   │   │   └── presentation/
-│   │   │   │       ├── controller/
-│   │   │   │       └── mapper/
+│   │   │   │       └── controller/
 │   │   │   │
 │   │   │   ├── attendance/                                # Check-in, offline sync, real-time metrics
 │   │   │   │   ├── contracts/                             # Public facades for other modules
@@ -1087,8 +1085,7 @@ backend/
 │   │   │   │   │   ├── qr/
 │   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
-│   │   │   │       ├── controller/
-│   │   │   │       └── mapper/
+│   │   │   │       └── controller/
 │   │   │   │
 │   │   │   ├── notifications/                             # Templates, in-app inbox, delivery orchestration
 │   │   │   │   ├── contracts/                             # Public facades for other modules
@@ -1104,8 +1101,7 @@ backend/
 │   │   │   │   │   ├── providers/                         # Email and future channels
 │   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
-│   │   │   │       ├── controller/
-│   │   │   │       └── mapper/
+│   │   │   │       └── controller/
 │   │   │   │
 │   │   │   ├── ai/                                        # Async summarization pipeline
 │   │   │   │   ├── contracts/                             # Public facades for other modules
@@ -1121,8 +1117,7 @@ backend/
 │   │   │   │   │   ├── ai_client/
 │   │   │   │   │   └── event_publication/
 │   │   │   │   └── presentation/
-│   │   │   │       ├── controller/
-│   │   │   │       └── mapper/
+│   │   │   │       └── controller/
 │   │   │   │
 │   │   │   └── ingestion/                                 # CSV ingestion, quarantine, alerts
 │   │   │       ├── contracts/                             # Public facades for other modules
@@ -1139,8 +1134,7 @@ backend/
 │   │   │       │   ├── storage/
 │   │   │       │   └── event_publication/
 │   │   │       └── presentation/
-│   │   │           ├── controller/
-│   │   │           └── mapper/
+│   │   │           └── controller/
 │   │   │
 │   │   └── resources/
 │   │       ├── application.yml

@@ -6,8 +6,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record RegisterRequest(
-                @Email @NotBlank String email,
-                @NotBlank @Size(min = 8) String password,
-                @NotBlank String fullName,
-                @Pattern(regexp = "^\\+?[0-9\\- ]{7,20}$", message = "must be a valid phone format") String phone) {
+        @Email @NotBlank String email,
+        @NotBlank @Size(min = 8) String password,
+        @NotBlank String fullName,
+        @Pattern(regexp = "^\\+?[0-9\\- ]{7,20}$", message = "must be a valid phone format") String phone) {
 }

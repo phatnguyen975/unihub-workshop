@@ -65,6 +65,7 @@ dependencies {
 
 	// Developer Tools & Utils
 	implementation("org.apache.pdfbox:pdfbox:3.0.2") // PDF extraction for AI summaries
+	implementation("org.openapitools:jackson-databind-nullable:0.2.6") // Nullable field handling for PATCH semantics
 	implementation("io.github.cdimascio:java-dotenv:5.2.2") // Local env loading
 	compileOnly("org.projectlombok:lombok") // Boilerplate reduction
 	annotationProcessor("org.projectlombok:lombok")

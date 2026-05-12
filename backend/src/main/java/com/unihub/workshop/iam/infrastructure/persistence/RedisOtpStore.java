@@ -1,12 +1,10 @@
 package com.unihub.workshop.iam.infrastructure.persistence;
 
 import com.unihub.workshop.iam.domain.repository.OtpStore;
+import com.unihub.workshop.shared.exception.AppException;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,9 +15,6 @@ public class RedisOtpStore implements OtpStore {
     private static final String ATTEMPTS_PREFIX = "otp:attempts:";
 
     private final StringRedisTemplate stringRedisTemplate;
-    private final Map<String, ExpiringValue<String>> otpCache = new ConcurrentHashMap<>();
-    private final Map<String, Instant> cooldownCache = new ConcurrentHashMap<>();
-    private final Map<String, AttemptCounter> attemptsCache = new ConcurrentHashMap<>();
 
     public RedisOtpStore(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
@@ -27,87 +22,45 @@ public class RedisOtpStore implements OtpStore {
 
     @Override
     public void saveOtp(String email, String otp, Duration ttl) {
-        ValueOperations<String, String> ops = ops();
-        if (ops != null) {
-            ops.set(key(email), otp, ttl);
-            return;
-        }
-        otpCache.put(key(email), new ExpiringValue<>(otp, expiresAt(ttl)));
+        runRedis(() -> stringRedisTemplate.opsForValue().set(key(email), otp, ttl));
     }
 
     @Override
     public String getOtp(String email) {
-        ValueOperations<String, String> ops = ops();
-        if (ops != null) {
-            return ops.get(key(email));
-        }
-        return getCachedOtp(key(email));
+        return callRedis(() -> stringRedisTemplate.opsForValue().get(key(email)));
     }
 
     @Override
     public void deleteOtp(String email) {
-        otpCache.remove(key(email));
-        if (stringRedisTemplate != null) {
-            stringRedisTemplate.delete(key(email));
-        }
+        runRedis(() -> stringRedisTemplate.delete(key(email)));
     }
 
     @Override
     public boolean isCooldownActive(String email) {
         String cooldownKey = cooldownKey(email);
-        ValueOperations<String, String> ops = ops();
-        if (ops != null) {
-            return ops.get(cooldownKey) != null;
-        }
-        Instant expiry = cooldownCache.get(cooldownKey);
-        if (expiry == null) {
-            return false;
-        }
-        if (expiry.isAfter(Instant.now())) {
-            return true;
-        }
-        cooldownCache.remove(cooldownKey);
-        return false;
+        return Boolean.TRUE.equals(callRedis(() -> stringRedisTemplate.hasKey(cooldownKey)));
     }
 
     @Override
     public void markCooldown(String email, Duration ttl) {
-        String cooldownKey = cooldownKey(email);
-        ValueOperations<String, String> ops = ops();
-        if (ops != null) {
-            ops.set(cooldownKey, "1", ttl);
-            return;
-        }
-        cooldownCache.put(cooldownKey, expiresAt(ttl));
+        runRedis(() -> stringRedisTemplate.opsForValue().set(cooldownKey(email), "1", ttl));
     }
 
     @Override
     public int incrementFailedAttempts(String email, Duration ttl) {
         String attemptsKey = attemptsKey(email);
-        ValueOperations<String, String> ops = ops();
-        if (ops != null) {
-            Long count = ops.increment(attemptsKey);
+        return callRedis(() -> {
+            Long count = stringRedisTemplate.opsForValue().increment(attemptsKey);
             if (count != null && count == 1L) {
                 stringRedisTemplate.expire(attemptsKey, ttl);
             }
             return count == null ? 0 : count.intValue();
-        }
-        AttemptCounter counter = attemptsCache.get(attemptsKey);
-        if (counter == null || counter.isExpired()) {
-            counter = new AttemptCounter(0, expiresAt(ttl));
-        }
-        counter.increment(ttl);
-        attemptsCache.put(attemptsKey, counter);
-        return counter.count();
+        });
     }
 
     @Override
     public void resetFailedAttempts(String email) {
-        String attemptsKey = attemptsKey(email);
-        attemptsCache.remove(attemptsKey);
-        if (stringRedisTemplate != null) {
-            stringRedisTemplate.delete(attemptsKey);
-        }
+        runRedis(() -> stringRedisTemplate.delete(attemptsKey(email)));
     }
 
     private String key(String email) {
@@ -122,52 +75,29 @@ public class RedisOtpStore implements OtpStore {
         return ATTEMPTS_PREFIX + email.toLowerCase();
     }
 
-    private ValueOperations<String, String> ops() {
-        return stringRedisTemplate == null ? null : stringRedisTemplate.opsForValue();
+    private void runRedis(RedisRunnable runnable) {
+        try {
+            runnable.run();
+        } catch (RuntimeException ex) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "OTP infrastructure unavailable", "otp_infra");
+        }
     }
 
-    private Instant expiresAt(Duration ttl) {
-        return Instant.now().plus(ttl);
+    private <T> T callRedis(RedisSupplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (RuntimeException ex) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "OTP infrastructure unavailable", "otp_infra");
+        }
     }
 
-    private String getCachedOtp(String key) {
-        ExpiringValue<String> cached = otpCache.get(key);
-        if (cached == null) {
-            return null;
-        }
-        if (cached.expiresAt().isAfter(Instant.now())) {
-            return cached.value();
-        }
-        otpCache.remove(key);
-        return null;
+    @FunctionalInterface
+    private interface RedisRunnable {
+        void run();
     }
 
-    private record ExpiringValue<T>(T value, Instant expiresAt) {
-    }
-
-    private static final class AttemptCounter {
-        private int count;
-        private Instant expiresAt;
-
-        private AttemptCounter(int count, Instant expiresAt) {
-            this.count = count;
-            this.expiresAt = expiresAt;
-        }
-
-        private void increment(Duration ttl) {
-            if (isExpired()) {
-                count = 0;
-            }
-            count += 1;
-            expiresAt = Instant.now().plus(ttl);
-        }
-
-        private boolean isExpired() {
-            return expiresAt == null || expiresAt.isBefore(Instant.now());
-        }
-
-        private int count() {
-            return count;
-        }
+    @FunctionalInterface
+    private interface RedisSupplier<T> {
+        T get();
     }
 }

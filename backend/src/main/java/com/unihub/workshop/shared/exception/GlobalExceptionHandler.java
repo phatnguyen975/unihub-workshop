@@ -3,9 +3,6 @@ package com.unihub.workshop.shared.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
-import java.net.InetAddress;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,8 +17,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import com.unihub.workshop.shared.web.ApiResponse;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final MetadataGenerator metadataGenerator;
+
+    public GlobalExceptionHandler(MetadataGenerator metadataGenerator) {
+        this.metadataGenerator = metadataGenerator;
+    }
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(
@@ -111,10 +116,7 @@ public class GlobalExceptionHandler {
     }
 
     private ApiResponse.Metadata metadata(HttpStatus status) {
-        return new ApiResponse.Metadata(
-                status.value(),
-                resolveProcessedBy(),
-                OffsetDateTime.now(ZoneOffset.UTC).toString());
+        return metadataGenerator.create(status);
     }
 
     private ApiResponse.ProblemDetails problemDetails(
@@ -160,14 +162,6 @@ public class GlobalExceptionHandler {
             return path.substring(lastDot + 1);
         }
         return path;
-    }
-
-    private String resolveProcessedBy() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (Exception ignored) {
-            return "unknown";
-        }
     }
 
     private String errorType(String errorCode, String fallback) {

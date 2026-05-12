@@ -1,10 +1,11 @@
 package com.unihub.workshop.iam.infrastructure.security;
 
 import com.unihub.workshop.iam.domain.repository.TokenStore;
+import com.unihub.workshop.shared.exception.AppException;
 import java.time.Duration;
 import java.time.Instant;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,10 +23,10 @@ public class RedisTokenStore implements TokenStore {
 
     @Override
     public void blacklistRefreshToken(String jti, Duration ttl) {
-        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+        if (jti == null || jti.isBlank() || ttl == null || ttl.isZero() || ttl.isNegative()) {
             return;
         }
-        stringRedisTemplate.opsForValue().set(refreshBlacklistKey(jti), "1", ttl);
+        runRedis(() -> stringRedisTemplate.opsForValue().set(refreshBlacklistKey(jti), "1", ttl));
     }
 
     @Override
@@ -33,8 +34,7 @@ public class RedisTokenStore implements TokenStore {
         if (jti == null || jti.isBlank()) {
             return false;
         }
-        Boolean exists = stringRedisTemplate.hasKey(refreshBlacklistKey(jti));
-        return Boolean.TRUE.equals(exists);
+        return Boolean.TRUE.equals(callRedis(() -> stringRedisTemplate.hasKey(refreshBlacklistKey(jti))));
     }
 
     @Override
@@ -46,10 +46,11 @@ public class RedisTokenStore implements TokenStore {
         if (safeTtl.isZero() || safeTtl.isNegative()) {
             safeTtl = Duration.ofDays(30);
         }
-        stringRedisTemplate.opsForValue().set(
+        Duration ttlToUse = safeTtl;
+        runRedis(() -> stringRedisTemplate.opsForValue().set(
                 refreshRevokedAfterKey(userId),
                 String.valueOf(revokedAfter.getEpochSecond()),
-                safeTtl);
+                ttlToUse));
     }
 
     @Override
@@ -57,7 +58,7 @@ public class RedisTokenStore implements TokenStore {
         if (userId == null || userId.isBlank()) {
             return null;
         }
-        String value = stringRedisTemplate.opsForValue().get(refreshRevokedAfterKey(userId));
+        String value = callRedis(() -> stringRedisTemplate.opsForValue().get(refreshRevokedAfterKey(userId)));
         if (value == null || value.isBlank()) {
             return null;
         }
@@ -73,7 +74,7 @@ public class RedisTokenStore implements TokenStore {
         if (resetToken == null || resetToken.isBlank() || email == null || email.isBlank()) {
             return;
         }
-        stringRedisTemplate.opsForValue().set(resetTokenKey(resetToken), email, ttl);
+        runRedis(() -> stringRedisTemplate.opsForValue().set(resetTokenKey(resetToken), email, ttl));
     }
 
     @Override
@@ -81,13 +82,14 @@ public class RedisTokenStore implements TokenStore {
         if (resetToken == null || resetToken.isBlank()) {
             return null;
         }
-        ValueOperations<String, String> ops = stringRedisTemplate.opsForValue();
         String key = resetTokenKey(resetToken);
-        String value = ops.get(key);
-        if (value != null) {
-            stringRedisTemplate.delete(key);
-        }
-        return value;
+        return callRedis(() -> {
+            String value = stringRedisTemplate.opsForValue().get(key);
+            if (value != null) {
+                stringRedisTemplate.delete(key);
+            }
+            return value;
+        });
     }
 
     private String refreshBlacklistKey(String jti) {
@@ -100,5 +102,33 @@ public class RedisTokenStore implements TokenStore {
 
     private String resetTokenKey(String resetToken) {
         return RESET_TOKEN_PREFIX + resetToken;
+    }
+
+    private void runRedis(RedisRunnable runnable) {
+        try {
+            runnable.run();
+        } catch (RuntimeException ex) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Redis token store unavailable",
+                    "redis_unavailable");
+        }
+    }
+
+    private <T> T callRedis(RedisSupplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (RuntimeException ex) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Redis token store unavailable",
+                    "redis_unavailable");
+        }
+    }
+
+    @FunctionalInterface
+    private interface RedisRunnable {
+        void run();
+    }
+
+    @FunctionalInterface
+    private interface RedisSupplier<T> {
+        T get();
     }
 }

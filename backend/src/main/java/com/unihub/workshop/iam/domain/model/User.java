@@ -5,11 +5,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.Version;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 @Table(name = "users")
 public class User {
 
@@ -43,6 +49,10 @@ public class User {
     @Column(name = "organization_id")
     private UUID organizationId;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Column(name = "is_temporary_password", nullable = false)
     private boolean isTemporaryPassword;
 
@@ -55,9 +65,11 @@ public class User {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
-    @Column(name = "created_at", nullable = false)
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
@@ -134,6 +146,14 @@ public class User {
 
     public void setOrganizationId(UUID organizationId) {
         this.organizationId = organizationId;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public boolean isTemporaryPassword() {
