@@ -10,6 +10,7 @@ import com.unihub.workshop.iam.application.usecases.UserUseCase;
 import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ResponseFactory;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -43,9 +44,11 @@ public class UserController {
 
     @PostMapping("/me/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @Valid @RequestBody LogoutRequest request) {
+            @Valid @RequestBody LogoutRequest request,
+            HttpServletRequest httpRequest) {
         String userId = requireUserId();
-        UseCaseResult<Void> result = authenticationUseCase.logout(userId, request);
+        String accessToken = extractBearerToken(httpRequest.getHeader("Authorization"));
+        UseCaseResult<Void> result = authenticationUseCase.logout(userId, request, accessToken);
         ApiResponse<Void> body = responseFactory.success(result.data(), result.message(), result.status());
         SecurityContextHolder.clearContext();
         return ResponseEntity.status(result.status()).body(body);
@@ -87,5 +90,17 @@ public class UserController {
             return subject;
         }
         throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid authentication", "unauthorized");
+    }
+
+    private String extractBearerToken(String authorization) {
+        if (authorization == null || authorization.isBlank()) {
+            return null;
+        }
+        String trimmed = authorization.trim();
+        if (!trimmed.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return null;
+        }
+        String token = trimmed.substring(7).trim();
+        return token.isBlank() ? null : token;
     }
 }

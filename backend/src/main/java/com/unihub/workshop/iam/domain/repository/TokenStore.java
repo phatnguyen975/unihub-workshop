@@ -5,6 +5,10 @@ import java.time.Instant;
 
 public interface TokenStore {
 
+    void blacklistAccessToken(String jti, Duration ttl);
+
+    boolean isAccessTokenBlacklisted(String jti);
+
     void blacklistRefreshToken(String jti, Duration ttl);
 
     boolean isRefreshTokenBlacklisted(String jti);

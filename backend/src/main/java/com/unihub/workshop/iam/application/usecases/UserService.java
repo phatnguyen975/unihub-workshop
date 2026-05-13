@@ -6,7 +6,6 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.repository.UserRepository;
 import com.unihub.workshop.shared.exception.AppException;
 import java.util.UUID;
-import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +31,8 @@ public class UserService implements UserUseCase {
     public UseCaseResult<UserProfileResponse> updateProfile(String userId, UpdateProfileRequest request) {
         User user = loadUser(userId);
 
-        boolean fullNameProvided = request.fullName() != null && request.fullName().isPresent();
-        boolean phoneProvided = request.phone() != null && request.phone().isPresent();
+        boolean fullNameProvided = request.isFullNameProvided();
+        boolean phoneProvided = request.isPhoneProvided();
         if (!fullNameProvided && !phoneProvided) {
             throw new AppException(HttpStatus.BAD_REQUEST, "At least one field is required", "validation");
         }
@@ -44,8 +43,7 @@ public class UserService implements UserUseCase {
         }
 
         if (phoneProvided) {
-            JsonNullable<String> phoneValue = request.phone();
-            String phone = phoneValue.get();
+            String phone = request.phone();
             if (phone == null) {
                 user.setPhone(null);
             } else {
@@ -70,8 +68,7 @@ public class UserService implements UserUseCase {
         }
     }
 
-    private String normalizeFullName(JsonNullable<String> fullNameValue) {
-        String fullName = fullNameValue.get();
+    private String normalizeFullName(String fullName) {
         if (fullName == null) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Invalid full name", "validation");
         }

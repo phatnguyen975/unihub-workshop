@@ -4,6 +4,7 @@ Since you are running two app instances (`unihub-app-1` and `unihub-app-2`), eve
 
 - **Load Balancing Check:** In every successful response, verify the `metadata.processedBy` field. If sending requests via a Load Balancer (e.g., Nginx), you should see this value toggle between `unihub-app-1` and `unihub-app-2` (Round Robin).
 - **Logging Check:** Check the console logs of the active instance. You should see a log entry from `RequestLoggingFilter` containing your `clientIp` and `userAgent`.
+- **Consistency Check:** Perform 50 requests to `unihub-app-1`, then 51 requests to `unihub-app-2`. The 101st request (on `unihub-app-2`) must be blocked, confirming the distributed rate limit is working across different nodes.
 
 ## 1. Registration Flow
 
@@ -173,6 +174,7 @@ The OTP is stored in Redis under the lowercase email key.
 
 ```bash
 docker exec -it <redis_container_name> redis-cli
+AUTH <redis_password>
 GET otp:<email_address_lowercased>
 TTL otp:<email_address_lowercased>
 ```
@@ -181,6 +183,7 @@ Example:
 
 ```bash
 docker exec -it unihub-redis redis-cli
+AUTH redis
 GET otp:student1@unihub.local
 ```
 
@@ -317,20 +320,17 @@ This is the most visual way to monitor the processedBy metadata across instances
    - Open Postman and create a `POST` request to `http://localhost/api/v1/auth/login`.
    - In the **Body** tab, select `raw` then `JSON` and enter valid login credentials.
    - Save this request into a Collection (e.g., "IAM Module").
-
 2. **Open the Runner:**
    - In the left sidebar, click on the **Collections** tab.
    - Click the **three dots (...)** next to your "IAM Module" collection.
-   - Select **Run collection**.
-
+   - Select **Run**.
 3. **Configure the Run:**
-   - On the right side (Functional tab), ensure your `Login` request is checked.
+   - On the right side (**Functional** tab), ensure your `Login` request is checked.
    - **Iterations:** Change this value to `110`.
    - **Delay:** Set to `0ms` (to simulate a spike).
    - **Data:** Leave as is.
-
 4. **Execute and Observe:**
-   - Click the big blue button: **Run IAM Module**.
+   - Click the big blue button: **Start run**.
    - **In the Results Table:**
      - Scroll through the list. You should see `200 OK` for the first 100 entries.
      - At **Iteration 101**, the status must change to **429 Too Many Requests**.
@@ -341,4 +341,3 @@ This is the most visual way to monitor the processedBy metadata across instances
 
 - Change the source IP or proxy path and verify the bucket is isolated per IP.
 - Wait a full minute and verify the bucket refills and requests are accepted again.
-- **Consistency Check:** Perform 50 requests to `unihub-app-1`, then 51 requests to `unihub-app-2`. The 101st request (on `unihub-app-2`) must be blocked, confirming the distributed rate limit is working across different nodes.

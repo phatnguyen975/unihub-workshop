@@ -25,7 +25,7 @@ public class JwtTokenProvider {
     private final String issuer;
 
     public JwtTokenProvider(
-            @Value("${app.jwt.secret:dev-secret-please-change-dev-secret-please-change}") String secret,
+            @Value("${app.jwt.secret:}") String secret,
             @Value("${app.jwt.issuer:unihub}") String issuer) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.issuer = issuer;

@@ -27,7 +27,7 @@ public interface AuthenticationUseCase {
 
     UseCaseResult<RefreshResponse> refresh(RefreshRequest request);
 
-    UseCaseResult<Void> logout(String userId, LogoutRequest request);
+    UseCaseResult<Void> logout(String userId, LogoutRequest request, String accessToken);
 
     UseCaseResult<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request);
 

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class RedisTokenStore implements TokenStore {
 
+    private static final String ACCESS_BLACKLIST_PREFIX = "auth:access:blacklist:";
     private static final String REFRESH_BLACKLIST_PREFIX = "auth:refresh:blacklist:";
     private static final String REFRESH_REVOKED_AFTER_PREFIX = "auth:refresh:revoked-after:";
     private static final String RESET_TOKEN_PREFIX = "auth:reset:";
@@ -19,6 +20,22 @@ public class RedisTokenStore implements TokenStore {
 
     public RedisTokenStore(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
+    }
+
+    @Override
+    public void blacklistAccessToken(String jti, Duration ttl) {
+        if (jti == null || jti.isBlank() || ttl == null || ttl.isZero() || ttl.isNegative()) {
+            return;
+        }
+        runRedis(() -> stringRedisTemplate.opsForValue().set(accessBlacklistKey(jti), "1", ttl));
+    }
+
+    @Override
+    public boolean isAccessTokenBlacklisted(String jti) {
+        if (jti == null || jti.isBlank()) {
+            return false;
+        }
+        return Boolean.TRUE.equals(callRedis(() -> stringRedisTemplate.hasKey(accessBlacklistKey(jti))));
     }
 
     @Override
@@ -90,6 +107,10 @@ public class RedisTokenStore implements TokenStore {
             }
             return value;
         });
+    }
+
+    private String accessBlacklistKey(String jti) {
+        return ACCESS_BLACKLIST_PREFIX + jti;
     }
 
     private String refreshBlacklistKey(String jti) {

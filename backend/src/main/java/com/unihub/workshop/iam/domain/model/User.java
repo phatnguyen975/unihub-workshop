@@ -6,7 +6,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.EntityListeners;
-import jakarta.persistence.Version;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -48,10 +47,6 @@ public class User {
 
     @Column(name = "organization_id")
     private UUID organizationId;
-
-    @Version
-    @Column(name = "version")
-    private Long version;
 
     @Column(name = "is_temporary_password", nullable = false)
     private boolean isTemporaryPassword;
@@ -146,14 +141,6 @@ public class User {
 
     public void setOrganizationId(UUID organizationId) {
         this.organizationId = organizationId;
-    }
-
-    public Long getVersion() {
-        return version;
-    }
-
-    public void setVersion(Long version) {
-        this.version = version;
     }
 
     public boolean isTemporaryPassword() {

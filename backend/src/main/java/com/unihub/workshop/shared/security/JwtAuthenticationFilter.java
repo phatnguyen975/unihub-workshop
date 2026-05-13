@@ -1,6 +1,7 @@
 package com.unihub.workshop.shared.security;
 
 import com.unihub.workshop.iam.infrastructure.security.JwtTokenProvider;
+import com.unihub.workshop.iam.domain.repository.TokenStore;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,9 +22,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenStore tokenStore;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(
+            JwtTokenProvider jwtTokenProvider,
+            TokenStore tokenStore) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenStore = tokenStore;
     }
 
     @Override
@@ -49,6 +54,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token type");
                 return;
             }
+
+            if (tokenStore.isAccessTokenBlacklisted(claims.jti())) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
+                return;
+            }
+
             String subject = claims.subject();
             if (subject == null || subject.isBlank()) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token subject");

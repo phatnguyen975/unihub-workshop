@@ -289,7 +289,23 @@ public class AuthenticationService implements AuthenticationUseCase {
 
     @Override
     @Transactional
-    public UseCaseResult<Void> logout(String userId, com.unihub.workshop.iam.application.dto.LogoutRequest request) {
+    public UseCaseResult<Void> logout(String userId, com.unihub.workshop.iam.application.dto.LogoutRequest request,
+            String accessToken) {
+        // Blacklist the access token if provided
+        if (accessToken != null && !accessToken.isBlank()) {
+            try {
+                JwtTokenProvider.TokenClaims accessTokenClaims = jwtTokenProvider.parseToken(accessToken);
+                if (accessTokenClaims.expiresAt() != null) {
+                    Duration ttl = remainingTtl(accessTokenClaims.expiresAt());
+                    tokenStore.blacklistAccessToken(accessTokenClaims.jti(), ttl);
+                }
+            } catch (JwtException | IllegalArgumentException ex) {
+                // Log but don't fail logout if access token is invalid
+                System.err.println("Failed to parse access token for blacklisting: " + ex.getMessage());
+            }
+        }
+
+        // Blacklist the refresh token if provided
         String refreshToken = request == null ? null : request.refreshToken();
         if (refreshToken == null || refreshToken.isBlank()) {
             return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);

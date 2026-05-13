@@ -1,5 +1,4 @@
 package com.unihub.workshop.iam.application.dto;
 
-public record LogoutRequest(
-        String refreshToken) {
+public record LogoutRequest(String refreshToken) {
 }

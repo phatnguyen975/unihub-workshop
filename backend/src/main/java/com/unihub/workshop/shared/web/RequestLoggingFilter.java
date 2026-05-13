@@ -39,13 +39,13 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         } finally {
             long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
             logger.info(
-                    "request method={} uri={} clientIp={} status={} durationMs={} processedBy={} userAgent={}",
+                    "{} {} {} - {}ms - processedBy={} - clientIp={} - userAgent={}",
                     request.getMethod(),
                     request.getRequestURI(),
-                    clientIp,
                     response.getStatus(),
                     durationMs,
                     processedBy,
+                    clientIp,
                     userAgent);
         }
     }

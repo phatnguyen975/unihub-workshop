@@ -1,6 +1,9 @@
 spring:
   application:
     name: backend
+  autoconfigure:
+    exclude:
+      - org.springframework.modulith.events.amqp.RabbitJacksonConfiguration
   datasource:
     url: ${NEON_PRIMARY_URL}
     username: ${DB_USERNAME}
@@ -59,3 +62,7 @@ app:
     from: ${MAIL_FROM}
   ai:
     api-key: ${AI_SERVICE_API_KEY}
+
+rate:
+  limiting:
+    enabled: true
