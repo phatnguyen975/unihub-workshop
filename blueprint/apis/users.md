@@ -19,31 +19,7 @@
 }
 ```
 
-- Error payloads use RFC 7807 inside `error`:
-
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "data": null,
-  "metadata": {
-    "statusCode": 400,
-    "processedBy": "unihub-app-1",
-    "timestamp": "2026-05-11T10:00:00Z"
-  },
-  "error": {
-    "type": "https://api.unihub.local/problems/validation",
-    "title": "Bad Request",
-    "detail": "One or more fields are invalid.",
-    "instance": "/api/v1/auth/register",
-    "validationErrors": [
-      "email: must be a well-formed email address",
-      "password: must be at least 8 characters"
-    ]
-  }
-}
-```
-
+- Error payloads use RFC 7807 inside `error`.
 - **Required headers:** `Authorization: Bearer <token>`.
 - All JSON keys are **camelCase**.
 

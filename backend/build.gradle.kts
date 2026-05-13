@@ -51,8 +51,9 @@ dependencies {
 	// Resiliency & Rate Limiting (Circuit Breakers, Token Bucket)
 	implementation("org.springframework.boot:spring-boot-starter-data-redis") // Redis cache + token bucket state
 	implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j") // Circuit breakers
-	implementation("com.bucket4j:bucket4j-core:8.10.1") // Token bucket algorithm
-	implementation("com.bucket4j:bucket4j-redis:8.10.1") // Redis-backed rate limiter
+	implementation("com.bucket4j:bucket4j_jdk17-core:8.18.0") // Token bucket algorithm
+	implementation("com.bucket4j:bucket4j_jdk17-redis-common:8.18.0") // Redis-backed rate limiter common module
+	implementation("com.bucket4j:bucket4j_jdk17-lettuce:8.18.0") // Lettuce-backed distributed rate limiter
 
 	// Third-Party Integrations (Storage, Payment)
 	implementation(platform("software.amazon.awssdk:bom:2.25.70")) // AWS SDK BOM

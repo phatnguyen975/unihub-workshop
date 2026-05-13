@@ -13,6 +13,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
+            com.unihub.workshop.shared.web.RateLimitingFilter rateLimitingFilter,
             com.unihub.workshop.shared.web.RequestLoggingFilter requestLoggingFilter,
             JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         return http
@@ -22,6 +23,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/users/**").authenticated()
                         .anyRequest().authenticated())
+                .addFilterBefore(rateLimitingFilter, com.unihub.workshop.shared.web.RequestLoggingFilter.class)
                 .addFilterBefore(requestLoggingFilter, JwtAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

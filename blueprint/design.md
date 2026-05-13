@@ -659,7 +659,7 @@ We use **Role-Based Access Control (RBAC)** with role claims enforced at the API
 | `ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
 | `STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
 
-Database roles are stored as plain domain values; the authentication layer prepends `ROLE_` when issuing JWTs and constructing Spring Security authorities.
+Database roles and Spring Security authorities are stored and processed strictly as plain domain values. The authentication layer **does not** prepend `ROLE_` when issuing JWTs or constructing authorities.
 
 ### Stateless JWT & Role Claims
 
@@ -670,15 +670,15 @@ The API Gateway and Backend Services do not query PostgreSQL for permissions on 
 ```json
 {
   "sub": "1b8f8c7b-2e4b-4f6c-9b3b-6b8d2f0c9a12",
-  "role": "ROLE_ORGANIZER",
+  "role": "ORGANIZER",
   "iat": 1767225600,
   "exp": 1767229200,
   "jti": "9c1f6c23-0f5d-4f8b-9f51-2d5f3a2f1d9e"
 }
 ```
 
-- **Client usage (React/Android):** The client decodes the `role` claim to drive the UI, such as hiding the "Create Workshop" action for `ROLE_STUDENT`.
-- **Server usage (Spring Boot):** The API enforces access via the `role` claim (for example, `@PreAuthorize("hasRole('ORGANIZER')")`) and uses `sub` for row-level ownership checks.
+- **Client usage (React/Android):** The client decodes the role claim to drive the UI, such as hiding the "Create Workshop" action for STUDENT.
+- **Server usage (Spring Boot):** The API enforces access via the role claim using authority checks (for example, `@PreAuthorize("hasAuthority('ORGANIZER')")`) and uses `sub` for row-level ownership checks.
 
 ### Multi-Layer Enforcement Points
 
