@@ -6,6 +6,5 @@ public record LoginResponse(
         String tokenType,
         int expiresInSeconds,
         Integer refreshExpiresInSeconds,
-        boolean passwordChangeRequired,
         LoginUserResponse user) {
 }

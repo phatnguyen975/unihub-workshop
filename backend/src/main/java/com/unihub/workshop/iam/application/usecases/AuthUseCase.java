@@ -9,13 +9,14 @@ import com.unihub.workshop.iam.application.dto.ForgotPasswordRequest;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordResponse;
 import com.unihub.workshop.iam.application.dto.ResetPasswordRequest;
 import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
+import com.unihub.workshop.iam.application.dto.ChangePasswordResponse;
 import com.unihub.workshop.iam.application.dto.ResendOtpRequest;
 import com.unihub.workshop.iam.application.dto.RegisterRequest;
 import com.unihub.workshop.iam.application.dto.RegisterResponse;
 import com.unihub.workshop.iam.application.dto.VerifyOtpRequest;
 import com.unihub.workshop.iam.application.dto.VerifyOtpResponse;
 
-public interface AuthenticationUseCase {
+public interface AuthUseCase {
 
     UseCaseResult<RegisterResponse> register(RegisterRequest request);
 
@@ -33,5 +34,5 @@ public interface AuthenticationUseCase {
 
     UseCaseResult<Void> resetPassword(ResetPasswordRequest request);
 
-    UseCaseResult<Void> changePassword(String userId, ChangePasswordRequest request);
+    UseCaseResult<ChangePasswordResponse> changePassword(String userId, ChangePasswordRequest request);
 }

@@ -17,7 +17,7 @@ public interface TokenStore {
 
     Instant getRefreshTokensRevokedAfter(String userId);
 
-    void storeResetToken(String resetToken, String email, Duration ttl);
+    void storeResetToken(String resetToken, String userId, Duration ttl);
 
     String consumeResetToken(String resetToken);
 }

@@ -316,6 +316,60 @@
 - 403 Forbidden (not owner of organization).
 - 404 Not Found (organization not found).
 
+### GET /api/v1/organizations/{organizationId}/staff
+
+**Security:** Bearer Token (Organizer)
+
+**Query Parameters:**
+
+| Field | Type | Required | Constraints / Business Rules            |
+| :---- | :--- | :------- | :-------------------------------------- |
+| page  | int  | No       | Zero-based page index. Defaults to `0`. |
+| size  | int  | No       | Page size. Defaults to `20`.            |
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Staff list retrieved",
+  "data": {
+    "items": [
+      {
+        "id": "d4f5a1a1-1f7d-4d59-8aa1-5bce7d7e1c10",
+        "email": "staff1@unihub.edu",
+        "fullName": "Jordan Lee",
+        "role": "STAFF",
+        "status": "ACTIVE",
+        "isTemporaryPassword": false
+      }
+    ],
+    "pagination": {
+      "page": 0,
+      "size": 20,
+      "totalElements": 1,
+      "totalPages": 1,
+      "hasNext": false,
+      "hasPrevious": false
+    }
+  },
+  "metadata": {
+    "statusCode": 200,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-14T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+The response follows the standard list/pagination envelope: the staff records are placed in `data.items`, and the pagination details are placed in `data.pagination`.
+
+**Common Errors:**
+
+- 401 Unauthorized (missing/invalid token).
+- 403 Forbidden (organization not owned by caller).
+- 404 Not Found (organization not found).
+
 ### POST /api/v1/organizations/{organizationId}/staff
 
 **Security:** Bearer Token (Organizer)

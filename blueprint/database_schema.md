@@ -27,6 +27,8 @@ erDiagram
   organizations {
     uuid id PK
     varchar name
+    text description
+    varchar address
     varchar status
     uuid organizer_id FK
     datetime created_at
@@ -298,6 +300,8 @@ erDiagram
 | :----------- | :----------- | :------------------------------------------------ | :---------------- | :-------------------- | :--------------------------------------- |
 | id           | UUID         | PK                                                | gen_random_uuid() | UNIQUE B-Tree (id)    | Primary key.                             |
 | name         | VARCHAR(200) | NOT NULL                                          | None              | B-Tree (name)         | Organization or department name.         |
+| description  | TEXT         | NULL                                              | NULL              | None                  | Optional organization description.       |
+| address      | VARCHAR(255) | NULL                                              | NULL              | None                  | Optional organization address.           |
 | status       | VARCHAR(20)  | NOT NULL, CHECK (status IN ('ACTIVE','INACTIVE')) | 'ACTIVE'          | B-Tree (status)       | Organization lifecycle status.           |
 | organizer_id | UUID         | FK -> users(id) ON DELETE RESTRICT                | None              | B-Tree (organizer_id) | Organizer who manages this organization. |
 | created_at   | TIMESTAMPTZ  | NOT NULL                                          | now()             | B-Tree (created_at)   | Audit timestamp.                         |

@@ -12,7 +12,7 @@ import com.unihub.workshop.iam.application.dto.ResendOtpRequest;
 import com.unihub.workshop.iam.application.dto.ResetPasswordRequest;
 import com.unihub.workshop.iam.application.dto.VerifyOtpRequest;
 import com.unihub.workshop.iam.application.dto.VerifyOtpResponse;
-import com.unihub.workshop.iam.application.usecases.AuthenticationUseCase;
+import com.unihub.workshop.iam.application.usecases.AuthUseCase;
 import com.unihub.workshop.iam.application.usecases.UseCaseResult;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ResponseFactory;
@@ -26,13 +26,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(path = "/api/v1/auth", produces = MediaType.APPLICATION_JSON_VALUE)
-public class AuthenticationController {
+public class AuthController {
 
-    private final AuthenticationUseCase authenticationUseCase;
+    private final AuthUseCase authenticationUseCase;
     private final ResponseFactory responseFactory;
 
-    public AuthenticationController(
-            AuthenticationUseCase authenticationUseCase,
+    public AuthController(
+            AuthUseCase authenticationUseCase,
             ResponseFactory responseFactory) {
         this.authenticationUseCase = authenticationUseCase;
         this.responseFactory = responseFactory;
@@ -82,8 +82,7 @@ public class AuthenticationController {
     public ResponseEntity<ApiResponse<ForgotPasswordResponse>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
         UseCaseResult<ForgotPasswordResponse> result = authenticationUseCase.forgotPassword(request);
-        ApiResponse<ForgotPasswordResponse> body = responseFactory.success(result.data(), result.message(),
-                result.status());
+        ApiResponse<ForgotPasswordResponse> body = responseFactory.success(result.data(), result.message(), result.status());
         return ResponseEntity.status(result.status()).body(body);
     }
 

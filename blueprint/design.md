@@ -1022,10 +1022,10 @@ backend/
 │   │   │   │   ├── observability/                         # Logging, audit, and request context
 │   │   │   │   └── config/                                # Infra config (Redis, RabbitMQ, MinIO, SpringDoc)
 │   │   │   │
-│   │   │   ├── iam/                                       # Identity and access management (users, auth, orgs, admin)
+│   │   │   ├── iam/                                       # Identity and access management (users, auth, organizations)
 │   │   │   │   ├── contracts/                             # Public facades for other modules
 │   │   │   │   ├── domain/                                # Identity aggregates and policies
-│   │   │   │   │   ├── model/                             # Users, orgs, roles, credentials
+│   │   │   │   │   ├── model/                             # Users, organizations, roles, credentials
 │   │   │   │   │   ├── events/                            # Account and security lifecycle events
 │   │   │   │   │   └── repository/                        # Ports for persistence and external services
 │   │   │   │   ├── application/                           # Use cases (login, otp, provisioning)
@@ -1039,102 +1039,11 @@ backend/
 │   │   │   │       └── controller/
 │   │   │   │
 │   │   │   ├── workshops/                                 # Workshop lifecycle, search, brochures, assignments
-│   │   │   │   ├── contracts/                             # Public facades for other modules
-│   │   │   │   ├── domain/                                # Workshop aggregates and invariants
-│   │   │   │   │   ├── model/                             # Workshops, speakers, assignments
-│   │   │   │   │   ├── events/                            # Lifecycle and brochure events
-│   │   │   │   │   └── repository/                        # Ports for persistence and storage
-│   │   │   │   ├── application/                           # Use cases (draft, publish, search)
-│   │   │   │   │   ├── usecases/                          # Orchestrates workshop flows
-│   │   │   │   │   └── dto/                               # Request/response models
-│   │   │   │   ├── infrastructure/                        # DB, FTS, S3, event publication adapters
-│   │   │   │   │   ├── persistence/
-│   │   │   │   │   ├── storage/                           # MinIO client and brochure storage
-│   │   │   │   │   ├── search/                            # Postgres FTS adapters
-│   │   │   │   │   └── event_publication/
-│   │   │   │   └── presentation/
-│   │   │   │       └── controller/
-│   │   │   │
-│   │   │   ├── registration/                              # Seat allocation, payments, tickets, idempotency
-│   │   │   │   ├── contracts/                             # Public facades for other modules
-│   │   │   │   ├── domain/                                # Registration aggregates and rules
-│   │   │   │   │   ├── model/                             # Registrations, payments, idempotency
-│   │   │   │   │   ├── events/                            # Registration lifecycle events
-│   │   │   │   │   └── repository/                        # Ports for persistence and payment gateway
-│   │   │   │   ├── application/                           # Use cases (register, cancel, qr)
-│   │   │   │   │   ├── usecases/                          # Orchestrates payment and seat logic
-│   │   │   │   │   └── dto/                               # Request/response models
-│   │   │   │   ├── infrastructure/                        # DB, event publication, payment adapter
-│   │   │   │   │   ├── persistence/
-│   │   │   │   │   ├── event_publication/
-│   │   │   │   │   └── payment/                           # Stripe + ChaosMock adapter
-│   │   │   │   └── presentation/
-│   │   │   │       └── controller/
-│   │   │   │
+│   │   │   ├── registrations/                             # Seat allocation, payments, tickets, idempotency
 │   │   │   ├── attendance/                                # Check-in, offline sync, real-time metrics
-│   │   │   │   ├── contracts/                             # Public facades for other modules
-│   │   │   │   ├── domain/                                # Attendance invariants and QR rules
-│   │   │   │   │   ├── model/                             # Attendance records and scan events
-│   │   │   │   │   ├── events/                            # Check-in lifecycle events
-│   │   │   │   │   └── repository/                        # Ports for persistence and QR verification
-│   │   │   │   ├── application/                           # Use cases (sync, roster, stats)
-│   │   │   │   │   ├── usecases/
-│   │   │   │   │   └── dto/
-│   │   │   │   ├── infrastructure/                        # DB, QR verification, event publication
-│   │   │   │   │   ├── persistence/
-│   │   │   │   │   ├── qr/
-│   │   │   │   │   └── event_publication/
-│   │   │   │   └── presentation/
-│   │   │   │       └── controller/
-│   │   │   │
-│   │   │   ├── notifications/                             # Templates, in-app inbox, delivery orchestration
-│   │   │   │   ├── contracts/                             # Public facades for other modules
-│   │   │   │   ├── domain/                                # Notification policies and templates
-│   │   │   │   │   ├── model/
-│   │   │   │   │   ├── events/
-│   │   │   │   │   └── repository/
-│   │   │   │   ├── application/                           # Use cases (send, retry, log)
-│   │   │   │   │   ├── usecases/
-│   │   │   │   │   └── dto/
-│   │   │   │   ├── infrastructure/                        # Providers, templating, inbox storage
-│   │   │   │   │   ├── persistence/
-│   │   │   │   │   ├── providers/                         # Email and future channels
-│   │   │   │   │   └── event_publication/
-│   │   │   │   └── presentation/
-│   │   │   │       └── controller/
-│   │   │   │
+│   │   │   ├── notifications/                             # Templates, email/in-app inbox, delivery orchestration
 │   │   │   ├── ai/                                        # Async summarization pipeline
-│   │   │   │   ├── contracts/                             # Public facades for other modules
-│   │   │   │   ├── domain/                                # Summary job state and policies
-│   │   │   │   │   ├── model/
-│   │   │   │   │   ├── events/
-│   │   │   │   │   └── repository/
-│   │   │   │   ├── application/                           # Use cases (enqueue, poll, store)
-│   │   │   │   │   ├── usecases/
-│   │   │   │   │   └── dto/
-│   │   │   │   ├── infrastructure/                        # AI client, storage, worker adapters
-│   │   │   │   │   ├── persistence/
-│   │   │   │   │   ├── ai_client/
-│   │   │   │   │   └── event_publication/
-│   │   │   │   └── presentation/
-│   │   │   │       └── controller/
-│   │   │   │
 │   │   │   └── ingestion/                                 # CSV ingestion, quarantine, alerts
-│   │   │       ├── contracts/                             # Public facades for other modules
-│   │   │       ├── domain/                                # Batch state and validation rules
-│   │   │       │   ├── model/
-│   │   │       │   ├── events/
-│   │   │       │   └── repository/
-│   │   │       ├── application/                           # Use cases (trigger, report)
-│   │   │       │   ├── usecases/
-│   │   │       │   └── dto/
-│   │   │       ├── infrastructure/                        # Spring Batch, S3, event publication adapters
-│   │   │       │   ├── persistence/
-│   │   │       │   ├── batch/
-│   │   │       │   ├── storage/
-│   │   │       │   └── event_publication/
-│   │   │       └── presentation/
-│   │   │           └── controller/
 │   │   │
 │   │   └── resources/
 │   │       ├── application.yml
@@ -1397,11 +1306,14 @@ All fields must be present in every response. If a field is not applicable (for 
         "title": "Design Systems"
       }
     ],
-    "page": 0,
-    "size": 20,
-    "total": 120,
-    "hasPrev": false,
-    "hasNext": true
+    "pagination": {
+      "page": 0,
+      "size": 20,
+      "totalElements": 1,
+      "totalPages": 1,
+      "hasNext": false,
+      "hasPrevious": false
+    }
   },
   "metadata": {
     "statusCode": 200,
@@ -1443,11 +1355,11 @@ To keep operational complexity low during initial launch, the system relies excl
 
 #### API Request Logs
 
-Every incoming API request is intercepted and logged on completion using a strict format: `[Method] [Endpoint] [Code] - [ResponseTime] - [Message]`.
+Every incoming API request is intercepted and logged on completion using the structured format emitted by `RequestLoggingFilter`: `[METHOD] [URI] [STATUS] - [DURATION]ms - processedBy=[instance] - clientIp=[ip] - userAgent=[agent]`.
 
 ```text
-[INFO] POST /api/v1/registrations 201 - 45ms - Workshop registered successfully
-[ERROR] POST /api/v1/registrations 409 - 120ms - Workshop capacity exceeded
+[INFO] POST /api/v1/organizations/7f3c4db8-1d1a-4f1f-a7b8-0f3a4d9f8d11/staff 200 - 18ms - processedBy=unihub-app-1 - clientIp=192.168.1.4 - userAgent=Mozilla/5.0
+[INFO] PATCH /api/v1/users/me 200 - 12ms - processedBy=unihub-app-1 - clientIp=192.168.1.4 - userAgent=Mozilla/5.0
 ```
 
 #### System & Worker Logs
