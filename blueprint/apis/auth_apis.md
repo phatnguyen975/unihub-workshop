@@ -321,6 +321,50 @@
 - 403 Forbidden (user status UNVERIFIED or LOCKED).
 - 429 Too Many Requests (temporary lockout).
 
+### POST /api/v1/auth/refresh
+
+**Security:** Public (Guest)
+
+**Request Body:**
+
+```json
+{
+  "refreshToken": "jwt-refresh-token"
+}
+```
+
+| Field        | Type   | Required | Constraints / Business Rules                |
+| :----------- | :----- | :------- | :------------------------------------------ |
+| refreshToken | string | Yes      | Must be a valid, non-expired refresh token. |
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Token refreshed",
+  "data": {
+    "accessToken": "new-jwt-access-token",
+    "refreshToken": "new-jwt-refresh-token",
+    "tokenType": "Bearer",
+    "expiresInSeconds": 900,
+    "refreshExpiresInSeconds": 2592000,
+    "refreshTokenRotated": true
+  },
+  "metadata": {
+    "statusCode": 200,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-11T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+**Common Errors:**
+
+- 401 Unauthorized (missing/invalid/expired/revoked refresh token).
+- 403 Forbidden (user not ACTIVE).
+
 ### POST /api/v1/auth/forgot-password
 
 **Security:** Public (Guest)

@@ -86,6 +86,94 @@
 - 400 Bad Request (malformed refresh token).
 - 401 Unauthorized (missing/invalid token).
 
+### GET /api/v1/users/me
+
+**Security:** Bearer Token (Student, Organizer, Staff)
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Profile retrieved",
+  "data": {
+    "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
+    "email": "student@unihub.edu",
+    "fullName": "Ava Student",
+    "phone": "+1-555-0100",
+    "role": "STUDENT",
+    "status": "ACTIVE",
+    "organizationId": null,
+    "studentId": "STU-10992",
+    "isTemporaryPassword": false
+  },
+  "metadata": {
+    "statusCode": 200,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-11T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+> [!NOTE]
+> The `studentId` can be `null` for users who registered manually and have not yet been matched by the nightly CSV ingestion process.
+
+**Common Errors:**
+
+- 401 Unauthorized (missing/invalid token).
+- 404 Not Found (user not found).
+
+### PATCH /api/v1/users/me
+
+**Security:** Bearer Token (Student, Organizer, Staff)
+
+**Request Body:**
+
+```json
+{
+  "fullName": "Ava B. Student",
+  "phone": "+1-555-0101"
+}
+```
+
+| Field    | Type   | Required | Constraints / Business Rules                                                                               |
+| :------- | :----- | :------- | :--------------------------------------------------------------------------------------------------------- |
+| fullName | string | No       | If provided, must be non-empty string. Cannot be set to `null`.                                            |
+| phone    | string | No       | If provided, must be a valid phone format. If explicitly sent as `null`, the phone number will be cleared. |
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Profile updated",
+  "data": {
+    "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
+    "email": "student@unihub.edu",
+    "fullName": "Ava B. Student",
+    "phone": "+1-555-0101",
+    "role": "STUDENT",
+    "status": "ACTIVE",
+    "organizationId": null,
+    "studentId": "STU-10992",
+    "isTemporaryPassword": false
+  },
+  "metadata": {
+    "statusCode": 200,
+    "processedBy": "unihub-app-1",
+    "timestamp": "2026-05-11T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+**Common Errors:**
+
+- 400 Bad Request (validation).
+- 401 Unauthorized (missing/invalid token).
+- 404 Not Found (user not found).
+
 ### PUT /api/v1/users/me/password
 
 **Security:** Bearer Token (Student, Organizer, Staff)
@@ -126,144 +214,13 @@
 
 **Post-Condition:**
 
-- The system sets `isTemporaryPassword` to `false` in the `USERS` table after a successful password update.
+- The system sets `isTemporaryPassword` to `false` in the `users` table after a successful password update.
 - The response confirms that `isTemporaryPassword` is now `false`.
 
 **Common Errors:**
 
 - 400 Bad Request (validation or weak password).
 - 401 Unauthorized (missing token or current password mismatch).
-
-### GET /api/v1/users/me
-
-**Security:** Bearer Token (Student, Organizer, Staff)
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Profile retrieved",
-  "data": {
-    "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
-    "email": "student@unihub.edu",
-    "fullName": "Ava Student",
-    "phone": "+1-555-0100",
-    "role": "STUDENT",
-    "status": "ACTIVE",
-    "organizationId": null,
-    "studentId": "STU-10992",
-    "isTemporaryPassword": false
-  },
-  "metadata": {
-    "statusCode": 200,
-    "processedBy": "unihub-app-1",
-    "timestamp": "2026-05-11T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-> **Developer Note:** `studentId` can be `null` for users who registered manually and have not yet been matched by the nightly CSV ingestion process.
-
-**Common Errors:**
-
-- 401 Unauthorized (missing/invalid token).
-- 404 Not Found (user not found).
-
-### PATCH /api/v1/users/me
-
-**Security:** Bearer Token (Student, Organizer, Staff)
-
-**Request Body:**
-
-```json
-{
-  "fullName": "Ava B. Student",
-  "phone": "+1-555-0101"
-}
-```
-
-| Field    | Type   | Required | Constraints / Business Rules                                                                               |
-| :------- | :----- | :------- | :--------------------------------------------------------------------------------------------------------- |
-| fullName | string | No       | If provided, must be non-empty string. Cannot be set to null.                                              |
-| phone    | string | No       | If provided, must be a valid phone format. If explicitly sent as `null`, the phone number will be cleared. |
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Profile updated",
-  "data": {
-    "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
-    "email": "student@unihub.edu",
-    "fullName": "Ava B. Student",
-    "phone": "+1-555-0101",
-    "role": "STUDENT",
-    "status": "ACTIVE",
-    "organizationId": null,
-    "studentId": "STU-10992",
-    "isTemporaryPassword": false
-  },
-  "metadata": {
-    "statusCode": 200,
-    "processedBy": "unihub-app-1",
-    "timestamp": "2026-05-11T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-**Common Errors:**
-
-- 400 Bad Request (validation).
-- 401 Unauthorized (missing/invalid token).
-- 404 Not Found (user not found).
-
-### POST /api/v1/auth/refresh
-
-**Security:** Public (Guest, refresh token required)
-
-**Request Body:**
-
-```json
-{
-  "refreshToken": "jwt-refresh-token"
-}
-```
-
-| Field        | Type   | Required | Constraints / Business Rules                |
-| :----------- | :----- | :------- | :------------------------------------------ |
-| refreshToken | string | Yes      | Must be a valid, non-expired refresh token. |
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Token refreshed",
-  "data": {
-    "accessToken": "new-jwt-access-token",
-    "refreshToken": "new-jwt-refresh-token",
-    "tokenType": "Bearer",
-    "expiresInSeconds": 900,
-    "refreshExpiresInSeconds": 2592000,
-    "refreshTokenRotated": true
-  },
-  "metadata": {
-    "statusCode": 200,
-    "processedBy": "unihub-app-1",
-    "timestamp": "2026-05-11T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-**Common Errors:**
-
-- 401 Unauthorized (missing/invalid/expired/revoked refresh token).
-- 403 Forbidden (user not ACTIVE).
 
 ### POST /api/v1/organizations
 
@@ -379,7 +336,8 @@
 | fullName | string | Yes      | Non-empty.                                                       |
 | role     | string | Yes      | One of `STAFF`; client cannot provision higher privileged roles. |
 
-**Note:** The organizer does not provide a password. The system generates a cryptographically strong temporary password and sends it to the staff member's email through an internal event.
+> [!NOTE]
+> The organizer does not provide a password. The system generates a cryptographically strong temporary password and sends it to the staff member's email through an internal event.
 
 **Success Response (201):**
 
