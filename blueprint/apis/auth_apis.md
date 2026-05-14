@@ -1,4 +1,4 @@
-# UniHub Workshop - Auth API Contracts
+# UniHub Workshop - Authentication API Contracts
 
 ## 1. Conventions
 
@@ -46,8 +46,8 @@
 
 - **Required headers:**
   - Rate-limited endpoints may return `X-RateLimit-Remaining` and `X-RateLimit-Retry-After`.
-  - **Note:** All endpoints in this module are public and DO NOT require an Authorization header.
-- **Security notes:** `refreshToken` is returned in the JSON body for cross-platform parity (Web + Android). Web clients must store it securely (avoid plain `LocalStorage` when possible) to mitigate XSS risk.
+  - All endpoints in this module are public and DO NOT require an `Authorization` header.
+- **Security:** `refreshToken` is returned in the JSON body for cross-platform parity (Web + Android). Web clients must store it securely (avoid plain `LocalStorage` when possible) to mitigate XSS risk.
 - All JSON keys are **camelCase**.
 
 ## 2. Contracts
@@ -143,7 +143,7 @@
 | otp    | string | Yes      | Exactly 6 digits.                    |
 | intent | string | Yes      | One of `REGISTER`, `RESET_PASSWORD`. |
 
-**Success Response (REGISTER, 200):**
+**Success Response (`REGISTER`, 200):**
 
 ```json
 {
@@ -162,7 +162,7 @@
 }
 ```
 
-**Success Response (RESET_PASSWORD, 200):**
+**Success Response (`RESET_PASSWORD`, 200):**
 
 ```json
 {
@@ -259,7 +259,6 @@
     "tokenType": "Bearer",
     "expiresInSeconds": 900,
     "refreshExpiresInSeconds": 2592000,
-    "passwordChangeRequired": false,
     "user": {
       "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
       "email": "student@unihub.edu",
@@ -281,7 +280,8 @@
 }
 ```
 
-> **Developer Note:** `studentId` can be `null` for users who registered manually and have not yet been matched by the nightly CSV ingestion process.
+> [!NOTE]
+> The `studentId` can be `null` for users who registered manually and have not yet been matched by the nightly CSV ingestion process.
 
 **Alternate Success (Password Change Required, 200):**
 
@@ -294,7 +294,6 @@
     "refreshToken": null,
     "tokenType": "Bearer",
     "expiresInSeconds": 900,
-    "passwordChangeRequired": true,
     "user": {
       "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
       "email": "staff@unihub.edu",
@@ -321,50 +320,6 @@
 - 401 Unauthorized (invalid credentials).
 - 403 Forbidden (user status UNVERIFIED or LOCKED).
 - 429 Too Many Requests (temporary lockout).
-
-### POST /api/v1/auth/refresh
-
-**Security:** Public (Guest, refresh token required)
-
-**Request Body:**
-
-```json
-{
-  "refreshToken": "jwt-refresh-token"
-}
-```
-
-| Field        | Type   | Required | Constraints / Business Rules                |
-| :----------- | :----- | :------- | :------------------------------------------ |
-| refreshToken | string | Yes      | Must be a valid, non-expired refresh token. |
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Token refreshed",
-  "data": {
-    "accessToken": "new-jwt-access-token",
-    "refreshToken": "new-jwt-refresh-token",
-    "tokenType": "Bearer",
-    "expiresInSeconds": 900,
-    "refreshExpiresInSeconds": 2592000,
-    "refreshTokenRotated": true
-  },
-  "metadata": {
-    "statusCode": 200,
-    "processedBy": "unihub-app-1",
-    "timestamp": "2026-05-11T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-**Common Errors:**
-
-- 401 Unauthorized (missing/invalid/expired/revoked refresh token).
-- 403 Forbidden (user not ACTIVE).
 
 ### POST /api/v1/auth/forgot-password
 
@@ -399,12 +354,6 @@
   "error": null
 }
 ```
-
-**Common Errors:**
-
-- 400 Bad Request (invalid email).
-- 429 Too Many Requests (OTP cooldown).
-- 503 Service Unavailable (Redis/event publication failure).
 
 ### POST /api/v1/auth/reset-password
 
