@@ -105,6 +105,7 @@
     "status": "ACTIVE",
     "organizationId": null,
     "studentId": "STU-10992",
+    "lastLoginAt": "2026-05-11T10:00:00Z",
     "isTemporaryPassword": false
   },
   "metadata": {
@@ -157,6 +158,7 @@
     "status": "ACTIVE",
     "organizationId": null,
     "studentId": "STU-10992",
+    "lastLoginAt": "2026-05-11T10:00:00Z",
     "isTemporaryPassword": false
   },
   "metadata": {
@@ -341,6 +343,7 @@
         "fullName": "Jordan Lee",
         "role": "STAFF",
         "status": "ACTIVE",
+        "lastLoginAt": "2026-05-11T10:00:00Z",
         "isTemporaryPassword": false
       }
     ],
@@ -405,6 +408,7 @@ The response follows the standard list/pagination envelope: the staff records ar
     "fullName": "New Staff",
     "role": "STAFF",
     "organizationId": "org-12345",
+    "lastLoginAt": null,
     "isTemporaryPassword": true
   },
   "metadata": {

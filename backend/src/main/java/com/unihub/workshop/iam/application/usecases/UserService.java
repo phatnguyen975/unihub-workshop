@@ -153,13 +153,14 @@ public class UserService implements UserUseCase {
         User organizer = loadOrganizer(userId);
         Organization organization = loadOwnedOrganization(organizer, organizationId);
 
-        Page<User> staffPage = userRepository.findByOrganizationIdAndRole(organization.getId(), UserRole.STAFF, pageable);
+        Page<User> staffPage = userRepository.findByOrganizationIdAndRole(organization.getId(), UserRole.STAFF,
+                pageable);
         List<OrganizationStaffResponse> staff = staffPage.getContent().stream()
                 .map(this::toOrganizationStaffResponse)
                 .toList();
 
         OrganizationStaffPageResponse response = new OrganizationStaffPageResponse(
-            staff,
+                staff,
                 new PaginationMetadata(
                         staffPage.getNumber(),
                         staffPage.getSize(),
@@ -220,6 +221,7 @@ public class UserService implements UserUseCase {
                 staff.getFullName(),
                 staff.getRole().name(),
                 organization.getId().toString(),
+                staff.getLastLoginAt() == null ? null : staff.getLastLoginAt().toString(),
                 true);
         return new UseCaseResult<>(HttpStatus.CREATED, "Staff account provisioned", response);
     }
@@ -270,9 +272,11 @@ public class UserService implements UserUseCase {
     }
 
     private Organization loadOwnedOrganization(User organizer, String organizationId) {
-        UUID parsedOrganizationId = parseUuid(organizationId, HttpStatus.BAD_REQUEST, "Invalid organization identifier", "validation");
+        UUID parsedOrganizationId = parseUuid(organizationId, HttpStatus.BAD_REQUEST, "Invalid organization identifier",
+                "validation");
         Organization organization = organizationRepository.findById(parsedOrganizationId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Organization not found", "organization_not_found"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Organization not found",
+                        "organization_not_found"));
         if (!organizer.getId().equals(organization.getOrganizerId())) {
             throw new AppException(HttpStatus.FORBIDDEN, "Organization is outside organizer ownership", "forbidden");
         }
@@ -367,6 +371,7 @@ public class UserService implements UserUseCase {
                 user.getStatus() == null ? null : user.getStatus().name(),
                 user.getOrganizationId() == null ? null : user.getOrganizationId().toString(),
                 user.getStudentId(),
+                user.getLastLoginAt() == null ? null : user.getLastLoginAt().toString(),
                 user.isTemporaryPassword());
     }
 
@@ -387,6 +392,7 @@ public class UserService implements UserUseCase {
                 user.getFullName(),
                 user.getRole() == null ? null : user.getRole().name(),
                 user.getStatus() == null ? null : user.getStatus().name(),
+                user.getLastLoginAt() == null ? null : user.getLastLoginAt().toString(),
                 user.isTemporaryPassword());
     }
 }

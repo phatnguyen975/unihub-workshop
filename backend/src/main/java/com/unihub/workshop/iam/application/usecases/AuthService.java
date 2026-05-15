@@ -110,7 +110,7 @@ public class AuthService implements AuthUseCase {
         userRepository.save(user);
 
         String otp = otpGenerator.generateOtp();
-        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
         log.info("TEMP TEST ONLY - Generated registration OTP for {}: {}", email, otp);
         saveOtpAndCooldown(email, otp);
         publishEvent(new UserRegisteredEvent(email, request.fullName()));
@@ -184,7 +184,7 @@ public class AuthService implements AuthUseCase {
                 throw new AppException(HttpStatus.NOT_FOUND, "Email not found", "not_found");
             }
             String otp = otpGenerator.generateOtp();
-            // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+            // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
             log.info("TEMP TEST ONLY - Generated registration OTP resend for {}: {}", email, otp);
             saveOtpAndCooldown(email, otp);
             publishEvent(new UserRegisteredEvent(email, user.getFullName()));
@@ -195,7 +195,7 @@ public class AuthService implements AuthUseCase {
             throw new AppException(HttpStatus.NOT_FOUND, "Email not found", "not_found");
         }
         String otp = otpGenerator.generateOtp();
-        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
         log.info("TEMP TEST ONLY - Generated forgot-password OTP for {}: {}", email, otp);
         saveOtpAndCooldown(email, otp);
         publishEvent(new PasswordResetRequestedEvent(email));
@@ -230,6 +230,11 @@ public class AuthService implements AuthUseCase {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials", "invalid_credentials");
         }
 
+        user.setFailedLoginAttempts(0);
+        user.setLockoutUntil(null);
+        user.setLastLoginAt(now);
+        userRepository.save(user);
+
         if (user.isTemporaryPassword()) {
             String accessToken = jwtTokenProvider.generateRestrictedAccessToken(user);
             LoginResponse response = new LoginResponse(
@@ -241,11 +246,6 @@ public class AuthService implements AuthUseCase {
                     toLoginUserResponse(user));
             return new UseCaseResult<>(HttpStatus.OK, "Password change required", response);
         }
-
-        user.setFailedLoginAttempts(0);
-        user.setLockoutUntil(null);
-        user.setLastLoginAt(now);
-        userRepository.save(user);
 
         String accessToken = jwtTokenProvider.generateAccessToken(user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user);
@@ -349,7 +349,7 @@ public class AuthService implements AuthUseCase {
         }
 
         String otp = otpGenerator.generateOtp();
-        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
         log.info("TEMP TEST ONLY - Generated forgot-password OTP for {}: {}", email, otp);
         saveOtpAndCooldown(email, otp);
         publishEvent(new PasswordResetRequestedEvent(email));
@@ -418,6 +418,7 @@ public class AuthService implements AuthUseCase {
                 user.getStatus() == null ? null : user.getStatus().name(),
                 user.getOrganizationId() == null ? null : user.getOrganizationId().toString(),
                 user.getStudentId(),
+                user.getLastLoginAt() == null ? null : user.getLastLoginAt().toString(),
                 user.isTemporaryPassword());
     }
 

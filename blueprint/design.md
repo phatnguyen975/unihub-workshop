@@ -404,6 +404,8 @@ erDiagram
   ORGANIZATIONS {
     uuid id PK
     string name
+    string description
+    string address
     uuid organizer_id FK
   }
 
@@ -1034,6 +1036,7 @@ backend/
 │   │   │   │   ├── infrastructure/                        # Adapters for DB, Redis, mail, JWT
 │   │   │   │   │   ├── persistence/                       # JPA repositories and mappings
 │   │   │   │   │   ├── security/                          # Token issuance, hashing, blocklists
+│   │   │   │   │   ├── bootstrap/                         # Startup seeding and initialization runners
 │   │   │   │   │   └── event_publication/                 # Emits verification and reset events
 │   │   │   │   └── presentation/                          # Controllers and API endpoints
 │   │   │   │       └── controller/

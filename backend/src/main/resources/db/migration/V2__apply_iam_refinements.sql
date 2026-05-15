@@ -1,3 +1,0 @@
-ALTER TABLE organizations
-  ADD COLUMN IF NOT EXISTS description TEXT,
-  ADD COLUMN IF NOT EXISTS address VARCHAR(255);

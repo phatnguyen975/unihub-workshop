@@ -9,5 +9,6 @@ public record UserProfileResponse(
         String status,
         String organizationId,
         String studentId,
+        String lastLoginAt,
         boolean isTemporaryPassword) {
 }

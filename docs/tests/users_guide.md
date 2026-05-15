@@ -15,8 +15,8 @@ Create a Postman environment with these variables:
 - `staffEmail` = `staff.new@unihub.edu`
 - `organizationId` = empty string
 - `organizationName` = `Faculty of Information Technology`
-- `organizerPassword` = `Password123!`
-- `organizerNewPassword` = `Password456!`
+- `studentPassword` = `Password123!`
+- `studentNewPassword` = `Password456!`
 
 ### Global Checks
 
@@ -121,6 +121,7 @@ Fetch the authenticated user profile.
     "status": "ACTIVE",
     "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
     "studentId": null,
+    "lastLoginAt": "2026-05-11T10:00:00Z",
     "isTemporaryPassword": false
   },
   "metadata": {
@@ -173,6 +174,7 @@ Update the authenticated user profile using partial-field semantics.
     "status": "ACTIVE",
     "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
     "studentId": null,
+    "lastLoginAt": "2026-05-11T10:00:00Z",
     "isTemporaryPassword": false
   },
   "metadata": {
@@ -205,9 +207,9 @@ Change the authenticated user's password and clear the temporary-password restri
 
 ```json
 {
-  "currentPassword": "{{organizerPassword}}",
-  "newPassword": "{{organizerNewPassword}}",
-  "confirmPassword": "{{organizerNewPassword}}"
+  "currentPassword": "{{studentPassword}}",
+  "newPassword": "{{studentNewPassword}}",
+  "confirmPassword": "{{studentNewPassword}}"
 }
 ```
 
@@ -357,6 +359,7 @@ Fetch the organizer's staff list with pagination.
         "fullName": "Jordan Lee",
         "role": "STAFF",
         "status": "ACTIVE",
+        "lastLoginAt": "2026-05-11T10:00:00Z",
         "isTemporaryPassword": false
       }
     ],
@@ -418,6 +421,7 @@ Provision a new staff account tied to the organizer's organization.
     "fullName": "New Staff",
     "role": "STAFF",
     "organizationId": "org-12345",
+    "lastLoginAt": null,
     "isTemporaryPassword": true
   },
   "metadata": {

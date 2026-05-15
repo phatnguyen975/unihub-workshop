@@ -288,6 +288,7 @@ Exchange valid credentials for JWT access and refresh tokens.
       "status": "ACTIVE",
       "organizationId": null,
       "studentId": null,
+      "lastLoginAt": "2026-05-11T10:00:00Z",
       "isTemporaryPassword": false
     }
   },

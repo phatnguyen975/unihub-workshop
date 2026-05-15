@@ -30,6 +30,8 @@ CREATE TABLE users (
 CREATE TABLE organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(200) NOT NULL,
+  description TEXT,
+  address VARCHAR(255),
   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE')),
   organizer_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

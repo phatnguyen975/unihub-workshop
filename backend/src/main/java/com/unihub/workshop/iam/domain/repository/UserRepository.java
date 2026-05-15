@@ -16,4 +16,6 @@ public interface UserRepository {
     Page<User> findByOrganizationIdAndRole(UUID organizationId, UserRole role, Pageable pageable);
 
     User save(User user);
+
+    <S extends User> S saveAndFlush(S entity);
 }
