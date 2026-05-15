@@ -150,14 +150,14 @@ sequenceDiagram
           alt Payment success
             Pay-->>API: Approved
             API->>DB: Begin tx
-            API->>DB: Update registration (PAID) + event publication
+            API->>DB: Update registration (CONFIRMED) + event publication
             API->>DB: Commit
             API-->>Web: 201 + QR code
           else Timeout or failure
             Pay-->>API: Timeout/Error
             Note over API,Pay: Resilience4j circuit breaker trips
             API->>DB: Begin tx
-            API->>DB: Update registration (FAILED)
+            API->>DB: Update registration (CANCELED)
             API->>DB: Increment capacity (compensating action)
             API->>DB: Commit
             API-->>Web: 502 or 202
@@ -174,12 +174,12 @@ sequenceDiagram
 
   Note over Sweeper,DB: Background sweep for expired PENDING > 15m
   Sweeper->>DB: Select PENDING registrations > 15m
-  Sweeper->>DB: Mark FAILED + increment capacity (compensate)
+  Sweeper->>DB: Mark CANCELED + increment capacity (compensate)
 ```
 
 - **Idempotency barrier:** The API checks the idempotency key before any reservation logic, returning a cached success response on retries to avoid double processing.
 - **Short-lived pessimistic locking:** The capacity lock is held only inside the reservation transaction and released before any payment call, preventing long-held locks and connection pool exhaustion.
-- **Compensating transactions:** Failed or timed-out payments transition the registration to `FAILED` and increment capacity, ensuring the final seat is not lost.
+- **Compensating transactions:** Timed-out or failed payments transition the registration to `CANCELED` and increment capacity, ensuring the final seat is not lost.
 - **Circuit breaker protection:** Resilience4j guards the payment call path and surfaces controlled failures when the gateway degrades.
 - **Event publication registry:** Confirmation notifications are persisted and externalized by Spring Modulith, decoupled from the synchronous user request.
 
@@ -213,7 +213,7 @@ sequenceDiagram
     else Invalid/Fake QR (Poison Pill Prevention)
       DB-->>API: Invalid workshop/student
       API-->>Mobile: Error (400/404)
-      Mobile->>Local: Mark Failed/Rejected
+      Mobile->>Local: Mark Rejected
     end
   end
 ```
@@ -221,7 +221,7 @@ sequenceDiagram
 - **Offline-first capture:** The mobile app records scans locally to keep check-in operational during network drops.
 - **Batch synchronization:** Pending records are synced in batches when connectivity returns, reducing request overhead.
 - **Idempotent conflict resolution:** Duplicate records return a success acknowledgment so the client can safely clear them, even if a prior response was lost.
-- **Poison Pill prevention:** Invalid QR codes are deterministically rejected and marked failed locally, preventing infinite retry loops that waste bandwidth and battery.
+- **Poison Pill prevention:** Invalid QR codes are deterministically rejected and marked rejected locally, preventing infinite retry loops that waste bandwidth and battery.
 
 ### Async AI Summarization Flow
 
@@ -432,7 +432,7 @@ erDiagram
   WORKSHOP_ASSIGNMENTS {
     uuid id PK
     uuid workshop_id FK
-    uuid organization_id FK
+    uuid staff_id FK
   }
 
   REGISTRATIONS {
@@ -456,7 +456,7 @@ erDiagram
     datetime created_at
   }
 
-  ATTENDANCE {
+  ATTENDANCES {
     uuid id PK
     uuid registration_id FK
     uuid workshop_id FK
@@ -527,7 +527,7 @@ erDiagram
   ORGANIZATIONS ||--o{ WORKSHOP_ASSIGNMENTS : "is assigned to"
   WORKSHOPS ||--o{ BROCHURES : has
   WORKSHOPS ||--o{ AI_SUMMARIES : summarizes
-  REGISTRATIONS ||--|| ATTENDANCE : results_in
+  REGISTRATIONS ||--|| ATTENDANCES : results_in
   REGISTRATIONS ||--o| PAYMENTS : paid_by
   STUDENT_IMPORT_BATCHES ||--o{ STUDENT_IMPORT_ERRORS : contains
 ```
@@ -568,10 +568,10 @@ The schema separates core domain tables (users, workshops, registrations, paymen
 
 **REGISTRATIONS**
 
-| Field Name        | Data Type (PostgreSQL) | Business/Technical Purpose                                                                     |
-| :---------------- | :--------------------- | :--------------------------------------------------------------------------------------------- |
-| `idempotency_key` | TEXT                   | Correlates retries to the same request for safe deduplication.                                 |
-| `status`          | TEXT                   | `PENDING`, `CONFIRMED`, `PAID`, `FAILED`, `CANCELED`; `FAILED` triggers capacity compensation. |
+| Field Name        | Data Type (PostgreSQL) | Business/Technical Purpose                                                                       |
+| :---------------- | :--------------------- | :----------------------------------------------------------------------------------------------- |
+| `idempotency_key` | TEXT                   | Correlates retries to the same request for safe deduplication.                                   |
+| `status`          | TEXT                   | `PENDING`, `CONFIRMED`, `CANCELED`; `CANCELED` triggers capacity compensation (restores 1 seat). |
 
 **PAYMENTS**
 
@@ -1043,10 +1043,10 @@ backend/
 │   │   │   │
 │   │   │   ├── workshops/                                 # Workshop lifecycle, search, brochures, assignments
 │   │   │   ├── registrations/                             # Seat allocation, payments, tickets, idempotency
-│   │   │   ├── attendance/                                # Check-in, offline sync, real-time metrics
+│   │   │   ├── attendances/                               # Check-in, offline sync, real-time metrics
 │   │   │   ├── notifications/                             # Templates, email/in-app inbox, delivery orchestration
 │   │   │   ├── ai/                                        # Async summarization pipeline
-│   │   │   └── ingestion/                                 # CSV ingestion, quarantine, alerts
+│   │   │   └── ingestions/                                # CSV ingestion, quarantine, alerts
 │   │   │
 │   │   └── resources/
 │   │       ├── application.yml

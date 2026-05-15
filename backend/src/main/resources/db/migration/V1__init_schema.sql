@@ -80,11 +80,11 @@ CREATE TABLE workshop_speakers (
 CREATE TABLE workshop_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workshop_id UUID NOT NULL REFERENCES workshops(id) ON DELETE CASCADE,
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
+  staff_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   assigned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_workshop_assignments UNIQUE (workshop_id, organization_id)
+  CONSTRAINT uq_workshop_assignments UNIQUE (workshop_id, staff_id)
 );
 
 CREATE TABLE registrations (
@@ -92,7 +92,7 @@ CREATE TABLE registrations (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   workshop_id UUID NOT NULL REFERENCES workshops(id) ON DELETE RESTRICT,
   idempotency_key VARCHAR(255) NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','REGISTERED','CONFIRMED','PAID','FAILED','CANCELED','CHECKED_IN')),
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','CONFIRMED','CANCELED')),
   ticket_type VARCHAR(20) NOT NULL DEFAULT 'FREE' CHECK (ticket_type IN ('FREE','PAID')),
   qr_code_payload TEXT,
   qr_issued_at TIMESTAMPTZ,
@@ -116,7 +116,7 @@ CREATE TABLE payments (
   CONSTRAINT uq_payments_provider_ref UNIQUE (provider_ref)
 );
 
-CREATE TABLE attendance (
+CREATE TABLE attendances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   registration_id UUID NOT NULL REFERENCES registrations(id) ON DELETE RESTRICT,
   checked_in_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -126,7 +126,7 @@ CREATE TABLE attendance (
   offline_mode_flag BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_attendance_registration UNIQUE (registration_id)
+  CONSTRAINT uq_attendances_registration UNIQUE (registration_id)
 );
 
 CREATE TABLE brochures (
@@ -307,7 +307,7 @@ CREATE INDEX idx_workshop_speakers_sort_order ON workshop_speakers (sort_order);
 CREATE INDEX idx_workshop_speakers_created_at ON workshop_speakers (created_at);
 CREATE INDEX idx_workshop_speakers_updated_at ON workshop_speakers (updated_at);
 
-CREATE INDEX idx_workshop_assignments_org_id ON workshop_assignments (organization_id);
+CREATE INDEX idx_workshop_assignments_staff_id ON workshop_assignments (staff_id);
 CREATE INDEX idx_workshop_assignments_assigned_at ON workshop_assignments (assigned_at);
 CREATE INDEX idx_workshop_assignments_created_at ON workshop_assignments (created_at);
 CREATE INDEX idx_workshop_assignments_updated_at ON workshop_assignments (updated_at);
@@ -320,7 +320,7 @@ CREATE INDEX idx_registrations_qr_issued_at ON registrations (qr_issued_at);
 CREATE INDEX idx_registrations_created_at ON registrations (created_at);
 CREATE INDEX idx_registrations_updated_at ON registrations (updated_at);
 CREATE UNIQUE INDEX idx_registrations_active_unique ON registrations (user_id, workshop_id)
-  WHERE status IN ('PENDING','REGISTERED','CONFIRMED','PAID','CHECKED_IN');
+  WHERE status IN ('PENDING','CONFIRMED');
 
 CREATE INDEX idx_payments_registration_id ON payments (registration_id);
 CREATE INDEX idx_payments_provider ON payments (provider);
@@ -330,12 +330,12 @@ CREATE INDEX idx_payments_created_at ON payments (created_at);
 CREATE INDEX idx_payments_updated_at ON payments (updated_at);
 CREATE INDEX idx_payments_provider_payload ON payments USING GIN (provider_payload);
 
-CREATE INDEX idx_attendance_checked_in_by ON attendance (checked_in_by_user_id);
-CREATE INDEX idx_attendance_scanned_at ON attendance (scanned_at);
-CREATE INDEX idx_attendance_checked_in_at ON attendance (checked_in_at);
-CREATE INDEX idx_attendance_source ON attendance (source);
-CREATE INDEX idx_attendance_created_at ON attendance (created_at);
-CREATE INDEX idx_attendance_updated_at ON attendance (updated_at);
+CREATE INDEX idx_attendances_checked_in_by ON attendances (checked_in_by_user_id);
+CREATE INDEX idx_attendances_scanned_at ON attendances (scanned_at);
+CREATE INDEX idx_attendances_checked_in_at ON attendances (checked_in_at);
+CREATE INDEX idx_attendances_source ON attendances (source);
+CREATE INDEX idx_attendances_created_at ON attendances (created_at);
+CREATE INDEX idx_attendances_updated_at ON attendances (updated_at);
 
 CREATE INDEX idx_brochures_workshop_id ON brochures (workshop_id);
 CREATE INDEX idx_brochures_status ON brochures (status);
@@ -449,8 +449,8 @@ BEFORE UPDATE ON payments
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_set_updated_at_attendance
-BEFORE UPDATE ON attendance
+CREATE TRIGGER trg_set_updated_at_attendances
+BEFORE UPDATE ON attendances
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
