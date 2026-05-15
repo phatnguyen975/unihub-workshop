@@ -220,7 +220,23 @@ Change the authenticated user's password and clear the temporary-password restri
   "success": true,
   "message": "Password changed",
   "data": {
-    "isTemporaryPassword": false
+    "accessToken": "jwt-access-token",
+    "refreshToken": "jwt-refresh-token",
+    "tokenType": "Bearer",
+    "expiresInSeconds": 900,
+    "refreshExpiresInSeconds": 2592000,
+    "user": {
+      "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
+      "email": "organizer@unihub.edu",
+      "fullName": "Riley Organizer",
+      "phone": "+15550000001",
+      "role": "ORGANIZER",
+      "status": "ACTIVE",
+      "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
+      "studentId": null,
+      "lastLoginAt": "2026-05-11T10:00:00Z",
+      "isTemporaryPassword": false
+    }
   },
   "metadata": {
     "statusCode": 200,
@@ -266,9 +282,10 @@ Create an organization owned by the authenticated organizer.
   "message": "Organization created",
   "data": {
     "id": "org-12345",
-    "name": "Northside Learning QA",
+    "name": "Faculty of Information Technology",
     "description": "Organizer QA org",
     "address": "123 Learning Way",
+    "status": "ACTIVE",
     "ownerId": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a"
   },
   "metadata": {
@@ -315,7 +332,10 @@ Update only the organization owned by the authenticated organizer.
   "data": {
     "id": "org-12345",
     "name": "Northside Learning QA Updated",
-    "description": "Updated description"
+    "description": "Updated description",
+    "address": "123 Learning Way",
+    "status": "ACTIVE",
+    "ownerId": "03f7237f-8049-4649-bbd7-5f3b8ca9ec07"
   },
   "metadata": {
     "statusCode": 200,
@@ -404,8 +424,7 @@ Provision a new staff account tied to the organizer's organization.
 ```json
 {
   "email": "{{staffEmail}}",
-  "fullName": "Staff One",
-  "role": "STAFF"
+  "fullName": "Staff One"
 }
 ```
 
@@ -509,8 +528,8 @@ Use this scenario immediately after provisioning a staff account.
 3. Call a protected endpoint such as `GET /api/v1/users/me` with the staff access token.
 4. Verify the call returns `403 Forbidden` because the account still has `isTemporaryPassword = true`.
 5. Call `PUT /api/v1/users/me/password` with the current temporary password and the new password.
-6. Confirm the response returns `isTemporaryPassword = false`.
-7. Re-call the same protected endpoint.
+6. Confirm the response returns a payload containing `accessToken` and `refreshToken`, and the `user` object shows `isTemporaryPassword = false`.
+7. Use the returned `accessToken` to call the protected endpoint.
 8. Confirm access is now granted and the endpoint returns the expected data.
 
 Recommended endpoint order for the check:

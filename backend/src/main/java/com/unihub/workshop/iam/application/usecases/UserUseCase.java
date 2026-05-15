@@ -10,6 +10,8 @@ import com.unihub.workshop.iam.application.dto.UpdateProfileRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusResponse;
 import com.unihub.workshop.iam.application.dto.UserProfileResponse;
+import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
+import com.unihub.workshop.iam.application.dto.LogoutRequest;
 import org.springframework.data.domain.Pageable;
 
 public interface UserUseCase {
@@ -27,4 +29,8 @@ public interface UserUseCase {
     UseCaseResult<ProvisionStaffResponse> provisionInternalAccount(String userId, String organizationId, ProvisionStaffRequest request);
 
     UseCaseResult<UpdateStaffStatusResponse> manageStaffStatus(String userId, String targetUserId, UpdateStaffStatusRequest request);
+
+    UseCaseResult<com.unihub.workshop.iam.application.dto.LoginResponse> changePassword(String userId, ChangePasswordRequest request);
+
+    UseCaseResult<Void> logout(String userId, LogoutRequest request, String accessToken);
 }

@@ -203,7 +203,23 @@
   "success": true,
   "message": "Password changed",
   "data": {
-    "isTemporaryPassword": false
+    "accessToken": "jwt-access-token",
+    "refreshToken": "jwt-refresh-token",
+    "tokenType": "Bearer",
+    "expiresInSeconds": 900,
+    "refreshExpiresInSeconds": 2592000,
+    "user": {
+      "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
+      "email": "student@unihub.edu",
+      "fullName": "Ava Student",
+      "phone": "+1-555-0100",
+      "role": "STUDENT",
+      "status": "ACTIVE",
+      "organizationId": null,
+      "studentId": "STU-10992",
+      "lastLoginAt": "2026-05-11T10:00:00Z",
+      "isTemporaryPassword": false
+    }
   },
   "metadata": {
     "statusCode": 200,
@@ -382,19 +398,19 @@ The response follows the standard list/pagination envelope: the staff records ar
 ```json
 {
   "email": "staff.new@unihub.edu",
-  "fullName": "New Staff",
-  "role": "STAFF"
+  "fullName": "New Staff"
 }
 ```
 
-| Field    | Type   | Required | Constraints / Business Rules                                     |
-| :------- | :----- | :------- | :--------------------------------------------------------------- |
-| email    | string | Yes      | Must be a valid email format; duplicate emails return 409.       |
-| fullName | string | Yes      | Non-empty.                                                       |
-| role     | string | Yes      | One of `STAFF`; client cannot provision higher privileged roles. |
+| Field    | Type   | Required | Constraints / Business Rules                               |
+| :------- | :----- | :------- | :--------------------------------------------------------- |
+| email    | string | Yes      | Must be a valid email format; duplicate emails return 409. |
+| fullName | string | Yes      | Non-empty.                                                 |
 
 > [!NOTE]
-> The organizer does not provide a password. The system generates a cryptographically strong temporary password and sends it to the staff member's email through an internal event.
+>
+> - The organizer does not provide a password. The system generates a cryptographically strong temporary password and sends it to the staff member's email through an internal event.
+> - The `role` is implicitly assigned as `STAFF` by the server; clients must not send a `role` field.
 
 **Success Response (201):**
 

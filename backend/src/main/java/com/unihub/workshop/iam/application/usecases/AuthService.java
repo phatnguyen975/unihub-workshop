@@ -1,7 +1,5 @@
 package com.unihub.workshop.iam.application.usecases;
 
-import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
-import com.unihub.workshop.iam.application.dto.ChangePasswordResponse;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordRequest;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordResponse;
 import com.unihub.workshop.iam.application.dto.LoginRequest;
@@ -203,6 +201,7 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
+    @Transactional
     public UseCaseResult<LoginResponse> login(LoginRequest request) {
         String email = normalizeEmail(request.email());
         User user = userRepository.findByEmailIgnoreCase(email)
@@ -233,7 +232,7 @@ public class AuthService implements AuthUseCase {
         user.setFailedLoginAttempts(0);
         user.setLockoutUntil(null);
         user.setLastLoginAt(now);
-        userRepository.save(user);
+        userRepository.saveAndFlush(user);
 
         if (user.isTemporaryPassword()) {
             String accessToken = jwtTokenProvider.generateRestrictedAccessToken(user);
@@ -298,42 +297,6 @@ public class AuthService implements AuthUseCase {
 
     @Override
     @Transactional
-    public UseCaseResult<Void> logout(String userId, com.unihub.workshop.iam.application.dto.LogoutRequest request,
-            String accessToken) {
-        // Blacklist the access token if provided
-        if (accessToken != null && !accessToken.isBlank()) {
-            try {
-                JwtTokenProvider.TokenClaims accessTokenClaims = jwtTokenProvider.parseToken(accessToken);
-                if (accessTokenClaims.expiresAt() != null) {
-                    Duration ttl = remainingTtl(accessTokenClaims.expiresAt());
-                    tokenStore.blacklistAccessToken(accessTokenClaims.jti(), ttl);
-                }
-            } catch (JwtException | IllegalArgumentException ex) {
-                // Log but don't fail logout if access token is invalid
-                System.err.println("Failed to parse access token for blacklisting: " + ex.getMessage());
-            }
-        }
-
-        // Blacklist the refresh token if provided
-        String refreshToken = request == null ? null : request.refreshToken();
-        if (refreshToken == null || refreshToken.isBlank()) {
-            return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);
-        }
-
-        JwtTokenProvider.TokenClaims claims = parseRefreshToken(
-                refreshToken,
-                HttpStatus.BAD_REQUEST,
-                "Invalid refresh token",
-                "invalid_refresh_token");
-        if (userId != null && !userId.isBlank() && !userId.equals(claims.subject())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid refresh token", "invalid_refresh_token");
-        }
-        tokenStore.blacklistRefreshToken(claims.jti(), remainingTtl(claims.expiresAt()));
-        return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);
-    }
-
-    @Override
-    @Transactional
     public UseCaseResult<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request) {
         String email = normalizeEmail(request.email());
         if (otpStore.isCooldownActive(email)) {
@@ -385,27 +348,6 @@ public class AuthService implements AuthUseCase {
         revokeRefreshTokens(user);
 
         return new UseCaseResult<>(HttpStatus.OK, "Password reset successful", null);
-    }
-
-    @Override
-    @Transactional
-    public UseCaseResult<ChangePasswordResponse> changePassword(String userId, ChangePasswordRequest request) {
-        if (!request.newPassword().equals(request.confirmPassword())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Passwords do not match", "password_mismatch");
-        }
-
-        User user = loadUserById(userId, HttpStatus.UNAUTHORIZED);
-        if (user.getPasswordHash() == null
-                || !passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Current password mismatch", "invalid_credentials");
-        }
-
-        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        user.setTemporaryPassword(false);
-        userRepository.save(user);
-        revokeRefreshTokens(user);
-
-        return new UseCaseResult<>(HttpStatus.OK, "Password changed", new ChangePasswordResponse(false));
     }
 
     private LoginUserResponse toLoginUserResponse(User user) {
