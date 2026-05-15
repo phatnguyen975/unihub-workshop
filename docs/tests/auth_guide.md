@@ -9,14 +9,12 @@ This guide covers the public authentication APIs under `/api/v1/auth`. All reque
 Create a Postman environment with these variables:
 
 - `baseUrl` = `http://localhost/api/v1`
-- `testEmail` = `student1@unihub.local`
-- `testPassword` = `Password123!`
-- `newPassword` = `Password456!`
+- `studentEmail` = `student1@unihub.local`
+- `studentPassword` = `Password123!`
+- `studentNewPassword` = `Password456!`
 - `resetToken` = empty string
 - `accessToken` = empty string
 - `refreshToken` = empty string
-- `otp` = empty string
-- `processedBy` = empty string
 
 ### Global Checks
 
@@ -84,8 +82,8 @@ Create a new account and trigger OTP generation for account verification.
 
 ```json
 {
-  "email": "{{testEmail}}",
-  "password": "{{testPassword}}",
+  "email": "{{studentEmail}}",
+  "password": "{{studentPassword}}",
   "fullName": "Student One",
   "phone": "+15551234567"
 }
@@ -139,7 +137,7 @@ Registration example:
 
 ```json
 {
-  "email": "{{testEmail}}",
+  "email": "{{studentEmail}}",
   "otp": "123456",
   "intent": "REGISTER"
 }
@@ -149,7 +147,7 @@ Password reset example:
 
 ```json
 {
-  "email": "{{testEmail}}",
+  "email": "{{studentEmail}}",
   "otp": "123456",
   "intent": "RESET_PASSWORD"
 }
@@ -217,7 +215,7 @@ Generate a fresh OTP for registration or password recovery.
 
 ```json
 {
-  "email": "{{testEmail}}",
+  "email": "{{studentEmail}}",
   "intent": "REGISTER"
 }
 ```
@@ -264,8 +262,8 @@ Exchange valid credentials for JWT access and refresh tokens.
 
 ```json
 {
-  "email": "{{testEmail}}",
-  "password": "{{testPassword}}"
+  "email": "{{studentEmail}}",
+  "password": "{{studentPassword}}"
 }
 ```
 
@@ -390,7 +388,7 @@ Start the recovery flow without revealing whether the email exists.
 
 ```json
 {
-  "email": "{{testEmail}}"
+  "email": "{{studentEmail}}"
 }
 ```
 
@@ -439,8 +437,8 @@ Complete password recovery using a reset token.
 ```json
 {
   "resetToken": "{{resetToken}}",
-  "newPassword": "{{newPassword}}",
-  "confirmPassword": "{{newPassword}}"
+  "newPassword": "{{studentNewPassword}}",
+  "confirmPassword": "{{studentNewPassword}}"
 }
 ```
 

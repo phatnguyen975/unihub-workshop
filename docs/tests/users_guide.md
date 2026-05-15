@@ -11,12 +11,12 @@ Create a Postman environment with these variables:
 - `baseUrl` = `http://localhost/api/v1`
 - `accessToken` = empty string
 - `refreshToken` = empty string
+- `staffId` = empty string
+- `staffEmail` = `staff.new@unihub.edu`
 - `organizationId` = empty string
-- `staffUserId` = empty string
-- `newStaffEmail` = empty string
-- `newStaffPassword` = empty string
-- `newStaffFullName` = empty string
-- `newOrgName` = `Northside Learning QA`
+- `organizationName` = `Faculty of Information Technology`
+- `organizerPassword` = `Password123!`
+- `organizerNewPassword` = `Password456!`
 
 ### Global Checks
 
@@ -205,9 +205,9 @@ Change the authenticated user's password and clear the temporary-password restri
 
 ```json
 {
-  "currentPassword": "Password123!",
-  "newPassword": "Password456!",
-  "confirmPassword": "Password456!"
+  "currentPassword": "{{organizerPassword}}",
+  "newPassword": "{{organizerNewPassword}}",
+  "confirmPassword": "{{organizerNewPassword}}"
 }
 ```
 
@@ -250,7 +250,7 @@ Create an organization owned by the authenticated organizer.
 
 ```json
 {
-  "name": "{{newOrgName}}",
+  "name": "{{organizationName}}",
   "description": "Organizer QA org",
   "address": "123 Learning Way"
 }
@@ -400,8 +400,8 @@ Provision a new staff account tied to the organizer's organization.
 
 ```json
 {
-  "email": "{{newStaffEmail}}",
-  "fullName": "{{newStaffFullName}}",
+  "email": "{{staffEmail}}",
+  "fullName": "Staff One",
   "role": "STAFF"
 }
 ```
@@ -461,7 +461,7 @@ Activate or lock a staff account in the organizer's tenant.
 ### Postman Steps
 
 1. **Method:** `PATCH`
-2. **URL:** `{{baseUrl}}/users/{{staffUserId}}/status`
+2. **URL:** `{{baseUrl}}/users/{{staffId}}/status`
 3. **Headers:** `Authorization: Bearer {{accessToken}}`
 4. **Body:** `raw` JSON
 
