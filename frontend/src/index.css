@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary:        #1B5E20;
+  --color-primary-light:  #E8F5E9;
+  --color-bg:             #FAFAFA;
+  --color-surface:        #FFFFFF;
+  --color-border:         #E0E0E0;
+  --color-text-primary:   #1A1A1A;
+  --color-text-muted:     #757575;
+  --color-warning:        #F57C00;
+  --color-warning-bg:     #FFF3E0;
+  --color-warning-border: #FFE0B2;
+  --color-error:          #C62828;
+  --color-info-bg:        #E3F2FD;
+  --color-info-border:    #90CAF9;
+  --color-info-text:      #0D47A1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  margin: 0;
+  padding: 0;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.animate-spin-custom {
+  animation: spin 1s linear infinite;
+}
