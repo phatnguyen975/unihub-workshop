@@ -137,6 +137,7 @@ CREATE TABLE brochures (
   mime_type VARCHAR(100),
   size_bytes BIGINT CHECK (size_bytes >= 0),
   status VARCHAR(20) NOT NULL DEFAULT 'UPLOADED' CHECK (status IN ('UPLOADED','DELETED')),
+  file_url TEXT NOT NULL,
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),

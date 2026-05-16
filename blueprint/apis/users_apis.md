@@ -2,7 +2,7 @@
 
 ## 1. Conventions
 
-- **Base path:** `/api/v1`
+- **Base path:** `/api/v1/users` and `/api/v1/organizations`
 - All responses use the standard envelope:
 
 ```json

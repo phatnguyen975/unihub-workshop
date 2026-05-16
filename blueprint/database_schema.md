@@ -400,18 +400,19 @@ erDiagram
 
 ### `brochures` Table
 
-| Attribute   | Type         | Constraint                                         | Default Value     | Indexing                    | Description              |
-| :---------- | :----------- | :------------------------------------------------- | :---------------- | :-------------------------- | :----------------------- |
-| id          | UUID         | PK                                                 | gen_random_uuid() | UNIQUE B-Tree (id)          | Primary key.             |
-| workshop_id | UUID         | FK -> workshops(id) ON DELETE CASCADE              | None              | B-Tree (workshop_id)        | Workshop owning the PDF. |
-| storage_key | VARCHAR(512) | NOT NULL                                           | None              | UNIQUE B-Tree (storage_key) | Object storage key.      |
-| file_name   | VARCHAR(255) | NULL                                               | NULL              | None                        | Original filename.       |
-| mime_type   | VARCHAR(100) | NULL                                               | NULL              | None                        | Stored MIME type.        |
-| size_bytes  | BIGINT       | NULL, CHECK (size_bytes >= 0)                      | NULL              | None                        | File size in bytes.      |
-| status      | VARCHAR(20)  | NOT NULL, CHECK (status IN ('UPLOADED','DELETED')) | 'UPLOADED'        | B-Tree (status)             | File lifecycle.          |
-| uploaded_at | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (uploaded_at)        | Upload timestamp.        |
-| created_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (created_at)         | Audit timestamp.         |
-| updated_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (updated_at)         | Audit timestamp.         |
+| Attribute   | Type         | Constraint                                         | Default Value     | Indexing                    | Description                                          |
+| :---------- | :----------- | :------------------------------------------------- | :---------------- | :-------------------------- | :--------------------------------------------------- |
+| id          | UUID         | PK                                                 | gen_random_uuid() | UNIQUE B-Tree (id)          | Primary key.                                         |
+| workshop_id | UUID         | FK -> workshops(id) ON DELETE CASCADE              | None              | B-Tree (workshop_id)        | Workshop owning the PDF.                             |
+| storage_key | VARCHAR(512) | NOT NULL                                           | None              | UNIQUE B-Tree (storage_key) | Object storage key.                                  |
+| file_name   | VARCHAR(255) | NULL                                               | NULL              | None                        | Original filename.                                   |
+| mime_type   | VARCHAR(100) | NULL                                               | NULL              | None                        | Stored MIME type.                                    |
+| size_bytes  | BIGINT       | NULL, CHECK (size_bytes >= 0)                      | NULL              | None                        | File size in bytes.                                  |
+| status      | VARCHAR(20)  | NOT NULL, CHECK (status IN ('UPLOADED','DELETED')) | 'UPLOADED'        | B-Tree (status)             | File lifecycle.                                      |
+| uploaded_at | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (uploaded_at)        | Upload timestamp.                                    |
+| file_url    | TEXT         | NOT NULL                                           | None              | None                        | Full object storage URL for the brochure (S3/MinIO). |
+| created_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (created_at)         | Audit timestamp.                                     |
+| updated_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (updated_at)         | Audit timestamp.                                     |
 
 ### `ai_summaries` Table
 
