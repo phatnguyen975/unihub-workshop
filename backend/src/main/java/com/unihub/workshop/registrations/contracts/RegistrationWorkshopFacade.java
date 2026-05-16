@@ -35,4 +35,10 @@ public interface RegistrationWorkshopFacade {
      * @return the number of pending registrations
      */
     int getPendingRegistrationCount(UUID workshopId);
+
+    /**
+     * Retrieves a paged list of attendees (registrations) for the workshop.
+     * Implementations should return an AttendeePage containing items and pagination metadata.
+     */
+    AttendeePage listAttendees(UUID workshopId, int page, int size, String status);
 }

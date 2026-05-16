@@ -43,4 +43,10 @@ public class DummyRegistrationWorkshopFacadeImpl implements RegistrationWorkshop
         // Dummy: return 0 pending registrations
         return 0;
     }
+
+    @Override
+    public com.unihub.workshop.registrations.contracts.AttendeePage listAttendees(UUID workshopId, int page, int size, String status) {
+        var pagination = new com.unihub.workshop.shared.web.PaginationMetadata(page, size, 0L, 0, false, false);
+        return new com.unihub.workshop.registrations.contracts.AttendeePage(java.util.List.of(), pagination);
+    }
 }

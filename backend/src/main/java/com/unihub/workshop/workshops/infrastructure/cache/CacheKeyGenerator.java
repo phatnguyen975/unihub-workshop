@@ -33,6 +33,28 @@ public class CacheKeyGenerator {
         return hashKey(raw);
     }
 
+    public String generateManagementListKey(String organizerId, int page, int size, String status) {
+        StringBuilder raw = new StringBuilder();
+        raw.append("org:").append(organizerId == null ? "null" : organizerId);
+        raw.append("|page:").append(page);
+        raw.append("|size:").append(size);
+        if (status != null && !status.isBlank()) raw.append("|status:").append(status.trim());
+        return hashKey(raw.toString());
+    }
+
+    public String generateAnalyticsKey(java.util.UUID workshopId) {
+        return hashKey("analytics:wid:" + (workshopId == null ? "null" : workshopId.toString()));
+    }
+
+    public String generateAttendeesKey(java.util.UUID workshopId, int page, int size, String status) {
+        StringBuilder raw = new StringBuilder();
+        raw.append("wid:").append(workshopId == null ? "null" : workshopId.toString());
+        raw.append("|page:").append(page);
+        raw.append("|size:").append(size);
+        if (status != null && !status.isBlank()) raw.append("|status:").append(status.trim());
+        return hashKey(raw.toString());
+    }
+
     private String hashKey(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
