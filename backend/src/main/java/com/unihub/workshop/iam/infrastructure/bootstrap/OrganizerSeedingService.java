@@ -8,6 +8,7 @@ import com.unihub.workshop.iam.domain.repository.UserRepository;
 import com.unihub.workshop.shared.exception.AppException;
 import java.security.SecureRandom;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class OrganizerSeedingService {
 
     private static final Logger log = LoggerFactory.getLogger(OrganizerSeedingService.class);
@@ -29,15 +31,6 @@ public class OrganizerSeedingService {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final SecureRandom secureRandom = new SecureRandom();
-
-    public OrganizerSeedingService(
-            UserRepository userRepository,
-            PasswordEncoder passwordEncoder,
-            ApplicationEventPublisher eventPublisher) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createIfAbsent(OrganizerSeedingRunner.SeededOrganizer organizer) {

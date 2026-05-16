@@ -13,7 +13,6 @@ import com.unihub.workshop.iam.application.dto.UpdateProfileRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusResponse;
 import com.unihub.workshop.iam.application.dto.UserProfileResponse;
-import com.unihub.workshop.iam.application.usecases.AuthUseCase;
 import com.unihub.workshop.iam.application.usecases.UseCaseResult;
 import com.unihub.workshop.iam.application.usecases.UserUseCase;
 import com.unihub.workshop.shared.exception.AppException;
@@ -21,6 +20,7 @@ import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ResponseFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -40,18 +40,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(path = "/api/v1", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequiredArgsConstructor
 public class UserController {
 
     private final UserUseCase userUseCase;
     private final ResponseFactory responseFactory;
-
-    public UserController(
-            AuthUseCase authenticationUseCase,
-            UserUseCase userUseCase,
-            ResponseFactory responseFactory) {
-        this.userUseCase = userUseCase;
-        this.responseFactory = responseFactory;
-    }
 
     @PostMapping("/users/me/logout")
     public ResponseEntity<ApiResponse<Void>> logout(

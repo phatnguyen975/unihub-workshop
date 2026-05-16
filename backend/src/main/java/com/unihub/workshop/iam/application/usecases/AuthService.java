@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class AuthService implements AuthUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
@@ -61,23 +63,6 @@ public class AuthService implements AuthUseCase {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
-
-    public AuthService(
-            UserRepository userRepository,
-            OtpStore otpStore,
-            OtpGenerator otpGenerator,
-            TokenStore tokenStore,
-            JwtTokenProvider jwtTokenProvider,
-            PasswordEncoder passwordEncoder,
-            ApplicationEventPublisher eventPublisher) {
-        this.userRepository = userRepository;
-        this.otpStore = otpStore;
-        this.otpGenerator = otpGenerator;
-        this.tokenStore = tokenStore;
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.passwordEncoder = passwordEncoder;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Override
     @Transactional

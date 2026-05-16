@@ -10,27 +10,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import lombok.RequiredArgsConstructor;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class OrganizerSeedingRunner implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(OrganizerSeedingRunner.class);
     private final OrganizerSeedProperties seedProperties;
     private final ObjectMapper objectMapper;
     private final OrganizerSeedingService seedingService;
-
-    public OrganizerSeedingRunner(
-            OrganizerSeedProperties seedProperties,
-            ObjectMapper objectMapper,
-            OrganizerSeedingService seedingService) {
-        this.seedProperties = seedProperties;
-        this.objectMapper = objectMapper;
-        this.seedingService = seedingService;
-    }
 
     @Override
     public void run(ApplicationArguments args) {

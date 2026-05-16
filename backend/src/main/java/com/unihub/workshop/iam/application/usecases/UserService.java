@@ -43,9 +43,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class UserService implements UserUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
@@ -60,21 +62,6 @@ public class UserService implements UserUseCase {
     private final TokenStore tokenStore;
     private final JwtTokenProvider jwtTokenProvider;
     private final SecureRandom secureRandom = new SecureRandom();
-
-    public UserService(
-            UserRepository userRepository,
-            OrganizationRepository organizationRepository,
-            PasswordEncoder passwordEncoder,
-            ApplicationEventPublisher eventPublisher,
-            TokenStore tokenStore,
-            JwtTokenProvider jwtTokenProvider) {
-        this.userRepository = userRepository;
-        this.organizationRepository = organizationRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.eventPublisher = eventPublisher;
-        this.tokenStore = tokenStore;
-        this.jwtTokenProvider = jwtTokenProvider;
-    }
 
     @Override
     @Transactional

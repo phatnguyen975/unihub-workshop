@@ -1,5 +1,8 @@
 package com.unihub.workshop.iam.domain.model;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -16,26 +19,34 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "organizations")
+@Getter
+@NoArgsConstructor
 public class Organization {
 
     @Id
     @Column(name = "id", nullable = false)
+    @Setter
     private UUID id;
 
     @Column(name = "name", nullable = false)
+    @Setter
     private String name;
 
     @Column(name = "description")
+    @Setter
     private String description;
 
     @Column(name = "address")
+    @Setter
     private String address;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
+    @Setter
     private OrganizationStatus status;
 
     @Column(name = "organizer_id", nullable = false)
+    @Setter
     private UUID organizerId;
 
     @CreatedDate
@@ -45,60 +56,4 @@ public class Organization {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getAddress() {
-        return address;
-    }
-
-    public void setAddress(String address) {
-        this.address = address;
-    }
-
-    public OrganizationStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(OrganizationStatus status) {
-        this.status = status;
-    }
-
-    public UUID getOrganizerId() {
-        return organizerId;
-    }
-
-    public void setOrganizerId(UUID organizerId) {
-        this.organizerId = organizerId;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
 }

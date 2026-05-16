@@ -1,5 +1,8 @@
 package com.unihub.workshop.iam.domain.model;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -14,22 +17,29 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "password_reset_tokens")
+@Getter
+@NoArgsConstructor
 public class PasswordResetToken {
 
     @Id
     @Column(name = "id", nullable = false)
+    @Setter
     private UUID id;
 
     @Column(name = "user_id", nullable = false)
+    @Setter
     private UUID userId;
 
     @Column(name = "token_hash", nullable = false)
+    @Setter
     private String tokenHash;
 
     @Column(name = "expires_at", nullable = false)
+    @Setter
     private OffsetDateTime expiresAt;
 
     @Column(name = "used_at")
+    @Setter
     private OffsetDateTime usedAt;
 
     @CreatedDate
@@ -39,44 +49,4 @@ public class PasswordResetToken {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
-    public String getTokenHash() {
-        return tokenHash;
-    }
-
-    public void setTokenHash(String tokenHash) {
-        this.tokenHash = tokenHash;
-    }
-
-    public OffsetDateTime getExpiresAt() {
-        return expiresAt;
-    }
-
-    public void setExpiresAt(OffsetDateTime expiresAt) {
-        this.expiresAt = expiresAt;
-    }
-
-    public OffsetDateTime getUsedAt() {
-        return usedAt;
-    }
-
-    public void setUsedAt(OffsetDateTime usedAt) {
-        this.usedAt = usedAt;
-    }
 }

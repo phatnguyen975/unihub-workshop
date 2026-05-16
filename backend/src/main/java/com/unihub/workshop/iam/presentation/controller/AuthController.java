@@ -17,6 +17,7 @@ import com.unihub.workshop.iam.application.usecases.UseCaseResult;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ResponseFactory;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,17 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(path = "/api/v1/auth", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthUseCase authenticationUseCase;
     private final ResponseFactory responseFactory;
-
-    public AuthController(
-            AuthUseCase authenticationUseCase,
-            ResponseFactory responseFactory) {
-        this.authenticationUseCase = authenticationUseCase;
-        this.responseFactory = responseFactory;
-    }
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<RegisterResponse>> register(

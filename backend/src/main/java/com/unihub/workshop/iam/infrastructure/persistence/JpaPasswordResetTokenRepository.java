@@ -10,13 +10,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface JpaPasswordResetTokenRepository extends JpaRepository<PasswordResetToken, UUID>, PasswordResetTokenRepository {
+public interface JpaPasswordResetTokenRepository
+        extends JpaRepository<PasswordResetToken, UUID>, PasswordResetTokenRepository {
 
     @Override
     @Query("""
-            select t from PasswordResetToken t
-            where t.tokenHash = :tokenHash
-              and t.usedAt is null
+                SELECT t FROM PasswordResetToken t
+                WHERE t.tokenHash = :tokenHash AND t.usedAt IS NULL AND t.expiresAt > CURRENT_TIMESTAMP
             """)
     Optional<PasswordResetToken> findActiveByTokenHash(@Param("tokenHash") String tokenHash);
 }
