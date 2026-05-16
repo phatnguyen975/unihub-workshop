@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../hooks/useAuthStore';
-import { MOCK_USER, DEMO_CREDENTIALS } from '../../constants/mockData';
+import { MOCK_STUDENT_USER, MOCK_ORGANIZER_USER, DEMO_CREDENTIALS } from '../../constants/mockData';
 import { Eye, EyeOff, BookOpen } from 'lucide-react';
 // import { authApi } from '../../api/auth'; // We'll use mock for now as requested
 
@@ -13,6 +13,14 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate(user?.role === 'ORGANIZER' ? '/organizer' : '/');
+    }
+  }, [isAuthenticated, navigate, user]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +36,12 @@ export const LoginPage: React.FC = () => {
       const isOrganizer = email === DEMO_CREDENTIALS.organizer.email && password === DEMO_CREDENTIALS.organizer.password;
       const isTemp = email === DEMO_CREDENTIALS.temp.email && password === DEMO_CREDENTIALS.temp.password;
 
-      if (isStudent || isOrganizer || isTemp) {
-        // In a real app, this would be returned from authApi.login
-        setAuth(MOCK_USER, 'mock-jwt-token-12345');
+      if (isStudent || isTemp) {
+        setAuth(MOCK_STUDENT_USER, 'mock-jwt-token-student');
         navigate('/');
+      } else if (isOrganizer) {
+        setAuth(MOCK_ORGANIZER_USER, 'mock-jwt-token-organizer');
+        navigate('/organizer');
       } else {
         setError('Invalid email or password');
       }

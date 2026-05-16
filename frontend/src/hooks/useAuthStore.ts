@@ -1,13 +1,13 @@
 // src/hooks/useAuthStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { LoginUserResponse } from '../types';
+import type { User } from '../types';
 
 interface AuthState {
-  user: LoginUserResponse | null;
+  user: User | null;
   accessToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: LoginUserResponse, token: string) => void;
+  setAuth: (user: User, token: string) => void;
   clearAuth: () => void;
 }
 

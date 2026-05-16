@@ -32,7 +32,7 @@ export const StudentHeader: React.FC = () => {
       .substring(0, 2);
   };
 
-  const initials = user?.fullName ? getInitials(user.fullName) : 'AS';
+  const initials = user?.full_name ? getInitials(user.full_name) : 'AS';
 
   const handleLogout = () => {
     clearAuth();
@@ -92,10 +92,10 @@ export const StudentHeader: React.FC = () => {
               {/* Profile Summary */}
               <div className="border-b-[1.33px] border-[#E0E0E0] p-4 flex flex-col">
                 <span className="text-[16px] font-semibold text-[#1A1A1A] leading-[24px]">
-                  {user?.fullName || 'Sarah Johnson'}
+                  {user?.full_name || 'Sarah Johnson'}
                 </span>
                 <span className="text-[12px] font-normal text-[#757575] leading-[16px] mt-1">
-                  {user?.studentId || 'STU-2024-1001'}
+                  {user?.student_id || 'STU-2024-1001'}
                 </span>
                 <span className="text-[12px] font-normal text-[#757575] leading-[16px] mt-1">
                   {user?.email || 'sarah.johnson@university.edu'}
