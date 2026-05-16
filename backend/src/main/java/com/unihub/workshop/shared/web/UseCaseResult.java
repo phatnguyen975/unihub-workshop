@@ -1,4 +1,4 @@
-package com.unihub.workshop.iam.application.usecases;
+package com.unihub.workshop.shared.web;
 
 import org.springframework.http.HttpStatus;
 

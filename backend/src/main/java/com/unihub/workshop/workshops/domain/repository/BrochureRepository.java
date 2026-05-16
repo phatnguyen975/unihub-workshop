@@ -10,4 +10,6 @@ import com.unihub.workshop.workshops.domain.model.Brochure;
 public interface BrochureRepository extends JpaRepository<Brochure, UUID> {
 
     List<Brochure> findByWorkshopId(UUID workshopId);
+
+    List<Brochure> findByWorkshopIdOrderByUploadedAtDesc(UUID workshopId);
 }

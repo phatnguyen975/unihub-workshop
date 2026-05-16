@@ -1,4 +1,4 @@
-package com.unihub.workshop.iam.application.dto;
+package com.unihub.workshop.shared.web;
 
 public record PaginationMetadata(
         int page,

@@ -10,6 +10,7 @@ import com.unihub.workshop.iam.application.dto.UpdateProfileRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusResponse;
 import com.unihub.workshop.iam.application.dto.UserProfileResponse;
+import com.unihub.workshop.shared.web.UseCaseResult;
 import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
 import com.unihub.workshop.iam.application.dto.LogoutRequest;
 import org.springframework.data.domain.Pageable;

@@ -13,11 +13,12 @@ import com.unihub.workshop.iam.application.dto.UpdateProfileRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusRequest;
 import com.unihub.workshop.iam.application.dto.UpdateStaffStatusResponse;
 import com.unihub.workshop.iam.application.dto.UserProfileResponse;
-import com.unihub.workshop.iam.application.usecases.UseCaseResult;
 import com.unihub.workshop.iam.application.usecases.UserUseCase;
 import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ResponseFactory;
+import com.unihub.workshop.shared.web.UseCaseResult;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

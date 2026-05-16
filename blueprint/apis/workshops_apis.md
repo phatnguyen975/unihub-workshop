@@ -455,7 +455,7 @@
 
 ```json
 {
-  "status": "PUBLISHED", // or "CANCELED", "DRAFT"
+  "status": "PUBLISHED",
   "version": 1
 }
 ```

@@ -24,6 +24,8 @@ import com.unihub.workshop.iam.domain.repository.TokenStore;
 import com.unihub.workshop.iam.domain.repository.UserRepository;
 import com.unihub.workshop.iam.infrastructure.security.JwtTokenProvider;
 import com.unihub.workshop.shared.exception.AppException;
+import com.unihub.workshop.shared.web.UseCaseResult;
+
 import io.jsonwebtoken.JwtException;
 import java.time.Duration;
 import java.time.Instant;

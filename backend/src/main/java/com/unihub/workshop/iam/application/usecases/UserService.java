@@ -4,7 +4,6 @@ import com.unihub.workshop.iam.application.dto.CreateOrganizationRequest;
 import com.unihub.workshop.iam.application.dto.OrganizationResponse;
 import com.unihub.workshop.iam.application.dto.OrganizationStaffPageResponse;
 import com.unihub.workshop.iam.application.dto.OrganizationStaffResponse;
-import com.unihub.workshop.iam.application.dto.PaginationMetadata;
 import com.unihub.workshop.iam.application.dto.ProvisionStaffRequest;
 import com.unihub.workshop.iam.application.dto.ProvisionStaffResponse;
 import com.unihub.workshop.iam.application.dto.UpdateOrganizationRequest;
@@ -24,6 +23,9 @@ import com.unihub.workshop.iam.domain.model.UserStatus;
 import com.unihub.workshop.iam.domain.repository.OrganizationRepository;
 import com.unihub.workshop.iam.domain.repository.UserRepository;
 import com.unihub.workshop.shared.exception.AppException;
+import com.unihub.workshop.shared.web.PaginationMetadata;
+import com.unihub.workshop.shared.web.UseCaseResult;
+
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
