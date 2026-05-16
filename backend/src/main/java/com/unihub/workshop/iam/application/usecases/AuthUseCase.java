@@ -12,6 +12,7 @@ import com.unihub.workshop.iam.application.dto.RegisterRequest;
 import com.unihub.workshop.iam.application.dto.RegisterResponse;
 import com.unihub.workshop.iam.application.dto.VerifyOtpRequest;
 import com.unihub.workshop.iam.application.dto.VerifyOtpResponse;
+import com.unihub.workshop.shared.web.UseCaseResult;
 
 public interface AuthUseCase {
 

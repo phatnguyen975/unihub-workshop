@@ -13,9 +13,10 @@ import com.unihub.workshop.iam.application.dto.ResetPasswordRequest;
 import com.unihub.workshop.iam.application.dto.VerifyOtpRequest;
 import com.unihub.workshop.iam.application.dto.VerifyOtpResponse;
 import com.unihub.workshop.iam.application.usecases.AuthUseCase;
-import com.unihub.workshop.iam.application.usecases.UseCaseResult;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ResponseFactory;
+import com.unihub.workshop.shared.web.UseCaseResult;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
