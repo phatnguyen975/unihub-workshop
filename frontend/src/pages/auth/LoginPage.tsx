@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../hooks/useAuthStore';
 import { MOCK_STUDENT_USER, MOCK_ORGANIZER_USER, DEMO_CREDENTIALS } from '../../constants/mockData';
-import { Eye, EyeOff, BookOpen } from 'lucide-react';
+import { Eye, EyeOff, BookOpen, AlertCircle } from 'lucide-react';
 // import { authApi } from '../../api/auth'; // We'll use mock for now as requested
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type LoginErrors = {
+  email?: string;
+  password?: string;
+};
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -11,6 +18,7 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState<LoginErrors>({});
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -24,8 +32,28 @@ export const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
+
+    const nextErrors: LoginErrors = {};
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail) {
+      nextErrors.email = 'Email is required.';
+    } else if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
+
+    if (!trimmedPassword) {
+      nextErrors.password = 'Password is required.';
+    }
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
       // Simulate API call
@@ -43,7 +71,7 @@ export const LoginPage: React.FC = () => {
         setAuth(MOCK_ORGANIZER_USER, 'mock-jwt-token-organizer');
         navigate('/organizer');
       } else {
-        setError('Invalid email or password');
+        setError('Invalid email or password. Please try again.');
       }
     } catch (err) {
       setError('An error occurred during login. Please try again.');
@@ -54,78 +82,114 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center"
-      style={{ background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8F4 100%)' }}
+      className="min-h-screen flex items-center justify-center px-4 py-4"
+      style={{
+        background:
+          'linear-gradient(135deg, #E8F5E9 0%, #EAF6EB 16.67%, #EBF6ED 33.33%, #EDF7EF 50%, #EEF7F0 66.67%, #F0F8F2 83.33%, #F1F8F4 100%)',
+      }}
     >
-      <div className="flex flex-col items-center w-full max-w-[448px] gap-8 px-4">
-        
+      <div className="flex flex-col items-center w-full max-w-[447.99px] gap-[32px]">
         {/* Logo block */}
         <div className="flex flex-col items-center">
-          <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center shadow-md mb-4">
-            <BookOpen className="text-white w-8 h-8" />
+          <div className="w-[63.99px] h-[63.99px] bg-primary rounded-lg flex items-center justify-center shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] mb-[15.99px]">
+            <BookOpen className="text-white w-[32px] h-[32px]" />
           </div>
-          <h1 className="text-[30px] font-semibold text-[#1A1A1A] leading-[36px] text-center mb-1">
+          <h1 className="text-[30px] font-semibold text-[#1A1A1A] leading-[36px] tracking-[0.395508px] text-center mb-[3.99px]">
             Welcome to UniHub
           </h1>
-          <p className="text-[16px] font-normal text-[#757575] leading-[24px] text-center">
+          <p className="text-[16px] font-normal text-[#757575] leading-[24px] tracking-[-0.3125px] text-center">
             Sign in to access your workshop portal
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="w-full bg-white rounded-[16px] border-[1.33px] border-[#E0E0E0] shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] px-[33.33px] pt-[33.33px] pb-[17.33px] flex flex-col gap-[24px]">
-          <form onSubmit={handleLogin} className="flex flex-col gap-[24px]">
+        <div className="w-full bg-white rounded-[16px] border-[0.555556px] border-[#E0E0E0] shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] px-[32.5521px] pt-[32.5521px] pb-[16.5538px] flex flex-col gap-[23.99px]">
+          <form onSubmit={handleLogin} noValidate className="flex flex-col gap-[23.99px]">
             
             {/* Email Field */}
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-medium text-[#1A1A1A] leading-[20px]">
+            <div className="flex flex-col gap-[7.99px]">
+              <label className="text-[14px] font-medium text-[#1A1A1A] leading-[20px] tracking-[-0.150391px]">
                 Email Address
               </label>
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) {
+                    setErrors((prev) => ({ ...prev, email: undefined }));
+                  }
+                  if (error) {
+                    setError('');
+                  }
+                }}
                 placeholder="student@unihub.edu"
-                className="bg-[#F5F5F5] border-[1.33px] border-[#E0E0E0] rounded-lg h-[50.67px] px-4 text-[16px] text-[#1A1A1A] placeholder:text-[rgba(26,26,26,0.5)] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                required
+                className={`bg-[#F5F5F5] border-[0.555556px] ${
+                  errors.email
+                    ? 'border-[#C62828] focus:border-[#C62828] focus:ring-[#C62828]'
+                    : 'border-[#E0E0E0] focus:border-primary focus:ring-primary'
+                } rounded-[8px] h-[49.1px] px-[16px] py-[12px] text-[16px] leading-[19px] tracking-[-0.3125px] text-[#1A1A1A] placeholder:text-[rgba(26,26,26,0.5)] focus:outline-none focus:ring-1 transition-colors`}
               />
+              {errors.email && (
+                <p className="text-[12px] leading-[16px] text-[#C62828]">{errors.email}</p>
+              )}
             </div>
 
             {/* Password Field */}
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-medium text-[#1A1A1A] leading-[20px]">
+            <div className="flex flex-col gap-[7.99px]">
+              <label className="text-[14px] font-medium text-[#1A1A1A] leading-[20px] tracking-[-0.150391px]">
                 Password
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errors.password) {
+                      setErrors((prev) => ({ ...prev, password: undefined }));
+                    }
+                    if (error) {
+                      setError('');
+                    }
+                  }}
                   placeholder="Enter your password"
-                  className="w-full bg-[#F5F5F5] border-[1.33px] border-[#E0E0E0] rounded-lg h-[50.67px] pl-4 pr-12 text-[16px] text-[#1A1A1A] placeholder:text-[rgba(26,26,26,0.5)] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                  required
+                  className={`w-full bg-[#F5F5F5] border-[0.555556px] ${
+                    errors.password
+                      ? 'border-[#C62828] focus:border-[#C62828] focus:ring-[#C62828]'
+                      : 'border-[#E0E0E0] focus:border-primary focus:ring-primary'
+                  } rounded-[8px] h-[49.1px] pl-[16px] pr-[48px] py-[12px] text-[16px] leading-[19px] tracking-[-0.3125px] text-[#1A1A1A] placeholder:text-[rgba(26,26,26,0.5)] focus:outline-none focus:ring-1 transition-colors`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#757575] hover:text-[#1A1A1A] transition-colors"
+                  className="absolute right-[16px] top-1/2 -translate-y-1/2 text-[#757575] hover:text-[#1A1A1A] transition-colors"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {errors.password && (
+                <p className="text-[12px] leading-[16px] text-[#C62828]">{errors.password}</p>
+              )}
             </div>
 
             {/* Forgot Password */}
             <div className="flex justify-end">
-              <button type="button" className="text-[14px] font-medium text-primary hover:underline">
+              <Link
+                to="/forgot-password"
+                className="text-[14px] font-medium text-primary tracking-[-0.150391px] hover:underline"
+              >
                 Forgot Password?
-              </button>
+              </Link>
             </div>
 
             {error && (
-              <div className="text-error text-sm text-center bg-[#FFCDD2] bg-opacity-20 py-2 rounded-md">
-                {error}
+              <div className="flex items-center gap-[7.99px] h-[55.1px] px-[16.55px] rounded-[8px] border-[0.555556px] border-[#C62828] bg-[#FFCDD2]">
+                <AlertCircle className="text-[#C62828]" size={20} />
+                <span className="text-[14px] leading-[20px] tracking-[-0.150391px] text-[#C62828]">
+                  {error}
+                </span>
               </div>
             )}
 
@@ -133,7 +197,7 @@ export const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-[48px] bg-primary text-white rounded-lg text-[16px] font-medium flex items-center justify-center hover:bg-[#154d19] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full h-[47.99px] bg-primary text-white rounded-[8px] text-[16px] font-medium leading-[24px] tracking-[-0.3125px] flex items-center justify-center hover:bg-[#154d19] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin-custom"></div>
@@ -144,22 +208,22 @@ export const LoginPage: React.FC = () => {
           </form>
 
           {/* Divider & Register */}
-          <div className="border-t-[1.33px] border-[#E0E0E0] pt-[17.33px] flex items-center justify-center gap-1">
-            <span className="text-[14px] font-normal text-[#757575] leading-[20px]">
+          <div className="border-t-[0.555556px] border-[#E0E0E0] pt-[16.5538px] flex items-center justify-center gap-1">
+            <span className="text-[14px] font-normal text-[#757575] leading-[20px] tracking-[-0.150391px]">
               Don't have an account?
             </span>
-            <button type="button" className="text-[16px] font-medium text-primary hover:underline leading-[24px]">
+            <Link to="/register" className="text-[16px] font-medium text-primary hover:underline leading-[24px] tracking-[-0.3125px]">
               Register
-            </button>
+            </Link>
           </div>
         </div>
 
         {/* Demo Credentials */}
-        <div className="w-full bg-[#E3F2FD] border-[1.33px] border-[#90CAF9] rounded-lg p-[17.33px] flex flex-col gap-2">
+        <div className="w-full bg-[#E3F2FD] border-[0.555556px] border-[#90CAF9] rounded-[8px] px-[16.5538px] pt-[16.5538px] pb-[16.5538px] flex flex-col gap-[7.99px]">
           <div className="text-[12px] font-semibold text-[#0D47A1] leading-[16px]">
             Demo Credentials:
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-[3.99px]">
             <div className="text-[12px] font-normal text-[#1565C0] leading-[16px]">
               Student: student@unihub.edu / student123
             </div>
