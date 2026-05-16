@@ -4,12 +4,9 @@ import com.unihub.workshop.iam.application.dto.LoginRequest;
 import com.unihub.workshop.iam.application.dto.LoginResponse;
 import com.unihub.workshop.iam.application.dto.RefreshRequest;
 import com.unihub.workshop.iam.application.dto.RefreshResponse;
-import com.unihub.workshop.iam.application.dto.LogoutRequest;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordRequest;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordResponse;
 import com.unihub.workshop.iam.application.dto.ResetPasswordRequest;
-import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
-import com.unihub.workshop.iam.application.dto.ChangePasswordResponse;
 import com.unihub.workshop.iam.application.dto.ResendOtpRequest;
 import com.unihub.workshop.iam.application.dto.RegisterRequest;
 import com.unihub.workshop.iam.application.dto.RegisterResponse;
@@ -28,11 +25,7 @@ public interface AuthUseCase {
 
     UseCaseResult<RefreshResponse> refresh(RefreshRequest request);
 
-    UseCaseResult<Void> logout(String userId, LogoutRequest request, String accessToken);
-
     UseCaseResult<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request);
 
     UseCaseResult<Void> resetPassword(ResetPasswordRequest request);
-
-    UseCaseResult<ChangePasswordResponse> changePassword(String userId, ChangePasswordRequest request);
 }

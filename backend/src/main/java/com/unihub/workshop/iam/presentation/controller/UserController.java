@@ -1,7 +1,7 @@
 package com.unihub.workshop.iam.presentation.controller;
 
 import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
-import com.unihub.workshop.iam.application.dto.ChangePasswordResponse;
+import com.unihub.workshop.iam.application.dto.LoginResponse;
 import com.unihub.workshop.iam.application.dto.CreateOrganizationRequest;
 import com.unihub.workshop.iam.application.dto.LogoutRequest;
 import com.unihub.workshop.iam.application.dto.OrganizationResponse;
@@ -42,7 +42,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(path = "/api/v1", produces = MediaType.APPLICATION_JSON_VALUE)
 public class UserController {
 
-    private final AuthUseCase authenticationUseCase;
     private final UserUseCase userUseCase;
     private final ResponseFactory responseFactory;
 
@@ -50,7 +49,6 @@ public class UserController {
             AuthUseCase authenticationUseCase,
             UserUseCase userUseCase,
             ResponseFactory responseFactory) {
-        this.authenticationUseCase = authenticationUseCase;
         this.userUseCase = userUseCase;
         this.responseFactory = responseFactory;
     }
@@ -61,18 +59,18 @@ public class UserController {
             HttpServletRequest httpRequest) {
         String userId = requireUserId();
         String accessToken = extractBearerToken(httpRequest.getHeader("Authorization"));
-        UseCaseResult<Void> result = authenticationUseCase.logout(userId, request, accessToken);
+        UseCaseResult<Void> result = userUseCase.logout(userId, request, accessToken);
         ApiResponse<Void> body = responseFactory.success(result.data(), result.message(), result.status());
         SecurityContextHolder.clearContext();
         return ResponseEntity.status(result.status()).body(body);
     }
 
     @PutMapping("/users/me/password")
-    public ResponseEntity<ApiResponse<ChangePasswordResponse>> changePassword(
+    public ResponseEntity<ApiResponse<LoginResponse>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request) {
         String userId = requireUserId();
-        UseCaseResult<ChangePasswordResponse> result = authenticationUseCase.changePassword(userId, request);
-        ApiResponse<ChangePasswordResponse> body = responseFactory.success(result.data(), result.message(), result.status());
+        UseCaseResult<LoginResponse> result = userUseCase.changePassword(userId, request);
+        ApiResponse<LoginResponse> body = responseFactory.success(result.data(), result.message(), result.status());
         return ResponseEntity.status(result.status()).body(body);
     }
 

@@ -11,12 +11,12 @@ Create a Postman environment with these variables:
 - `baseUrl` = `http://localhost/api/v1`
 - `accessToken` = empty string
 - `refreshToken` = empty string
+- `staffId` = empty string
+- `staffEmail` = `staff.new@unihub.edu`
 - `organizationId` = empty string
-- `staffUserId` = empty string
-- `newStaffEmail` = empty string
-- `newStaffPassword` = empty string
-- `newStaffFullName` = empty string
-- `newOrgName` = `Northside Learning QA`
+- `organizationName` = `Faculty of Information Technology`
+- `studentPassword` = `Password123!`
+- `studentNewPassword` = `Password456!`
 
 ### Global Checks
 
@@ -121,6 +121,7 @@ Fetch the authenticated user profile.
     "status": "ACTIVE",
     "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
     "studentId": null,
+    "lastLoginAt": "2026-05-11T10:00:00Z",
     "isTemporaryPassword": false
   },
   "metadata": {
@@ -173,6 +174,7 @@ Update the authenticated user profile using partial-field semantics.
     "status": "ACTIVE",
     "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
     "studentId": null,
+    "lastLoginAt": "2026-05-11T10:00:00Z",
     "isTemporaryPassword": false
   },
   "metadata": {
@@ -205,9 +207,9 @@ Change the authenticated user's password and clear the temporary-password restri
 
 ```json
 {
-  "currentPassword": "Password123!",
-  "newPassword": "Password456!",
-  "confirmPassword": "Password456!"
+  "currentPassword": "{{studentPassword}}",
+  "newPassword": "{{studentNewPassword}}",
+  "confirmPassword": "{{studentNewPassword}}"
 }
 ```
 
@@ -218,7 +220,23 @@ Change the authenticated user's password and clear the temporary-password restri
   "success": true,
   "message": "Password changed",
   "data": {
-    "isTemporaryPassword": false
+    "accessToken": "jwt-access-token",
+    "refreshToken": "jwt-refresh-token",
+    "tokenType": "Bearer",
+    "expiresInSeconds": 900,
+    "refreshExpiresInSeconds": 2592000,
+    "user": {
+      "id": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a",
+      "email": "organizer@unihub.edu",
+      "fullName": "Riley Organizer",
+      "phone": "+15550000001",
+      "role": "ORGANIZER",
+      "status": "ACTIVE",
+      "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
+      "studentId": null,
+      "lastLoginAt": "2026-05-11T10:00:00Z",
+      "isTemporaryPassword": false
+    }
   },
   "metadata": {
     "statusCode": 200,
@@ -250,7 +268,7 @@ Create an organization owned by the authenticated organizer.
 
 ```json
 {
-  "name": "{{newOrgName}}",
+  "name": "{{organizationName}}",
   "description": "Organizer QA org",
   "address": "123 Learning Way"
 }
@@ -264,9 +282,10 @@ Create an organization owned by the authenticated organizer.
   "message": "Organization created",
   "data": {
     "id": "org-12345",
-    "name": "Northside Learning QA",
+    "name": "Faculty of Information Technology",
     "description": "Organizer QA org",
     "address": "123 Learning Way",
+    "status": "ACTIVE",
     "ownerId": "6c3f3a7c-1f15-4f9b-a0df-8d7d1d9c8f2a"
   },
   "metadata": {
@@ -313,7 +332,10 @@ Update only the organization owned by the authenticated organizer.
   "data": {
     "id": "org-12345",
     "name": "Northside Learning QA Updated",
-    "description": "Updated description"
+    "description": "Updated description",
+    "address": "123 Learning Way",
+    "status": "ACTIVE",
+    "ownerId": "03f7237f-8049-4649-bbd7-5f3b8ca9ec07"
   },
   "metadata": {
     "statusCode": 200,
@@ -357,6 +379,7 @@ Fetch the organizer's staff list with pagination.
         "fullName": "Jordan Lee",
         "role": "STAFF",
         "status": "ACTIVE",
+        "lastLoginAt": "2026-05-11T10:00:00Z",
         "isTemporaryPassword": false
       }
     ],
@@ -400,9 +423,8 @@ Provision a new staff account tied to the organizer's organization.
 
 ```json
 {
-  "email": "{{newStaffEmail}}",
-  "fullName": "{{newStaffFullName}}",
-  "role": "STAFF"
+  "email": "{{staffEmail}}",
+  "fullName": "Staff One"
 }
 ```
 
@@ -418,6 +440,7 @@ Provision a new staff account tied to the organizer's organization.
     "fullName": "New Staff",
     "role": "STAFF",
     "organizationId": "org-12345",
+    "lastLoginAt": null,
     "isTemporaryPassword": true
   },
   "metadata": {
@@ -461,7 +484,7 @@ Activate or lock a staff account in the organizer's tenant.
 ### Postman Steps
 
 1. **Method:** `PATCH`
-2. **URL:** `{{baseUrl}}/users/{{staffUserId}}/status`
+2. **URL:** `{{baseUrl}}/users/{{staffId}}/status`
 3. **Headers:** `Authorization: Bearer {{accessToken}}`
 4. **Body:** `raw` JSON
 
@@ -505,8 +528,8 @@ Use this scenario immediately after provisioning a staff account.
 3. Call a protected endpoint such as `GET /api/v1/users/me` with the staff access token.
 4. Verify the call returns `403 Forbidden` because the account still has `isTemporaryPassword = true`.
 5. Call `PUT /api/v1/users/me/password` with the current temporary password and the new password.
-6. Confirm the response returns `isTemporaryPassword = false`.
-7. Re-call the same protected endpoint.
+6. Confirm the response returns a payload containing `accessToken` and `refreshToken`, and the `user` object shows `isTemporaryPassword = false`.
+7. Use the returned `accessToken` to call the protected endpoint.
 8. Confirm access is now granted and the endpoint returns the expected data.
 
 Recommended endpoint order for the check:

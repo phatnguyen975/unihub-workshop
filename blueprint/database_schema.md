@@ -69,7 +69,7 @@ erDiagram
   workshop_assignments {
     uuid id PK
     uuid workshop_id FK
-    uuid organization_id FK
+    uuid staff_id FK
     datetime assigned_at
     datetime created_at
     datetime updated_at
@@ -102,7 +102,7 @@ erDiagram
     datetime updated_at
   }
 
-  attendance {
+  attendances {
     uuid id PK
     uuid registration_id FK
     uuid checked_in_by_user_id FK
@@ -255,12 +255,12 @@ erDiagram
   organizations ||--o{ users : "contains staff"
   workshops ||--o{ workshop_speakers : has
   workshops ||--o{ workshop_assignments : assigns
-  organizations ||--o{ workshop_assignments : "is assigned"
+  users ||--o{ workshop_assignments : "is assigned (staff)"
   users ||--o{ registrations : registers
   workshops ||--o{ registrations : has
   registrations ||--o| payments : paid_by
-  registrations ||--|| attendance : results_in
-  users ||--o{ attendance : checked_by
+  registrations ||--|| attendances : results_in
+  users ||--o{ attendances : checked_by
   workshops ||--o{ brochures : has
   workshops ||--o{ ai_summaries : summarizes
   student_import_batches ||--o{ student_import_errors : contains
@@ -344,29 +344,29 @@ erDiagram
 
 ### `workshop_assignments` Table
 
-| Attribute       | Type        | Constraint                                 | Default Value     | Indexing                                     | Description                            |
-| :-------------- | :---------- | :----------------------------------------- | :---------------- | :------------------------------------------- | :------------------------------------- |
-| id              | UUID        | PK                                         | gen_random_uuid() | UNIQUE B-Tree (id)                           | Primary key.                           |
-| workshop_id     | UUID        | FK -> workshops(id) ON DELETE CASCADE      | None              | UNIQUE B-Tree (workshop_id, organization_id) | Workshop assigned to an organization.  |
-| organization_id | UUID        | FK -> organizations(id) ON DELETE RESTRICT | None              | B-Tree (organization_id)                     | Organization responsible for check-in. |
-| assigned_at     | TIMESTAMPTZ | NOT NULL                                   | now()             | B-Tree (assigned_at)                         | Assignment timestamp.                  |
-| created_at      | TIMESTAMPTZ | NOT NULL                                   | now()             | B-Tree (created_at)                          | Audit timestamp.                       |
-| updated_at      | TIMESTAMPTZ | NOT NULL                                   | now()             | B-Tree (updated_at)                          | Audit timestamp.                       |
+| Attribute   | Type        | Constraint                            | Default Value     | Indexing                              | Description                                      |
+| :---------- | :---------- | :------------------------------------ | :---------------- | :------------------------------------ | :----------------------------------------------- |
+| id          | UUID        | PK                                    | gen_random_uuid() | UNIQUE B-Tree (id)                    | Primary key.                                     |
+| workshop_id | UUID        | FK -> workshops(id) ON DELETE CASCADE | None              | UNIQUE B-Tree (workshop_id, staff_id) | Workshop assigned to an individual staff member. |
+| staff_id    | UUID        | FK -> users(id) ON DELETE RESTRICT    | None              | B-Tree (staff_id)                     | Staff user responsible for check-in.             |
+| assigned_at | TIMESTAMPTZ | NOT NULL                              | now()             | B-Tree (assigned_at)                  | Assignment timestamp.                            |
+| created_at  | TIMESTAMPTZ | NOT NULL                              | now()             | B-Tree (created_at)                   | Audit timestamp.                                 |
+| updated_at  | TIMESTAMPTZ | NOT NULL                              | now()             | B-Tree (updated_at)                   | Audit timestamp.                                 |
 
 ### `registrations` Table
 
-| Attribute       | Type         | Constraint                                                                                               | Default Value     | Indexing                        | Description                              |
-| :-------------- | :----------- | :------------------------------------------------------------------------------------------------------- | :---------------- | :------------------------------ | :--------------------------------------- |
-| id              | UUID         | PK                                                                                                       | gen_random_uuid() | UNIQUE B-Tree (id)              | Primary key.                             |
-| user_id         | UUID         | FK -> users(id) ON DELETE RESTRICT                                                                       | None              | B-Tree (user_id)                | Student owner of the registration.       |
-| workshop_id     | UUID         | FK -> workshops(id) ON DELETE RESTRICT                                                                   | None              | B-Tree (workshop_id)            | Workshop being registered.               |
-| idempotency_key | VARCHAR(255) | NOT NULL, UNIQUE                                                                                         | None              | UNIQUE B-Tree (idempotency_key) | Prevents duplicate registrations.        |
-| status          | VARCHAR(20)  | NOT NULL, CHECK (status IN ('PENDING','REGISTERED','CONFIRMED','PAID','FAILED','CANCELED','CHECKED_IN')) | 'PENDING'         | B-Tree (status)                 | Registration lifecycle state.            |
-| ticket_type     | VARCHAR(20)  | NOT NULL, CHECK (ticket_type IN ('FREE','PAID'))                                                         | 'FREE'            | B-Tree (ticket_type)            | Derived from price at registration time. |
-| qr_code_payload | TEXT         | NULL                                                                                                     | NULL              | None                            | Signed QR payload or URL.                |
-| qr_issued_at    | TIMESTAMPTZ  | NULL                                                                                                     | NULL              | B-Tree (qr_issued_at)           | QR issuance timestamp.                   |
-| created_at      | TIMESTAMPTZ  | NOT NULL                                                                                                 | now()             | B-Tree (created_at)             | Audit timestamp.                         |
-| updated_at      | TIMESTAMPTZ  | NOT NULL                                                                                                 | now()             | B-Tree (updated_at)             | Audit timestamp.                         |
+| Attribute       | Type         | Constraint                                                     | Default Value     | Indexing                        | Description                              |
+| :-------------- | :----------- | :------------------------------------------------------------- | :---------------- | :------------------------------ | :--------------------------------------- |
+| id              | UUID         | PK                                                             | gen_random_uuid() | UNIQUE B-Tree (id)              | Primary key.                             |
+| user_id         | UUID         | FK -> users(id) ON DELETE RESTRICT                             | None              | B-Tree (user_id)                | Student owner of the registration.       |
+| workshop_id     | UUID         | FK -> workshops(id) ON DELETE RESTRICT                         | None              | B-Tree (workshop_id)            | Workshop being registered.               |
+| idempotency_key | VARCHAR(255) | NOT NULL, UNIQUE                                               | None              | UNIQUE B-Tree (idempotency_key) | Prevents duplicate registrations.        |
+| status          | VARCHAR(20)  | NOT NULL, CHECK (status IN ('PENDING','CONFIRMED','CANCELED')) | 'PENDING'         | B-Tree (status)                 | Registration lifecycle state.            |
+| ticket_type     | VARCHAR(20)  | NOT NULL, CHECK (ticket_type IN ('FREE','PAID'))               | 'FREE'            | B-Tree (ticket_type)            | Derived from price at registration time. |
+| qr_code_payload | TEXT         | NULL                                                           | NULL              | None                            | Signed QR payload or URL.                |
+| qr_issued_at    | TIMESTAMPTZ  | NULL                                                           | NULL              | B-Tree (qr_issued_at)           | QR issuance timestamp.                   |
+| created_at      | TIMESTAMPTZ  | NOT NULL                                                       | now()             | B-Tree (created_at)             | Audit timestamp.                         |
+| updated_at      | TIMESTAMPTZ  | NOT NULL                                                       | now()             | B-Tree (updated_at)             | Audit timestamp.                         |
 
 ### `payments` Table
 
@@ -384,7 +384,7 @@ erDiagram
 | created_at       | TIMESTAMPTZ   | NOT NULL                                                              | now()             | B-Tree (created_at)          | Audit timestamp.                |
 | updated_at       | TIMESTAMPTZ   | NOT NULL                                                              | now()             | B-Tree (updated_at)          | Audit timestamp.                |
 
-### `attendance` Table
+### `attendances` Table
 
 | Attribute             | Type        | Constraint                                              | Default Value     | Indexing                        | Description                                 |
 | :-------------------- | :---------- | :------------------------------------------------------ | :---------------- | :------------------------------ | :------------------------------------------ |
@@ -400,18 +400,19 @@ erDiagram
 
 ### `brochures` Table
 
-| Attribute   | Type         | Constraint                                         | Default Value     | Indexing                    | Description              |
-| :---------- | :----------- | :------------------------------------------------- | :---------------- | :-------------------------- | :----------------------- |
-| id          | UUID         | PK                                                 | gen_random_uuid() | UNIQUE B-Tree (id)          | Primary key.             |
-| workshop_id | UUID         | FK -> workshops(id) ON DELETE CASCADE              | None              | B-Tree (workshop_id)        | Workshop owning the PDF. |
-| storage_key | VARCHAR(512) | NOT NULL                                           | None              | UNIQUE B-Tree (storage_key) | Object storage key.      |
-| file_name   | VARCHAR(255) | NULL                                               | NULL              | None                        | Original filename.       |
-| mime_type   | VARCHAR(100) | NULL                                               | NULL              | None                        | Stored MIME type.        |
-| size_bytes  | BIGINT       | NULL, CHECK (size_bytes >= 0)                      | NULL              | None                        | File size in bytes.      |
-| status      | VARCHAR(20)  | NOT NULL, CHECK (status IN ('UPLOADED','DELETED')) | 'UPLOADED'        | B-Tree (status)             | File lifecycle.          |
-| uploaded_at | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (uploaded_at)        | Upload timestamp.        |
-| created_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (created_at)         | Audit timestamp.         |
-| updated_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (updated_at)         | Audit timestamp.         |
+| Attribute   | Type         | Constraint                                         | Default Value     | Indexing                    | Description                                          |
+| :---------- | :----------- | :------------------------------------------------- | :---------------- | :-------------------------- | :--------------------------------------------------- |
+| id          | UUID         | PK                                                 | gen_random_uuid() | UNIQUE B-Tree (id)          | Primary key.                                         |
+| workshop_id | UUID         | FK -> workshops(id) ON DELETE CASCADE              | None              | B-Tree (workshop_id)        | Workshop owning the PDF.                             |
+| storage_key | VARCHAR(512) | NOT NULL                                           | None              | UNIQUE B-Tree (storage_key) | Object storage key.                                  |
+| file_name   | VARCHAR(255) | NULL                                               | NULL              | None                        | Original filename.                                   |
+| mime_type   | VARCHAR(100) | NULL                                               | NULL              | None                        | Stored MIME type.                                    |
+| size_bytes  | BIGINT       | NULL, CHECK (size_bytes >= 0)                      | NULL              | None                        | File size in bytes.                                  |
+| status      | VARCHAR(20)  | NOT NULL, CHECK (status IN ('UPLOADED','DELETED')) | 'UPLOADED'        | B-Tree (status)             | File lifecycle.                                      |
+| uploaded_at | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (uploaded_at)        | Upload timestamp.                                    |
+| file_url    | TEXT         | NOT NULL                                           | None              | None                        | Full object storage URL for the brochure (S3/MinIO). |
+| created_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (created_at)         | Audit timestamp.                                     |
+| updated_at  | TIMESTAMPTZ  | NOT NULL                                           | now()             | B-Tree (updated_at)         | Audit timestamp.                                     |
 
 ### `ai_summaries` Table
 
@@ -561,7 +562,7 @@ erDiagram
 - Enable `pgcrypto` and use `gen_random_uuid()` for UUID v4 primary keys.
 - Store all timestamps in UTC using `TIMESTAMPTZ`; enforce consistency at the application layer.
 - Add a standard trigger to set `updated_at = now()` on every `UPDATE`.
-- **Use a partial unique index to enforce one active registration per user and workshop:** `UNIQUE (user_id, workshop_id) WHERE status IN ('PENDING','REGISTERED','CONFIRMED','PAID','CHECKED_IN')`.
+- **Use a partial unique index to enforce one active registration per user and workshop:** `UNIQUE (user_id, workshop_id) WHERE status IN ('PENDING','CONFIRMED')`.
 - Enforce capacity integrity with `CHECK (capacity_remaining >= 0 AND capacity_remaining <= capacity_total)` and lock workshops with `SELECT ... FOR UPDATE` during seat allocation.
 - **Add cleanup jobs for TTL-bound tables:** `idempotency_keys.expires_at`, `password_reset_tokens.expires_at`, `refresh_tokens.expires_at`.
 - Create a partial index for `event_publication` where `completion_date IS NULL` to speed pending publication scans.

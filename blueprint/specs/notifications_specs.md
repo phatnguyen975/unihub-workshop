@@ -2,7 +2,7 @@
 
 This module is the centralized consumer for system events and manages delivery, templating, status tracking, retry handling, and operator notifications. It consumes published events from the other modules and routes them to delivery channels while keeping the state of every notification auditable and idempotent.
 
-## Get Notification Status
+## 1. Get Notification Status
 
 | Field                   | Details                                                                                                                                                                                                                                                                                                                                                              |
 | :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -14,7 +14,7 @@ This module is the centralized consumer for system events and manages delivery, 
 | **Constraints**         | - Access is limited to the workshop owner.<br>- Notification logs are read only and immutable.<br>- The `notification_logs` table stores the delivery history.                                                                                                                                                                                                       |
 | **Acceptance Criteria** | - Status history is returned for valid registrations.<br>- Non owners cannot access the logs.                                                                                                                                                                                                                                                                        |
 
-## Spring Modulith Event Publication
+## 2. Spring Modulith Event Publication
 
 | Field                   | Details                                                                                                                                                                                                                                                                                                            |
 | :---------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -26,7 +26,7 @@ This module is the centralized consumer for system events and manages delivery, 
 | **Constraints**         | - Each event publication must be externalized at least once.<br>- Publication state transitions must remain transactional.<br>- The event publication registry is the source of truth for pending notifications.                                                                                                   |
 | **Acceptance Criteria** | - Notification events are published to RabbitMQ.<br>- Event publication entries are marked completed.                                                                                                                                                                                                              |
 
-## Transactional Email Consumer
+## 3. Transactional Email Consumer
 
 | Field                   | Details                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -38,19 +38,19 @@ This module is the centralized consumer for system events and manages delivery, 
 | **Constraints**         | - Template rendering must be deterministic.<br>- Notification logs must capture status transitions.<br>- The `notification_logs` table stores the delivery outcome.                                                                                                                                                                                                                                                                         |
 | **Acceptance Criteria** | - Successful sends are logged as `SENT` or `DELIVERED`.<br>- Failures are captured with error details.                                                                                                                                                                                                                                                                                                                                      |
 
-## Bulk Notification Consumer
+## 4. Bulk Notification Consumer
 
-| Field                   | Details                                                                                                                                                                                                                                                                              |
-| :---------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Use Case Name**       | Bulk Notification Consumer                                                                                                                                                                                                                                                           |
-| **Description**         | Process broadcast notifications and queue individual email jobs.                                                                                                                                                                                                                     |
-| **Actors**              | Internal System                                                                                                                                                                                                                                                                      |
-| **Main Flow**           | 1. The system consumes a broadcast message from RabbitMQ.<br>2. The system queries all `CONFIRMED` or `PAID` attendees for the workshop.<br>3. The system enqueues individual notification jobs per attendee.<br>4. The system applies provider rate limiting and batching controls. |
-| **Error Scenarios**     | - A missing workshop returns a failed status.<br>- A provider rate limit breach returns a retryable failure.                                                                                                                                                                         |
-| **Constraints**         | - Bulk sends must respect provider rate limits.<br>- Each attendee must receive an individual notification job.<br>- The `registrations` table provides the attendee list.                                                                                                           |
-| **Acceptance Criteria** | - Broadcast events produce per attendee jobs.<br>- Rate limits are honored without message loss.                                                                                                                                                                                     |
+| Field                   | Details                                                                                                                                                                                                                                                                    |
+| :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Use Case Name**       | Bulk Notification Consumer                                                                                                                                                                                                                                                 |
+| **Description**         | Process broadcast notifications and queue individual email jobs.                                                                                                                                                                                                           |
+| **Actors**              | Internal System                                                                                                                                                                                                                                                            |
+| **Main Flow**           | 1. The system consumes a broadcast message from RabbitMQ.<br>2. The system queries all `CONFIRMED` attendees for the workshop.<br>3. The system enqueues individual notification jobs per attendee.<br>4. The system applies provider rate limiting and batching controls. |
+| **Error Scenarios**     | - A missing workshop returns a failed status.<br>- A provider rate limit breach returns a retryable failure.                                                                                                                                                               |
+| **Constraints**         | - Bulk sends must respect provider rate limits.<br>- Each attendee must receive an individual notification job.<br>- The `registrations` table provides the attendee list.                                                                                                 |
+| **Acceptance Criteria** | - Broadcast events produce per attendee jobs.<br>- Rate limits are honored without message loss.                                                                                                                                                                           |
 
-## Notification Template Engine
+## 5. Notification Template Engine
 
 | Field                   | Details                                                                                                                                                                                                                                                                           |
 | :---------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -62,7 +62,7 @@ This module is the centralized consumer for system events and manages delivery, 
 | **Constraints**         | - Templates must be versioned and backward compatible.<br>- Rendering must be deterministic for the same inputs.                                                                                                                                                                  |
 | **Acceptance Criteria** | - The rendered output contains the correct dynamic fields.<br>- Template selection remains consistent per event type.                                                                                                                                                             |
 
-## Fallback, Retry and DLQ Strategy
+## 6. Fallback, Retry and DLQ Strategy
 
 | Field                   | Details                                                                                                                                                                                                                                                                                                                                                                        |
 | :---------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ This module is the centralized consumer for system events and manages delivery, 
 | **Constraints**         | - Exponential backoff is required for retries.<br>- Dead letter routing occurs after the maximum retry threshold is exceeded.<br>- Idempotency must be preserved through the notification identifier.                                                                                                                                                                          |
 | **Acceptance Criteria** | - Transient failures are retried with backoff.<br>- Exhausted retries are routed to the dead letter queue and logged.                                                                                                                                                                                                                                                          |
 
-## System Alert Consumer
+## 7. System Alert Consumer
 
 | Field                   | Details                                                                                                                                                                                                                                                                                                                                                                          |
 | :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -2,7 +2,7 @@
 
 ## 1. Conventions
 
-- **Base path:** `/api/v1`
+- **Base path:** `/api/v1/auth`
 - All responses use the standard envelope:
 
 ```json
@@ -268,6 +268,7 @@
       "status": "ACTIVE",
       "organizationId": null,
       "studentId": "STU-10992",
+      "lastLoginAt": "2026-05-11T10:00:00Z",
       "isTemporaryPassword": false
     }
   },
@@ -302,6 +303,7 @@
       "role": "STAFF",
       "status": "ACTIVE",
       "organizationId": "1abf4f71-8c42-4af8-9d0f-4f8d8d6f6d5d",
+      "lastLoginAt": "2026-05-11T10:00:00Z",
       "isTemporaryPassword": true
     }
   },

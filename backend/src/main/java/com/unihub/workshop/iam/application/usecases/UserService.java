@@ -30,6 +30,13 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
+import com.unihub.workshop.iam.application.dto.LogoutRequest;
+import com.unihub.workshop.iam.domain.repository.TokenStore;
+import com.unihub.workshop.iam.infrastructure.security.JwtTokenProvider;
+import io.jsonwebtoken.JwtException;
+import java.time.Duration;
+import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -50,17 +57,90 @@ public class UserService implements UserUseCase {
     private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final TokenStore tokenStore;
+    private final JwtTokenProvider jwtTokenProvider;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public UserService(
             UserRepository userRepository,
             OrganizationRepository organizationRepository,
             PasswordEncoder passwordEncoder,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            TokenStore tokenStore,
+            JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
         this.passwordEncoder = passwordEncoder;
         this.eventPublisher = eventPublisher;
+        this.tokenStore = tokenStore;
+        this.jwtTokenProvider = jwtTokenProvider;
+    }
+
+    @Override
+    @Transactional
+    public UseCaseResult<com.unihub.workshop.iam.application.dto.LoginResponse> changePassword(String userId, ChangePasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Passwords do not match", "password_mismatch");
+        }
+
+        User user = loadUser(userId);
+        if (user.getPasswordHash() == null
+                || !passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Current password mismatch", "invalid_credentials");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setTemporaryPassword(false);
+        userRepository.saveAndFlush(user);
+        revokeRefreshTokens(user);
+
+        // If the user had a temporary password, return a LoginResponse with new tokens so the client
+        // can continue without re-login. Otherwise return tokens as well for consistency.
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user);
+        com.unihub.workshop.iam.application.dto.LoginResponse response = new com.unihub.workshop.iam.application.dto.LoginResponse(
+                accessToken,
+                refreshToken,
+                "Bearer",
+                900,
+                2_592_000,
+                toProfileResponse(user) == null ? null : toLoginUserResponse(user));
+        return new UseCaseResult<>(HttpStatus.OK, "Password changed", response);
+    }
+
+    @Override
+    @Transactional
+    public UseCaseResult<Void> logout(String userId, LogoutRequest request, String accessToken) {
+        // Blacklist the access token if provided
+        if (accessToken != null && !accessToken.isBlank()) {
+            try {
+                JwtTokenProvider.TokenClaims accessTokenClaims = jwtTokenProvider.parseToken(accessToken);
+                if (accessTokenClaims.expiresAt() != null) {
+                    Duration ttl = remainingTtl(accessTokenClaims.expiresAt());
+                    tokenStore.blacklistAccessToken(accessTokenClaims.jti(), ttl);
+                }
+            } catch (JwtException | IllegalArgumentException ex) {
+                // Log but don't fail logout if access token is invalid
+                System.err.println("Failed to parse access token for blacklisting: " + ex.getMessage());
+            }
+        }
+
+        // Blacklist the refresh token if provided
+        String refreshToken = request == null ? null : request.refreshToken();
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);
+        }
+
+        JwtTokenProvider.TokenClaims claims = parseRefreshToken(
+                refreshToken,
+                HttpStatus.BAD_REQUEST,
+                "Invalid refresh token",
+                "invalid_refresh_token");
+        if (userId != null && !userId.isBlank() && !userId.equals(claims.subject())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid refresh token", "invalid_refresh_token");
+        }
+        tokenStore.blacklistRefreshToken(claims.jti(), remainingTtl(claims.expiresAt()));
+        return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);
     }
 
     @Override
@@ -153,13 +233,14 @@ public class UserService implements UserUseCase {
         User organizer = loadOrganizer(userId);
         Organization organization = loadOwnedOrganization(organizer, organizationId);
 
-        Page<User> staffPage = userRepository.findByOrganizationIdAndRole(organization.getId(), UserRole.STAFF, pageable);
+        Page<User> staffPage = userRepository.findByOrganizationIdAndRole(organization.getId(), UserRole.STAFF,
+                pageable);
         List<OrganizationStaffResponse> staff = staffPage.getContent().stream()
                 .map(this::toOrganizationStaffResponse)
                 .toList();
 
         OrganizationStaffPageResponse response = new OrganizationStaffPageResponse(
-            staff,
+                staff,
                 new PaginationMetadata(
                         staffPage.getNumber(),
                         staffPage.getSize(),
@@ -185,12 +266,10 @@ public class UserService implements UserUseCase {
             throw new AppException(HttpStatus.CONFLICT, "Email already exists", "email_exists");
         }
 
-        if (!"STAFF".equals(request.role())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Invalid role", "validation");
-        }
+        // role is implicitly STAFF for this endpoint
 
         String temporaryPassword = generateTemporaryPassword();
-        // TEMP TEST ONLY: remove after QA because this exposes the plaintext temporary password in logs.
+        // TEMP TEST ONLY: remove after QA because this exposes the plaintext temporary password in logs
         log.info("TEMP TEST ONLY - Generated temporary staff password for {}: {}", email, temporaryPassword);
 
         User staff = new User();
@@ -220,6 +299,7 @@ public class UserService implements UserUseCase {
                 staff.getFullName(),
                 staff.getRole().name(),
                 organization.getId().toString(),
+                staff.getLastLoginAt() == null ? null : staff.getLastLoginAt().toString(),
                 true);
         return new UseCaseResult<>(HttpStatus.CREATED, "Staff account provisioned", response);
     }
@@ -270,9 +350,11 @@ public class UserService implements UserUseCase {
     }
 
     private Organization loadOwnedOrganization(User organizer, String organizationId) {
-        UUID parsedOrganizationId = parseUuid(organizationId, HttpStatus.BAD_REQUEST, "Invalid organization identifier", "validation");
+        UUID parsedOrganizationId = parseUuid(organizationId, HttpStatus.BAD_REQUEST, "Invalid organization identifier",
+                "validation");
         Organization organization = organizationRepository.findById(parsedOrganizationId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Organization not found", "organization_not_found"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Organization not found",
+                        "organization_not_found"));
         if (!organizer.getId().equals(organization.getOrganizerId())) {
             throw new AppException(HttpStatus.FORBIDDEN, "Organization is outside organizer ownership", "forbidden");
         }
@@ -367,6 +449,7 @@ public class UserService implements UserUseCase {
                 user.getStatus() == null ? null : user.getStatus().name(),
                 user.getOrganizationId() == null ? null : user.getOrganizationId().toString(),
                 user.getStudentId(),
+                user.getLastLoginAt() == null ? null : user.getLastLoginAt().toString(),
                 user.isTemporaryPassword());
     }
 
@@ -387,6 +470,74 @@ public class UserService implements UserUseCase {
                 user.getFullName(),
                 user.getRole() == null ? null : user.getRole().name(),
                 user.getStatus() == null ? null : user.getStatus().name(),
+                user.getLastLoginAt() == null ? null : user.getLastLoginAt().toString(),
                 user.isTemporaryPassword());
+    }
+
+    private com.unihub.workshop.iam.application.dto.LoginUserResponse toLoginUserResponse(User user) {
+        return new com.unihub.workshop.iam.application.dto.LoginUserResponse(
+                user.getId() == null ? null : user.getId().toString(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getRole() == null ? null : user.getRole().name(),
+                user.getStatus() == null ? null : user.getStatus().name(),
+                user.getOrganizationId() == null ? null : user.getOrganizationId().toString(),
+                user.getStudentId(),
+                user.getLastLoginAt() == null ? null : user.getLastLoginAt().toString(),
+                user.isTemporaryPassword());
+    }
+
+    private JwtTokenProvider.TokenClaims parseRefreshToken(
+            String refreshToken,
+            HttpStatus status,
+            String message,
+            String errorCode) {
+        JwtTokenProvider.TokenClaims claims = parseToken(refreshToken, status, message, errorCode);
+        if (!"refresh".equals(claims.type())) {
+            throw new AppException(status, message, errorCode);
+        }
+        return claims;
+    }
+
+    private JwtTokenProvider.TokenClaims parseToken(
+            String token,
+            HttpStatus status,
+            String message,
+            String errorCode) {
+        if (token == null || token.isBlank()) {
+            throw new AppException(status, message, errorCode);
+        }
+        try {
+            JwtTokenProvider.TokenClaims claims = jwtTokenProvider.parseToken(token);
+            if (claims.subject() == null || claims.subject().isBlank()
+                    || claims.jti() == null || claims.jti().isBlank()) {
+                throw new AppException(status, message, errorCode);
+            }
+            return claims;
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw new AppException(status, message, errorCode);
+        }
+    }
+
+    private Duration remainingTtl(Instant expiresAt) {
+        if (expiresAt == null) {
+            return Duration.ZERO;
+        }
+        Instant now = Instant.now();
+        if (expiresAt.isBefore(now)) {
+            return Duration.ZERO;
+        }
+        return Duration.between(now, expiresAt);
+    }
+
+    private void revokeRefreshTokens(User user) {
+        if (user == null || user.getId() == null) {
+            return;
+        }
+        tokenStore.revokeRefreshTokens(
+                user.getId().toString(),
+                Instant.now(),
+                Duration.ofSeconds(2_592_000));
     }
 }

@@ -18,4 +18,7 @@ public interface JpaUserRepository extends JpaRepository<User, UUID>, UserReposi
 
     @Override
     Page<User> findByOrganizationIdAndRole(UUID organizationId, UserRole role, Pageable pageable);
+
+    @Override
+    <S extends User> S saveAndFlush(S entity);
 }

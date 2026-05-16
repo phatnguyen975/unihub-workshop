@@ -1,7 +1,5 @@
 package com.unihub.workshop.iam.application.usecases;
 
-import com.unihub.workshop.iam.application.dto.ChangePasswordRequest;
-import com.unihub.workshop.iam.application.dto.ChangePasswordResponse;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordRequest;
 import com.unihub.workshop.iam.application.dto.ForgotPasswordResponse;
 import com.unihub.workshop.iam.application.dto.LoginRequest;
@@ -110,7 +108,7 @@ public class AuthService implements AuthUseCase {
         userRepository.save(user);
 
         String otp = otpGenerator.generateOtp();
-        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
         log.info("TEMP TEST ONLY - Generated registration OTP for {}: {}", email, otp);
         saveOtpAndCooldown(email, otp);
         publishEvent(new UserRegisteredEvent(email, request.fullName()));
@@ -184,7 +182,7 @@ public class AuthService implements AuthUseCase {
                 throw new AppException(HttpStatus.NOT_FOUND, "Email not found", "not_found");
             }
             String otp = otpGenerator.generateOtp();
-            // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+            // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
             log.info("TEMP TEST ONLY - Generated registration OTP resend for {}: {}", email, otp);
             saveOtpAndCooldown(email, otp);
             publishEvent(new UserRegisteredEvent(email, user.getFullName()));
@@ -195,7 +193,7 @@ public class AuthService implements AuthUseCase {
             throw new AppException(HttpStatus.NOT_FOUND, "Email not found", "not_found");
         }
         String otp = otpGenerator.generateOtp();
-        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
         log.info("TEMP TEST ONLY - Generated forgot-password OTP for {}: {}", email, otp);
         saveOtpAndCooldown(email, otp);
         publishEvent(new PasswordResetRequestedEvent(email));
@@ -203,6 +201,7 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
+    @Transactional
     public UseCaseResult<LoginResponse> login(LoginRequest request) {
         String email = normalizeEmail(request.email());
         User user = userRepository.findByEmailIgnoreCase(email)
@@ -230,6 +229,11 @@ public class AuthService implements AuthUseCase {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid credentials", "invalid_credentials");
         }
 
+        user.setFailedLoginAttempts(0);
+        user.setLockoutUntil(null);
+        user.setLastLoginAt(now);
+        userRepository.saveAndFlush(user);
+
         if (user.isTemporaryPassword()) {
             String accessToken = jwtTokenProvider.generateRestrictedAccessToken(user);
             LoginResponse response = new LoginResponse(
@@ -241,11 +245,6 @@ public class AuthService implements AuthUseCase {
                     toLoginUserResponse(user));
             return new UseCaseResult<>(HttpStatus.OK, "Password change required", response);
         }
-
-        user.setFailedLoginAttempts(0);
-        user.setLockoutUntil(null);
-        user.setLastLoginAt(now);
-        userRepository.save(user);
 
         String accessToken = jwtTokenProvider.generateAccessToken(user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user);
@@ -298,42 +297,6 @@ public class AuthService implements AuthUseCase {
 
     @Override
     @Transactional
-    public UseCaseResult<Void> logout(String userId, com.unihub.workshop.iam.application.dto.LogoutRequest request,
-            String accessToken) {
-        // Blacklist the access token if provided
-        if (accessToken != null && !accessToken.isBlank()) {
-            try {
-                JwtTokenProvider.TokenClaims accessTokenClaims = jwtTokenProvider.parseToken(accessToken);
-                if (accessTokenClaims.expiresAt() != null) {
-                    Duration ttl = remainingTtl(accessTokenClaims.expiresAt());
-                    tokenStore.blacklistAccessToken(accessTokenClaims.jti(), ttl);
-                }
-            } catch (JwtException | IllegalArgumentException ex) {
-                // Log but don't fail logout if access token is invalid
-                System.err.println("Failed to parse access token for blacklisting: " + ex.getMessage());
-            }
-        }
-
-        // Blacklist the refresh token if provided
-        String refreshToken = request == null ? null : request.refreshToken();
-        if (refreshToken == null || refreshToken.isBlank()) {
-            return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);
-        }
-
-        JwtTokenProvider.TokenClaims claims = parseRefreshToken(
-                refreshToken,
-                HttpStatus.BAD_REQUEST,
-                "Invalid refresh token",
-                "invalid_refresh_token");
-        if (userId != null && !userId.isBlank() && !userId.equals(claims.subject())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Invalid refresh token", "invalid_refresh_token");
-        }
-        tokenStore.blacklistRefreshToken(claims.jti(), remainingTtl(claims.expiresAt()));
-        return new UseCaseResult<>(HttpStatus.OK, "Logged out", null);
-    }
-
-    @Override
-    @Transactional
     public UseCaseResult<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request) {
         String email = normalizeEmail(request.email());
         if (otpStore.isCooldownActive(email)) {
@@ -349,7 +312,7 @@ public class AuthService implements AuthUseCase {
         }
 
         String otp = otpGenerator.generateOtp();
-        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs.
+        // TEMP TEST ONLY: remove after QA because this exposes the plaintext OTP in logs
         log.info("TEMP TEST ONLY - Generated forgot-password OTP for {}: {}", email, otp);
         saveOtpAndCooldown(email, otp);
         publishEvent(new PasswordResetRequestedEvent(email));
@@ -387,27 +350,6 @@ public class AuthService implements AuthUseCase {
         return new UseCaseResult<>(HttpStatus.OK, "Password reset successful", null);
     }
 
-    @Override
-    @Transactional
-    public UseCaseResult<ChangePasswordResponse> changePassword(String userId, ChangePasswordRequest request) {
-        if (!request.newPassword().equals(request.confirmPassword())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Passwords do not match", "password_mismatch");
-        }
-
-        User user = loadUserById(userId, HttpStatus.UNAUTHORIZED);
-        if (user.getPasswordHash() == null
-                || !passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Current password mismatch", "invalid_credentials");
-        }
-
-        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        user.setTemporaryPassword(false);
-        userRepository.save(user);
-        revokeRefreshTokens(user);
-
-        return new UseCaseResult<>(HttpStatus.OK, "Password changed", new ChangePasswordResponse(false));
-    }
-
     private LoginUserResponse toLoginUserResponse(User user) {
         return new LoginUserResponse(
                 user.getId() == null ? null : user.getId().toString(),
@@ -418,6 +360,7 @@ public class AuthService implements AuthUseCase {
                 user.getStatus() == null ? null : user.getStatus().name(),
                 user.getOrganizationId() == null ? null : user.getOrganizationId().toString(),
                 user.getStudentId(),
+                user.getLastLoginAt() == null ? null : user.getLastLoginAt().toString(),
                 user.isTemporaryPassword());
     }
 

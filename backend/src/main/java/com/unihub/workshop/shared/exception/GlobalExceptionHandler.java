@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.ObjectError;
@@ -71,6 +72,21 @@ public class GlobalExceptionHandler {
                 validationErrors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.failure("Invalid request payload", metadata(HttpStatus.BAD_REQUEST), error));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(
+            AccessDeniedException ex,
+            HttpServletRequest request) {
+        HttpStatus status = HttpStatus.FORBIDDEN;
+        ApiResponse.ProblemDetails error = problemDetails(
+                "urn:unihub:error:forbidden",
+                "Forbidden",
+                "You do not have permission to access this resource.",
+                request.getRequestURI(),
+                null);
+        return ResponseEntity.status(status)
+                .body(ApiResponse.failure("Access Denied", metadata(status), error));
     }
 
     @ExceptionHandler({ NoHandlerFoundException.class, NoResourceFoundException.class })

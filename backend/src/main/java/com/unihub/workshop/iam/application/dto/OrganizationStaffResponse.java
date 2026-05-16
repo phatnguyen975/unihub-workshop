@@ -6,5 +6,6 @@ public record OrganizationStaffResponse(
         String fullName,
         String role,
         String status,
+        String lastLoginAt,
         boolean isTemporaryPassword) {
 }
