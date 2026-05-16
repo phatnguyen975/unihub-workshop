@@ -38,6 +38,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.unihub.workshop.workshops.infrastructure.cache.WorkshopCacheService;
 
 @Service
 @RequiredArgsConstructor
@@ -54,6 +56,8 @@ public class WorkshopManagementService {
     private final BrochureRepository brochureRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final EntityManager entityManager;
+    private final WorkshopCacheService cacheService;
+    private final ObjectMapper objectMapper;
 
     public UseCaseResult<WorkshopManagementResponse> createWorkshop(String organizerId, CreateWorkshopRequest request) {
         UUID organizer = parseOrganizer(organizerId);
@@ -70,14 +74,28 @@ public class WorkshopManagementService {
         workshop.setCurrency(request.currency());
 
         Workshop saved = workshopRepository.save(workshop);
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.CREATED, "Workshop created", mapToResponse(saved));
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public UseCaseResult<WorkshopManagementFullResponse> getWorkshopForManagement(String organizerId, UUID workshopId) {
         UUID organizer = parseOrganizer(organizerId);
+        String cacheKey = workshopId.toString();
+        Object cachedResult = cacheService.getManagementDetailCache(cacheKey);
+        if (cachedResult != null) {
+            try {
+                WorkshopManagementFullResponse response = objectMapper.convertValue(cachedResult, WorkshopManagementFullResponse.class);
+                return new UseCaseResult<>(HttpStatus.OK, "Workshop details", response);
+            } catch (Exception e) {
+                // Cache miss on conversion; continue to fetch from DB
+            }
+        }
+
         Workshop workshop = loadWorkshop(workshopId, organizer);
-        return new UseCaseResult<>(HttpStatus.OK, "Workshop details", mapToFullResponse(workshop));
+        WorkshopManagementFullResponse response = mapToFullResponse(workshop);
+        cacheService.setManagementDetailCache(cacheKey, response);
+        return new UseCaseResult<>(HttpStatus.OK, "Workshop details", response);
     }
 
     public UseCaseResult<WorkshopManagementFullResponse> updateWorkshop(
@@ -112,6 +130,8 @@ public class WorkshopManagementService {
             workshop.setEndTime(request.endTime());
 
         Workshop saved = workshopRepository.save(workshop);
+        cacheService.evictAllDetailCaches(workshopId.toString());
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.OK, "Workshop updated", mapToFullResponse(saved));
     }
 
@@ -148,6 +168,8 @@ public class WorkshopManagementService {
                 saved.getLocation(),
                 OffsetDateTime.now()));
 
+        cacheService.evictAllDetailCaches(workshopId.toString());
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.OK, "Workshop rescheduled", mapToFullResponse(saved));
     }
 
@@ -183,6 +205,8 @@ public class WorkshopManagementService {
                     OffsetDateTime.now()));
         }
 
+        cacheService.evictAllDetailCaches(workshopId.toString());
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.OK, "Status changed", mapToFullResponse(saved));
     }
 
@@ -196,6 +220,8 @@ public class WorkshopManagementService {
         // capture full state before deletion
         var full = mapToFullResponse(workshop);
         workshopRepository.delete(workshop);
+        cacheService.evictAllDetailCaches(workshopId.toString());
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.OK, "Deleted", full);
     }
 
@@ -215,6 +241,8 @@ public class WorkshopManagementService {
 
         workshopRepository.saveAndFlush(workshop);
         Workshop refreshed = loadWorkshop(workshopId, organizer);
+        cacheService.evictManagementDetailCache(workshopId.toString());
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.CREATED, "Speaker added", mapToFullResponse(refreshed));
     }
 
@@ -233,6 +261,8 @@ public class WorkshopManagementService {
 
         workshopRepository.saveAndFlush(workshop);
         Workshop refreshed = loadWorkshop(workshopId, organizer);
+        cacheService.evictManagementDetailCache(workshopId.toString());
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.OK, "Speaker removed", mapToFullResponse(refreshed));
     }
 
@@ -279,6 +309,9 @@ public class WorkshopManagementService {
                 savedBrochure.getSizeBytes() == null ? 0L : savedBrochure.getSizeBytes(),
                 savedBrochure.getUploadedAt()));
 
+        cacheService.evictPublicDetailCache(workshopId.toString());
+        cacheService.evictManagementDetailCache(workshopId.toString());
+        cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.ACCEPTED, "Brochure upload accepted", new BrochureUploadResponse(
                 savedBrochure.getId(),
                 savedBrochure.getFileUrl(),
