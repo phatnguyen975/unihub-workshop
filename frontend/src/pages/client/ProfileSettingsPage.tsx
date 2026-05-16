@@ -11,7 +11,7 @@ export const ProfileSettingsPage: React.FC = () => {
   const [isUpdated, setIsUpdated] = useState(false);
 
   // Form states for Personal Info
-  const [fullName, setFullName] = useState(user?.fullName || 'Sarah Duyen');
+  const [fullName, setFullName] = useState(user?.full_name || 'Sarah Duyen');
   const [email, setEmail] = useState(user?.email || 'sarah.johnson@university.edu');
   const [phone, setPhone] = useState(user?.phone || '+1 (555) 123-4567');
 
@@ -36,7 +36,7 @@ export const ProfileSettingsPage: React.FC = () => {
       .substring(0, 2);
   };
 
-  const initials = user?.fullName ? getInitials(user.fullName) : 'SD';
+  const initials = user?.full_name ? getInitials(user.full_name) : 'SD';
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col relative">
@@ -69,10 +69,10 @@ export const ProfileSettingsPage: React.FC = () => {
                     {initials}
                   </div>
                   <h3 className="text-[18px] font-semibold text-[#1A1A1A] leading-[27px] text-center">
-                    {user?.fullName || 'Sarah Duyen'}
+                    {user?.full_name || 'Sarah Duyen'}
                   </h3>
                   <p className="text-[14px] font-normal text-[#757575] leading-[20px] text-center mt-1">
-                    {user?.studentId || 'STU-2024-1001'}
+                    {user?.student_id || 'STU-2024-1001'}
                   </p>
                 </div>
 
@@ -149,7 +149,7 @@ export const ProfileSettingsPage: React.FC = () => {
                         <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-[#757575] w-5 h-5" />
                         <input
                           type="text"
-                          value={user?.studentId || 'STU-2024-1001'}
+                          value={user?.student_id || 'STU-2024-1001'}
                           disabled
                           className="w-full bg-[#EEEEEE] border-[1.33px] border-[#E0E0E0] rounded-lg h-[50.67px] pl-[40px] pr-4 text-[16px] text-[#757575] cursor-not-allowed"
                         />

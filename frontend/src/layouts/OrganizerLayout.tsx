@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Building2, Users, Calendar, Bell } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, Calendar } from 'lucide-react';
+import { NotificationsDropdown } from '../components/organizer/NotificationsDropdown';
+import { OrganizerProfileDropdown } from '../components/organizer/OrganizerProfileDropdown';
 
 interface OrganizerLayoutProps {
   children: React.ReactNode;
@@ -66,15 +68,8 @@ export const OrganizerLayout: React.FC<OrganizerLayoutProps> = ({ children }) =>
             <h2 className="text-[24px] font-semibold text-[#1A1A1A] leading-[36px] hidden lg:block">UniHub <span className="text-[12px] font-normal text-[#757575] ml-2">Organizer Portal</span></h2>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100">
-              <Bell size={20} className="text-[#1A1A1A]" />
-              <div className="absolute top-1 right-1 w-4 h-4 bg-[#1B5E20] rounded-full flex items-center justify-center text-[10px] font-medium text-white border border-white">
-                2
-              </div>
-            </button>
-            <button className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-[14px]" style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #43A047 100%)' }}>
-              SC
-            </button>
+            <NotificationsDropdown />
+            <OrganizerProfileDropdown />
           </div>
         </header>
 
