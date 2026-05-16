@@ -81,3 +81,22 @@ export interface Registration {
   created_at: string;
   qr_code_payload: string;
 }
+
+export interface Organization {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  organizer_id: string;
+  created_at: string;
+  updated_at: string;
+  
+  // FE-only mock fields
+  total_workshops: number;
+  total_students: number;
+  staff_count: number;
+  contact_email: string;
+  contact_phone: string;
+  initials: string;
+}

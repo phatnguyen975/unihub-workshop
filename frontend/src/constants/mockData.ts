@@ -1,8 +1,8 @@
 // src/constants/mockData.ts
 
-import type { Workshop, User, Registration } from '../types';
+import type { Workshop, User, Registration, Organization } from '../types';
 
-export const MOCK_USER: User = {
+export const MOCK_STUDENT_USER: User = {
   id: 'usr-001',
   email: 'student@unihub.edu',
   full_name: 'Ava Student',
@@ -13,6 +13,20 @@ export const MOCK_USER: User = {
   student_id: 'STU-2022-001',
   is_temporary_password: false,
 };
+
+export const MOCK_ORGANIZER_USER: User = {
+  id: 'usr-002',
+  email: 'organizer@unihub.edu',
+  full_name: 'John Organizer',
+  phone: '+84909876543',
+  role: 'ORGANIZER',
+  status: 'ACTIVE',
+  organization_id: 'org-001',
+  student_id: null,
+  is_temporary_password: false,
+};
+
+export const MOCK_USER = MOCK_STUDENT_USER; // Default for backward compatibility
 
 export const MOCK_WORKSHOPS: Workshop[] = [
   {
@@ -307,5 +321,88 @@ export const MOCK_REGISTRATIONS: Registration[] = [
     status: 'CHECKED_IN',
     created_at: '2026-05-01T11:00:00Z',
     qr_code_payload: 'QR_BLOCKCHAIN_004',
+  }
+];
+
+export const MOCK_ORGANIZATIONS: Organization[] = [
+  {
+    id: 'org-001',
+    name: 'Tech University',
+    description: 'Computer Science and Engineering programs',
+    address: '123 University Ave',
+    status: 'ACTIVE',
+    organizer_id: 'usr-002',
+    created_at: '2026-01-15T08:00:00Z',
+    updated_at: '2026-02-10T10:00:00Z',
+    total_workshops: 24,
+    total_students: 1247,
+    staff_count: 12,
+    contact_email: 'contact@techuniversity.edu',
+    contact_phone: '+1 234 567 8900',
+    initials: 'TE',
+  },
+  {
+    id: 'org-002',
+    name: 'Business School',
+    description: 'MBA and Executive Education programs',
+    address: '456 Business Blvd',
+    status: 'ACTIVE',
+    organizer_id: 'usr-002',
+    created_at: '2025-11-20T09:30:00Z',
+    updated_at: '2026-01-05T14:20:00Z',
+    total_workshops: 15,
+    total_students: 892,
+    staff_count: 6,
+    contact_email: 'info@business.edu',
+    contact_phone: '+1 234 567 8901',
+    initials: 'BU',
+  },
+  {
+    id: 'org-003',
+    name: 'Engineering Department',
+    description: 'Mechanical and Civil Engineering workshops',
+    address: '789 Engineering Dr',
+    status: 'ACTIVE',
+    organizer_id: 'usr-002',
+    created_at: '2025-08-10T11:00:00Z',
+    updated_at: '2026-03-12T16:45:00Z',
+    total_workshops: 10,
+    total_students: 1104,
+    staff_count: 10,
+    contact_email: 'eng@university.edu',
+    contact_phone: '+1 234 567 8902',
+    initials: 'EN',
+  },
+  {
+    id: 'org-004',
+    name: 'Arts & Design',
+    description: 'Creative arts and digital design courses',
+    address: '321 Creative Lane',
+    status: 'ACTIVE',
+    organizer_id: 'usr-002',
+    created_at: '2026-02-01T10:15:00Z',
+    updated_at: '2026-04-05T09:10:00Z',
+    total_workshops: 8,
+    total_students: 456,
+    staff_count: 3,
+    contact_email: 'arts@design.edu',
+    contact_phone: '+1 234 567 8903',
+    initials: 'AR',
+  },
+  {
+    id: 'org-005',
+    name: 'Medical School',
+    description: 'Healthcare and medical training programs',
+    address: '654 Health St',
+    status: 'INACTIVE',
+    organizer_id: 'usr-002',
+    created_at: '2024-12-05T13:40:00Z',
+    updated_at: '2025-10-22T11:30:00Z',
+    total_workshops: 12,
+    total_students: 1128,
+    staff_count: 11,
+    contact_email: 'med@health.edu',
+    contact_phone: '+1 234 567 8904',
+    initials: 'ME',
   }
 ];
