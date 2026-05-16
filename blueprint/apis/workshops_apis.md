@@ -74,7 +74,7 @@
 | startDate   | string (ISO8601) | No       | Filter workshops starting on or after this date. |
 | endDate     | string (ISO8601) | No       | Filter workshops ending on or before this date.  |
 | minCapacity | int              | No       | Minimum `capacityTotal` filter.                  |
-| sort        | string           | No       | e.g., `startTime:asc`.                           |
+| sort        | string           | No       | e.g., `startTime,asc`.                           |
 
 **Constraints / Business Rules:**
 
@@ -167,7 +167,12 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
     "brochureUrl": "https://assets.unihub.local/brochures/workshop-123.pdf"
   },
@@ -225,7 +230,12 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
     "assignedStaff": [
       {
@@ -405,7 +415,12 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
     "assignedStaff": [
       {
@@ -481,7 +496,12 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
     "assignedStaff": [
       {
@@ -567,7 +587,12 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
     "assignedStaff": [
       {
@@ -598,9 +623,16 @@
 
 **Security:** Bearer Token (Organizer)
 
+**Query Parameters:**
+
+| Field   | Type | Required | Description                                                                          |
+| :------ | :--- | :------- | :----------------------------------------------------------------------------------- |
+| version | int  | Yes      | Optimistic lock version. Client MUST provide the current workshop version to delete. |
+
 **Constraints / Business Rules:**
 
 - Only `DRAFT` workshops can be deleted. Attempting to delete `PUBLISHED` or `CANCELED` workshops returns HTTP 400.
+- The system MUST validate the optimistic lock `version` before deleting to prevent stale deletes. If mismatched, return HTTP 409 Conflict.
 - Writes executed on Master; response returns `204 No Content` with the standard envelope set to `data: null`.
 
 **Success Response (204):**
@@ -679,7 +711,12 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
     "assignedStaff": [],
     "brochureUrl": null
@@ -770,11 +807,16 @@
 
 **Security:** Bearer Token (Organizer)
 
-**Request:** `multipart/form-data` with `file` (PDF)
+**Request:** `multipart/form-data`
+
+| Field | Type         | Required | Description                     |
+| :---- | :----------- | :------- | :------------------------------ |
+| file  | binary (PDF) | Yes      | The brochure PDF file (max 5MB) |
 
 **Constraints / Business Rules:**
 
-- Accepts a PDF file and enqueues processing (virus scan, PDF optimization). Returns `202 Accepted` while processing.
+- Accepts a PDF file, stores the object in S3/MinIO, and persists brochure metadata in the `brochures` table. Returns `202 Accepted` immediately after the file is stored and metadata is persisted; async processing (virus scan, PDF optimization, AI summarization) continues in the background.
+- The `aiSummaryStatus` in the response indicates the async summarization job has been queued.
 - Writes executed on Master; the upload is acknowledged immediately and processing happens asynchronously.
 
 **Success Response (202):**
@@ -784,8 +826,10 @@
   "success": true,
   "message": "Brochure upload accepted",
   "data": {
-    "uploadId": "upl-123",
-    "status": "PROCESSING"
+    "brochureId": "uuid",
+    "fileUrl": "https://assets.unihub.local/brochures/workshop-123.pdf",
+    "brochureStatus": "UPLOADED",
+    "aiSummaryStatus": "PROCESSING"
   },
   "metadata": {
     "statusCode": 202,
@@ -867,17 +911,21 @@
 
 ```json
 {
-  "staffId": "staff-1"
+  "staffId": "staff-1",
+  "version": 1
 }
 ```
 
-| Field   | Type   | Required | Constraints / Business Rules                                     |
-| :------ | :----- | :------- | :--------------------------------------------------------------- |
-| staffId | string | Yes      | Must reference an existing staff member in the organizer tenant. |
+| Field   | Type   | Required | Constraints / Business Rules                                                               |
+| :------ | :----- | :------- | :----------------------------------------------------------------------------------------- |
+| staffId | string | Yes      | Must reference an existing staff member in the organizer tenant.                           |
+| version | int    | Yes      | Optimistic lock version. Client MUST provide the current workshop version to assign staff. |
 
 **Constraints / Business Rules:**
 
-- Assignments are created on the Master and the response MUST include the updated `workshop` entity.
+- The system MUST validate the optimistic lock `version`. If it does not match the database, return HTTP 409 Conflict.
+- Assigning staff mutates the workshop aggregate root and MUST increment the workshop's version.
+- Assignments are created on the Master and the response MUST include the updated full `workshop` entity as read from Master.
 - If the staff has overlapping assignments, return HTTP 409.
 
 **Success Response (201):**
@@ -888,6 +936,7 @@
   "message": "Staff assigned to workshop",
   "data": {
     "id": "workshop-123",
+    "version": 2,
     "title": "Intro to Node",
     "description": "Tutorial about Node",
     "startTime": "2026-06-01T09:00:00Z",
@@ -901,9 +950,20 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
-    "assignedStaff": [{ "id": "staff-1", "fullName": "Jordan Lee" }],
+    "assignedStaff": [
+      {
+        "id": "staff-uuid",
+        "fullName": "Jane Staff",
+        "email": "jane@unihub.edu"
+      }
+    ],
     "brochureUrl": "https://assets.unihub.local/brochures/workshop-123.pdf"
   },
   "metadata": {
@@ -927,10 +987,23 @@
 
 **Security:** Bearer Token (Organizer)
 
+**Path Parameters:**
+
+- `id` (string) - Workshop identifier.
+- `staffId` (string) - Staff identifier to remove.
+
+**Query Parameters:**
+
+| Field   | Type | Required | Description                                                                                |
+| :------ | :--- | :------- | :----------------------------------------------------------------------------------------- |
+| version | int  | Yes      | Optimistic lock version. Client MUST provide the current workshop version to remove staff. |
+
 **Constraints / Business Rules:**
 
+- The system MUST validate the optimistic lock `version`. If it does not match the database, return HTTP 409 Conflict.
+- Removing staff mutates the workshop aggregate root and MUST increment the workshop's version.
 - Removes the assignment on the Master and publishes `StaffUnassignedFromWorkshopEvent(workshopId, staffId, removedAt)`.
-- Response MUST include updated workshop entity from Master.
+- Response MUST include updated full workshop entity from Master.
 
 **Success Response (200):**
 
@@ -940,6 +1013,7 @@
   "message": "Staff unassigned",
   "data": {
     "id": "workshop-123",
+    "version": 2,
     "title": "Intro to Node",
     "description": "Tutorial about Node",
     "startTime": "2026-06-01T09:00:00Z",
@@ -953,7 +1027,12 @@
     "priceAmount": 0.0,
     "currency": "USD",
     "speakers": [
-      { "id": "sp-1", "name": "Alice Presenter", "bio": "Speaker bio", "sortOrder": 1 }
+      {
+        "id": "sp-1",
+        "name": "Alice Presenter",
+        "bio": "Speaker bio",
+        "sortOrder": 1
+      }
     ],
     "assignedStaff": [],
     "brochureUrl": "https://assets.unihub.local/brochures/workshop-123.pdf"
@@ -982,11 +1061,14 @@
 
 **Query Parameters:**
 
-| Field  | Type   | Required | Description                                                                       |
-| :----- | :----- | :------- | :-------------------------------------------------------------------------------- |
-| page   | int    | No       | Zero-based page index. Default `0`.                                               |
-| size   | int    | No       | Page size. Default `20`.                                                          |
-| status | string | No       | Filter workshops by status (e.g., `DRAFT`, `PUBLISHED`, `CANCELED`, `COMPLETED`). |
+| Field     | Type             | Required | Description                                                                       |
+| :-------- | :--------------- | :------- | :-------------------------------------------------------------------------------- |
+| page      | int              | No       | Zero-based page index. Default `0`.                                               |
+| size      | int              | No       | Page size. Default `20`.                                                          |
+| status    | string           | No       | Filter workshops by status (e.g., `DRAFT`, `PUBLISHED`, `CANCELED`, `COMPLETED`). |
+| startDate | string (ISO8601) | No       | Filter workshops with startTime >= this date/time.                                |
+| endDate   | string (ISO8601) | No       | Filter workshops with startTime <= this date/time.                                |
+| sort      | string           | No       | Sort order, e.g. `startTime,asc` or `createdAt,desc`.                             |
 
 **Constraints / Business Rules:**
 
@@ -1004,7 +1086,8 @@
         "id": "workshop-123",
         "title": "Intro to Node",
         "status": "PUBLISHED",
-        "startsAt": "2026-06-01T09:00:00Z",
+        "startTime": "2026-06-01T09:00:00Z",
+        "endTime": "2026-06-01T12:00:00Z",
         "capacityTotal": 30,
         "capacityRemaining": 12
       }
@@ -1050,6 +1133,9 @@
     "id": "workshop-123",
     "registrations": 28,
     "confirmed": 24,
+    "checkedInCount": 20,
+    "canceledCount": 4,
+    "noShowCount": 4,
     "capacityTotal": 30,
     "capacityRemaining": 6,
     "utilizationPercent": 80
