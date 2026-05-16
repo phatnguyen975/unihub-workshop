@@ -66,6 +66,9 @@ app:
     from: ${MAIL_FROM}
   ai:
     api-key: ${AI_SERVICE_API_KEY}
+  storage:
+    brochure:
+      base-url: ${BROCHURE_BASE_URL}
 
 rate:
   limiting:

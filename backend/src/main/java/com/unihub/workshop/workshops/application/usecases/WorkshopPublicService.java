@@ -25,6 +25,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.unihub.workshop.workshops.infrastructure.cache.CacheKeyGenerator;
+import com.unihub.workshop.workshops.infrastructure.cache.WorkshopCacheService;
 
 @Service
 @Transactional(readOnly = true)
@@ -36,10 +39,31 @@ public class WorkshopPublicService implements WorkshopPublicUseCase {
     private final WorkshopRepository workshopRepository;
     private final WorkshopSpeakerRepository workshopSpeakerRepository;
     private final BrochureRepository brochureRepository;
+    private final WorkshopCacheService cacheService;
+    private final CacheKeyGenerator keyGenerator;
+    private final ObjectMapper objectMapper;
 
     @Override
     public UseCaseResult<WorkshopDiscoveryPageResponse> discoverWorkshops(WorkshopDiscoveryCriteria criteria) {
         WorkshopDiscoveryCriteria normalizedCriteria = normalize(criteria);
+        String cacheKey = keyGenerator.generateListKey(
+                normalizedCriteria.page(),
+                normalizedCriteria.size(),
+                normalizedCriteria.q(),
+                normalizedCriteria.minCapacity(),
+                normalizedCriteria.organizerId() != null ? normalizedCriteria.organizerId().toString() : null,
+                normalizedCriteria.sort());
+
+        Object cachedResult = cacheService.getPublicListCache(cacheKey);
+        if (cachedResult != null) {
+            try {
+                WorkshopDiscoveryPageResponse response = objectMapper.convertValue(cachedResult, WorkshopDiscoveryPageResponse.class);
+                return new UseCaseResult<>(HttpStatus.OK, "Workshops list retrieved", response);
+            } catch (Exception e) {
+                // Cache miss on conversion; continue to fetch from DB
+            }
+        }
+
         PageRequest pageRequest = PageRequest.of(
                 normalizedCriteria.page(),
                 normalizedCriteria.size(),
@@ -59,11 +83,23 @@ public class WorkshopPublicService implements WorkshopPublicUseCase {
                 workshopPage.hasPrevious());
 
         WorkshopDiscoveryPageResponse response = new WorkshopDiscoveryPageResponse(items, pagination);
+        cacheService.setPublicListCache(cacheKey, response);
         return new UseCaseResult<>(HttpStatus.OK, "Workshops list retrieved", response);
     }
 
     @Override
     public UseCaseResult<WorkshopPublicDetailsResponse> getWorkshopDetails(UUID workshopId) {
+        String cacheKey = workshopId.toString();
+        Object cachedResult = cacheService.getPublicDetailCache(cacheKey);
+        if (cachedResult != null) {
+            try {
+                WorkshopPublicDetailsResponse response = objectMapper.convertValue(cachedResult, WorkshopPublicDetailsResponse.class);
+                return new UseCaseResult<>(HttpStatus.OK, "Workshop details retrieved", response);
+            } catch (Exception e) {
+                // Cache miss on conversion; continue to fetch from DB
+            }
+        }
+
         Workshop workshop = workshopRepository.findById(workshopId)
                 .filter(found -> found.getStatus() == WorkshopStatus.PUBLISHED)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Workshop not found", "not_found"));
@@ -98,6 +134,7 @@ public class WorkshopPublicService implements WorkshopPublicUseCase {
                 speakers,
                 brochureUrl);
 
+        cacheService.setPublicDetailCache(cacheKey, response);
         return new UseCaseResult<>(HttpStatus.OK, "Workshop details retrieved", response);
     }
 

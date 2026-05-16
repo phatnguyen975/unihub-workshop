@@ -26,5 +26,6 @@ public record WorkshopManagementFullResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         List<WorkshopSpeakerResponse> speakers,
-        List<AssignedStaffResponse> assignedStaff) {
+        List<AssignedStaffResponse> assignedStaff,
+        String brochureUrl) {
 }
