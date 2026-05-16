@@ -1,6 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from '../pages/auth/LoginPage';
+import { RegisterPage } from '../pages/auth/RegisterPage';
+import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
+import { VerifyResetCodePage } from '../pages/auth/VerifyResetCodePage';
+import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { CatalogPage } from '../pages/client/CatalogPage';
 import { WorkshopDetailPage } from '../pages/client/WorkshopDetailPage';
 import { ProfileSettingsPage } from '../pages/client/ProfileSettingsPage';
@@ -33,6 +37,10 @@ export const AppRoutes: React.FC = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/verify-reset" element={<VerifyResetCodePage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         {/* Student Routes */}
         <Route path="/" element={<ProtectedRoute role="STUDENT"><CatalogPage /></ProtectedRoute>} />
