@@ -18,6 +18,7 @@ public class WorkshopCacheService {
     private static final long PUBLIC_LIST_TTL_MINUTES = 5;
     private static final long PUBLIC_DETAIL_TTL_MINUTES = 15;
     private static final long MANAGEMENT_DETAIL_TTL_MINUTES = 10;
+    private static final long STAFF_AVAILABLE_TTL_MINUTES = 5;
 
     public void setPublicListCache(String key, Object value) {
         redisTemplate.opsForValue().set(
@@ -55,6 +56,18 @@ public class WorkshopCacheService {
         return redisTemplate.opsForValue().get(MANAGEMENT_DETAIL_KEY_PREFIX + workshopId);
     }
 
+    public void setStaffAvailableCache(String key, Object value) {
+        redisTemplate.opsForValue().set(
+                "workshops:management:staff:available:" + key,
+                value,
+                STAFF_AVAILABLE_TTL_MINUTES,
+                TimeUnit.MINUTES);
+    }
+
+    public Object getStaffAvailableCache(String key) {
+        return redisTemplate.opsForValue().get("workshops:management:staff:available:" + key);
+    }
+
     public void evictPublicListCachePattern() {
         evictKeyPattern(PUBLIC_LIST_KEY_PREFIX + "*");
     }
@@ -70,6 +83,10 @@ public class WorkshopCacheService {
     public void evictAllDetailCaches(String workshopId) {
         evictPublicDetailCache(workshopId);
         evictManagementDetailCache(workshopId);
+    }
+
+    public void evictStaffAvailablePattern(String workshopId) {
+        evictKeyPattern("workshops:management:staff:available:" + workshopId + ":*");
     }
 
     private void evictKeyPattern(String pattern) {

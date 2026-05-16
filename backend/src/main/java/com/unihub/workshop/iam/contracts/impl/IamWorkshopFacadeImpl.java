@@ -35,4 +35,11 @@ public class IamWorkshopFacadeImpl implements IamWorkshopFacade {
     public boolean verifyOrganizationExists(UUID organizationId) {
         return organizationRepository.findById(organizationId).isPresent();
     }
+
+    @Override
+    public UUID getOrganizationIdForUser(UUID userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getOrganizationId())
+                .orElse(null);
+    }
 }

@@ -28,6 +28,11 @@ public class CacheKeyGenerator {
         return hashKey(keyBuilder.toString());
     }
 
+    public String generateStaffAvailableKey(java.util.UUID workshopId, int page, int size) {
+        String raw = "wid:" + (workshopId == null ? "null" : workshopId.toString()) + "|page:" + page + "|size:" + size;
+        return hashKey(raw);
+    }
+
     private String hashKey(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

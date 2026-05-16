@@ -36,4 +36,9 @@ public interface IamWorkshopFacade {
      * @return true if the organization exists; false otherwise
      */
     boolean verifyOrganizationExists(UUID organizationId);
+
+    /**
+     * Returns the organization id associated with a user, or null if not set.
+     */
+    java.util.UUID getOrganizationIdForUser(java.util.UUID userId);
 }

@@ -20,4 +20,6 @@ public interface WorkshopAssignmentRepository extends JpaRepository<WorkshopAssi
                     AND w.endTime > :start
             """)
     List<WorkshopAssignment> findOverlappingAssignments(@Param("staffId") UUID staffId, @Param("start") OffsetDateTime start, @Param("end") OffsetDateTime end);
+
+    java.util.Optional<WorkshopAssignment> findByStaffIdAndWorkshopId(java.util.UUID staffId, java.util.UUID workshopId);
 }
