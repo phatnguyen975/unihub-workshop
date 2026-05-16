@@ -2,18 +2,30 @@ package com.unihub.workshop.workshops.application.usecases;
 
 import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.web.UseCaseResult;
+import com.unihub.workshop.workshops.application.dto.AssignSpeakerRequest;
+import com.unihub.workshop.workshops.application.dto.BrochureUploadResponse;
 import com.unihub.workshop.workshops.application.dto.ChangeStatusRequest;
 import com.unihub.workshop.workshops.application.dto.CreateWorkshopRequest;
 import com.unihub.workshop.workshops.application.dto.RescheduleWorkshopRequest;
+import com.unihub.workshop.workshops.application.dto.UploadBrochureRequest;
 import com.unihub.workshop.workshops.application.dto.UpdateWorkshopRequest;
+import com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse;
 import com.unihub.workshop.workshops.application.dto.WorkshopManagementResponse;
+import com.unihub.workshop.workshops.application.dto.WorkshopSpeakerResponse;
+import com.unihub.workshop.workshops.domain.events.BrochureUploadedEvent;
 import com.unihub.workshop.workshops.domain.events.WorkshopCanceledEvent;
 import com.unihub.workshop.workshops.domain.events.WorkshopPublishedEvent;
 import com.unihub.workshop.workshops.domain.events.WorkshopRescheduledEvent;
+import com.unihub.workshop.workshops.domain.model.Brochure;
 import com.unihub.workshop.workshops.domain.model.Workshop;
+import com.unihub.workshop.workshops.domain.model.WorkshopSpeaker;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
+import com.unihub.workshop.workshops.domain.repository.BrochureRepository;
+import com.unihub.workshop.workshops.domain.repository.WorkshopSpeakerRepository;
 import com.unihub.workshop.workshops.domain.repository.WorkshopRepository;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -23,14 +35,25 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class WorkshopManagementService {
 
+    private static final long MAX_BROCHURE_SIZE_BYTES = 5L * 1024 * 1024;
+
+    @Value("${app.storage.brochure.base-url}")
+    private String brochureBaseUrl;
+
     private final WorkshopRepository workshopRepository;
+    private final WorkshopSpeakerRepository workshopSpeakerRepository;
+    private final BrochureRepository brochureRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final EntityManager entityManager;
 
     public UseCaseResult<WorkshopManagementResponse> createWorkshop(String organizerId, CreateWorkshopRequest request) {
         UUID organizer = parseOrganizer(organizerId);
@@ -51,16 +74,13 @@ public class WorkshopManagementService {
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public UseCaseResult<com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse> getWorkshopForManagement(
-            String organizerId, UUID workshopId) {
+    public UseCaseResult<WorkshopManagementFullResponse> getWorkshopForManagement(String organizerId, UUID workshopId) {
         UUID organizer = parseOrganizer(organizerId);
-        Workshop workshop = workshopRepository.findById(workshopId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Workshop not found"));
-        requireOwnership(workshop, organizer);
+        Workshop workshop = loadWorkshop(workshopId, organizer);
         return new UseCaseResult<>(HttpStatus.OK, "Workshop details", mapToFullResponse(workshop));
     }
 
-    public UseCaseResult<com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse> updateWorkshop(
+    public UseCaseResult<WorkshopManagementFullResponse> updateWorkshop(
             String organizerId, UUID workshopId, UpdateWorkshopRequest request) {
         UUID organizer = parseOrganizer(organizerId);
         Workshop workshop = workshopRepository.findById(workshopId)
@@ -95,7 +115,7 @@ public class WorkshopManagementService {
         return new UseCaseResult<>(HttpStatus.OK, "Workshop updated", mapToFullResponse(saved));
     }
 
-    public UseCaseResult<com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse> rescheduleWorkshop(
+    public UseCaseResult<WorkshopManagementFullResponse> rescheduleWorkshop(
             String organizerId, UUID workshopId, RescheduleWorkshopRequest request) {
         UUID organizer = parseOrganizer(organizerId);
         Workshop workshop = workshopRepository.findById(workshopId)
@@ -131,7 +151,7 @@ public class WorkshopManagementService {
         return new UseCaseResult<>(HttpStatus.OK, "Workshop rescheduled", mapToFullResponse(saved));
     }
 
-    public UseCaseResult<com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse> changeStatus(
+    public UseCaseResult<WorkshopManagementFullResponse> changeStatus(
             String organizerId, UUID workshopId, ChangeStatusRequest request) {
         UUID organizer = parseOrganizer(organizerId);
         Workshop workshop = workshopRepository.findById(workshopId)
@@ -166,7 +186,7 @@ public class WorkshopManagementService {
         return new UseCaseResult<>(HttpStatus.OK, "Status changed", mapToFullResponse(saved));
     }
 
-    public UseCaseResult<com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse> deleteWorkshop(
+    public UseCaseResult<WorkshopManagementFullResponse> deleteWorkshop(
             String organizerId, UUID workshopId, int version) {
         UUID organizer = parseOrganizer(organizerId);
         Workshop workshop = workshopRepository.findById(workshopId)
@@ -179,7 +199,93 @@ public class WorkshopManagementService {
         return new UseCaseResult<>(HttpStatus.OK, "Deleted", full);
     }
 
-    // --- helpers ---
+    public UseCaseResult<WorkshopManagementFullResponse> assignSpeaker(
+            String organizerId, UUID workshopId, AssignSpeakerRequest request) {
+        UUID organizer = parseOrganizer(organizerId);
+        Workshop workshop = loadWorkshop(workshopId, organizer);
+        checkVersion(workshop, request.version());
+        ensureEditable(workshop);
+
+        WorkshopSpeaker speaker = new WorkshopSpeaker(
+                request.name().trim(),
+                request.bio(),
+                request.sortOrder() == null ? 0 : request.sortOrder());
+        workshop.addSpeaker(speaker);
+        forceVersionIncrement(workshop);
+
+        workshopRepository.saveAndFlush(workshop);
+        Workshop refreshed = loadWorkshop(workshopId, organizer);
+        return new UseCaseResult<>(HttpStatus.CREATED, "Speaker added", mapToFullResponse(refreshed));
+    }
+
+    public UseCaseResult<WorkshopManagementFullResponse> removeSpeaker(
+            String organizerId, UUID workshopId, UUID speakerId, int version) {
+        UUID organizer = parseOrganizer(organizerId);
+        Workshop workshop = loadWorkshop(workshopId, organizer);
+        checkVersion(workshop, version);
+        ensureEditable(workshop);
+
+        WorkshopSpeaker speaker = workshopSpeakerRepository.findByIdAndWorkshopId(speakerId, workshopId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Speaker not found"));
+        workshop.removeSpeaker(speaker);
+        workshopSpeakerRepository.delete(speaker);
+        forceVersionIncrement(workshop);
+
+        workshopRepository.saveAndFlush(workshop);
+        Workshop refreshed = loadWorkshop(workshopId, organizer);
+        return new UseCaseResult<>(HttpStatus.OK, "Speaker removed", mapToFullResponse(refreshed));
+    }
+
+    public UseCaseResult<BrochureUploadResponse> uploadBrochure(
+            String organizerId, UUID workshopId, UploadBrochureRequest request) {
+        UUID organizer = parseOrganizer(organizerId);
+        Workshop workshop = loadWorkshop(workshopId, organizer);
+        ensureEditable(workshop);
+
+        MultipartFile file = request == null ? null : request.file();
+        validateBrochure(file);
+        if (file == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Brochure file is required");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        String originalFileName = StringUtils.hasText(file.getOriginalFilename())
+                ? file.getOriginalFilename().trim()
+                : "brochure.pdf";
+        String sanitizedFileName = originalFileName.replaceAll("[^A-Za-z0-9._-]", "_");
+        String storageKey = "workshops/" + workshop.getId() + "/brochures/" + now.toInstant().toEpochMilli()
+                + "-" + sanitizedFileName;
+        String normalizedBaseUrl = brochureBaseUrl.endsWith("/") ? brochureBaseUrl : brochureBaseUrl + "/";
+        String fileUrl = normalizedBaseUrl + workshop.getId() + "/" + sanitizedFileName;
+
+        Brochure brochure = new Brochure(
+                storageKey,
+                originalFileName,
+                file.getContentType(),
+                file.getSize(),
+                fileUrl,
+                now);
+        workshop.addBrochure(brochure);
+        forceVersionIncrement(workshop);
+
+        workshopRepository.saveAndFlush(workshop);
+        Brochure savedBrochure = brochureRepository.saveAndFlush(brochure);
+
+        eventPublisher.publishEvent(new BrochureUploadedEvent(
+                workshop.getId(),
+                workshop.getOrganizerId(),
+                savedBrochure.getFileUrl(),
+                savedBrochure.getFileName(),
+                savedBrochure.getSizeBytes() == null ? 0L : savedBrochure.getSizeBytes(),
+                savedBrochure.getUploadedAt()));
+
+        return new UseCaseResult<>(HttpStatus.ACCEPTED, "Brochure upload accepted", new BrochureUploadResponse(
+                savedBrochure.getId(),
+                savedBrochure.getFileUrl(),
+                savedBrochure.getStatus(),
+                "PROCESSING"));
+    }
+
     private UUID parseOrganizer(String organizerId) {
         try {
             return UUID.fromString(organizerId);
@@ -194,10 +300,42 @@ public class WorkshopManagementService {
         }
     }
 
+    private Workshop loadWorkshop(UUID workshopId, UUID organizer) {
+        Workshop workshop = workshopRepository.findById(workshopId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Workshop not found"));
+        requireOwnership(workshop, organizer);
+        return workshop;
+    }
+
     private void checkVersion(Workshop workshop, int version) {
         if (workshop.getVersion() != version) {
             throw new AppException(HttpStatus.CONFLICT, "Version mismatch");
         }
+    }
+
+    private void ensureEditable(Workshop workshop) {
+        if (workshop.getStatus() == WorkshopStatus.CANCELED || workshop.getStatus() == WorkshopStatus.COMPLETED) {
+            throw new AppException(HttpStatus.CONFLICT, "Workshop is not editable in current status");
+        }
+    }
+
+    private void validateBrochure(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Brochure file is required");
+        }
+        if (file.getSize() > MAX_BROCHURE_SIZE_BYTES) {
+            throw new AppException(HttpStatus.CONTENT_TOO_LARGE, "Brochure must not exceed 5MB");
+        }
+        String contentType = file.getContentType();
+        String originalName = file.getOriginalFilename();
+        boolean looksLikePdf = StringUtils.hasText(originalName) && originalName.toLowerCase().endsWith(".pdf");
+        if (!"application/pdf".equalsIgnoreCase(contentType) && !looksLikePdf) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Only PDF brochures are accepted");
+        }
+    }
+
+    private void forceVersionIncrement(Workshop workshop) {
+        entityManager.lock(workshop, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
     }
 
     private boolean lockedFieldsChanged(Workshop workshop, UpdateWorkshopRequest request) {
@@ -244,14 +382,18 @@ public class WorkshopManagementService {
 
     private com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse mapToFullResponse(Workshop w) {
         var speakers = w.getSpeakers().stream()
-                .map(s -> new com.unihub.workshop.workshops.application.dto.WorkshopSpeakerResponse(
+                .map(s -> new WorkshopSpeakerResponse(
                         s.getId(), s.getSpeakerName(), s.getSpeakerBio(), s.getSortOrder()))
                 .toList();
         var assigned = w.getAssignments().stream()
                 .map(a -> new com.unihub.workshop.workshops.application.dto.AssignedStaffResponse(
                         a.getStaffId(), a.getAssignedAt(), a.getCreatedAt(), a.getUpdatedAt()))
                 .toList();
-        return new com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse(
+        String brochureUrl = brochureRepository.findByWorkshopIdOrderByUploadedAtDesc(w.getId()).stream()
+                .findFirst()
+                .map(Brochure::getFileUrl)
+                .orElse(null);
+        return new WorkshopManagementFullResponse(
                 w.getId(),
                 w.getOrganizerId(),
                 w.getTitle(),
@@ -271,6 +413,7 @@ public class WorkshopManagementService {
                 w.getCreatedAt(),
                 w.getUpdatedAt(),
                 speakers,
-                assigned);
+                assigned,
+                brochureUrl);
     }
 }
