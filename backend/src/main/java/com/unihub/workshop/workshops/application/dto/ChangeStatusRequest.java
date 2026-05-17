@@ -5,5 +5,5 @@ import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 
 public record ChangeStatusRequest(
         @NotNull WorkshopStatus status,
-        String reason) {
+        @NotNull Integer version) {
 }

@@ -6,10 +6,6 @@ import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import java.io.IOException;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
@@ -23,6 +19,8 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -34,30 +32,21 @@ public class JwtTokenProvider {
     private final RSAPrivateKey privateKey;
     private final RSAPublicKey publicKey;
     private final String issuer;
+    private final ResourceLoader resourceLoader;
 
     public JwtTokenProvider(
-            @Value("${app.jwt.private-key-path:file:certs/private.pem}") String privateKeyPath,
-            @Value("${app.jwt.public-key-path:file:certs/public.pem}") String publicKeyPath,
-            @Value("${app.jwt.issuer:unihub}") String issuer) {
+            @Value("${app.jwt.private-key-path:file:../certs/private.pem}") String privateKeyPath,
+            @Value("${app.jwt.public-key-path:file:../certs/public.pem}") String publicKeyPath,
+            @Value("${app.jwt.issuer:unihub}") String issuer,
+            ResourceLoader resourceLoader) {
         this.issuer = issuer;
-        RSAPrivateKey pKey = null;
-        RSAPublicKey pubKey = null;
+        this.resourceLoader = resourceLoader;
         try {
-            pKey = loadPrivateKey(privateKeyPath);
-            pubKey = loadPublicKey(publicKeyPath);
+            this.privateKey = loadPrivateKey(privateKeyPath);
+            this.publicKey = loadPublicKey(publicKeyPath);
         } catch (Exception e) {
-            try {
-                var kpg = java.security.KeyPairGenerator.getInstance("RSA");
-                kpg.initialize(2048);
-                var kp = kpg.generateKeyPair();
-                pKey = (RSAPrivateKey) kp.getPrivate();
-                pubKey = (RSAPublicKey) kp.getPublic();
-            } catch (Exception ex) {
-                throw new IllegalStateException("Failed to load RSA keys for JWT processing", e);
-            }
+            throw new IllegalStateException("Failed to load static RSA keys for JWT processing", e);
         }
-        this.privateKey = pKey;
-        this.publicKey = pubKey;
     }
 
     public String generateAccessToken(User user) {
@@ -115,25 +104,29 @@ public class JwtTokenProvider {
         return (RSAPublicKey) kf.generatePublic(spec);
     }
 
-    private byte[] readPem(String path) throws IOException {
-        Path p;
-        if (path.startsWith("file:")) {
-            p = Paths.get(URI.create(path));
-        } else if (path.startsWith("classpath:")) {
-            String resourcePath = path.substring("classpath:".length());
-            try (var is = getClass().getResourceAsStream(resourcePath)) {
-                if (is == null)
-                    throw new IOException("Resource not found: " + resourcePath);
-                return is.readAllBytes();
-            }
-        } else {
-            p = Paths.get(path);
+    private byte[] readPem(String location) throws IOException {
+        if (location == null || !location.startsWith("file:")) {
+            throw new IOException("JWT key location must use file: prefix. Provided: " + location);
         }
-        String pem = Files.readString(p);
-        pem = pem.replaceAll("-----BEGIN [A-Z ]+-----", "");
-        pem = pem.replaceAll("-----END [A-Z ]+-----", "");
-        pem = pem.replaceAll("\\s", "");
-        return Base64.getDecoder().decode(pem);
+
+        Resource resource = resourceLoader.getResource(location);
+        if (!resource.exists()) {
+            throw new IOException("JWT key file not found at location: " + location);
+        }
+
+        String pem;
+        try (var inputStream = resource.getInputStream()) {
+            pem = new String(inputStream.readAllBytes());
+        }
+
+        String normalized = pem
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .replaceAll("\\s", "");
+
+        return Base64.getDecoder().decode(normalized);
     }
 
     public record TokenClaims(
