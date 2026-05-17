@@ -46,8 +46,8 @@ spring:
 
 app:
   jwt:
-    private-key-path: ${JWT_PRIVATE_KEY_PATH:file:certs/private.pem}
-    public-key-path: ${JWT_PUBLIC_KEY_PATH:file:certs/public.pem}
+    private-key-path: ${JWT_PRIVATE_KEY_PATH:file:../certs/private.pem}
+    public-key-path: ${JWT_PUBLIC_KEY_PATH:file:../certs/public.pem}
     issuer: ${JWT_ISSUER}
   iam:
     seed:

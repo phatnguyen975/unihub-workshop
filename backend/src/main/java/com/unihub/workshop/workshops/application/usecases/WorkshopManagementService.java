@@ -27,6 +27,7 @@ import com.unihub.workshop.workshops.domain.repository.WorkshopRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -72,6 +73,7 @@ public class WorkshopManagementService {
         workshop.setCapacityRemaining(request.capacityTotal());
         workshop.setPriceAmount(request.priceAmount());
         workshop.setCurrency(request.currency());
+        sanitizePriceCurrency(workshop);
 
         Workshop saved = workshopRepository.save(workshop);
         cacheService.evictPublicListCachePattern();
@@ -124,6 +126,7 @@ public class WorkshopManagementService {
             workshop.setPriceAmount(request.priceAmount());
         if (request.currency() != null)
             workshop.setCurrency(request.currency());
+        sanitizePriceCurrency(workshop);
         if (request.startTime() != null)
             workshop.setStartTime(request.startTime());
         if (request.endTime() != null)
@@ -155,7 +158,6 @@ public class WorkshopManagementService {
 
         Workshop saved = workshopRepository.save(workshop);
 
-        // publish rescheduled event
         eventPublisher.publishEvent(new WorkshopRescheduledEvent(
                 saved.getId(),
                 saved.getOrganizerId(),
@@ -180,9 +182,21 @@ public class WorkshopManagementService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Workshop not found"));
         requireOwnership(workshop, organizer);
 
+        checkVersion(workshop, request.version());
+        validateStatusTransition(workshop, request.status());
+
         WorkshopStatus previous = workshop.getStatus();
         workshop.setStatus(request.status());
-        Workshop saved = workshopRepository.save(workshop);
+
+        if (request.status() == WorkshopStatus.PUBLISHED) {
+            ensurePublishable(workshop);
+        }
+
+        if (request.status() == WorkshopStatus.CANCELED) {
+            workshop.setCapacityRemaining(workshop.getCapacityTotal());
+        }
+
+        Workshop saved = workshopRepository.saveAndFlush(workshop);
 
         if (previous != WorkshopStatus.PUBLISHED && saved.getStatus() == WorkshopStatus.PUBLISHED) {
             eventPublisher.publishEvent(new WorkshopPublishedEvent(
@@ -201,13 +215,14 @@ public class WorkshopManagementService {
                     saved.getId(),
                     saved.getOrganizerId(),
                     saved.getTitle(),
-                    request.reason(),
+                    "Canceled via status update",
                     OffsetDateTime.now()));
         }
 
-        cacheService.evictAllDetailCaches(workshopId.toString());
+        cacheService.evictPublicDetailCache(workshopId.toString());
+        cacheService.evictManagementDetailCache(workshopId.toString());
         cacheService.evictPublicListCachePattern();
-        return new UseCaseResult<>(HttpStatus.OK, "Status changed", mapToFullResponse(saved));
+        return new UseCaseResult<>(HttpStatus.OK, "Workshop status updated", mapToFullResponse(saved));
     }
 
     public UseCaseResult<WorkshopManagementFullResponse> deleteWorkshop(
@@ -340,9 +355,50 @@ public class WorkshopManagementService {
         return workshop;
     }
 
-    private void checkVersion(Workshop workshop, int version) {
+    private void checkVersion(Workshop workshop, Integer version) {
+        if (version == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Version is required");
+        }
         if (workshop.getVersion() != version) {
             throw new AppException(HttpStatus.CONFLICT, "Version mismatch");
+        }
+    }
+
+    private void validateStatusTransition(Workshop workshop, WorkshopStatus targetStatus) {
+        if (targetStatus == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Status is required");
+        }
+
+        WorkshopStatus currentStatus = workshop.getStatus();
+        boolean validTransition = switch (currentStatus) {
+            case DRAFT -> targetStatus == WorkshopStatus.PUBLISHED;
+            case PUBLISHED -> targetStatus == WorkshopStatus.CANCELED;
+            default -> false;
+        };
+
+        if (!validTransition) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Invalid workshop status transition");
+        }
+    }
+
+    private void ensurePublishable(Workshop workshop) {
+        if (!StringUtils.hasText(workshop.getLocation())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Workshop location is required to publish");
+        }
+        if (!StringUtils.hasText(workshop.getVenue())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Workshop venue is required to publish");
+        }
+        if (!StringUtils.hasText(workshop.getRoom())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Workshop room is required to publish");
+        }
+        if (workshop.getCapacityTotal() <= 0) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Workshop capacity must be greater than zero");
+        }
+        if (workshop.getSpeakers().isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "At least one speaker is required to publish");
+        }
+        if (workshop.getStartTime() == null || !workshop.getStartTime().isAfter(OffsetDateTime.now())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Workshop start time must be in the future to publish");
         }
     }
 
@@ -369,6 +425,13 @@ public class WorkshopManagementService {
 
     private void forceVersionIncrement(Workshop workshop) {
         entityManager.lock(workshop, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
+    }
+
+    private void sanitizePriceCurrency(Workshop workshop) {
+        BigDecimal priceAmount = workshop.getPriceAmount();
+        if (priceAmount != null && priceAmount.compareTo(BigDecimal.ZERO) == 0) {
+            workshop.setCurrency(null);
+        }
     }
 
     private boolean lockedFieldsChanged(Workshop workshop, UpdateWorkshopRequest request) {
