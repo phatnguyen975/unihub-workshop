@@ -73,3 +73,15 @@ app:
 rate:
   limiting:
     enabled: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+    instances:
+      stripePayment:
+        baseConfig: default

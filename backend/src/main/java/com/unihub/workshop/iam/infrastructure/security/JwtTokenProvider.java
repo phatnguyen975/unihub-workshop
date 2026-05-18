@@ -61,6 +61,22 @@ public class JwtTokenProvider {
         return buildToken(user, ACCESS_TOKEN_TTL, "restricted");
     }
 
+    public String generateTicketToken(UUID registrationId, UUID workshopId, UUID userId) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .issuer(issuer)
+                .subject(userId.toString())
+                .id(UUID.randomUUID().toString())
+                .issuedAt(Date.from(now))
+                .claim("type", "ticket")
+                .claim("registration_id", registrationId.toString())
+                .claim("workshop_id", workshopId.toString())
+                .claim("user_id", userId.toString())
+                .claim("issued_at", now.toString())
+                .signWith(privateKey, Jwts.SIG.RS256)
+                .compact();
+    }
+
     public TokenClaims parseToken(String token) throws JwtException {
         Jws<Claims> parsed = Jwts.parser()
                 .verifyWith(publicKey)
