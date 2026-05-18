@@ -4,7 +4,6 @@ import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ResponseFactory;
 import com.unihub.workshop.shared.web.UseCaseResult;
-import com.unihub.workshop.workshops.application.dto.AssignSpeakerRequest;
 import com.unihub.workshop.workshops.application.dto.ChangeStatusRequest;
 import com.unihub.workshop.workshops.application.dto.BrochureUploadResponse;
 import com.unihub.workshop.workshops.application.dto.CreateWorkshopRequest;
@@ -100,28 +99,6 @@ public class WorkshopManagementController {
             @PathVariable("id") UUID id) {
         String userId = requireUserId();
         UseCaseResult<WorkshopManagementFullResponse> result = managementService.getWorkshopForManagement(userId, id);
-        return ResponseEntity.status(result.status())
-                .body(responseFactory.success(result.data(), result.message(), result.status()));
-    }
-
-    @PostMapping(path = "/{id}/speakers", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<WorkshopManagementFullResponse>> assignSpeaker(
-            @PathVariable("id") UUID id,
-            @Valid @RequestBody AssignSpeakerRequest request) {
-        String userId = requireUserId();
-        UseCaseResult<WorkshopManagementFullResponse> result = managementService.assignSpeaker(userId, id, request);
-        return ResponseEntity.status(result.status())
-                .body(responseFactory.success(result.data(), result.message(), result.status()));
-    }
-
-    @DeleteMapping("/{id}/speakers/{speakerId}")
-    public ResponseEntity<ApiResponse<WorkshopManagementFullResponse>> removeSpeaker(
-            @PathVariable("id") UUID id,
-            @PathVariable("speakerId") UUID speakerId,
-            @RequestParam(name = "version") int version) {
-        String userId = requireUserId();
-        UseCaseResult<WorkshopManagementFullResponse> result = managementService.removeSpeaker(userId, id, speakerId,
-                version);
         return ResponseEntity.status(result.status())
                 .body(responseFactory.success(result.data(), result.message(), result.status()));
     }

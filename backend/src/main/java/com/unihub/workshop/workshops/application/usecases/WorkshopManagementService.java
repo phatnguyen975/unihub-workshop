@@ -2,11 +2,11 @@ package com.unihub.workshop.workshops.application.usecases;
 
 import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.web.UseCaseResult;
-import com.unihub.workshop.workshops.application.dto.AssignSpeakerRequest;
 import com.unihub.workshop.workshops.application.dto.BrochureUploadResponse;
 import com.unihub.workshop.workshops.application.dto.ChangeStatusRequest;
 import com.unihub.workshop.workshops.application.dto.CreateWorkshopRequest;
 import com.unihub.workshop.workshops.application.dto.RescheduleWorkshopRequest;
+import com.unihub.workshop.workshops.application.dto.SpeakerRequest;
 import com.unihub.workshop.workshops.application.dto.UploadBrochureRequest;
 import com.unihub.workshop.workshops.application.dto.UpdateWorkshopRequest;
 import com.unihub.workshop.workshops.application.dto.WorkshopManagementFullResponse;
@@ -21,7 +21,6 @@ import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopSpeaker;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.domain.repository.BrochureRepository;
-import com.unihub.workshop.workshops.domain.repository.WorkshopSpeakerRepository;
 import com.unihub.workshop.workshops.domain.repository.WorkshopRepository;
 
 import jakarta.persistence.EntityManager;
@@ -29,6 +28,9 @@ import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -53,7 +55,6 @@ public class WorkshopManagementService {
     private String brochureBaseUrl;
 
     private final WorkshopRepository workshopRepository;
-    private final WorkshopSpeakerRepository workshopSpeakerRepository;
     private final BrochureRepository brochureRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final EntityManager entityManager;
@@ -74,6 +75,7 @@ public class WorkshopManagementService {
         workshop.setPriceAmount(request.priceAmount());
         workshop.setCurrency(request.currency());
         sanitizePriceCurrency(workshop);
+        workshop.syncSpeakers(mapSpeakers(request.speakers()));
 
         Workshop saved = workshopRepository.save(workshop);
         cacheService.evictPublicListCachePattern();
@@ -87,7 +89,8 @@ public class WorkshopManagementService {
         Object cachedResult = cacheService.getManagementDetailCache(cacheKey);
         if (cachedResult != null) {
             try {
-                WorkshopManagementFullResponse response = objectMapper.convertValue(cachedResult, WorkshopManagementFullResponse.class);
+                WorkshopManagementFullResponse response = objectMapper.convertValue(cachedResult,
+                        WorkshopManagementFullResponse.class);
                 return new UseCaseResult<>(HttpStatus.OK, "Workshop details", response);
             } catch (Exception e) {
                 // Cache miss on conversion; continue to fetch from DB
@@ -131,6 +134,7 @@ public class WorkshopManagementService {
             workshop.setStartTime(request.startTime());
         if (request.endTime() != null)
             workshop.setEndTime(request.endTime());
+        workshop.syncSpeakers(mapSpeakers(request.speakers()));
 
         Workshop saved = workshopRepository.save(workshop);
         cacheService.evictAllDetailCaches(workshopId.toString());
@@ -238,47 +242,6 @@ public class WorkshopManagementService {
         cacheService.evictAllDetailCaches(workshopId.toString());
         cacheService.evictPublicListCachePattern();
         return new UseCaseResult<>(HttpStatus.OK, "Deleted", full);
-    }
-
-    public UseCaseResult<WorkshopManagementFullResponse> assignSpeaker(
-            String organizerId, UUID workshopId, AssignSpeakerRequest request) {
-        UUID organizer = parseOrganizer(organizerId);
-        Workshop workshop = loadWorkshop(workshopId, organizer);
-        checkVersion(workshop, request.version());
-        ensureEditable(workshop);
-
-        WorkshopSpeaker speaker = new WorkshopSpeaker(
-                request.name().trim(),
-                request.bio(),
-                request.sortOrder() == null ? 0 : request.sortOrder());
-        workshop.addSpeaker(speaker);
-        forceVersionIncrement(workshop);
-
-        workshopRepository.saveAndFlush(workshop);
-        Workshop refreshed = loadWorkshop(workshopId, organizer);
-        cacheService.evictManagementDetailCache(workshopId.toString());
-        cacheService.evictPublicListCachePattern();
-        return new UseCaseResult<>(HttpStatus.CREATED, "Speaker added", mapToFullResponse(refreshed));
-    }
-
-    public UseCaseResult<WorkshopManagementFullResponse> removeSpeaker(
-            String organizerId, UUID workshopId, UUID speakerId, int version) {
-        UUID organizer = parseOrganizer(organizerId);
-        Workshop workshop = loadWorkshop(workshopId, organizer);
-        checkVersion(workshop, version);
-        ensureEditable(workshop);
-
-        WorkshopSpeaker speaker = workshopSpeakerRepository.findByIdAndWorkshopId(speakerId, workshopId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Speaker not found"));
-        workshop.removeSpeaker(speaker);
-        workshopSpeakerRepository.delete(speaker);
-        forceVersionIncrement(workshop);
-
-        workshopRepository.saveAndFlush(workshop);
-        Workshop refreshed = loadWorkshop(workshopId, organizer);
-        cacheService.evictManagementDetailCache(workshopId.toString());
-        cacheService.evictPublicListCachePattern();
-        return new UseCaseResult<>(HttpStatus.OK, "Speaker removed", mapToFullResponse(refreshed));
     }
 
     public UseCaseResult<BrochureUploadResponse> uploadBrochure(
@@ -452,6 +415,20 @@ public class WorkshopManagementService {
         if (request.roomLayoutKey() != null && !Objects.equals(workshop.getRoomLayoutKey(), request.roomLayoutKey()))
             return true;
         return false;
+    }
+
+    private List<WorkshopSpeaker> mapSpeakers(List<SpeakerRequest> speakerRequests) {
+        if (speakerRequests == null) {
+            return Collections.emptyList();
+        }
+
+        return speakerRequests.stream()
+                .map(s -> new WorkshopSpeaker(
+                        s.name().trim(),
+                        s.bio(),
+                        s.sortOrder() == null ? 0 : s.sortOrder()))
+                .sorted(Comparator.comparingInt(WorkshopSpeaker::getSortOrder))
+                .toList();
     }
 
     private WorkshopManagementResponse mapToResponse(Workshop w) {

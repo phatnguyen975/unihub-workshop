@@ -82,7 +82,8 @@ public class PaymentController {
                     if (stripeObject instanceof Session) {
                         Session session = (Session) stripeObject;
                         String sessionId = session.getId();
-                        log.info("Processing checkout.session.completed with sessionId={}", sessionId);
+                        log.info("Extracted Session ID: {}", sessionId);
+                        log.info("About to call finalizePaymentForSession for providerRef={}", sessionId);
                         paymentService.finalizePaymentForSession(sessionId);
                     } else {
                         log.warn("checkout.session.completed payload was not a Stripe Checkout Session: {}", stripeObject.getClass().getName());

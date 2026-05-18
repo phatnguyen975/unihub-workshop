@@ -279,7 +279,14 @@
   "currency": "USD",
   "venue": "Main Campus",
   "room": "Room 101",
-  "roomLayoutKey": "CLASSROOM"
+  "roomLayoutKey": "CLASSROOM",
+  "speakers": [
+    {
+      "name": "Alice Presenter",
+      "bio": "Speaker bio",
+      "sortOrder": 1
+    }
+  ]
 }
 ```
 
@@ -296,10 +303,12 @@
 | venue         | string           | No       | Venue name or identifier.                                              |
 | room          | string           | No       | Room identifier within venue.                                          |
 | roomLayoutKey | string           | No       | Room layout identifier, e.g. `CLASSROOM`, `THEATER`.                   |
+| speakers      | array            | No       | Full speaker list managed by workshop aggregate root.                  |
 
 **Constraints / Business Rules:**
 
 - Creates a workshop in `DRAFT` status by default.
+- If `speakers` is provided, the system creates all speaker rows inside the same workshop transaction.
 - Write executed on Master; response MUST include the created entity as returned by the Master transaction.
 
 **Success Response (201):**
@@ -364,7 +373,19 @@
   "currency": "USD",
   "venue": "Main Campus",
   "room": "Room 101",
-  "roomLayoutKey": "THEATER"
+  "roomLayoutKey": "THEATER",
+  "speakers": [
+    {
+      "name": "Alice Presenter",
+      "bio": "Speaker bio",
+      "sortOrder": 1
+    },
+    {
+      "name": "Bob Architect",
+      "bio": "System design expert",
+      "sortOrder": 2
+    }
+  ]
 }
 ```
 
@@ -381,6 +402,7 @@
 | venue         | string           | No       | Venue name or identifier.                                                                                                       |
 | room          | string           | No       | Room identifier within venue.                                                                                                   |
 | roomLayoutKey | string           | No       | Room layout identifier, e.g. `CLASSROOM`, `THEATER`.                                                                            |
+| speakers      | array            | No       | Full replacement speaker list. Missing existing items are deleted via orphan removal.                                           |
 | version       | int              | Yes      | Optimistic lock version. Client MUST provide the current version to update.                                                     |
 
 **Constraints / Business Rules:**
@@ -390,6 +412,7 @@
 - If the workshop `status` is `PUBLISHED`, logistical fields (`startTime`, `endTime`, `location`, `venue`, `room`, `roomLayoutKey`) MUST NOT be modified via this endpoint. Client must use the Reschedule endpoint for logistical changes.
 - If the workshop `status` is `PUBLISHED`, financial fields (`priceAmount`, `currency`) are STRICTLY IMMUTABLE and cannot be changed via any endpoint to prevent billing disputes with existing registrants.
 - If `priceAmount` is greater than 0, `currency` MUST be provided.
+- `speakers` is treated as the source of truth for workshop speakers during PUT. Any existing speaker missing from the incoming list is removed through JPA orphan removal.
 - Writes executed on Master; response MUST include the updated entity as read from the Master.
 
 **Success Response (200):**
@@ -659,149 +682,6 @@
 - 404 Not Found.
 
 ## 4. Sub-resources APIs (Organizer)
-
-### POST /api/v1/workshops/{id}/speakers
-
-**Security:** Bearer Token (Organizer)
-
-**Request Body:**
-
-```json
-{
-  "name": "Alice Presenter",
-  "bio": "Speaker bio",
-  "sortOrder": 1,
-  "version": 1
-}
-```
-
-| Field     | Type   | Required | Constraints / Business Rules                                                                |
-| :-------- | :----- | :------- | :------------------------------------------------------------------------------------------ |
-| name      | string | Yes      | Non-empty.                                                                                  |
-| bio       | string | No       |                                                                                             |
-| sortOrder | int    | No       | Optional ordering integer.                                                                  |
-| version   | int    | Yes      | Optimistic lock version. Client MUST provide the current workshop version to add a speaker. |
-
-**Constraints / Business Rules:**
-
-- System MUST validate the optimistic lock `version`. If it does not match the database, return HTTP 409 Conflict.
-- Adding a speaker mutates the workshop aggregate and MUST increment its version.
-- Writes executed on Master; response MUST include the updated full workshop entity as read from Master.
-
-**Success Response (201):**
-
-```json
-{
-  "success": true,
-  "message": "Speaker added",
-  "data": {
-    "id": "workshop-123",
-    "version": 2,
-    "title": "Intro to Node",
-    "description": "Tutorial about Node",
-    "startTime": "2026-06-01T09:00:00Z",
-    "endTime": "2026-06-01T12:00:00Z",
-    "capacityTotal": 30,
-    "capacityRemaining": 12,
-    "status": "DRAFT",
-    "location": "Main Hall",
-    "venue": "Main Campus",
-    "room": "Room 101",
-    "roomLayoutKey": "CLASSROOM",
-    "priceAmount": 0.0,
-    "currency": "USD",
-    "speakers": [
-      {
-        "id": "sp-1",
-        "name": "Alice Presenter",
-        "bio": "Speaker bio",
-        "sortOrder": 1
-      }
-    ],
-    "assignedStaff": [],
-    "brochureUrl": null
-  },
-  "metadata": {
-    "statusCode": 201,
-    "processedBy": "unihub-app-1",
-    "timestamp": "2026-05-11T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-**Common Errors:**
-
-- 400 Bad Request (validation).
-- 401 Unauthorized.
-- 403 Forbidden (not owner).
-- 404 Not Found (workshop not found).
-- 409 Conflict (optimistic lock mismatch).
-
-### DELETE /api/v1/workshops/{id}/speakers/{speakerId}
-
-**Security:** Bearer Token (Organizer)
-
-**Path Parameters:**
-
-- `id` (string) - Workshop identifier.
-- `speakerId` (string) - Speaker identifier to remove.
-
-**Query Parameters:**
-
-| Field   | Type | Required | Description                                                                                    |
-| :------ | :--- | :------- | :--------------------------------------------------------------------------------------------- |
-| version | int  | Yes      | Optimistic lock version. Client MUST provide the current workshop version to remove a speaker. |
-
-**Constraints / Business Rules:**
-
-- System MUST validate the optimistic lock `version`. If it does not match the database, return HTTP 409 Conflict.
-- Removing a speaker does not delete the speaker profile globally; it only removes the workshop association.
-- Removal mutates the workshop aggregate and MUST increment its version.
-- Writes executed on Master; response MUST include the updated full workshop entity as read from Master.
-
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Speaker removed",
-  "data": {
-    "id": "workshop-123",
-    "version": 2,
-    "title": "Intro to Node",
-    "description": "Tutorial about Node",
-    "startTime": "2026-06-01T09:00:00Z",
-    "endTime": "2026-06-01T12:00:00Z",
-    "capacityTotal": 30,
-    "capacityRemaining": 12,
-    "status": "DRAFT",
-    "location": "Main Hall",
-    "venue": "Main Campus",
-    "room": "Room 101",
-    "roomLayoutKey": "CLASSROOM",
-    "priceAmount": 0.0,
-    "currency": "USD",
-    "speakers": [],
-    "assignedStaff": [],
-    "brochureUrl": null
-  },
-  "metadata": {
-    "statusCode": 200,
-    "processedBy": "unihub-app-1",
-    "timestamp": "2026-05-11T10:00:00Z"
-  },
-  "error": null
-}
-```
-
-**Common Errors:**
-
-- 400 Bad Request (invalid version format).
-- 401 Unauthorized.
-- 403 Forbidden (not owner).
-- 404 Not Found (workshop or speaker not found).
-- 409 Conflict (optimistic lock mismatch).
 
 ### POST /api/v1/workshops/{id}/brochure
 

@@ -98,21 +98,22 @@ public class PaymentService {
 
     @Transactional
     public void finalizePaymentForSession(String sessionId) {
+        log.info("Entering finalizePaymentForSession with providerRef: {}", sessionId);
         var opt = paymentRepository.findByProviderRef(sessionId);
         if (opt.isEmpty()) {
-            log.warn("Stripe payment lookup NOT FOUND for providerRef={}", sessionId);
+            log.error("CRITICAL: No payment found in DB for providerRef: {}", sessionId);
             throw new IllegalStateException("Payment not found for providerRef=" + sessionId);
         }
 
         var payment = opt.get();
-        log.info("Stripe payment lookup FOUND for providerRef={} paymentId={} status={}", sessionId, payment.getId(),
-                payment.getStatus());
+        log.info("Payment record found. Current status: {}", payment.getStatus());
 
         if ("COMPLETED".equals(payment.getStatus())) {
             log.info("Stripe payment already completed for providerRef={} paymentId={}", sessionId, payment.getId());
             return;
         }
 
+        log.info("Looking up registration for paymentId={} registrationId={}", payment.getId(), payment.getRegistrationId());
         var regOpt = registrationRepository.findById(payment.getRegistrationId());
         if (regOpt.isEmpty()) {
             log.warn("Registration NOT FOUND for paymentId={} registrationId={}", payment.getId(),
@@ -121,13 +122,16 @@ public class PaymentService {
         }
 
         var reg = regOpt.get();
+        log.info("Registration record found. Current status: {}", reg.getStatus());
 
         payment.setStatus("COMPLETED");
+        log.info("Attempting to save updated entities to DB.");
         paymentRepository.save(payment);
         log.info("Updated payment status to COMPLETED and saved paymentId={} providerRef={}", payment.getId(),
                 sessionId);
 
         reg.setStatus("CONFIRMED");
+        log.info("Attempting to save updated entities to DB.");
         registrationRepository.save(reg);
         log.info("Updated registration status to CONFIRMED and saved registrationId={}", reg.getId());
 

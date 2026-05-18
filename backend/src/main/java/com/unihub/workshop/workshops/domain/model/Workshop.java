@@ -165,6 +165,21 @@ public class Workshop {
         speaker.setWorkshop(null);
     }
 
+    public void syncSpeakers(List<WorkshopSpeaker> newSpeakers) {
+        for (WorkshopSpeaker speaker : this.speakers) {
+            speaker.setWorkshop(null);
+        }
+        this.speakers.clear();
+
+        if (newSpeakers == null) {
+            return;
+        }
+
+        for (WorkshopSpeaker speaker : newSpeakers) {
+            addSpeaker(speaker);
+        }
+    }
+
     public void addAssignment(WorkshopAssignment assignment) {
         assignment.setWorkshop(this);
         this.assignments.add(assignment);
