@@ -77,19 +77,24 @@ public class PaymentController {
             log.info("Stripe webhook received event type={}", event.getType());
             if ("checkout.session.completed".equals(event.getType())) {
                 EventDataObjectDeserializer dataObjectDeserializer = event.getDataObjectDeserializer();
+                StripeObject stripeObject;
                 if (dataObjectDeserializer.getObject().isPresent()) {
-                    StripeObject stripeObject = dataObjectDeserializer.getObject().get();
-                    if (stripeObject instanceof Session) {
-                        Session session = (Session) stripeObject;
-                        String sessionId = session.getId();
-                        log.info("Extracted Session ID: {}", sessionId);
-                        log.info("About to call finalizePaymentForSession for providerRef={}", sessionId);
-                        paymentService.finalizePaymentForSession(sessionId);
-                    } else {
-                        log.warn("checkout.session.completed payload was not a Stripe Checkout Session: {}", stripeObject.getClass().getName());
-                    }
+                    stripeObject = dataObjectDeserializer.getObject().get();
                 } else {
-                    log.warn("checkout.session.completed event did not deserialize into a Stripe Session");
+                    log.warn(
+                            "checkout.session.completed event did not deserialize into a Stripe Session; using unsafe fallback");
+                    stripeObject = dataObjectDeserializer.deserializeUnsafe();
+                }
+
+                if (stripeObject instanceof Session) {
+                    Session session = (Session) stripeObject;
+                    String sessionId = session.getId();
+                    log.info("Extracted Session ID: {}", sessionId);
+                    log.info("About to call finalizePaymentForSession for providerRef={}", sessionId);
+                    paymentService.finalizePaymentForSession(sessionId);
+                } else {
+                    log.warn("Payload was not a Stripe Checkout Session. Type: {}",
+                            stripeObject != null ? stripeObject.getClass().getName() : "null");
                 }
             } else {
                 log.warn("Ignoring Stripe webhook event type={}", event.getType());

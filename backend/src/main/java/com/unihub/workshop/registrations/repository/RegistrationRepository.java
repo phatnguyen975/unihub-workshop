@@ -31,7 +31,7 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
     @Query("select r from Registration r where r.id = :id")
     java.util.Optional<Registration> findByIdForUpdate(@Param("id") UUID id);
 
-    @Query(value = "SELECT * FROM registrations WHERE status = 'PENDING' AND created_at < (NOW() - INTERVAL '15 minutes') ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    @Query(value = "SELECT * FROM registrations WHERE status = 'PENDING' AND created_at < (NOW() - INTERVAL '15 minutes') ORDER BY created_at ASC FOR UPDATE SKIP LOCKED", nativeQuery = true)
     List<Registration> findNextExpiredPendingForUpdateSkipLocked();
 
     Page<Registration> findByUserId(UUID userId, Pageable pageable);

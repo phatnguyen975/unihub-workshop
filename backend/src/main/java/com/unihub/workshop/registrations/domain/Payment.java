@@ -37,9 +37,10 @@ public class Payment {
     @Setter
     private String providerRef;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Setter
-    private String status = "PENDING";
+    private PaymentStatus status = PaymentStatus.PENDING;
 
     @Column(name = "amount", nullable = false)
     @Setter

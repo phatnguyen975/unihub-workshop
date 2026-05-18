@@ -5,6 +5,7 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.unihub.workshop.registrations.domain.Payment;
+import com.unihub.workshop.registrations.domain.PaymentStatus;
 import com.unihub.workshop.registrations.domain.Registration;
 import com.unihub.workshop.registrations.repository.PaymentRepository;
 import com.unihub.workshop.registrations.repository.RegistrationRepository;
@@ -82,7 +83,7 @@ public class PaymentService {
         p.setRegistrationId(reg.getId());
         p.setProvider("stripe");
         p.setProviderRef(session.getId());
-        p.setStatus("PENDING");
+        p.setStatus(PaymentStatus.PENDING);
         p.setAmount(reg.getWorkshop().getPriceAmount());
         p.setCurrency(reg.getWorkshop().getCurrency());
         p.setProviderPayload(session.toJson());
@@ -108,8 +109,8 @@ public class PaymentService {
         var payment = opt.get();
         log.info("Payment record found. Current status: {}", payment.getStatus());
 
-        if ("COMPLETED".equals(payment.getStatus())) {
-            log.info("Stripe payment already completed for providerRef={} paymentId={}", sessionId, payment.getId());
+        if (PaymentStatus.SUCCESS.equals(payment.getStatus())) {
+            log.info("Stripe payment already successful for providerRef={} paymentId={}", sessionId, payment.getId());
             return;
         }
 
@@ -124,10 +125,10 @@ public class PaymentService {
         var reg = regOpt.get();
         log.info("Registration record found. Current status: {}", reg.getStatus());
 
-        payment.setStatus("COMPLETED");
+        payment.setStatus(PaymentStatus.SUCCESS);
         log.info("Attempting to save updated entities to DB.");
         paymentRepository.save(payment);
-        log.info("Updated payment status to COMPLETED and saved paymentId={} providerRef={}", payment.getId(),
+        log.info("Updated payment status to SUCCESS and saved paymentId={} providerRef={}", payment.getId(),
                 sessionId);
 
         reg.setStatus("CONFIRMED");
