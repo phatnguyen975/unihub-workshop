@@ -1,0 +1,6 @@
+package com.unihub.workshop.notifications.domain.model;
+
+public enum InAppNotificationStatus {
+    UNREAD,
+    READ
+}

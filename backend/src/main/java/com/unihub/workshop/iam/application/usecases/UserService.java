@@ -13,6 +13,7 @@ import com.unihub.workshop.iam.application.dto.UpdateStaffStatusResponse;
 import com.unihub.workshop.iam.application.dto.UserProfileResponse;
 import com.unihub.workshop.iam.domain.events.OrganizationCreatedEvent;
 import com.unihub.workshop.iam.domain.events.OrganizationUpdatedEvent;
+import com.unihub.workshop.iam.domain.events.UserAccountCreatedEvent;
 import com.unihub.workshop.iam.domain.events.StaffAccountProvisionedEvent;
 import com.unihub.workshop.iam.domain.events.StaffStatusUpdatedEvent;
 import com.unihub.workshop.iam.domain.model.Organization;
@@ -255,7 +256,7 @@ public class UserService implements UserUseCase {
             throw new AppException(HttpStatus.CONFLICT, "Email already exists", "email_exists");
         }
 
-        // role is implicitly STAFF for this endpoint
+    // role is implicitly STAFF for this endpoint
 
         String temporaryPassword = generateTemporaryPassword();
         // TEMP TEST ONLY: remove after QA because this exposes the plaintext temporary password in logs
@@ -273,7 +274,7 @@ public class UserService implements UserUseCase {
         staff.setTemporaryPassword(true);
         staff.setFailedLoginAttempts(0);
         staff.setLockoutUntil(null);
-        userRepository.save(staff);
+        userRepository.saveAndFlush(staff);
 
         publishEvent(new StaffAccountProvisionedEvent(
                 staff.getId(),
@@ -281,6 +282,12 @@ public class UserService implements UserUseCase {
                 staff.getEmail(),
                 staff.getFullName(),
                 temporaryPassword));
+
+        publishEvent(new UserAccountCreatedEvent(
+            staff.getEmail(),
+            staff.getFullName(),
+            staff.getRole().name(),
+            temporaryPassword));
 
         ProvisionStaffResponse response = new ProvisionStaffResponse(
                 staff.getId().toString(),

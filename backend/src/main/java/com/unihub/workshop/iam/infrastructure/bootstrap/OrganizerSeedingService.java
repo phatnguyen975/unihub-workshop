@@ -1,6 +1,7 @@
 package com.unihub.workshop.iam.infrastructure.bootstrap;
 
 import com.unihub.workshop.iam.domain.events.OrganizerSeededEvent;
+import com.unihub.workshop.iam.domain.events.UserAccountCreatedEvent;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.domain.model.UserStatus;
@@ -68,6 +69,11 @@ public class OrganizerSeedingService {
         try {
             eventPublisher.publishEvent(
                     new OrganizerSeededEvent(user.getId(), user.getEmail(), user.getFullName(), temporaryPassword));
+            eventPublisher.publishEvent(new UserAccountCreatedEvent(
+                    user.getEmail(),
+                    user.getFullName(),
+                    user.getRole().name(),
+                    temporaryPassword));
         } catch (RuntimeException ex) {
             throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Event publication failed", "event_infra");
         }
