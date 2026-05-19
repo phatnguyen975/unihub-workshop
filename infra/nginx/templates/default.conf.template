@@ -1,0 +1,54 @@
+upstream unihub_backend {
+    server ${APP_SERVER_1} max_fails=5 fail_timeout=30s;
+    server ${APP_SERVER_2} max_fails=5 fail_timeout=30s;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    server_tokens off;
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types application/json application/javascript text/plain text/css;
+
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options DENY;
+    add_header X-XSS-Protection "1; mode=block";
+
+    client_max_body_size 20m;
+
+    location = /health {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    location / {
+        proxy_pass http://unihub_backend;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host ${DOLLAR}host;
+        proxy_set_header X-Real-IP ${DOLLAR}remote_addr;
+        proxy_set_header X-Forwarded-For ${DOLLAR}proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${DOLLAR}scheme;
+
+        proxy_set_header X-Request-ID ${DOLLAR}request_id;
+        proxy_set_header Connection "";
+
+        proxy_next_upstream error timeout invalid_header http_502 http_503 http_504;
+        proxy_next_upstream_tries 4;
+
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
+        proxy_busy_buffers_size 32k;
+    }
+}
