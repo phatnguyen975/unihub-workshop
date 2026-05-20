@@ -4,7 +4,7 @@
 
 ### Architectural Paradigm
 
-The system uses **Event-Driven Modular Monolith** powered by **Spring Modulith** and Clean Architecture boundaries.
+The system uses **Event-Driven Modular Monolith** powered by **Spring Modulith** and **Clean Architecture** boundaries.
 
 This approach balances high-traffic scalability with simplified operational complexity. The **Event-Driven Modular Monolith** keeps operational complexity low while enforcing strong internal module boundaries. The **Spring Modulith** event registry and broker decouple asynchronous operations, handling high workloads without blocking core synchronous transactions.
 
@@ -20,7 +20,7 @@ This approach balances high-traffic scalability with simplified operational comp
 The system architecture is organized into a strict tiered structure to distribute load and enforce clear operational concerns:
 
 - **Client Tier:** React (TypeScript) for the responsive web portal; React Native (TypeScript) with a local SQLite engine for the offline-first mobile check-in application.
-- **Edge / API Gateway Layer:** Nginx acting as the reverse proxy, load balancer, and edge router responsible for SSL termination and global rate-limiting.
+- **API Gateway Layer:** Nginx acting as the reverse proxy, load balancer, and edge router responsible for SSL termination and global rate-limiting.
 - **Backend Tier:** Java and Spring Boot leveraging **Spring Modulith** for internal async event publication registry and modular boundary enforcement.
 - **Data Persistence Tier:** Serverless Neon PostgreSQL for core relational data and ACID transactions; S3-compatible Object Storage for PDF assets and legacy CSV storage.
 - **Asynchronous & Caching Layer:** Redis for distributed caching; RabbitMQ for reliable, decoupled message brokering.
@@ -34,73 +34,43 @@ The system architecture is organized into a strict tiered structure to distribut
 
 ## 2. Static Architecture - C4 Models
 
-### 2.1. Level 1: System Context Diagram
+### Level 1 - System Context Diagram
 
-- Student
-  - Description: Browses workshops, registers for sessions (free or paid), pays when required, and checks in on-site using a QR confirmation.
+<p align="center">
+  <img src="./diagrams/c4_system_context.png" style="width:100%;" alt="System Context Diagram">
+  <img src="./diagrams/c4_system_context_key.png" style="width:100%;" alt="System Context Diagram Key">
+</p>
 
-- Organizer
-  - Description: Manages workshops, staff, and schedules strictly within a Logical Multi-tenant Organization scope (Faculty/Department). All data access and administrative actions are constrained to the Organizer's tenant boundary and enforced by API and service-layer tenancy checks.
+| Actor / System                       | Type            | Core Responsibility / Description                                                                                                                                                                                                                                     |
+| :----------------------------------- | :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Student**                          | Person          | Browses workshops, registers for sessions (free or paid), pays when required, and checks in on-site using a QR confirmation.                                                                                                                                          |
+| **Organizer**                        | Person          | Manages workshops, staff, and schedules strictly within a Logical Multi-tenant Organization (Faculty/Department). All administrative actions and data access are constrained to the Organizer's tenant boundary and enforced by API and service-layer tenancy checks. |
+| **Check-in Staff**                   | Person          | Performs on-site QR scanning using the Mobile App, relies on local offline persistence for resilience, and synchronizes batched check-ins when network connectivity is available.                                                                                     |
+| **UniHub Workshop System**           | Core System     | Core platform for registration, payment orchestration, event publication, offline-first check-in reconciliation, and orchestration of background workers for deferred processing.                                                                                     |
+| **Payment Gateway**                  | External System | Generalized external payment provider for card authorization and capture; invoked over HTTPS/JSON with circuit-breaker protection.                                                                                                                                    |
+| **Notification Providers**           | External System | External email and in-app delivery services used to send confirmations and operational notifications; consumed asynchronously via HTTPS/JSON.                                                                                                                         |
+| **AI Summarization Service**         | External System | External provider for asynchronous PDF parsing and summarization; jobs are submitted by workers and results consumed via the event-driven pipeline.                                                                                                                   |
+| **Legacy Student Management System** | External System | Legacy student management system with no direct API; drops nightly CSV exports into object storage (S3-compatible) for offline batch ingestion and validation.                                                                                                        |
 
-- Check-in Staff
-  - Description: Performs on-site QR scanning using the Mobile App, relies on local offline persistence for resilience, and synchronizes batched check-ins when network connectivity is available.
+### Level 2 - Container Diagram
 
-- UniHub Workshop System
-  - Description: The core platform responsible for registration, payment orchestration, event publication, offline-first check-in reconciliation, and orchestration of background workers for deferred processing.
+<p align="center">
+  <img src="./diagrams/c4_container.png" style="width:100%;" alt="Container Diagram">
+  <img src="./diagrams/c4_container_key.png" style="width:100%;" alt="Container Diagram Key">
+</p>
 
-- Payment Gateway
-  - Description: Generalized external payment provider used for card authorization/capture and payment status callbacks; invoked over HTTPS/JSON with circuit-breaker protection.
-
-- Notification Providers
-  - Description: External services (email and in-app delivery) used to send confirmations and operational notifications; consumed asynchronously via HTTPS/JSON.
-
-- AI Service
-  - Description: External third-party provider that performs asynchronous PDF parsing and summarization; UniHub submits extraction jobs and consumes results via an event-driven worker pipeline.
-
-- Legacy System
-  - Description: A legacy student management system that periodically drops nightly CSV exports into object storage (S3-compatible). There is no direct API; files are validated and ingested by offline batch workers.
-
-### 2.2. Level 2: Container Diagram
-
-- Web App
-  - Technology: React, TypeScript (Local Node.js).
-  - Purpose: Responsive web portal for Students and Organizers; performs client-side validation, renders QR confirmations, and initiates registration flows. Authenticates users (JWT) and communicates with the API via the local gateway.
-
-- Mobile App
-  - Technology: React Native, TypeScript.
-  - Purpose: Offline-first check-in application for Check-in Staff. Captures scans, writes events to the local SQLite queue, and syncs batched events to the backend when connectivity permits.
-
-- Local SQLite Database
-  - Technology: SQLite embedded on the device.
-  - Purpose: Acts as the offline-first queue for pending check-in events, ensuring durable local persistence, idempotent upserts, and deterministic reconciliation during batch syncs.
-
-- API Gateway / Load Balancer
-  - Technology: Nginx (Docker).
-  - Purpose: Edge routing, load balancing, and Token Bucket rate limiting for incoming HTTP traffic inside the local Docker network. Forwards validated requests to the Core Backend Monolith.
-
-- Core Backend Monolith
-  - Technology: Java, Spring Boot, Spring Modulith (Docker).
-  - Purpose: Implements the authoritative domain logic, module-level event publication registry, outbox pattern for reliable event externalization, transactional seat allocation, payment orchestration, and coordinates background job scheduling.
-
-- Background Workers
-  - Technology: Java, Spring Boot, Spring Batch (Docker).
-  - Purpose: Executes deferred tasks such as AI PDF summarization, notification dispatch, and nightly CSV ingestion. Consumes brokered events, interacts with object storage and external APIs, and persists async results to the cloud database.
-
-- PostgreSQL (Authoritative Store)
-  - Technology: Neon PostgreSQL (Cloud Service).
-  - Purpose: Authoritative transactional datastore for registrations, payments, and attendance. Access requires JDBC over SSL/TLS to ensure encryption in transit between local services and the cloud-hosted database.
-
-- Message Broker
-  - Technology: RabbitMQ (Docker).
-  - Purpose: Provides reliable, decoupled queues for event-driven processing, worker retries, and dead-letter handling using the outbox-driven integration from the Core Backend Monolith.
-
-- Cache / Rate Limiter
-  - Technology: Redis (Docker).
-  - Purpose: Provides cache-aside reads for performance and shared token-bucket counters used by the gateway for admission control and rate limiting.
-
-- Object Storage
-  - Technology: MinIO / S3-compatible (Docker).
-  - Purpose: Stores unstructured assets (PDFs and nightly CSV drops). Workers and the Core Backend read/write objects via the S3 API for ingestion and processing.
+| Container                       | Technology Stack                   | Deployment Target                 | Architectural Purpose                                                                                                                                                                                                         |
+| :------------------------------ | :--------------------------------- | :-------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web App**                     | React, TypeScript                  | Local Docker                      | Responsive web portal for Students and Organizers; performs client-side validation, renders QR confirmations, authenticates users (JWT), and communicates with the API via the local gateway.                                 |
+| **Mobile App**                  | React Native, TypeScript           | Physical Mobile Device / Emulator | Offline-first check-in application for Check-in Staff; captures scans, queues events locally, and syncs batched events to the backend when connectivity permits.                                                              |
+| **Local SQLite Database**       | SQLite                             | Local device storage              | Offline-first queue for pending check-in events; provides durable local persistence, idempotent upserts, and deterministic reconciliation during batch syncs.                                                                 |
+| **API Gateway / Load Balancer** | Nginx                              | Local Docker                      | Edge routing, load balancing, and Token Bucket rate limiting for incoming HTTP traffic inside the local Docker network; forwards validated requests to the Core Backend Monolith.                                             |
+| **Core Backend Monolith**       | Java, Spring Boot, Spring Modulith | Local Docker                      | Implements authoritative domain logic, module-level event publication registry, outbox pattern for reliable event externalization, transactional seat allocation, and payment orchestration.                                  |
+| **Background Workers**          | Java, Spring Boot, Spring Batch    | Local Docker                      | Executes deferred tasks: AI PDF summarization, notification delivery, and nightly CSV ingestion. Consumes brokered events, interacts with object storage and external APIs, and persists async results to the cloud database. |
+| **PostgreSQL**                  | Neon PostgreSQL                    | Cloud Service (Neon)              | Authoritative transactional datastore for registrations, payments, and attendance. Requires JDBC over SSL/TLS for encrypted access from local services.                                                                       |
+| **Cache / Rate Limiter**        | Redis                              | Local Docker                      | Cache-aside reads for performance and shared token-bucket counters used by the gateway for admission control and rate limiting.                                                                                               |
+| **Message Broker**              | RabbitMQ                           | Local Docker                      | Reliable, decoupled queues for event-driven processing, worker retries, and dead-letter handling; integrates with the Core Backend Monolith via the outbox pattern.                                                           |
+| **Object Storage**              | MinIO / S3-compatible              | Local Docker                      | Stores unstructured assets (PDFs and nightly CSV drops); accessed via the S3 API by workers and the Core Backend for ingestion and processing.                                                                                |
 
 ## 3. High-Level Architecture Diagram
 
