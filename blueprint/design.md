@@ -85,96 +85,130 @@ The system architecture is organized into a strict tiered structure to distribut
 - Event-driven decoupling via Spring Modulith event publication registry and RabbitMQ-backed worker pipelines for async AI summarization and CSV ingestion.
 - Offline-first mobile check-in with a local SQLite queue and batched reconciliation to the cloud-backed authoritative store.
 
-| Architectural Pattern          | Implementation Details                                                                                                                                                                               |
-| :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gateway / Traffic Distribution | Nginx acts as a pure reverse proxy and load balancer, routing incoming HTTP requests across Core Backend Monolith instances.                                                                         |
-| Cache & Rate Limiting          | Core Backend Monoliths enforce distributed Token Bucket admission control (via Bucket4j) at the application filter layer, using Redis for shared counters and cache-aside reads.                     |
-| Read / Write Separation        | Core Backend Monoliths read from Neon PostgreSQL replicas on cache misses and write domain data plus outbox publications to the Neon PostgreSQL primary; all database access uses JDBC over SSL/TLS. |
-| Worker Responsibilities        | Background Workers consume brokered events from RabbitMQ, execute AI summarization, notification dispatch, and nightly CSV ingestion, and persist async results to Neon PostgreSQL.                  |
-| Broker Integration             | Spring Modulith externalizes events to RabbitMQ; workers consume tasks, perform retries/backoff, and route failures to DLQs when necessary.                                                          |
+| Architectural Pattern              | Implementation Details                                                                                                                                                                               |
+| :--------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gateway / Traffic Distribution** | Nginx acts as a pure reverse proxy and load balancer, routing incoming HTTP requests across Core Backend Monolith instances.                                                                         |
+| **Cache & Rate Limiting**          | Core Backend Monoliths enforce distributed Token Bucket admission control (via Bucket4j) at the application filter layer, using Redis for shared counters and cache-aside reads.                     |
+| **Read / Write Separation**        | Core Backend Monoliths read from Neon PostgreSQL replicas on cache misses and write domain data plus outbox publications to the Neon PostgreSQL primary; all database access uses JDBC over SSL/TLS. |
+| **Worker Responsibilities**        | Background Workers consume brokered events from RabbitMQ, execute AI summarization, notification dispatch, and nightly CSV ingestion, and persist async results to Neon PostgreSQL.                  |
+| **Broker Integration**             | Spring Modulith externalizes events to RabbitMQ; workers consume tasks, perform retries/backoff, and route failures to DLQs when necessary.                                                          |
 
 ### Workshop Registration Flow
 
-This sequence captures the end-to-end registration flow, including concurrency control, idempotent payment retries, and event publication-driven notifications.
+The workshop registration process is designed to handle high-concurrency registration spikes (up to 12,000 requests within a 10-minute window) while ensuring strict zero-overbooking and exactly-once processing guarantees.
+
+**Registration statuses:**
+
+- `PENDING`: Temporary reservation. Slot is deducted in Redis, and the system is awaiting a synchronous payment callback, an asynchronous webhook, or a background reconciliation sweep.
+- `CONFIRMED`: Fully finalized registration. The seat is permanently locked in the database, the transaction is verified, and the check-in QR code is activated.
+- `FAILED`: Failed or abandoned registration due to payment errors, explicit timeouts, or capacity rejection. Inventory is safely returned.
+- `CANCELED`: Registration explicitly canceled by the student or an organizer prior to the event execution.
 
 ```mermaid
 sequenceDiagram
   actor Student
   participant Web as Web App
   participant GW as API Gateway
-  participant Redis as Redis (Token Bucket)
-  participant API as Backend API
-  participant DB as Neon PostgreSQL (Cloud)
+  participant Redis as Redis
+  participant API as Core Backend Monolith
+  participant DB as Neon PostgreSQL
   participant Pay as Payment Gateway
-  participant Sweeper as Payment Timeout Sweeper
+  participant Sweeper as Background Sweeper (Cron)
   participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
-  participant Notify as Notification Provider
+  participant Worker as Background Workers
+  participant Notify as Notification Providers
 
   Student->>Web: Select workshop + submit registration
   Web->>GW: POST /registrations (idempotency key)
-  GW->>Redis: Consume token bucket
+  GW->>API: Forward request
+  API->>Redis: Consume token bucket
   alt Rate limited
-    Redis-->>GW: Reject
+    Redis-->>API: Reject
+    API-->>GW: 429 Too Many Requests
     GW-->>Web: 429 Too Many Requests
   else Allowed
-    Redis-->>GW: Allow
-    GW->>API: Forward request
+    Redis-->>API: Allow
     API->>DB: Lookup idempotency key
     alt Key exists
-      API-->>Web: Return cached success response
+      API-->>GW: Return cached response (or 409 Conflict if PENDING)
+      GW-->>Web: Return cached response (or 409 Conflict if PENDING)
     else New request
-      API->>DB: Begin tx, lock workshop row
-      API->>DB: Check capacity
-      alt Workshop full
-        API->>DB: Rollback
-        API-->>Web: 409 Sold out
-      else Seats available
-        API->>DB: Decrement capacity
-        API->>DB: Insert registration (PENDING)
-        API->>DB: Commit
+      API->>DB: Insert idempotency key (Status: PENDING)
+      API->>Redis: Atomic decrement capacity pre-check
+      alt No capacity
+        Redis-->>API: Capacity unavailable
+        API->>DB: Update idempotency key (Status: FAILED)
+        API-->>GW: 409 Conflict
+        GW-->>Web: 409 Conflict
+      else Capacity available
+        Redis-->>API: Capacity reserved
         alt Free workshop
           API->>DB: Begin tx
-          API->>DB: Update registration (CONFIRMED) + event publication
+          API->>DB: Insert Registration (Status: CONFIRMED)
+          API->>DB: Insert WorkshopRegisteredEvent into Outbox
+          API->>DB: Update idempotency key (Status: COMPLETED)
           API->>DB: Commit
-          API-->>Web: 201 + QR code
+          API-->>GW: 201 Created + QR code
+          GW-->>Web: 201 Created + QR code
         else Paid workshop
+          API->>DB: Begin tx
+          API->>DB: Insert Registration (Status: PENDING)
+          API->>DB: Commit
           API->>Pay: Charge (idempotency key)
           alt Payment success
             Pay-->>API: Approved
             API->>DB: Begin tx
-            API->>DB: Update registration (CONFIRMED) + event publication
+            API->>DB: Update Registration (Status: CONFIRMED)
+            API->>DB: Insert WorkshopRegisteredEvent into Outbox
+            API->>DB: Update idempotency key (Status: COMPLETED)
             API->>DB: Commit
-            API-->>Web: 201 + QR code
+            API-->>GW: 201 Created + QR code
+            GW-->>Web: 201 Created + QR code
           else Timeout or failure
             Pay-->>API: Timeout/Error
             Note over API,Pay: Resilience4j circuit breaker trips
             API->>DB: Begin tx
-            API->>DB: Update registration (CANCELED)
-            API->>DB: Increment capacity (compensating action)
+            API->>DB: Update Registration (Status: FAILED)
+            API->>Redis: Increment capacity (compensating action)
+            API->>DB: Update idempotency key (Status: FAILED)
             API->>DB: Commit
-            API-->>Web: 502 or 202
+            API-->>GW: 503 Service Unavailable
+            GW-->>Web: 503 Service Unavailable
           end
         end
       end
     end
   end
 
-  par Event publication and notify
+  par Event publication and async processing
     Registry->>Broker: Externalize event
-    Broker->>Notify: Deliver confirmation
+    Broker->>Worker: Consume registration event
+    Worker->>Notify: Send confirmation email/in-app
   end
 
-  Note over Sweeper,DB: Background sweep for expired PENDING > 15m
-  Sweeper->>DB: Select PENDING registrations > 15m
-  Sweeper->>DB: Mark CANCELED + increment capacity (compensate)
+  loop Background sweep (every X minutes)
+    Sweeper->>DB: Select PENDING registrations > 15 minutes
+    Sweeper->>Pay: Query payment transaction status
+    alt Payment actually succeeded (Delayed Webhook Recovery)
+      Pay-->>Sweeper: Transaction Paid
+      Sweeper->>DB: Update Registration (Status: CONFIRMED)
+      Sweeper->>DB: Insert WorkshopRegisteredEvent into Outbox (event_publication)
+      Sweeper->>DB: Update idempotency key (Status: COMPLETED, Response: 201)
+    else Payment failed or never initiated (Standard Cleanup)
+      Pay-->>Sweeper: Transaction Failed / Not Found
+      Sweeper->>DB: Update Registration (Status: FAILED)
+      Sweeper->>Redis: Increment capacity (refund reservations)
+      Sweeper->>DB: Update idempotency key (Status: FAILED, Response: 504 Timeout)
+    end
+  end
 ```
 
-- **Idempotency barrier:** The API checks the idempotency key before any reservation logic, returning a cached success response on retries to avoid double processing.
-- **Short-lived pessimistic locking:** The capacity lock is held only inside the reservation transaction and released before any payment call, preventing long-held locks and connection pool exhaustion.
-- **Compensating transactions:** Timed-out or failed payments transition the registration to `CANCELED` and increment capacity, ensuring the final seat is not lost.
-- **Circuit breaker protection:** Resilience4j guards the payment call path and surfaces controlled failures when the gateway degrades.
-- **Event publication registry:** Confirmation notifications are persisted and externalized by Spring Modulith, decoupled from the synchronous user request.
+- **Distributed Rate Limiting Location:** The rate limiting logic (via Bucket4j) is evaluated directly within the application filter layer of the Core Backend Monolith using shared Redis nodes for state counters, preventing Nginx from needing direct data tier couplings.
+- **Lock-Free Concurrency Chokepoint:** To sustain 12,000 concurrent requests without hitting database row contention or thread pool depletion, capacity checks are offloaded entirely to Redis via an atomic decrement operation. The database transaction is only opened after capacity is verified.
+- **Idempotency Lifecycle (Strict State Management):** The system completely guards against double-booking and duplicate charges by tracking the idempotency key state through three phases: `PENDING` (acts as a concurrent lock), `COMPLETED` (serves cached payloads), and `FAILED` (safely releases the lock for client retries).
+- **Transactional Outbox Implementation:** To eliminate distributed transaction vulnerability, event emission is tightly integrated with domain operations. The registration record modifications and event storage occur in the same database transaction, natively mapped to Spring Modulith’s `event_publication` table.
+- **Dual-Case Reconciliation Sweeper:** The background cleanup job acts as a defensive synchronization boundary. Instead of blindly cancelling expired `PENDING` states, it first issues an API call to the Payment Gateway. If a webhook was lost but payment succeeded, it heals the state to `CONFIRMED`. If the checkout was abandoned, it marks it as `FAILED`, refunds the Redis capacity, and unlocks the idempotency state.
 
 ### Workshop Lifecycle Management Flow
 
@@ -185,7 +219,7 @@ sequenceDiagram
   actor Organizer
   participant Web as Admin Web App
   participant API as Backend API
-  participant DB as Neon PostgreSQL (Cloud)
+  participant DB as Neon PostgreSQL
   participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
   participant NotifWorker as Notification Worker
@@ -230,7 +264,7 @@ sequenceDiagram
   actor Client
   participant API as Backend API
   participant Cache as Redis Cache
-  participant Replica as Neon PostgreSQL (Cloud)
+  participant Replica as Neon PostgreSQL
 
   Client->>API: GET /workshops/search?q=keyword
   API->>Cache: GET search:{keyword}
@@ -256,7 +290,7 @@ sequenceDiagram
   participant Mobile as Mobile App (React Native)
   participant Local as Local SQLite
   participant API as Backend API
-  participant DB as Neon PostgreSQL (Cloud)
+  participant DB as Neon PostgreSQL
 
   Staff->>Mobile: Scan QR code
   Mobile->>Local: Store check-in event (Pending)
@@ -295,7 +329,7 @@ sequenceDiagram
   actor Organizer
   participant Web as Web App
   participant API as Backend API
-  participant DB as Neon PostgreSQL (Cloud)
+  participant DB as Neon PostgreSQL
   participant S3 as Object Storage (MinIO Local)
   participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
@@ -414,7 +448,7 @@ sequenceDiagram
   participant Web as Web App
   participant API as API Gateway / Spring Security
   participant Service as Workshop Service
-  participant DB as Neon PostgreSQL (Cloud)
+  participant DB as Neon PostgreSQL
 
   Organizer->>Web: Click "Edit Workshop"
   alt Role not ORGANIZER (Layer 1)
@@ -495,7 +529,7 @@ Client retries caused by network drops or impatient clicks can create duplicate 
 sequenceDiagram
   actor Client
   participant GW as API Gateway
-  participant DB as Neon PostgreSQL (Cloud)
+  participant DB as Neon PostgreSQL
   participant Pay as Payment Gateway
 
   Client->>GW: POST /registrations (Idempotency-Key: A)
