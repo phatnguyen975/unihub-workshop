@@ -74,87 +74,24 @@ The system architecture is organized into a strict tiered structure to distribut
 
 ## 3. High-Level Architecture Diagram
 
-### System Architecture
+### System Architecture Diagram
 
-This diagram shows the production topology: horizontally scaled Spring Boot app servers behind an API gateway, Redis for cache and token bucket rate limiting, PostgreSQL primary-replica for write safety and read scalability, and Spring Modulith event publication registry with dedicated workers for AI and CSV ingestion. External integrations are modeled explicitly.
+<p align="center">
+  <img src="./diagrams/system_architecture.png" style="width:100%;" alt="System Architecture">
+</p>
 
-```mermaid
----
-config:
-  layout: elk
-  look: classic
-  fontFamily: '''Inter Variable'', sans-serif'
-  themeVariables:
-    fontFamily: '''Inter Variable'', sans-serif'
-  theme: neutral
----
-flowchart LR
-    Client(["Client (Web/Mobile)"]) -- HTTPS --> Nginx["API Gateway/Load Balancer (Nginx)"]
-    Nginx -- Load Balancing --> App1["App Server 1 (Spring Boot)"] & App2["App Server 2 (Spring Boot)"]
-    App1 -. Cache-Aside + Token Bucket .-> Redis["In-memory Cache (Redis)"]
-    App2 -. Cache-Aside + Token Bucket .-> Redis
-    App1 -- Read (Cache Miss) --> Replica["PostgreSQL Replica"]
-    App2 -- Read (Cache Miss) --> Replica
-    App1 -- Write (Domain + Outbox) --> Primary["PostgreSQL Primary"]
-    App2 -- Write (Domain + Outbox) --> Primary
-    Primary -- Replication --> Replica
-    App1 -- Payment Requests --> Pay["Payment Gateway"]
-    App2 -- Payment Requests --> Pay
-    App1 -- Upload PDFs --> S3["S3 Object Storage"]
-    App2 -- Upload PDFs --> S3
-    Legacy["Legacy Student System"] -- Nightly CSV Drop --> S3
-    Worker -- "Read Data (Batch Validation)" --> Replica
-    App1 -- "Externalize Events" --> Rabbit["Message Broker (RabbitMQ)"]
-    App2 -- "Externalize Events" --> Rabbit
-    Worker["Background Workers (Spring Batch)"] -- "Write Async Results" --> Primary
-    Worker -- "Consume Task Queues" --> Rabbit
-    Worker -- Read PDFs/CSVs --> S3
-    Worker -- AI Requests --> AI["AI Summarization Service"]
-    Worker -- Notifications --> Notify["Notification Providers"]
+- Horizontally scaled Core Backend Monolith instances (Node 1 and Node 2) behind a Local Docker edge using Nginx for HTTP routing and admission control.
+- Local Docker runtime for gateway, backend, workers, cache, broker, and object storage; Neon PostgreSQL is hosted as a Cloud Service requiring encrypted JDBC connections.
+- Event-driven decoupling via Spring Modulith event publication registry and RabbitMQ-backed worker pipelines for async AI summarization and CSV ingestion.
+- Offline-first mobile check-in with a local SQLite queue and batched reconciliation to the cloud-backed authoritative store.
 
-    Nginx@{ shape: hex}
-    App1@{ shape: rounded}
-    App2@{ shape: rounded}
-    Redis@{ shape: rounded}
-    Replica@{ shape: cyl}
-    Primary@{ shape: cyl}
-    Pay@{ shape: rounded}
-    S3@{ shape: rounded}
-    Legacy@{ shape: rounded}
-    Worker@{ shape: rounded}
-    Rabbit@{ shape: rounded}
-    AI@{ shape: rounded}
-    Notify@{ shape: rounded}
-     Client:::client
-     Nginx:::nginx
-     App1:::app
-     App2:::app
-     Redis:::redis
-     Replica:::db
-     Primary:::db
-     Pay:::external
-     S3:::storage
-     Legacy:::external
-     Worker:::worker
-     Rabbit:::broker
-     AI:::external
-     Notify:::external
-    classDef client fill:#f0f7ff,stroke:#0052cc,stroke-width:1px
-    classDef nginx fill:#f6ffed,stroke:#52c41a,stroke-width:1px
-    classDef app fill:#e6f7ff,stroke:#1890ff,stroke-width:1px
-    classDef redis fill:#fff1f0,stroke:#f5222d,stroke-width:1px
-    classDef db fill:#f9f0ff,stroke:#722ed1,stroke-width:1px
-    classDef broker fill:#fff7e6,stroke:#fa8c16,stroke-width:1px
-    classDef worker fill:#f0f5ff,stroke:#2f54eb,stroke-width:1px
-    classDef storage fill:#f6ffed,stroke:#52c41a,stroke-width:1px
-    classDef external fill:#fff1f0,stroke:#a8071a,stroke-width:1px
-```
-
-- **Traffic distribution:** Nginx load balances external HTTPS requests across horizontally scaled Spring Boot app servers.
-- **Cache and rate limiting:** App servers use cache-aside reads with Redis and enforce Token Bucket rate limiting at the edge.
-- **Read/write separation:** App servers read from the PostgreSQL replica on cache misses and write domain data plus event publications to the primary.
-- **Worker responsibilities:** Spring Modulith persists event publications and externalizes them to RabbitMQ, while workers write async results on the primary and read from the replica for batch validation workloads such as CSV ingestion.
-- **Broker integration:** Spring Modulith externalizes published events to RabbitMQ, and workers consume tasks for AI summarization and notification delivery.
+| Architectural Pattern          | Implementation Details                                                                                                                                                                               |
+| :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gateway / Traffic Distribution | Nginx acts as a pure reverse proxy and load balancer, routing incoming HTTP requests across Core Backend Monolith instances.                                                                         |
+| Cache & Rate Limiting          | Core Backend Monoliths enforce distributed Token Bucket admission control (via Bucket4j) at the application filter layer, using Redis for shared counters and cache-aside reads.                     |
+| Read / Write Separation        | Core Backend Monoliths read from Neon PostgreSQL replicas on cache misses and write domain data plus outbox publications to the Neon PostgreSQL primary; all database access uses JDBC over SSL/TLS. |
+| Worker Responsibilities        | Background Workers consume brokered events from RabbitMQ, execute AI summarization, notification dispatch, and nightly CSV ingestion, and persist async results to Neon PostgreSQL.                  |
+| Broker Integration             | Spring Modulith externalizes events to RabbitMQ; workers consume tasks, perform retries/backoff, and route failures to DLQs when necessary.                                                          |
 
 ### Workshop Registration Flow
 
@@ -167,7 +104,7 @@ sequenceDiagram
   participant GW as API Gateway
   participant Redis as Redis (Token Bucket)
   participant API as Backend API
-  participant DB as PostgreSQL Primary
+  participant DB as Neon PostgreSQL (Cloud)
   participant Pay as Payment Gateway
   participant Sweeper as Payment Timeout Sweeper
   participant Registry as Spring Modulith Event Registry
@@ -239,6 +176,76 @@ sequenceDiagram
 - **Circuit breaker protection:** Resilience4j guards the payment call path and surfaces controlled failures when the gateway degrades.
 - **Event publication registry:** Confirmation notifications are persisted and externalized by Spring Modulith, decoupled from the synchronous user request.
 
+### Workshop Lifecycle Management Flow
+
+This sequence captures the admin-driven workshop lifecycle and the event-driven propagation of changes to downstream services.
+
+```mermaid
+sequenceDiagram
+  actor Organizer
+  participant Web as Admin Web App
+  participant API as Backend API
+  participant DB as Neon PostgreSQL (Cloud)
+  participant Registry as Spring Modulith Event Registry
+  participant Broker as RabbitMQ
+  participant NotifWorker as Notification Worker
+  participant Notify as Notification Providers
+
+  Organizer->>Web: Create/Update/Reschedule/Cancel workshop
+  Web->>API: POST/PUT/PATCH /workshops
+  API->>DB: Begin tx
+  API->>DB: Validate and persist lifecycle change
+  alt Create
+    API->>DB: Insert workshop record
+    API->>DB: Insert event publication (WorkshopCreated)
+  else Update
+    API->>DB: Update workshop details
+    API->>DB: Insert event publication (WorkshopUpdated)
+  else Reschedule
+    API->>DB: Update schedule/venue
+    API->>DB: Insert event publication (WorkshopRescheduled)
+  else Cancel
+    API->>DB: Mark workshop as canceled
+    API->>DB: Insert event publication (WorkshopCanceled)
+  end
+  API->>DB: Commit
+  API-->>Web: 200/201 Response
+
+  par Event publication fan-out
+    Registry->>Broker: Externalize lifecycle event
+    Broker->>NotifWorker: Consume lifecycle event
+    NotifWorker->>DB: Fetch registered students (if Rescheduled/Canceled)
+    NotifWorker->>Notify: Send bulk notifications (Email/SMS)
+  end
+```
+
+- **Lifecycle coverage:** Admins can create, update, reschedule, or cancel workshops through the web portal.
+- **Transactional event publication:** The lifecycle change and event publication are committed in the same transaction to guarantee consistent state and downstream notification delivery.
+- **Asynchronous fan-out:** The notification worker consumes lifecycle events, fetches impacted students, and sends bulk emails without blocking the admin UI.
+
+### Workshop Search & Cache-Aside Flow
+
+```mermaid
+sequenceDiagram
+  actor Client
+  participant API as Backend API
+  participant Cache as Redis Cache
+  participant Replica as Neon PostgreSQL (Cloud)
+
+  Client->>API: GET /workshops/search?q=keyword
+  API->>Cache: GET search:{keyword}
+  alt Cache hit
+    Cache-->>API: Cached results
+    API-->>Client: 200 Results
+  else Cache miss
+    Cache-->>API: Miss
+    API->>Replica: Native FTS query (to_tsvector)
+    Replica-->>API: Result set
+    API->>Cache: SET search:{keyword} (short TTL)
+    API-->>Client: 200 Results
+  end
+```
+
 ### Offline Check-in & Synchronization Flow
 
 This sequence illustrates offline capture, local persistence, and server-authoritative reconciliation that prevents duplicate attendance records.
@@ -246,10 +253,10 @@ This sequence illustrates offline capture, local persistence, and server-authori
 ```mermaid
 sequenceDiagram
   actor Staff
-  participant Mobile as Android App
-  participant Local as Room/SQLite
+  participant Mobile as Mobile App (React Native)
+  participant Local as Local SQLite
   participant API as Backend API
-  participant DB as PostgreSQL Primary
+  participant DB as Neon PostgreSQL (Cloud)
 
   Staff->>Mobile: Scan QR code
   Mobile->>Local: Store check-in event (Pending)
@@ -288,11 +295,11 @@ sequenceDiagram
   actor Organizer
   participant Web as Web App
   participant API as Backend API
-  participant DB as PostgreSQL Primary
-  participant S3 as S3 Object Storage
+  participant DB as Neon PostgreSQL (Cloud)
+  participant S3 as Object Storage (MinIO Local)
   participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
-  participant Worker as AI Worker
+  participant Worker as Background Workers
   participant AI as AI Service
   participant DLQ as Dead Letter Queue
 
@@ -358,354 +365,7 @@ flowchart TD
 - **Archiving strategy:** Processed files are moved to an archive folder to prevent accidental reprocessing.
 - **Proactive alerting:** Job summaries (success and quarantined counts) are published to RabbitMQ to notify administrators.
 
-### Workshop Lifecycle Management Flow
-
-This sequence captures the admin-driven workshop lifecycle and the event-driven propagation of changes to downstream services.
-
-```mermaid
-sequenceDiagram
-  actor Organizer
-  participant Web as Admin Web App
-  participant API as Backend API
-  participant DB as PostgreSQL Primary
-  participant Registry as Spring Modulith Event Registry
-  participant Broker as RabbitMQ
-  participant NotifWorker as Notification Worker
-  participant Notify as Notification Providers
-
-  Organizer->>Web: Create/Update/Reschedule/Cancel workshop
-  Web->>API: POST/PUT/PATCH /workshops
-  API->>DB: Begin tx
-  API->>DB: Validate and persist lifecycle change
-  alt Create
-    API->>DB: Insert workshop record
-    API->>DB: Insert event publication (WorkshopCreated)
-  else Update
-    API->>DB: Update workshop details
-    API->>DB: Insert event publication (WorkshopUpdated)
-  else Reschedule
-    API->>DB: Update schedule/venue
-    API->>DB: Insert event publication (WorkshopRescheduled)
-  else Cancel
-    API->>DB: Mark workshop as canceled
-    API->>DB: Insert event publication (WorkshopCanceled)
-  end
-  API->>DB: Commit
-  API-->>Web: 200/201 Response
-
-  par Event publication fan-out
-    Registry->>Broker: Externalize lifecycle event
-    Broker->>NotifWorker: Consume lifecycle event
-    NotifWorker->>DB: Fetch registered students (if Rescheduled/Canceled)
-    NotifWorker->>Notify: Send bulk notifications (Email/SMS)
-  end
-```
-
-- **Lifecycle coverage:** Admins can create, update, reschedule, or cancel workshops through the web portal.
-- **Transactional event publication:** The lifecycle change and event publication are committed in the same transaction to guarantee consistent state and downstream notification delivery.
-- **Asynchronous fan-out:** The notification worker consumes lifecycle events, fetches impacted students, and sends bulk emails without blocking the admin UI.
-
-### Workshop Search & Cache-Aside Flow
-
-```mermaid
-sequenceDiagram
-  actor Client
-  participant API as Backend API
-  participant Cache as Redis Cache
-  participant Replica as PostgreSQL Replica
-
-  Client->>API: GET /workshops/search?q=keyword
-  API->>Cache: GET search:{keyword}
-  alt Cache hit
-    Cache-->>API: Cached results
-    API-->>Client: 200 Results
-  else Cache miss
-    Cache-->>API: Miss
-    API->>Replica: Native FTS query (to_tsvector)
-    Replica-->>API: Result set
-    API->>Cache: SET search:{keyword} (short TTL)
-    API-->>Client: 200 Results
-  end
-```
-
-## 4. Database Design
-
-### Database Technology Stack
-
-- **Core Data Stores (Server-Side):**
-  - **PostgreSQL (Primary System of Record):** Provides strict ACID guarantees, pessimistic row-level locking for the 60-seat race condition, and durable storage for Idempotency and Spring Modulith Event Publication records.
-  - **Redis (Cache & Rate Limiter):** High-throughput, low-latency storage for Token Bucket rate limiting and cache-aside workshop availability reads during the 12,000-user surge.
-  - **S3-Compatible Object Storage (Blob Store):** Cost-effective, scalable persistence for unstructured data, specifically used for storing Organizer-uploaded PDF brochures and nightly CSV drops from the legacy system.
-- **Mobile Data Store (Client-Side):**
-  - **SQLite via Room:** Local cache for workshop details and an event queue (`PendingCheckIn`) to support offline-first check-in.
-- **Database Tooling:**
-  - **Flyway (Migration Tool):** Migration-first schema management with deterministic, version-controlled deployments; Hibernate `ddl-auto=update` is explicitly disabled.
-  - **HikariCP (Connection Pool):** Efficient JDBC connection management to prevent connection pool exhaustion under burst traffic.
-
-### Entity-Relationship Diagram (ERD)
-
-```mermaid
-erDiagram
-  USERS {
-    uuid id PK
-    string email
-    string full_name
-    string role
-    string status
-    uuid organization_id FK
-    boolean is_temporary_password
-    datetime created_at
-  }
-
-  ORGANIZATIONS {
-    uuid id PK
-    string name
-    string description
-    string address
-    uuid organizer_id FK
-  }
-
-  WORKSHOPS {
-    uuid id PK
-    string title
-    string description
-    string status
-    int version
-    int capacity_total
-    int capacity_remaining
-    datetime start_time
-    datetime end_time
-    uuid organizer_id FK
-  }
-
-  WORKSHOP_SPEAKERS {
-    uuid id PK
-    uuid workshop_id FK
-    string speaker_name
-    string speaker_bio
-  }
-
-  WORKSHOP_ASSIGNMENTS {
-    uuid id PK
-    uuid workshop_id FK
-    uuid staff_id FK
-  }
-
-  REGISTRATIONS {
-    uuid id PK
-    uuid user_id FK
-    uuid workshop_id FK
-    string idempotency_key
-    string status
-    string ticket_type
-    string qr_code
-    datetime created_at
-  }
-
-  PAYMENTS {
-    uuid id PK
-    uuid registration_id FK
-    string provider
-    string provider_ref
-    string status
-    decimal amount
-    datetime created_at
-  }
-
-  ATTENDANCES {
-    uuid id PK
-    uuid registration_id FK
-    uuid workshop_id FK
-    datetime checked_in_at
-    string source
-  }
-
-  BROCHURES {
-    uuid id PK
-    uuid workshop_id FK
-    string storage_key
-    string status
-    datetime uploaded_at
-  }
-
-  AI_SUMMARIES {
-    uuid id PK
-    uuid workshop_id FK
-    text summary_text
-    string status
-    datetime updated_at
-  }
-
-  EVENT_PUBLICATION {
-    uuid id PK
-    datetime completion_date
-    int completion_attempts
-    string event_type
-    string listener_id
-    datetime publication_date
-    datetime last_resubmission_date
-    string serialized_event
-    string status
-  }
-
-  IDEMPOTENCY_KEYS {
-    uuid id PK
-    string idempotency_key
-    string request_hash
-    string status
-    datetime expires_at
-  }
-
-  STUDENT_IMPORT_BATCHES {
-    uuid id PK
-    string source_file
-    string status
-    int total_rows
-    int quarantined_rows
-    datetime created_at
-  }
-
-  STUDENT_IMPORT_ERRORS {
-    uuid id PK
-    uuid batch_id FK
-    int row_number
-    string error_reason
-    string raw_row
-  }
-
-  USERS ||--o{ REGISTRATIONS : registers
-  USERS ||--o{ WORKSHOPS : organizes
-  USERS ||--o{ ORGANIZATIONS : manages
-  ORGANIZATIONS ||--o{ USERS : "contains staff"
-  WORKSHOPS ||--o{ REGISTRATIONS : has
-  WORKSHOPS ||--o{ WORKSHOP_SPEAKERS : includes
-  WORKSHOPS ||--o{ WORKSHOP_ASSIGNMENTS : "has assignments"
-  ORGANIZATIONS ||--o{ WORKSHOP_ASSIGNMENTS : "is assigned to"
-  WORKSHOPS ||--o{ BROCHURES : has
-  WORKSHOPS ||--o{ AI_SUMMARIES : summarizes
-  REGISTRATIONS ||--|| ATTENDANCES : results_in
-  REGISTRATIONS ||--o| PAYMENTS : paid_by
-  STUDENT_IMPORT_BATCHES ||--o{ STUDENT_IMPORT_ERRORS : contains
-```
-
-The schema separates core domain tables (users, workshops, registrations, payments, attendance) from technical pattern tables (event publications and idempotency keys) to keep business logic clean while enabling resilience patterns. Workshop content artifacts (brochures and AI summaries) are modeled as first-class entities for lifecycle tracking, while import batches and errors capture CSV ingestion outcomes without polluting the core domain. This separation supports high-concurrency workflows, reliable async processing, and offline check-in reconciliation without coupling operational metadata directly to transactional records.
-
-### Core Schema & Data Dictionary
-
-**USERS**
-
-| Field Name              | Data Type (PostgreSQL) | Business/Technical Purpose                                      |
-| :---------------------- | :--------------------- | :-------------------------------------------------------------- |
-| `organization_id`       | UUID                   | Links staff users to their organization for check-in grouping.  |
-| `is_temporary_password` | BOOLEAN                | Forces password change on first login for provisioned accounts. |
-
-**ORGANIZATIONS**
-
-| Field Name     | Data Type (PostgreSQL) | Business/Technical Purpose                      |
-| :------------- | :--------------------- | :---------------------------------------------- |
-| `name`         | TEXT                   | Human-readable organization or department name. |
-| `organizer_id` | UUID                   | Organizer that manages the organization.        |
-
-**WORKSHOP_ASSIGNMENTS**
-
-| Field Name        | Data Type (PostgreSQL) | Business/Technical Purpose                        |
-| :---------------- | :--------------------- | :------------------------------------------------ |
-| `workshop_id`     | UUID                   | Workshop being assigned to a staff organization.  |
-| `organization_id` | UUID                   | Organization responsible for check-in operations. |
-
-**WORKSHOPS**
-
-| Field Name           | Data Type (PostgreSQL) | Business/Technical Purpose                                               |
-| :------------------- | :--------------------- | :----------------------------------------------------------------------- |
-| `capacity_total`     | INTEGER                | Fixed seat capacity used for demand planning and validations.            |
-| `capacity_remaining` | INTEGER                | Live seat counter updated under pessimistic lock to prevent overbooking. |
-| `version`            | INTEGER                | Optimistic locking for non-capacity edits (title, schedule).             |
-| `status`             | TEXT                   | Lifecycle state: `DRAFT`, `PUBLISHED`, `CANCELED`, `COMPLETED`.          |
-
-**REGISTRATIONS**
-
-| Field Name        | Data Type (PostgreSQL) | Business/Technical Purpose                                                                       |
-| :---------------- | :--------------------- | :----------------------------------------------------------------------------------------------- |
-| `idempotency_key` | TEXT                   | Correlates retries to the same request for safe deduplication.                                   |
-| `status`          | TEXT                   | `PENDING`, `CONFIRMED`, `CANCELED`; `CANCELED` triggers capacity compensation (restores 1 seat). |
-
-**PAYMENTS**
-
-| Field Name | Data Type (PostgreSQL) | Business/Technical Purpose                                     |
-| :--------- | :--------------------- | :------------------------------------------------------------- |
-| `status`   | TEXT                   | Payment lifecycle: `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED`. |
-
-**EVENT_PUBLICATION**
-
-| Field Name               | Data Type (PostgreSQL) | Business/Technical Purpose                                                       |
-| :----------------------- | :--------------------- | :------------------------------------------------------------------------------- |
-| `event_type`             | TEXT                   | Published event type recorded by Spring Modulith.                                |
-| `listener_id`            | TEXT                   | Target listener identifier for publication routing.                              |
-| `publication_date`       | TIMESTAMP              | When the event was registered for publication.                                   |
-| `completion_date`        | TIMESTAMP              | When the publication completed for the listener (null if pending).               |
-| `completion_attempts`    | INTEGER                | Tracks the number of retry attempts for the event publication.                   |
-| `last_resubmission_date` | TIMESTAMP              | Timestamp of the last attempt to resubmit the event for publication.             |
-| `serialized_event`       | TEXT                   | Serialized event payload persisted by the Event Publication registry.            |
-| `status`                 | TEXT                   | Lifecycle status of the event publication (e.g., INCOMPLETE, COMPLETED, FAILED). |
-
-**IDEMPOTENCY_KEYS**
-
-| Field Name     | Data Type (PostgreSQL) | Business/Technical Purpose                                |
-| :------------- | :--------------------- | :-------------------------------------------------------- |
-| `request_hash` | TEXT                   | Unique fingerprint of the request payload for validation. |
-| `expires_at`   | TIMESTAMP              | TTL cutoff for cleanup to prevent table bloat.            |
-
-### Concurrency & Integrity Constraints
-
-- **Capacity Protection (Race Condition Prevention):** Enforce `CHECK (capacity_remaining >= 0)` on `WORKSHOPS` and use `SELECT ... FOR UPDATE` to lock the workshop row during seat allocation to guarantee no overbooking.
-- **Idempotency Barrier (Double-Charge Prevention):** Apply `UNIQUE (idempotency_key)` on both `IDEMPOTENCY_KEYS.idempotency_key` and `REGISTRATIONS.idempotency_key` to prevent duplicate processing on client retries.
-- **Offline Sync Deduplication:** Add `UNIQUE (registration_id)` (or `UNIQUE (workshop_id, user_id)`) on `ATTENDANCE` to silently discard duplicate sync attempts from offline clients.
-- **Data Consistency:** Enforce `FOREIGN KEY ... ON DELETE RESTRICT` to prevent deleting a workshop that has existing registrations.
-
-### Indexing Strategy
-
-| Table               | Indexed Columns        | Index Type                                       | Business/Performance Rationale                                 |
-| :------------------ | :--------------------- | :----------------------------------------------- | :------------------------------------------------------------- |
-| `IDEMPOTENCY_KEYS`  | `idempotency_key`      | B-Tree                                           | Fast lookup during registration surges to deduplicate retries. |
-| `EVENT_PUBLICATION` | `completion_date`      | Partial B-Tree (`WHERE completion_date IS NULL`) | Speeds pending publication scans.                              |
-| `WORKSHOPS`         | `status`, `start_time` | Composite B-Tree                                 | Accelerates schedule browsing and filtering.                   |
-| `REGISTRATIONS`     | `user_id`              | B-Tree                                           | Efficient per-user registration history lookups.               |
-| `REGISTRATIONS`     | `workshop_id`          | B-Tree                                           | Efficient workshop roster and capacity checks.                 |
-
-### Mobile Local Database (Room SQLite Schema)
-
-The mobile database is intentionally minimal and is not a replica of the server. It stores a read-only workshop cache for staff selection and a write-optimized event queue for offline check-ins.
-
-```mermaid
-erDiagram
-  LOCAL_WORKSHOPS {
-    string id PK
-    string title
-    datetime start_time
-    string capacity_info
-  }
-
-  LOCAL_ATTENDEES {
-    string registration_id PK
-    string workshop_id
-    string full_name
-    string ticket_status
-  }
-
-  PENDING_CHECKINS {
-    string id PK
-    string workshop_id
-    string qr_code_payload
-    datetime scanned_at
-    string sync_status
-  }
-```
-
-- **LocalWorkshop (Read-Only Cache):** Minimal fields required for staff to select a workshop; refreshed when online.
-- **LocalAttendee (Read-Only Cache):** Read-only cache for the attendee roster, enabling offline search and verification without network.
-- **PendingCheckIn (Event Queue):** Offline scans with `sync_status` values `PENDING`, `SYNCED`, `FAILED`, or `REJECTED` to drive deterministic reconciliation.
-
-## 5. Access Control Design
+## 4. Access Control Design
 
 ### RBAC Model & User Personas
 
@@ -735,7 +395,7 @@ The API Gateway and Backend Services do not query PostgreSQL for permissions on 
 }
 ```
 
-- **Client usage (React/Android):** The client decodes the role claim to drive the UI, such as hiding the "Create Workshop" action for STUDENT.
+- **Client usage (React / React Native):** The client decodes the role claim to drive the UI, such as hiding the "Create Workshop" action for STUDENT.
 - **Server usage (Spring Boot):** The API enforces access via the role claim using authority checks (for example, `@PreAuthorize("hasAuthority('ORGANIZER')")`) and uses `sub` for row-level ownership checks.
 
 ### Multi-Layer Enforcement Points
@@ -754,7 +414,7 @@ sequenceDiagram
   participant Web as Web App
   participant API as API Gateway / Spring Security
   participant Service as Workshop Service
-  participant DB as PostgreSQL
+  participant DB as Neon PostgreSQL (Cloud)
 
   Organizer->>Web: Click "Edit Workshop"
   alt Role not ORGANIZER (Layer 1)
@@ -782,7 +442,7 @@ sequenceDiagram
 - **Layer 2 (Endpoint Gating):** The API gateway and Spring Security boundary require a `ROLE_ORGANIZER` claim for `PUT /workshops/{id}`.
 - **Layer 3 (Data Gating):** The service enforces ownership by matching `workshops.organizer_id` with `jwt.sub`, preventing IDOR attacks.
 
-## 6. System Protection Mechanisms
+## 5. System Protection Mechanisms
 
 ### Traffic Spike Management
 
@@ -826,7 +486,7 @@ stateDiagram-v2
 
 Client retries caused by network drops or impatient clicks can create duplicate `POST /registrations` requests, risking double-booking or double-charging. The system enforces exactly-once processing with an idempotency key strategy backed by PostgreSQL.
 
-- **Key generation and transmission:** The React/Android client generates a UUIDv4 and sends it in the `Idempotency-Key` header.
+- **Key generation and transmission:** The React / React Native client generates a UUIDv4 and sends it in the `Idempotency-Key` header.
 - **Storage and duplicate detection:** The backend stores keys in `IDEMPOTENCY_KEYS` with a `UNIQUE` constraint, creating a database-level barrier against race conditions.
 - **Workflow:** On the first attempt, the key is inserted, the payment is processed, and the final response payload is serialized and stored with the key. On a retry, the API finds the existing key and immediately returns the cached response, bypassing the payment gateway and write logic.
 - **TTL configuration:** Each key includes an `expires_at` timestamp (for example, 24 hours), and a scheduled cleanup job deletes expired records to prevent table bloat.
@@ -835,7 +495,7 @@ Client retries caused by network drops or impatient clicks can create duplicate 
 sequenceDiagram
   actor Client
   participant GW as API Gateway
-  participant DB as PostgreSQL
+  participant DB as Neon PostgreSQL (Cloud)
   participant Pay as Payment Gateway
 
   Client->>GW: POST /registrations (Idempotency-Key: A)
