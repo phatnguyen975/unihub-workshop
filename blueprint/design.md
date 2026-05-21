@@ -410,7 +410,7 @@ sequenceDiagram
   end
 
   Note over Organizer,Notify: ASYNCHRONOUS EVENT FAN-OUT
-  Note over API,Registry: Events are only externalized by the Registry component which reads event_publication post-commit.
+  Note over API,Registry: Events are only externalized by the Registry component which reads event_publication post-commit
   Note over Registry,Broker: Spring Modulith Transactional Outbox Event Fabric
   Registry->>Broker: Externalize domain events from event_publication
   Broker->>Worker: Deliver domain events
@@ -425,7 +425,7 @@ sequenceDiagram
     Worker->>Notify: Send bulk automated emails/push notifications
   end
 
-  Note over API,ES: DRAFT records are never synchronized to Elasticsearch and generate no external events until transition to PUBLISHED.
+  Note over API,ES: DRAFT records are never synchronized to Elasticsearch and generate no external events until transition to PUBLISHED
 ```
 
 - **State Machine Enforcement:** The system enforces strict transitions: `DRAFT` -> `PUBLISHED` -> `COMPLETED` or `CANCELED`. Once a workshop reaches a terminal state (`COMPLETED` or `CANCELED`), the API layer strictly blocks any further mutations and returns `422 Unprocessable Entity` for attempts to modify the record.
@@ -438,24 +438,51 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-  actor Client
-  participant API as Backend API
-  participant Cache as Redis Cache
-  participant Replica as Neon PostgreSQL
+  actor Client as Student
+  participant GW as API Gateway
+  participant API as Core Backend Monolith
+  participant Cache as Redis
+  participant ES as Elasticsearch
 
-  Client->>API: GET /workshops/search?q=keyword
-  API->>Cache: GET search:{keyword}
-  alt Cache hit
-    Cache-->>API: Cached results
-    API-->>Client: 200 Results
-  else Cache miss
-    Cache-->>API: Miss
-    API->>Replica: Native FTS query (to_tsvector)
-    Replica-->>API: Result set
-    API->>Cache: SET search:{keyword} (short TTL)
-    API-->>Client: 200 Results
+  Client->>GW: GET /api/v1/workshops/search?q={keyword}
+  GW->>API: Forward Search Request
+  API->>Cache: Get cached search results (Key: search:q:{keyword})
+  alt Cache Hit
+    Cache-->>API: Return serialized JSON results
+    API-->>GW: 200 OK (Cached Content)
+    GW-->>Client: 200 OK (Populate Search UI)
+  else Cache Miss
+    Cache-->>API: Null / Cache Miss
+    API->>Cache: Acquire Distributed Lock with TTL (e.g., 5s)
+    alt Lock Acquired (Leader Thread)
+      API->>ES: Execute Full-Text Search Query (Query DSL)
+      ES-->>API: Return matched workshop documents & scores
+      API->>Cache: Set search result cache with TTL (e.g., 5m)
+      API->>Cache: Release Distributed Lock
+      API-->>GW: 200 OK (Fresh Content)
+      GW-->>Client: 200 OK (Populate Search UI)
+    else Lock Denied (Follower Threads)
+      loop Polling (e.g., max 5 attempts, 50ms interval)
+        API->>API: Thread sleep (50ms)
+        API->>Cache: Get cached search results
+        Cache-->>API: Return result (Data or Null)
+        alt Cache Populated (by Leader)
+          API-->>GW: 200 OK (Cached Content)
+          GW-->>Client: 200 OK (Populate Search UI)
+        end
+      end
+      API->>API: Check if cached data is still Null after max retries
+      alt Cache still Null (Leader Timeout)
+        API-->>GW: 504 Gateway Timeout
+        GW-->>Client: 504 Gateway Timeout (Please retry)
+      end
+    end
   end
 ```
+
+- **Offloading the Transactional Database:** Full-text search is fully decoupled from PostgreSQL. The primary ACID database no longer performs `to_tsvector` searches; instead Elasticsearch serves as the dedicated CQRS read model, protecting Neon PostgreSQL from high-volume read traffic and heavy text vector processing.
+- **Multi-Tiered Performance Optimization:** The system implements a Cache-Aside pattern where Redis is the first line of defense for sub-millisecond reads. On a cache miss the API falls back to Elasticsearch Query DSL for powerful, typo-tolerant full-text queries and scoring across large datasets, providing sub-second responses under high concurrency.
+- **Cache Invalidation and TTL Strategy:** Search results are cached in Redis with a strict TTL (for example, 5 minutes) to balance freshness with throughput protection. To prevent "Cache Stampedes" (the Thundering Herd problem) when the TTL expires under heavy load, the system employs a Redis-backed Distributed Lock with a Spin-lock/Polling mechanism for follower threads. On a cache miss, only a single leader thread queries Elasticsearch while concurrent follower threads utilize a polling loop (retrying up to 5 times with a 50ms interval) to repeatedly check the cache until the leader successfully populates it, eliminating race conditions and ensuring stability even during unpredictable search engine latency spikes. Furthermore, the distributed lock is assigned a short TTL (for example, 5 seconds) to guarantee the system recovers from leader thread crashes, preventing irreversible deadlocks. If follower threads exhaust their polling limits without receiving data, they are designed to fail-fast with a 504 Gateway Timeout rather than hanging the client connection, ensuring predictable degradation. Eviction and invalidation strategies are employed when content changes (publish/reschedule/cancel) to keep read-models consistent.
 
 ### Offline Check-in & Synchronization Flow
 
