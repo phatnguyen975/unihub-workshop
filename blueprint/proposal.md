@@ -100,7 +100,7 @@ The system relies on a modular, decoupled architecture prioritizing resilience d
 - **Client Applications:** React (TypeScript) for Web, and React Native (TypeScript) with SQLite for offline-first Mobile check-in.
 - **Edge / API Gateway:** **Nginx** acts as the reverse proxy, load balancer, and API gateway, handling routing and edge-level rate limiting.
 - **Core Backend:** Java & Spring Boot. The architectural foundation utilizes **Spring Modulith** to enable the "Event-Driven Modular Monolith" and internal event registry.
-- **Data Persistence:** Serverless Neon PostgreSQL (for strict ACID transactions) and S3-compatible Object Storage for unstructured assets.
+- **Data Persistence:** Serverless Neon PostgreSQL (for strict ACID transactions), Elasticsearch (Search Engine), and S3-compatible Object Storage for unstructured assets.
 - **Asynchronous & Caching:** RabbitMQ for decoupled message processing, and Redis for distributed caching.
 
 > [!TIP]
@@ -119,7 +119,7 @@ The system relies on a modular, decoupled architecture prioritizing resilience d
 ### Blueprint Phase Artifacts
 
 - **System Design & C4 Diagrams:** Context, Container, and component dependency visuals.
-- **Database Schema:** SQL/NoSQL strategy justification, partial unique indexes, TTL cleanup routines, and full-text search strategies.
+- **Database Schema:** SQL/NoSQL strategy justification, partial unique indexes, TTL cleanup routines, and Elasticsearch integration for high-performance full-text search operations.
 - **Critical Flow Logic:** Documented steps for Paid Workshop Registration, Offline Sync, and CSV Ingestion including detailed recovery paths.
 - **Access Control Model:** Defined RBAC enforcement matrix across API endpoints, mobile, and web interfaces.
 - **Protection Designs:** Documented implementation choices for rate-limiting, idempotency, and circuit breakers.

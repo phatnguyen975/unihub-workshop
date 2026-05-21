@@ -22,7 +22,7 @@ The system architecture is organized into a strict tiered structure to distribut
 - **Client Tier:** React (TypeScript) for the responsive web portal; React Native (TypeScript) with a local SQLite engine for the offline-first mobile check-in application.
 - **API Gateway Layer:** Nginx acting as the reverse proxy, load balancer, and edge router responsible for SSL termination and global rate-limiting.
 - **Backend Tier:** Java and Spring Boot leveraging **Spring Modulith** for internal async event publication registry and modular boundary enforcement.
-- **Data Persistence Tier:** Serverless Neon PostgreSQL for core relational data and ACID transactions; S3-compatible Object Storage for PDF assets and legacy CSV storage.
+- **Data Persistence Tier:** Serverless Neon PostgreSQL for core relational data and ACID transactions; S3-compatible Object Storage for PDF assets and legacy CSV storage, and Elasticsearch for offloading heavy full-text search queries via the CQRS pattern.
 - **Asynchronous & Caching Layer:** Redis for distributed caching; RabbitMQ for reliable, decoupled message brokering.
 
 ### Core Resilience Strategies
@@ -63,11 +63,12 @@ The system architecture is organized into a strict tiered structure to distribut
 | :------------------------------ | :--------------------------------- | :-------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Web App**                     | React, TypeScript                  | Local Docker                      | Responsive web portal for Students and Organizers; performs client-side validation, renders QR confirmations, authenticates users (JWT), and communicates with the API via the local gateway.                                 |
 | **Mobile App**                  | React Native, TypeScript           | Physical Mobile Device / Emulator | Offline-first check-in application for Check-in Staff; captures scans, queues events locally, and syncs batched events to the backend when connectivity permits.                                                              |
-| **Local SQLite Database**       | SQLite                             | Local device storage              | Offline-first queue for pending check-in events; provides durable local persistence, idempotent upserts, and deterministic reconciliation during batch syncs.                                                                 |
+| **Local SQLite Database**       | SQLite                             | Local Device Storage              | Offline-first queue for pending check-in events; provides durable local persistence, idempotent upserts, and deterministic reconciliation during batch syncs.                                                                 |
 | **API Gateway / Load Balancer** | Nginx                              | Local Docker                      | Edge routing, load balancing, and Token Bucket rate limiting for incoming HTTP traffic inside the local Docker network; forwards validated requests to the Core Backend Monolith.                                             |
 | **Core Backend Monolith**       | Java, Spring Boot, Spring Modulith | Local Docker                      | Implements authoritative domain logic, module-level event publication registry, outbox pattern for reliable event externalization, transactional seat allocation, and payment orchestration.                                  |
 | **Background Workers**          | Java, Spring Boot, Spring Batch    | Local Docker                      | Executes deferred tasks: AI PDF summarization, notification delivery, and nightly CSV ingestion. Consumes brokered events, interacts with object storage and external APIs, and persists async results to the cloud database. |
-| **PostgreSQL**                  | Neon PostgreSQL                    | Cloud Service (Neon)              | Authoritative transactional datastore for registrations, payments, and attendance. Requires JDBC over SSL/TLS for encrypted access from local services.                                                                       |
+| **PostgreSQL**                  | PostgreSQL                         | Neon Cloud Service                | Authoritative transactional datastore for registrations, payments, and attendance. Requires JDBC over SSL/TLS for encrypted access from local services.                                                                       |
+| **Search Engine**               | Elasticsearch                      | Local Docker                      | Offloads read-heavy full-text search queries, enabling high-performance workshop discovery without impacting primary database transactions.                                                                                   |
 | **Cache / Rate Limiter**        | Redis                              | Local Docker                      | Cache-aside reads for performance and shared token-bucket counters used by the gateway for admission control and rate limiting.                                                                                               |
 | **Message Broker**              | RabbitMQ                           | Local Docker                      | Reliable, decoupled queues for event-driven processing, worker retries, and dead-letter handling; integrates with the Core Backend Monolith via the outbox pattern.                                                           |
 | **Object Storage**              | MinIO / S3-compatible              | Local Docker                      | Stores unstructured assets (PDFs and nightly CSV drops); accessed via the S3 API by workers and the Core Backend for ingestion and processing.                                                                                |
@@ -76,22 +77,25 @@ The system architecture is organized into a strict tiered structure to distribut
 
 ### System Architecture Diagram
 
-<p align="center">
-  <img src="./diagrams/system_architecture.png" style="width:100%;" alt="System Architecture">
-</p>
+**Key architectural characteristics:**
 
 - Horizontally scaled Core Backend Monolith instances (Node 1 and Node 2) behind a Local Docker edge using Nginx for HTTP routing and admission control.
 - Local Docker runtime for gateway, backend, workers, cache, broker, and object storage; Neon PostgreSQL is hosted as a Cloud Service requiring encrypted JDBC connections.
 - Event-driven decoupling via Spring Modulith event publication registry and RabbitMQ-backed worker pipelines for async AI summarization and CSV ingestion.
 - Offline-first mobile check-in with a local SQLite queue and batched reconciliation to the cloud-backed authoritative store.
 
-| Architectural Pattern              | Implementation Details                                                                                                                                                                               |
-| :--------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gateway / Traffic Distribution** | Nginx acts as a pure reverse proxy and load balancer, routing incoming HTTP requests across Core Backend Monolith instances.                                                                         |
-| **Cache & Rate Limiting**          | Core Backend Monoliths enforce distributed Token Bucket admission control (via Bucket4j) at the application filter layer, using Redis for shared counters and cache-aside reads.                     |
-| **Read / Write Separation**        | Core Backend Monoliths read from Neon PostgreSQL replicas on cache misses and write domain data plus outbox publications to the Neon PostgreSQL primary; all database access uses JDBC over SSL/TLS. |
-| **Worker Responsibilities**        | Background Workers consume brokered events from RabbitMQ, execute AI summarization, notification dispatch, and nightly CSV ingestion, and persist async results to Neon PostgreSQL.                  |
-| **Broker Integration**             | Spring Modulith externalizes events to RabbitMQ; workers consume tasks, perform retries/backoff, and route failures to DLQs when necessary.                                                          |
+<p align="center">
+  <img src="./diagrams/system_architecture.png" style="width:100%;" alt="System Architecture Diagram">
+</p>
+
+| Architectural Pattern              | Implementation Details                                                                                                                                                                                                                                                                                         |
+| :--------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gateway / Traffic Distribution** | Nginx acts as a pure reverse proxy and load balancer, routing incoming HTTP requests across Core Backend Monolith instances.                                                                                                                                                                                   |
+| **Cache & Rate Limiting**          | Core Backend Monoliths enforce distributed Token Bucket admission control (via Bucket4j) at the application filter layer, using Redis for shared counters and cache-aside reads.                                                                                                                               |
+| **Read / Write Separation**        | Core Backend Monoliths read from Neon PostgreSQL replicas on cache misses and write domain data plus outbox publications to the Neon PostgreSQL primary; all database access uses JDBC over SSL/TLS.                                                                                                           |
+| **Worker Responsibilities**        | Background Workers consume brokered events from RabbitMQ, execute AI summarization, notification dispatch, and nightly CSV ingestion, and persist async results to Neon PostgreSQL.                                                                                                                            |
+| **Broker Integration**             | Spring Modulith externalizes events to RabbitMQ; workers consume tasks, perform retries/backoff, and route failures to DLQs when necessary.                                                                                                                                                                    |
+| **CQRS & Search Optimization**     | To protect the primary PostgreSQL database from CPU-intensive full-text search queries under heavy load, the system utilizes Elasticsearch. The Core Backend writes to PostgreSQL, while Background Workers asynchronously synchronize the data to Elasticsearch, which exclusively serves all search traffic. |
 
 ### Workshop Registration Flow
 
@@ -113,7 +117,7 @@ sequenceDiagram
   participant API as Core Backend Monolith
   participant DB as Neon PostgreSQL
   participant Pay as Payment Gateway
-  participant Sweeper as Background Sweeper (Cron)
+  participant Sweeper as Cron Sweeper
   participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
   participant Worker as Background Workers
@@ -135,6 +139,15 @@ sequenceDiagram
       GW-->>Web: Return cached response (or 409 Conflict if PENDING)
     else New request
       API->>DB: Insert idempotency key (Status: PENDING)
+      API->>DB: Query existing registrations for time overlap
+      alt Schedule Overlap Detected
+        DB-->>API: Overlap found
+        API->>DB: Update idempotency key (Status: FAILED)
+        API-->>GW: 422 Unprocessable Entity (Time conflict)
+        GW-->>Web: 422 Unprocessable Entity
+      else No Overlap
+        DB-->>API: Schedule clear
+      end
       API->>Redis: Atomic decrement capacity pre-check
       alt No capacity
         Redis-->>API: Capacity unavailable
@@ -214,48 +227,212 @@ sequenceDiagram
 
 This sequence captures the admin-driven workshop lifecycle and the event-driven propagation of changes to downstream services.
 
+**Workshop statuses:**
+
+- `DRAFT`: Initial state upon creation. Visible only to the creating Organizer. No search synchronization or external events.
+- `PUBLISHED`: Made public by the Organizer. Active and searchable in Elasticsearch. Open for student registrations.
+- `CANCELED`: Aborted mid-lifecycle. Triggers student notifications and removal from active search listings.
+- `COMPLETED`: Automatically transitioned by the system sweeper when the current time passes the workshop's end time.
+
 ```mermaid
 sequenceDiagram
   actor Organizer
   participant Web as Admin Web App
-  participant API as Backend API
+  participant GW as API Gateway (Nginx)
+  participant API as Core Backend Monolith
   participant DB as Neon PostgreSQL
+  participant Sweeper as Cron Sweeper
   participant Registry as Spring Modulith Event Registry
-  participant Broker as RabbitMQ
-  participant NotifWorker as Notification Worker
+  participant Broker as Message Broker (RabbitMQ)
+  participant Worker as Background Workers
+  participant ES as Elasticsearch
   participant Notify as Notification Providers
 
-  Organizer->>Web: Create/Update/Reschedule/Cancel workshop
-  Web->>API: POST/PUT/PATCH /workshops
-  API->>DB: Begin tx
-  API->>DB: Validate and persist lifecycle change
-  alt Create
-    API->>DB: Insert workshop record
-    API->>DB: Insert event publication (WorkshopCreated)
-  else Update
-    API->>DB: Update workshop details
-    API->>DB: Insert event publication (WorkshopUpdated)
-  else Reschedule
-    API->>DB: Update schedule/venue
-    API->>DB: Insert event publication (WorkshopRescheduled)
-  else Cancel
-    API->>DB: Mark workshop as canceled
-    API->>DB: Insert event publication (WorkshopCanceled)
-  end
-  API->>DB: Commit
-  API-->>Web: 200/201 Response
+  Note over Organizer,Notify: CREATE OPERATION
+  Organizer->>Web: Click "Save Draft"
+  Web->>GW: POST /api/v1/workshops
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (Bypassed for Create)
+  API->>DB: Insert Workshop record (Status: DRAFT)
+  DB-->>API: Row persisted
+  API-->>GW: 201 Created (Draft Saved)
+  GW-->>Web: 201 Created
+  Web-->>Organizer: Show Draft Status in UI
 
-  par Event publication fan-out
-    Registry->>Broker: Externalize lifecycle event
-    Broker->>NotifWorker: Consume lifecycle event
-    NotifWorker->>DB: Fetch registered students (if Rescheduled/Canceled)
-    NotifWorker->>Notify: Send bulk notifications (Email/SMS)
+  Note over Organizer,Notify: PUBLISH OPERATION
+  Organizer->>Web: Click "Publish Workshop"
+  Web->>GW: PATCH /api/v1/workshops/{id}/publish
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  alt Unauthorized
+    DB-->>API: Ownership mismatch
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+    Web-->>Organizer: 403 Forbidden
+  else Authorized
+    API->>DB: Select current_status from workshops
+    DB-->>API: current_status: STATUS
+    alt current_status == DRAFT
+      API->>DB: Update Workshop (Status: PUBLISHED)
+      API->>DB: Insert WorkshopPublishedEvent into Outbox
+      DB-->>API: Transaction committed
+      API-->>GW: 200 OK (Workshop Published)
+      GW-->>Web: 200 OK
+      Web-->>Organizer: Show Published Status in UI
+    else
+      API-->>GW: 422 Unprocessable Entity (Invalid State Transition)
+      GW-->>Web: 422 Unprocessable Entity
+      Web-->>Organizer: 422 Unprocessable Entity
+    end
   end
+
+  Note over Organizer,Notify: UPDATE OPERATION
+  Organizer->>Web: Click "Save Changes"
+  Web->>GW: PUT /api/v1/workshops/{id}
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  alt Unauthorized
+    DB-->>API: Ownership mismatch
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+    Web-->>Organizer: 403 Forbidden
+  else Authorized
+    API->>DB: Select current_status from workshops
+    DB-->>API: current_status: STATUS
+    alt current_status == COMPLETED or current_status == CANCELED
+      API-->>GW: 422 Unprocessable Entity (Modification Blocked)
+      GW-->>Web: 422 Unprocessable Entity
+      Web-->>Organizer: 422 Unprocessable Entity
+    else
+      alt current_status == PUBLISHED
+        API->>DB: Query current registered student count
+        DB-->>API: registered_count
+        API->>API: Validate immutable fields & ensure capacity >= registered_count
+        alt Payload modifies immutable core fields or reduces capacity below registered count
+          API-->>GW: 422 Unprocessable Entity (Invalid Core Modification)
+          GW-->>Web: 422 Unprocessable Entity
+          Web-->>Organizer: 422 Unprocessable Entity
+        else
+          API->>DB: Update Workshop Details (non-core fields)
+          API->>DB: Insert WorkshopUpdatedEvent into Outbox
+          DB-->>API: Transaction committed
+          API-->>GW: 200 OK
+          GW-->>Web: 200 OK
+        end
+      else current_status == DRAFT
+        API->>DB: Update Workshop Details (all fields allowed)
+        Note over API,DB: DRAFT changes do not generate outbox events
+        DB-->>API: Transaction committed
+        API-->>GW: 200 OK
+        GW-->>Web: 200 OK
+      end
+    end
+  end
+
+  Note over Organizer,Notify: RESCHEDULE OPERATION
+  Organizer->>Web: Change Date/Time & Click "Reschedule"
+  Web->>GW: PATCH /api/v1/workshops/{id}/reschedule
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  alt Unauthorized
+    DB-->>API: Ownership mismatch
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+    Web-->>Organizer: 403 Forbidden
+  else Authorized
+    API->>DB: Select current_status from workshops
+    DB-->>API: current_status: STATUS
+    alt current_status == DRAFT or current_status == COMPLETED or current_status == CANCELED
+      API-->>GW: 422 Unprocessable Entity (Reschedule Restricted to Published)
+      GW-->>Web: 422 Unprocessable Entity
+      Web-->>Organizer: 422 Unprocessable Entity
+    else
+      API->>API: Validate new_start_time/new_end_time (must be future and start < end)
+      alt new_start_time < NOW or new_end_time <= new_start_time
+        API-->>GW: 422 Unprocessable Entity (Invalid Temporal Range)
+        GW-->>Web: 422 Unprocessable Entity
+        Web-->>Organizer: 422 Unprocessable Entity
+      else
+        API->>DB: Resource Collision Check (location/speaker overlap within time window)
+        alt Collision Found
+          DB-->>API: Collision Found
+          API-->>GW: 422 Unprocessable Entity (Resource Conflict)
+          GW-->>Web: 422 Unprocessable Entity
+          Web-->>Organizer: 422 Unprocessable Entity
+        else Schedule Clear
+          DB-->>API: Schedule Clear
+          API->>DB: Update Workshop Schedule (Status remains current)
+          API->>DB: Insert WorkshopRescheduledEvent into Outbox
+          DB-->>API: Transaction committed
+          API-->>GW: 200 OK
+          GW-->>Web: 200 OK
+          Web-->>Organizer: 200 OK
+        end
+      end
+    end
+  end
+
+  Note over Organizer,Notify: CANCEL OPERATION
+  Organizer->>Web: Click "Cancel Workshop"
+  Web->>GW: PATCH /api/v1/workshops/{id}/cancel
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  alt Unauthorized
+    DB-->>API: Ownership mismatch
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+    Web-->>Organizer: 403 Forbidden
+  else Authorized
+    API->>DB: Select current_status from workshops
+    DB-->>API: current_status: STATUS
+    alt current_status == CANCELED or current_status == COMPLETED
+      API-->>GW: 422 Unprocessable Entity (Invalid State)
+      GW-->>Web: 422 Unprocessable Entity
+      Web-->>Organizer: 422 Unprocessable Entity
+    else
+      API->>DB: Update Workshop (Status: CANCELED)
+      API->>DB: Insert WorkshopCanceledEvent into Outbox
+      DB-->>API: Transaction committed
+      API-->>GW: 200 OK
+      GW-->>Web: 200 OK
+      Web-->>Organizer: Show Canceled Status in UI
+    end
+  end
+
+  Note over Organizer,Notify: AUTOMATED LIFECYCLE SWEEPER
+  loop Hourly Sweep
+    Sweeper->>DB: Query PUBLISHED workshops where end_time < NOW
+    DB-->>Sweeper: Return expired workshop ids
+    Sweeper->>DB: Bulk Update Workshop (Status: COMPLETED)
+    DB-->>Sweeper: Acknowledge bulk update
+    Sweeper->>DB: Bulk Insert WorkshopCompletedEvent into Outbox
+    DB-->>Sweeper: Acknowledge bulk insert
+  end
+
+  Note over Organizer,Notify: ASYNCHRONOUS EVENT FAN-OUT
+  Note over API,Registry: Events are only externalized by the Registry component which reads event_publication post-commit.
+  Note over Registry,Broker: Spring Modulith Transactional Outbox Event Fabric
+  Registry->>Broker: Externalize domain events from event_publication
+  Broker->>Worker: Deliver domain events
+  alt Event is Published or Updated or Rescheduled
+    Worker->>ES: Sync/Upsert Workshop data to Elasticsearch Index
+  else Event is Completed or Canceled
+    Worker->>ES: Remove or mark inactive in Elasticsearch Index
+  end
+  alt Event is Rescheduled or Canceled
+    Worker->>DB: Fetch registered student list for this workshop
+    DB-->>Worker: Return student list
+    Worker->>Notify: Send bulk automated emails/push notifications
+  end
+
+  Note over API,ES: DRAFT records are never synchronized to Elasticsearch and generate no external events until transition to PUBLISHED.
 ```
 
-- **Lifecycle coverage:** Admins can create, update, reschedule, or cancel workshops through the web portal.
-- **Transactional event publication:** The lifecycle change and event publication are committed in the same transaction to guarantee consistent state and downstream notification delivery.
-- **Asynchronous fan-out:** The notification worker consumes lifecycle events, fetches impacted students, and sends bulk emails without blocking the admin UI.
+- **State Machine Enforcement:** The system enforces strict transitions: `DRAFT` -> `PUBLISHED` -> `COMPLETED` or `CANCELED`. Once a workshop reaches a terminal state (`COMPLETED` or `CANCELED`), the API layer strictly blocks any further mutations and returns `422 Unprocessable Entity` for attempts to modify the record.
+- **Data Ownership & Core Validation:** Modification endpoints validate `jwt.sub` against the workshop's `organizer_id` prior to mutation (skipped for `Create`). The `PUT`/`PATCH` handlers dynamically evaluate the current status: full updates are allowed while in `DRAFT`; once `PUBLISHED`, core fields (for example `price`) are immutable and any attempt to change them or reduce capacity below current registrations is rejected with `422 Unprocessable Entity` to protect active attendees.
+- **Automated Event Completion Sweeper:** A dedicated `Sweeper` cron component runs hourly. It queries the database for expired `PUBLISHED` workshops, marks them `COMPLETED`, and writes `WorkshopCompletedEvent` entries into the transactional outbox for downstream processing.
+- **Granular Asynchronous Branching:** The `Registry` component (not the API) extracts committed outbox rows and externalizes them to the message broker. Background workers synchronize to Elasticsearch on publication, updates, rescheduling, and completion events (keeping `DRAFT` items completely isolated); mass notification flows are executed only for disruptive events (`RESCHEDULED`, `CANCELED`).
+- **Strict Reschedule Guarantees:** The reschedule endpoint is explicitly blocked for `DRAFT`, `COMPLETED`, or `CANCELED` states. Rescheduling requires a `PUBLISHED` workshop, validates that proposed times are future and form a valid range, and runs a PostgreSQL-level resource collision check (location and speaker availability) to prevent double-booking. Any validation failure returns `422 Unprocessable Entity` and the transaction is not committed.
 
 ### Workshop Search & Cache-Aside Flow
 
