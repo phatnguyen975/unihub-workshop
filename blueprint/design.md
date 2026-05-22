@@ -482,7 +482,7 @@ sequenceDiagram
 
 - **Offloading the Transactional Database:** Full-text search is fully decoupled from PostgreSQL. The primary ACID database no longer performs `to_tsvector` searches; instead Elasticsearch serves as the dedicated CQRS read model, protecting Neon PostgreSQL from high-volume read traffic and heavy text vector processing.
 - **Multi-Tiered Performance Optimization:** The system implements a Cache-Aside pattern where Redis is the first line of defense for sub-millisecond reads. On a cache miss the API falls back to Elasticsearch Query DSL for powerful, typo-tolerant full-text queries and scoring across large datasets, providing sub-second responses under high concurrency.
-- **Cache Invalidation and TTL Strategy:** Search results are cached in Redis with a strict TTL (for example, 5 minutes) to balance freshness with throughput protection. To prevent "Cache Stampedes" (the Thundering Herd problem) when the TTL expires under heavy load, the system employs a Redis-backed Distributed Lock with a Spin-lock/Polling mechanism for follower threads. On a cache miss, only a single leader thread queries Elasticsearch while concurrent follower threads utilize a polling loop (retrying up to 5 times with a 50ms interval) to repeatedly check the cache until the leader successfully populates it, eliminating race conditions and ensuring stability even during unpredictable search engine latency spikes. Furthermore, the distributed lock is assigned a short TTL (for example, 5 seconds) to guarantee the system recovers from leader thread crashes, preventing irreversible deadlocks. If follower threads exhaust their polling limits without receiving data, they are designed to fail-fast with a 504 Gateway Timeout rather than hanging the client connection, ensuring predictable degradation. Eviction and invalidation strategies are employed when content changes (publish/reschedule/cancel) to keep read-models consistent.
+- **Cache Invalidation and TTL Strategy:** Search results are cached in Redis with a strict TTL (e.g., 5 minutes) to balance freshness with throughput protection. To prevent "Cache Stampedes" (the Thundering Herd problem) when the TTL expires under heavy load, the system employs a Redis-backed Distributed Lock with a Spin-lock/Polling mechanism for follower threads. On a cache miss, only a single leader thread queries Elasticsearch while concurrent follower threads utilize a polling loop (retrying up to 5 times with a 50ms interval) to repeatedly check the cache until the leader successfully populates it, eliminating race conditions and ensuring stability even during unpredictable search engine latency spikes. Furthermore, the distributed lock is assigned a short TTL (e.g., 5 seconds) to guarantee the system recovers from leader thread crashes, preventing irreversible deadlocks. If follower threads exhaust their polling limits without receiving data, they are designed to fail-fast with a 504 Gateway Timeout rather than hanging the client connection, ensuring predictable degradation. Eviction and invalidation strategies are employed when content changes (publish/reschedule/cancel) to keep read-models consistent.
 
 ### Offline Check-in & Synchronization Flow
 
@@ -490,39 +490,59 @@ This sequence illustrates offline capture, local persistence, and server-authori
 
 ```mermaid
 sequenceDiagram
-  actor Staff
-  participant Mobile as Mobile App (React Native)
-  participant Local as Local SQLite
-  participant API as Backend API
+  actor Staff as Event Staff
+  participant Mobile as Mobile App
+  participant GW as API Gateway
+  participant API as Core Backend Monolith
   participant DB as Neon PostgreSQL
 
-  Staff->>Mobile: Scan QR code
-  Mobile->>Local: Store check-in event (Pending)
-  Note over Mobile,Local: Offline-first capture, no network required
-
-  Mobile->>API: Sync batch when online
-  loop For each record in Batch
-    API->>DB: Validate and upsert attendance (idempotent key)
-    alt Valid & New Attendance
-      DB-->>API: Inserted
-      API-->>Mobile: Ack (recorded)
-      Mobile->>Local: Mark Synced
-    else Duplicate (Idempotency)
-      DB-->>API: Already recorded
-      API-->>Mobile: Ack (existing)
-      Mobile->>Local: Mark Synced
-    else Invalid/Fake QR (Poison Pill Prevention)
-      DB-->>API: Invalid workshop/student
-      API-->>Mobile: Error (400/404)
-      Mobile->>Local: Mark Rejected
+  Staff->>Mobile: Point camera at Student's QR Code
+  Mobile->>Mobile: Verify QR payload signature using local Public Key
+  alt Invalid Signature (Forged Ticket)
+    Mobile->>Mobile: Display "Invalid/Fake Ticket" error and drop
+  else Valid Signature (Authentic Ticket)
+    Mobile->>Mobile: Generate sync_id (Idempotency Key), extract registration_id & Save to SQLite
+  end
+  Mobile->>GW: POST /api/v1/workshops/{workshopId}/attendances/sync (Batch Array)
+  GW->>API: Forward Sync Request
+  API->>API: Validate JWT Role & Staff permission for {workshopId}
+  alt Unauthorized
+    API-->>GW: 403 Forbidden
+    GW-->>Mobile: 403 Forbidden
+    Mobile->>Mobile: Show authorization error
+  else Authorized
+    loop For each record in Batch
+      API->>DB: Verify registration_id exists and status == CONFIRMED
+      DB-->>API: Registration State
+      alt Invalid Registration (Canceled/Not Found)
+        API->>API: Append 'Rejected (Invalid Ticket)' to response array
+      else Valid Registration
+        API->>DB: Check for existing check-in by sync_id OR registration_id
+        DB-->>API: Existing record(s) state
+        alt sync_id exists (Network Retry / Idempotent Hit)
+          API->>API: Append 'Success (Already Synced)' to response
+        else registration_id already checked in (Multi-device collision)
+          API->>API: Append 'Rejected (Ticket Already Used)' to response
+        else New Check-in
+          API->>DB: Insert Check-in Record
+          DB-->>API: Inserted
+          API->>API: Append 'Success' to response array
+        end
+      end
     end
+    API-->>GW: 200 OK / 207 Multi-Status (Array of Results)
+    GW-->>Mobile: 200 OK / 207 Multi-Status
+    Mobile->>Mobile: Bulk Update SQLite (Mark Synced/Rejected)
   end
 ```
 
 - **Offline-first capture:** The mobile app records scans locally to keep check-in operational during network drops.
-- **Batch synchronization:** Pending records are synced in batches when connectivity returns, reducing request overhead.
-- **Idempotent conflict resolution:** Duplicate records return a success acknowledgment so the client can safely clear them, even if a prior response was lost.
-- **Poison Pill prevention:** Invalid QR codes are deterministically rejected and marked rejected locally, preventing infinite retry loops that waste bandwidth and battery.
+- **Gateway-routed synchronization:** When connectivity returns, the mobile app submits sync batches through the API Gateway (Nginx), enabling centralized TLS termination, perimeter controls, and rate limiting before traffic reaches the Core Backend Monolith.
+- **Role-based security guard:** The backend explicitly validates cryptographically-signed JWT claims (signed using the system's Asymmetric Private Key) and enforces that only `STAFF` or `ORGANIZER` roles can submit check-in payloads; unauthorized callers are rejected with `403 Forbidden`.
+- **Asymmetric Cryptography for Offline Authentication:** To prevent ticket forgery in a disconnected environment, the system utilizes a Public/Private Key Pair. The Core Backend signs the QR code payload (containing the `registration_id`) using its Private Key. The Check-in Mobile App securely stores the corresponding Public Key. During offline scanning, the app cryptographically verifies the signature to instantly drop forged tickets. This delegates the Proof of Issuance to the offline device, while the backend later handles the Proof of Validity (cancellations and ticket sharing) during the online batch synchronization.
+- **HTTP bulk consistency pattern:** The mobile client sends an array of records in one request, the API processes each record iteratively against PostgreSQL idempotency checks, and the server returns one unified `200/207` array response, preventing fragmented per-row HTTP replies.
+- **Registration Integrity Validation (Zero-Trust Offline Payload):** Because offline mobile payloads are inherently untrusted, the API does not blindly accept check-ins. During batch synchronization, the backend strictly verifies the embedded `registration_id` from the QR code against the authoritative database. If a student attempts to use a forged QR code or a ticket that was explicitly canceled or refunded (status != `CONFIRMED`), the backend silently rejects that specific record within the batch, ensuring absolute on-site security and accurate attendance reconciliation.
+- **Multi-Device Collision & Double-Scan Prevention:** In an offline-first environment, a student might share their QR code with another person and both could be scanned by different staff devices while offline. When batches are synced, the API checks both the `sync_id` and the `registration_id`. If the `sync_id` already exists, it is treated as a network retry and returned as success to clear the mobile queue. If a different `sync_id` attempts to claim an already-used `registration_id`, the backend identifies the collision and silently rejects the anomalous record, enforcing one-ticket-one-entry at the point of reconciliation.
 
 ### Async AI Summarization Flow
 
