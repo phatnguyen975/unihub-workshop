@@ -73,9 +73,7 @@ The system architecture is organized into a strict tiered structure to distribut
 | **Message Broker**              | RabbitMQ                           | Local Docker                      | Reliable, decoupled queues for event-driven processing, worker retries, and dead-letter handling; integrates with the Core Backend Monolith via the outbox pattern.                                                           |
 | **Object Storage**              | MinIO / S3-compatible              | Local Docker                      | Stores unstructured assets (PDFs and nightly CSV drops); accessed via the S3 API by workers and the Core Backend for ingestion and processing.                                                                                |
 
-## 3. High-Level Architecture Diagram
-
-### System Architecture Diagram
+## 3. System Architecture
 
 **Key architectural characteristics:**
 
@@ -96,6 +94,8 @@ The system architecture is organized into a strict tiered structure to distribut
 | **Worker Responsibilities**        | Background Workers consume brokered events from RabbitMQ, execute AI summarization, notification dispatch, and nightly CSV ingestion, and persist async results to Neon PostgreSQL.                                                                                                                            |
 | **Broker Integration**             | Spring Modulith externalizes events to RabbitMQ; workers consume tasks, perform retries/backoff, and route failures to DLQs when necessary.                                                                                                                                                                    |
 | **CQRS & Search Optimization**     | To protect the primary PostgreSQL database from CPU-intensive full-text search queries under heavy load, the system utilizes Elasticsearch. The Core Backend writes to PostgreSQL, while Background Workers asynchronously synchronize the data to Elasticsearch, which exclusively serves all search traffic. |
+
+## 4. Core System Flows
 
 ### Workshop Registration Flow
 
@@ -224,8 +224,6 @@ sequenceDiagram
 ### Workshop Lifecycle Management Flow
 
 This sequence captures the admin-driven workshop lifecycle and the event-driven propagation of changes to downstream services. The flow enforces a strict workshop state machine (`DRAFT`-> `PUBLISHED` -> `COMPLETED`/`CANCELED`), applies ownership and RBAC validations at mutation boundaries, and uses a Transactional Outbox pattern to reliably publish domain events only after successful commits.
-
-**Workshop statuses:**
 
 - `DRAFT`: Initial state upon creation. Visible only to the creating Organizer. No search synchronization or external events.
 - `PUBLISHED`: Made public by the Organizer. Active and searchable in Elasticsearch. Open for student registrations.
@@ -484,7 +482,7 @@ sequenceDiagram
 - **Stale-While-Revalidate (SWR) Pattern:** The API returns cached results immediately whenever possible. If data is stale (soft TTL expired) but within a permissible hard TTL, the system returns the stale payload instantly and triggers an asynchronous refresh. This non-blocking SWR approach prevents request threads from waiting on backend refreshes and avoids exhausting the Tomcat thread pool during surges (12,000+ concurrent users).
 - **Dual TTL Semantics:** Cache entries contain a soft TTL (short, e.g., 5 minutes) and a hard TTL (longer, e.g., 24 hours). The soft TTL controls freshness for immediate revalidation decisions; the hard TTL bounds how long stale data may be served before requiring a synchronous circuit-protected fetch from Elasticsearch.
 - **Non-blocking Refresh with `tryLock`:** Stale responses initiate a fire-and-forget background task that attempts a non-blocking `tryLock` in Redis. Only the task that obtains the lock performs the expensive ES query and writes the updated payload and new TTLs. If the lock is denied, the refresher does nothing - avoiding any synchronous follower blocking or spin-waiting on application request threads.
-- **Circuit Breaker & Graceful Degradation:** Any synchronous call to Elasticsearch (cache miss or hard TTL expiry) is protected by a Resilience4j-like Circuit Breaker and appropriate timeouts. On ES timeouts or when the circuit is `OPEN`, the API returns a safe default (empty result set) instead of a 5xx error, ensuring graceful degradation and predictable client behavior.
+- **Circuit Breaker & Graceful Degradation:** Any synchronous call to Elasticsearch (cache miss or hard TTL expiry) is protected by a Resilience4j-like Circuit Breaker and appropriate timeouts. On ES timeouts or when the circuit is `OPEN`, the API returns a safe default (empty result set) instead of a `5xx` error, ensuring graceful degradation and predictable client behavior.
 - **Operational Benefits:** This design eliminates Thread.sleep-based polling and prevents thread pool starvation, reduces end-to-end tail latency during cache churn, and minimizes stampede risk while maintaining eventual freshness. It also simplifies capacity planning and allows the search path to degrade safely when external systems are impaired.
 - **Cache Invalidation:** Writers (publish/reschedule/cancel) invalidate or update the Redis key and, where necessary, emit events to the background refresher to eagerly repopulate critical search slices. Cache updates always reset both TTLs to maintain correct SWR semantics.
 - **Telemetry & Observability:** Instrument refresh attempts, lock acquisition rate, cache hit/stale/miss ratios, ES response latencies, and circuit-breaker state transitions. Alert on elevated lock contention, high stale-serving ratios, or prolonged circuit-open periods to drive operational responses.
@@ -544,7 +542,7 @@ sequenceDiagram
 - **Bulk Operations:** The API resolves all `registration_id` values with one workshop-scoped bulk fetch and then performs a single bulk upsert for pending inserts. This eliminates per-row database chatter, protects the PostgreSQL connection pool, and keeps the sync path stable under high concurrency.
 - **Workshop Boundary Enforcement:** Every read and write is constrained by `{workshopId}`, so a valid ticket from one workshop cannot be synchronized against another workshop. This closes the Cross-Workshop Ticket Spoofing gap at the data-access layer, not just at the endpoint layer.
 - **In-Memory Idempotent Filter:** The API classifies each fetched record in RAM before writing anything. Existing rows with the same `sync_id` are treated as `SUCCESS` for legitimate retries, while a different `sync_id` against the same `registration_id` is treated as `ALREADY_USED` for a real double scan.
-- **Pessimistic DB constraints with Returned Identifiers:** The system relies on database-level unique constraints and atomic upsert mechanisms provided by the storage engine. Bulk writes return the identifiers that were successfully persisted; the API reconciles this returned list against the attempted inserts. Any attempted insert missing from the returned set lost the micro-second race and is marked `ALREADY_USED`. This approach avoids relying on exception-based control flow and keeps the reconciliation deterministic.
+- **Pessimistic DB Constraints with Returned Identifiers:** The system relies on database-level unique constraints and atomic upsert mechanisms provided by the storage engine. Bulk writes return the identifiers that were successfully persisted; the API reconciles this returned list against the attempted inserts. Any attempted insert missing from the returned set lost the micro-second race and is marked `ALREADY_USED`. This approach avoids relying on exception-based control flow and keeps the reconciliation deterministic.
 - **Structured 207 Multi-Status Reconciliation:** The API returns a single `207 Multi-Status` payload with explicit `{ sync_id, status }` objects such as `SUCCESS`, `INVALID_TICKET`, and `ALREADY_USED`. The mobile client uses those exact status codes to reconcile local SQLite state without parsing free-form messages.
 
 ### Async AI Summarization Flow
@@ -557,7 +555,7 @@ sequenceDiagram
   participant Web as Web App
   participant API as Backend API
   participant DB as Neon PostgreSQL
-  participant S3 as Object Storage (MinIO Local)
+  participant S3 as Object Storage
   participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
   participant Worker as Background Workers
@@ -567,7 +565,7 @@ sequenceDiagram
   Organizer->>Web: Upload brochure PDF
   Web->>API: POST /workshops/{id}/brochure
   API->>S3: Store PDF
-  API->>DB: Create summary job + event publication
+  API->>DB: Create summary job (Status: PROCESSING) + event publication
   API-->>Web: 202 Accepted
 
   Registry->>Broker: Externalize summarization event
@@ -578,55 +576,61 @@ sequenceDiagram
   Worker->>AI: Summarize processed chunks
   alt Success
     AI-->>Worker: Summary
-    Worker->>DB: Store summary result
-  else Transient Error (Timeout/5xx)
-    AI-->>Worker: Error/Timeout
+    Worker->>DB: Update job (Status: COMPLETED, result)
+  else Transient Error (HTTP 429 / Timeout / 5xx)
+    AI-->>Worker: Error/Rate Limit/Timeout
     Worker-->>Broker: Retry with backoff
   else Max Retries Exceeded
-    Worker-->>DLQ: Route failed job for review
+    Worker->>DB: Update job (Status: FAILED)
+    Worker-->>Broker: Mark message unprocessable
+    Broker-->>DLQ: Route failed job for review
   end
 ```
 
-- **Decoupled processing:** The API persists the job and event publication entry, then returns 202 so heavy PDF processing runs asynchronously.
-- **Local preprocessing:** The worker extracts, cleans, and chunks text before calling the AI service to avoid oversized payloads and token limit errors.
-- **Fault tolerance:** Transient AI failures trigger backoff retries through the broker without blocking other jobs.
-- **Dead Letter Queue (DLQ):** Jobs that exceed retry limits are routed to the DLQ for manual review, keeping the main queue healthy.
+- **Decoupled Processing:** The API persists the job and event publication entry, then returns `202` so heavy PDF processing runs asynchronously.
+- **Local Preprocessing:** The worker extracts, cleans, and chunks text before calling the AI service to avoid oversized payloads and token limit errors.
+- **Job State Tracking:** The database explicitly tracks `PROCESSING`, `COMPLETED`, and `FAILED` states so the Web App can poll or subscribe via WebSockets/SSE and notify the Organizer when the summary is ready or has failed.
+- **Rate Limiting Resilience:** The worker treats AI provider `HTTP 429` responses the same as transient timeouts and `5xx` failures, using broker-backed backoff retries to absorb temporary throttling without losing the job.
+- **Dead Letter Queue (DLQ) and Failure Handling:** When max retries are exhausted, the worker marks the database job as `FAILED` before the broker routes the unprocessable payload to the DLQ. This prevents zombie `PROCESSING` jobs and frontend infinite loading while preserving the event for monitoring or manual replay by Ops.
 
 ### Nightly Legacy CSV Ingestion Flow
 
-This flowchart represents the nightly batch pipeline for legacy CSV ingestion. It uses chunk-oriented batch processing with bulk upserts to maximize throughput, quarantines invalid rows at row-level to avoid failing the job, and archives processed files to S3 with lifecycle policies for long-term retention and safe replay.
+This flowchart represents the nightly batch pipeline for legacy CSV ingestion. It follows Spring Batch semantics (ItemReader / ItemProcessor / ItemWriter), streams input to avoid OOM, stages rejects locally during chunk processing, and uploads reject artifacts to S3 on job completion for operational review.
 
 ```mermaid
 flowchart TD
   Scheduler[Scheduler] --> Job[Spring Batch Job]
   Legacy[Legacy Student System] --> S3[S3 CSV Drop]
-  Job --> Fetch[Fetch CSV from S3 Drop]
-  Fetch --> FileValidate{File-Level Validation}
+  Job --> FileValidate{"File-Level Validation (headers / size)"}
   FileValidate -->|Invalid| Abort[Abort Job]
   Abort --> Alert[Publish Alert]
-  FileValidate -->|Valid| Parse[Parse rows]
+  FileValidate -->|Valid| Stream[Stream CSV via S3 Object InputStream]
 
-  Parse --> RowValidate{Validate row}
-  RowValidate -->|Invalid| Quarantine[Quarantine row + error report]
-  Quarantine --> Parse
-  RowValidate -->|Valid| Dedup[Deduplicate]
-  Dedup --> Chunk[Add to Chunk]
-  Chunk -->|Chunk Full| BulkUpsert[Bulk Upsert to PostgreSQL]
-  BulkUpsert --> Parse
+  Stream --> ItemReader["ItemReader (streaming rows)"]
+  ItemReader --> ItemProcessor["ItemProcessor (validate / dedupe intra-chunk)"]
+  ItemProcessor -->|Invalid Row| WriteReject["WriteReject: write invalid row to local disk (/tmp/rejects.csv)"]
+  WriteReject --> ItemProcessor
+  ItemProcessor -->|Valid Row| Chunk[Add row to in-memory chunk buffer]
+  Chunk -->|Chunk Full| ItemWriter[ItemWriter: Bulk Upsert to persistent store]
+  ItemWriter --> Commit["Commit Transaction & Update JobRepository (chunk offset)"]
+  Commit --> ItemReader
 
-  Parse -->|All rows processed| Archive[Archive file in S3]
+  ItemReader -->|All rows processed| UploadReject[Upload local /tmp/rejects.csv to S3]
+  UploadReject --> Archive[Archive original file in S3]
   Archive --> Complete[Job complete with metrics]
-  Complete --> Publish[Publish Job Summary to RabbitMQ]
+  Complete --> Publish["Publish Job Summary to RabbitMQ (include reject file S3 link)"]
   Publish --> Notify[Notify Admins]
 ```
 
-- **File-level guardrails:** Header and size validation prevents corrupted or malformed uploads from crashing the batch job.
-- **Chunk-oriented processing:** Valid rows are buffered and upserted in bulk to maximize throughput and avoid connection exhaustion.
-- **Fault tolerance & quarantining:** Invalid rows are isolated into a quarantine report while the job continues.
-- **Archiving strategy:** Processed files are moved to an archive folder to prevent accidental reprocessing.
-- **Proactive alerting:** Job summaries (success and quarantined counts) are published to RabbitMQ to notify administrators.
+- **File-level Guardrails:** Validate headers, required columns, and size limits before streaming. Invalid files are rejected immediately to avoid partial processing and wasted compute.
+- **Streaming File Reader:** The pipeline streams the CSV from S3 via an Object InputStream into the Spring Batch `ItemReader`, ensuring a flat memory footprint and eliminating OOM risk for large files.
+- **ItemReader / ItemProcessor / ItemWriter:** The job follows Spring Batch patterns: `ItemReader` streams rows, `ItemProcessor` validates and performs intra-chunk deduplication, and `ItemWriter` performs bulk upserts for committed chunks.
+- **Persistent Quarantine (Local Staging then Upload):** Reject rows are appended to a local ephemeral file (for example `/tmp/rejects.csv`) during chunk processing. After the job completes, the worker uploads the reject file to S3 in a single PUT operation; the job notification includes the S3 link for ops to review. This avoids unsupported S3 append operations.
+- **Chunk Commit & JobRepository (Restartability):** Transactions and chunk offsets are committed at the chunk boundary. If the pod crashes after chunk N, the next execution resumes at chunk N+1 based on JobRepository state, preventing duplicate processing.
+- **Intra-chunk Deduplication vs Bulk Upsert:** The `ItemProcessor` de-duplicates rows within the chunk in-memory to avoid intra-chunk constraint conflicts; the `ItemWriter` uses atomic bulk upserts to safely handle inter-chunk duplicates.
+- **Archiving & Retention:** Processed files and reject artifacts are archived in S3 and subject to lifecycle policies; job summaries include direct links to reject artifacts for remediation.
 
-## 4. Access Control Design
+## 5. Access Control Design
 
 ### RBAC Model & User Personas
 
@@ -638,7 +642,7 @@ We use **Role-Based Access Control (RBAC)** with role claims enforced at the API
 | `ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
 | `STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
 
-Database roles and Spring Security authorities are stored and processed strictly as plain domain values. The authentication layer **does not** prepend `ROLE_` when issuing JWTs or constructing authorities.
+Database roles and Spring Security authorities are stored and processed strictly as plain domain values. The authentication layer does not add a prefix when issuing JWTs or constructing authorities; roles are represented and evaluated in ALL CAPS.
 
 ### Stateless JWT & Role Claims
 
@@ -703,7 +707,7 @@ sequenceDiagram
 - **Layer 2 (Endpoint Gating):** The API gateway and Spring Security boundary require a `ORGANIZER` claim for `PUT /workshops/{id}`.
 - **Layer 3 (Data Gating):** The service enforces ownership by matching `workshops.organizer_id` with `jwt.sub`, preventing IDOR attacks.
 
-## 5. System Protection Mechanisms
+## 6. System Protection Mechanisms
 
 ### Traffic Spike Management
 
