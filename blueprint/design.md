@@ -259,7 +259,7 @@ sequenceDiagram
   Organizer->>Web: Click "Publish Workshop"
   Web->>GW: PATCH /api/v1/workshops/{id}/publish
   GW->>API: Forward Request
-  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
     DB-->>API: Ownership mismatch
     API-->>GW: 403 Forbidden
@@ -286,7 +286,7 @@ sequenceDiagram
   Organizer->>Web: Click "Save Changes"
   Web->>GW: PUT /api/v1/workshops/{id}
   GW->>API: Forward Request
-  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
     DB-->>API: Ownership mismatch
     API-->>GW: 403 Forbidden
@@ -329,7 +329,7 @@ sequenceDiagram
   Organizer->>Web: Change Date/Time & Click "Reschedule"
   Web->>GW: PATCH /api/v1/workshops/{id}/reschedule
   GW->>API: Forward Request
-  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
     DB-->>API: Ownership mismatch
     API-->>GW: 403 Forbidden
@@ -372,7 +372,7 @@ sequenceDiagram
   Organizer->>Web: Click "Cancel Workshop"
   Web->>GW: PATCH /api/v1/workshops/{id}/cancel
   GW->>API: Forward Request
-  API->>DB: Verify ownership (organizer_id == jwt.sub)
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
     DB-->>API: Ownership mismatch
     API-->>GW: 403 Forbidden
@@ -425,7 +425,7 @@ sequenceDiagram
 ```
 
 - **State Machine Enforcement:** The system enforces strict transitions: `DRAFT` -> `PUBLISHED` -> `COMPLETED`/`CANCELED`. Once a workshop reaches a terminal state (`COMPLETED` or `CANCELED`), the API layer strictly blocks any further mutations and returns `422 Unprocessable Entity` for attempts to modify the record.
-- **Data Ownership & Core Validation:** Modification endpoints validate `jwt.sub` against the workshop's `organizer_id` prior to mutation (skipped for `Create`). The `PUT`/`PATCH` handlers dynamically evaluate the current status: full updates are allowed while in `DRAFT`; once `PUBLISHED`, core fields (for example `price`) are immutable and any attempt to change them or reduce capacity below current registrations is rejected with `422 Unprocessable Entity` to protect active attendees.
+- **Data Ownership & Core Validation:** Modification endpoints validate `jwt.org` against `workshop.organization_id` to enforce logical multi-tenancy (skipped for `Create`). Any ORGANIZER within the same organization can manage its workshops. The `PUT`/`PATCH` handlers dynamically evaluate the current status: full updates are allowed while in `DRAFT`; once `PUBLISHED`, core fields (for example `price`) are immutable and any attempt to change them or reduce capacity below current registrations is rejected with `422 Unprocessable Entity` to protect active attendees.
 - **Automated Event Completion Sweeper:** A dedicated `Sweeper` cron component runs hourly. It queries the database for expired `PUBLISHED` workshops, marks them `COMPLETED`, and writes `WorkshopCompletedEvent` entries into the transactional outbox for downstream processing.
 - **Granular Asynchronous Branching:** The `Registry` component (not the API) extracts committed outbox rows and externalizes them to the message broker. Background workers synchronize to Elasticsearch on publication, updates, rescheduling, and completion events (keeping `DRAFT` items completely isolated); mass notification flows are executed only for disruptive events (Rescheduled, Canceled).
 - **Strict Reschedule Guarantees:** The reschedule endpoint is explicitly blocked for `DRAFT`, `COMPLETED`, or `CANCELED` states. Rescheduling requires a `PUBLISHED` workshop, validates that proposed times are future and form a valid range, and runs a PostgreSQL-level resource collision check (location and speaker availability) to prevent double-booking. Any validation failure returns `422 Unprocessable Entity` and the transaction is not committed.
@@ -632,21 +632,17 @@ flowchart TD
 
 ## 5. Access Control Design
 
-### RBAC Model & User Personas
+### RBAC Model & Logical Multi-Tenancy
 
-We use **Role-Based Access Control (RBAC)** with role claims enforced at the API and UI layers.
+We use **Role-Based Access Control (RBAC)** with three roles:
 
-| Role        | Access Rights                                                                                      |
-| :---------- | :------------------------------------------------------------------------------------------------- |
-| `STUDENT`   | View published workshops, register for workshops, view their own QR codes.                         |
-| `ORGANIZER` | Create/update/cancel workshops, upload PDF brochures, view attendee lists for their own workshops. |
-| `STAFF`     | View workshop details assigned to them and submit offline check-in sync batches.                   |
+- **STUDENT:** Browse workshops, register, and access their own QR codes.
+- **ORGANIZER:** Create and manage workshops for their organization, including publishing, rescheduling, and cancellations.
+- **STAFF:** Perform check-ins only for workshops they are explicitly assigned to.
 
-Database roles and Spring Security authorities are stored and processed strictly as plain domain values. The authentication layer does not add a prefix when issuing JWTs or constructing authorities; roles are represented and evaluated in ALL CAPS.
+The system enforces **Logical Multi-Tenancy** that each workshop belongs to an `organization_id` (for example, a Faculty). Authorization is scoped to the organization, not an individual user, so any `ORGANIZER` in the same organization can administer that organization's workshops.
 
-### Stateless JWT & Role Claims
-
-The API Gateway and Backend Services do not query PostgreSQL for permissions on every request. They trust a cryptographically signed JWT and perform `O(1)` authorization checks using the embedded role claim.
+JWTs are strictly signed using **Asymmetric Cryptography (for example, RS256)**. The core Identity/Auth module securely holds the **private key** and generates signed JWTs during login; verifiers only need the public key.
 
 **Example decoded JWT payload:**
 
@@ -654,30 +650,35 @@ The API Gateway and Backend Services do not query PostgreSQL for permissions on 
 {
   "sub": "1b8f8c7b-2e4b-4f6c-9b3b-6b8d2f0c9a12",
   "role": "ORGANIZER",
+  "org": "b4d3f9b7-1c2a-4b8d-9e61-2e5f6a7b8c90",
+  "jti": "9c1f6c23-0f5d-4f8b-9f51-2d5f3a2f1d9e",
   "iat": 1767225600,
-  "exp": 1767229200,
-  "jti": "9c1f6c23-0f5d-4f8b-9f51-2d5f3a2f1d9e"
+  "exp": 1767229200
 }
 ```
 
-- **Client usage (React / React Native):** The client decodes the role claim to drive the UI, such as hiding the "Create Workshop" action for STUDENT.
-- **Server usage (Spring Boot):** The API enforces access via the role claim using authority checks (for example, `@PreAuthorize("hasAuthority('ORGANIZER')")`) and uses `sub` for row-level ownership checks.
+The `jti` claim is mandatory to support secure logout and token revocation. Revoked tokens are blocked by storing their `jti` in a Redis blacklist and checking it on every request.
+
+### Account Provisioning & Security
+
+- **Bootstrapping:** Root organizations and initial root `ORGANIZER` accounts are seeded from JSON arrays defined in environment variables (for example, values loaded from a `.env` configuration). On startup, a Spring Boot initializer (for example, `ApplicationRunner`) parses the JSON, checks the database for existing organizations and accounts, and creates only missing records (idempotent). This avoids migration failures and allows new root tenants to be added by updating the environment configuration.
+- **Delegated Creation & Zero-Trust:** When an `ORGANIZER` creates `STAFFs` or invites other `ORGANIZERs`, they cannot set passwords. The system generates a temporary password, emails it directly to the new user, and sets `is_temporary_password = true` to enforce a reset on first login.
+- **Explicit Staff Assignment:** `STAFF` access is scoped by explicit assignment. A bridging table (for example, `workshop_assignments`) maps `STAFF` to specific workshops; unassigned `STAFF` cannot scan or sync attendance for other workshops, even within the same organization.
 
 ### Multi-Layer Enforcement Points
 
-- **Layer 1: UI/Client Layer (React & Mobile):** The client decodes the JWT to gate UI elements (hide menus, disable routes) for user experience. This improves UX but is not a security control.
-- **Layer 2: API Gateway & Controller Layer (Endpoint Security):** Requests are intercepted, JWT signatures are verified, and endpoint access is enforced by role claims (for example, `@PreAuthorize`). This blocks a Student from calling Organizer endpoints directly.
-- **Layer 3: Business/Data Layer (Data Ownership):** Services enforce ownership checks beyond role validation. For example, `PUT /workshops/{id}` verifies `ORGANIZER` and confirms `workshops.organizer_id == jwt.sub` to prevent cross-tenant tampering.
+- **Layer 1 (UI):** Client-side gating hides or disables restricted actions based on the JWT role for user experience only.
+- **Layer 2 (API Gateway & Security):** The gateway verifies the JWT signature using the system's public key (typically exposed via a JWKS endpoint), checks the Redis blacklist for the `jti`, and enforces role claims on endpoints.
+- **Layer 3 (Data Gating):** The service layer enforces logical multi-tenancy by requiring `workshop.organization_id == jwt.org` on every mutable workshop operation.
 
-### Authorization Sequence Diagram
-
-This diagram illustrates the defense-in-depth strategy using an Organizer attempting to edit a workshop, showing how each layer prevents unauthorized access.
+**Authorization Sequence Diagram:**
 
 ```mermaid
 sequenceDiagram
   actor Organizer
   participant Web as Web App
   participant API as API Gateway / Spring Security
+  participant Redis as Redis (Token Revocation)
   participant Service as Workshop Service
   participant DB as Neon PostgreSQL
 
@@ -686,15 +687,17 @@ sequenceDiagram
     Web-->>Organizer: Block action (UI error)
   else Role ORGANIZER
     Web->>API: PUT /workshops/{id} (JWT)
-    alt JWT invalid or role not allowed (Layer 2)
+    API->>API: Verify JWT signature using Public Key & enforce role
+    API->>Redis: Check jti blacklist
+    alt JWT invalid or revoked (Layer 2)
       API-->>Web: 403 Forbidden
-    else JWT valid and role allowed
+    else JWT valid and allowed
       API->>Service: Forward request
       Service->>DB: Load workshop by id
-      alt organizer_id != jwt.sub (Layer 3)
+      alt organization_id != jwt.org (Layer 3)
         Service-->>API: 403 Forbidden
         API-->>Web: 403 Forbidden
-      else organizer_id == jwt.sub
+      else organization_id == jwt.org
         Service->>DB: Update workshop
         Service-->>API: 200 OK
         API-->>Web: 200 OK
@@ -703,9 +706,12 @@ sequenceDiagram
   end
 ```
 
-- **Layer 1 (UX/UI Gating):** Provides immediate feedback and hides restricted features from unauthorized users, but is cosmetic and can be bypassed.
-- **Layer 2 (Endpoint Gating):** The API gateway and Spring Security boundary require a `ORGANIZER` claim for `PUT /workshops/{id}`.
-- **Layer 3 (Data Gating):** The service enforces ownership by matching `workshops.organizer_id` with `jwt.sub`, preventing IDOR attacks.
+### Offline PKI & Cryptography
+
+The backend securely holds the private key used to sign QR codes. QR payloads are signed server-side and verified offline by the mobile app to prevent forged tickets.
+
+- **Key Distribution:** When a `STAFF` member logs in online, the API returns the latest public key. The mobile app stores this key locally (SQLite or secure storage) and uses it to verify signatures while offline.
+- **Key Rotation**: Rotating the signing key invalidates compromised signatures globally while allowing the platform to distribute the new public key on the next authenticated session.
 
 ## 6. System Protection Mechanisms
 
@@ -752,7 +758,7 @@ stateDiagram-v2
 Client retries caused by network drops or impatient clicks can create duplicate `POST /registrations` requests, risking double-booking or double-charging. The system enforces exactly-once processing with an idempotency key strategy backed by PostgreSQL.
 
 - **Key generation and transmission:** The React / React Native client generates a UUIDv4 and sends it in the `Idempotency-Key` header.
-- **Storage and duplicate detection:** The backend stores keys in `IDEMPOTENCY_KEYS` with a `UNIQUE` constraint, creating a database-level barrier against race conditions.
+- **Storage and duplicate detection:** The backend stores keys in `idempotency_keys` with a `UNIQUE` constraint, creating a database-level barrier against race conditions.
 - **Workflow:** On the first attempt, the key is inserted, the payment is processed, and the final response payload is serialized and stored with the key. On a retry, the API finds the existing key and immediately returns the cached response, bypassing the payment gateway and write logic.
 - **TTL configuration:** Each key includes an `expires_at` timestamp (for example, 24 hours), and a scheduled cleanup job deletes expired records to prevent table bloat.
 
