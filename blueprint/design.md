@@ -99,9 +99,7 @@ The system architecture is organized into a strict tiered structure to distribut
 
 ### Workshop Registration Flow
 
-The workshop registration process is designed to handle high-concurrency registration spikes (up to 12,000 requests within a 10-minute window) while ensuring strict zero-overbooking and exactly-once processing guarantees.
-
-**Registration statuses:**
+The workshop registration process is designed to handle high-concurrency registration spikes (up to 12,000 requests within a 10-minute window). To achieve this it combines distributed Token-Bucket rate limiting (Bucket4j + Redis) at the gateway, lock-free Redis atomic capacity pre-checks to avoid database contention, and a strict idempotency lifecycle tightly integrated with payment confirmation to guarantee exactly-once processing and prevent double-booking.
 
 - `PENDING`: Temporary reservation. Slot is deducted in Redis, and the system is awaiting a synchronous payment callback, an asynchronous webhook, or a background reconciliation sweep.
 - `CONFIRMED`: Fully finalized registration. The seat is permanently locked in the database, the transaction is verified, and the check-in QR code is activated.
@@ -225,7 +223,7 @@ sequenceDiagram
 
 ### Workshop Lifecycle Management Flow
 
-This sequence captures the admin-driven workshop lifecycle and the event-driven propagation of changes to downstream services.
+This sequence captures the admin-driven workshop lifecycle and the event-driven propagation of changes to downstream services. The flow enforces a strict workshop state machine (`DRAFT`-> `PUBLISHED` -> `COMPLETED`/`CANCELED`), applies ownership and RBAC validations at mutation boundaries, and uses a Transactional Outbox pattern to reliably publish domain events only after successful commits.
 
 **Workshop statuses:**
 
@@ -243,7 +241,7 @@ sequenceDiagram
   participant DB as Neon PostgreSQL
   participant Sweeper as Cron Sweeper
   participant Registry as Spring Modulith Event Registry
-  participant Broker as Message Broker (RabbitMQ)
+  participant Broker as RabbitMQ
   participant Worker as Background Workers
   participant ES as Elasticsearch
   participant Notify as Notification Providers
@@ -428,69 +426,76 @@ sequenceDiagram
   Note over API,ES: DRAFT records are never synchronized to Elasticsearch and generate no external events until transition to PUBLISHED
 ```
 
-- **State Machine Enforcement:** The system enforces strict transitions: `DRAFT` -> `PUBLISHED` -> `COMPLETED` or `CANCELED`. Once a workshop reaches a terminal state (`COMPLETED` or `CANCELED`), the API layer strictly blocks any further mutations and returns `422 Unprocessable Entity` for attempts to modify the record.
+- **State Machine Enforcement:** The system enforces strict transitions: `DRAFT` -> `PUBLISHED` -> `COMPLETED`/`CANCELED`. Once a workshop reaches a terminal state (`COMPLETED` or `CANCELED`), the API layer strictly blocks any further mutations and returns `422 Unprocessable Entity` for attempts to modify the record.
 - **Data Ownership & Core Validation:** Modification endpoints validate `jwt.sub` against the workshop's `organizer_id` prior to mutation (skipped for `Create`). The `PUT`/`PATCH` handlers dynamically evaluate the current status: full updates are allowed while in `DRAFT`; once `PUBLISHED`, core fields (for example `price`) are immutable and any attempt to change them or reduce capacity below current registrations is rejected with `422 Unprocessable Entity` to protect active attendees.
 - **Automated Event Completion Sweeper:** A dedicated `Sweeper` cron component runs hourly. It queries the database for expired `PUBLISHED` workshops, marks them `COMPLETED`, and writes `WorkshopCompletedEvent` entries into the transactional outbox for downstream processing.
-- **Granular Asynchronous Branching:** The `Registry` component (not the API) extracts committed outbox rows and externalizes them to the message broker. Background workers synchronize to Elasticsearch on publication, updates, rescheduling, and completion events (keeping `DRAFT` items completely isolated); mass notification flows are executed only for disruptive events (`RESCHEDULED`, `CANCELED`).
+- **Granular Asynchronous Branching:** The `Registry` component (not the API) extracts committed outbox rows and externalizes them to the message broker. Background workers synchronize to Elasticsearch on publication, updates, rescheduling, and completion events (keeping `DRAFT` items completely isolated); mass notification flows are executed only for disruptive events (Rescheduled, Canceled).
 - **Strict Reschedule Guarantees:** The reschedule endpoint is explicitly blocked for `DRAFT`, `COMPLETED`, or `CANCELED` states. Rescheduling requires a `PUBLISHED` workshop, validates that proposed times are future and form a valid range, and runs a PostgreSQL-level resource collision check (location and speaker availability) to prevent double-booking. Any validation failure returns `422 Unprocessable Entity` and the transaction is not committed.
 
 ### Workshop Search & Cache-Aside Flow
 
+This flow offloads full-text search to Elasticsearch following a CQRS pattern that the Core Backend remains the authoritative source while background workers maintain the ES read model. The API implements a non-blocking Stale-While-Revalidate cache-aside strategy with dual soft/hard TTLs and a circuit-breaker-protected synchronous fallback to Elasticsearch, ensuring the Tomcat thread pool is never exhausted during large-scale traffic spikes.
+
 ```mermaid
 sequenceDiagram
-  actor Client as Student
+  actor Student as Student
   participant GW as API Gateway
   participant API as Core Backend Monolith
   participant Cache as Redis
   participant ES as Elasticsearch
+  participant Refresher as Async Refresher
 
-  Client->>GW: GET /api/v1/workshops/search?q={keyword}
+  Student->>GW: GET /api/v1/workshops/search?q={keyword}
   GW->>API: Forward Search Request
-  API->>Cache: Get cached search results (Key: search:q:{keyword})
-  alt Cache Hit
-    Cache-->>API: Return serialized JSON results
+  API->>Cache: GET search:q:{keyword}
+  Cache-->>API: Return {data, soft_ttl, hard_ttl} or Null
+
+  alt Cache Hit - Fresh (soft_ttl valid)
     API-->>GW: 200 OK (Cached Content)
-    GW-->>Client: 200 OK (Populate Search UI)
-  else Cache Miss
-    Cache-->>API: Null / Cache Miss
-    API->>Cache: Acquire Distributed Lock with TTL (e.g., 5s)
-    alt Lock Acquired (Leader Thread)
-      API->>ES: Execute Full-Text Search Query (Query DSL)
-      ES-->>API: Return matched workshop documents & scores
-      API->>Cache: Set search result cache with TTL (e.g., 5m)
-      API->>Cache: Release Distributed Lock
+    GW-->>Student: 200 OK (Populate Search UI)
+
+  else Cache Hit - Stale (soft_ttl expired, hard_ttl valid)
+    API-->>GW: 200 OK (Stale Cached Content)
+    GW-->>Student: 200 OK (Populate Search UI)
+    API->>Refresher: Launch async refresh task (fire-and-forget)
+    Refresher->>Cache: Try acquire lock (tryLock non-blocking)
+    alt Lock Acquired
+      Refresher->>ES: Query Elasticsearch (fresh data)
+      ES-->>Refresher: Return results
+      Refresher->>Cache: Update cache with new data, reset soft_ttl & hard_ttl
+      Refresher->>Refresher: Release lock
+    else Lock Denied
+      Refresher-->>API: No-op (another refresher is updating)
+    end
+
+  else Cache Miss / Hard TTL expired
+    API->>API: Query Elasticsearch synchronously (wrapped in Circuit Breaker)
+    alt ES Success
+      API->>Cache: Set cache with data, set soft_ttl & hard_ttl
       API-->>GW: 200 OK (Fresh Content)
-      GW-->>Client: 200 OK (Populate Search UI)
-    else Lock Denied (Follower Threads)
-      loop Polling (e.g., max 5 attempts, 50ms interval)
-        API->>API: Thread sleep (50ms)
-        API->>Cache: Get cached search results
-        Cache-->>API: Return result (Data or Null)
-        alt Cache Populated (by Leader)
-          API-->>GW: 200 OK (Cached Content)
-          GW-->>Client: 200 OK (Populate Search UI)
-        end
-      end
-      API->>API: Check if cached data is still Null after max retries
-      alt Cache still Null (Leader Timeout)
-        API-->>GW: 504 Gateway Timeout
-        GW-->>Client: 504 Gateway Timeout (Please retry)
-      end
+      GW-->>Student: 200 OK (Populate Search UI)
+    else ES Failure or Circuit Open
+      API-->>GW: 200 OK (Safe Default: Empty Result Set)
+      GW-->>Student: 200 OK (Empty Search Results)
     end
   end
 ```
 
-- **Offloading the Transactional Database:** Full-text search is fully decoupled from PostgreSQL. The primary ACID database no longer performs `to_tsvector` searches; instead Elasticsearch serves as the dedicated CQRS read model, protecting Neon PostgreSQL from high-volume read traffic and heavy text vector processing.
-- **Multi-Tiered Performance Optimization:** The system implements a Cache-Aside pattern where Redis is the first line of defense for sub-millisecond reads. On a cache miss the API falls back to Elasticsearch Query DSL for powerful, typo-tolerant full-text queries and scoring across large datasets, providing sub-second responses under high concurrency.
-- **Cache Invalidation and TTL Strategy:** Search results are cached in Redis with a strict TTL (e.g., 5 minutes) to balance freshness with throughput protection. To prevent "Cache Stampedes" (the Thundering Herd problem) when the TTL expires under heavy load, the system employs a Redis-backed Distributed Lock with a Spin-lock/Polling mechanism for follower threads. On a cache miss, only a single leader thread queries Elasticsearch while concurrent follower threads utilize a polling loop (retrying up to 5 times with a 50ms interval) to repeatedly check the cache until the leader successfully populates it, eliminating race conditions and ensuring stability even during unpredictable search engine latency spikes. Furthermore, the distributed lock is assigned a short TTL (e.g., 5 seconds) to guarantee the system recovers from leader thread crashes, preventing irreversible deadlocks. If follower threads exhaust their polling limits without receiving data, they are designed to fail-fast with a 504 Gateway Timeout rather than hanging the client connection, ensuring predictable degradation. Eviction and invalidation strategies are employed when content changes (publish/reschedule/cancel) to keep read-models consistent.
+- **Stale-While-Revalidate (SWR) Pattern:** The API returns cached results immediately whenever possible. If data is stale (soft TTL expired) but within a permissible hard TTL, the system returns the stale payload instantly and triggers an asynchronous refresh. This non-blocking SWR approach prevents request threads from waiting on backend refreshes and avoids exhausting the Tomcat thread pool during surges (12,000+ concurrent users).
+- **Dual TTL Semantics:** Cache entries contain a soft TTL (short, e.g., 5 minutes) and a hard TTL (longer, e.g., 24 hours). The soft TTL controls freshness for immediate revalidation decisions; the hard TTL bounds how long stale data may be served before requiring a synchronous circuit-protected fetch from Elasticsearch.
+- **Non-blocking Refresh with `tryLock`:** Stale responses initiate a fire-and-forget background task that attempts a non-blocking `tryLock` in Redis. Only the task that obtains the lock performs the expensive ES query and writes the updated payload and new TTLs. If the lock is denied, the refresher does nothing - avoiding any synchronous follower blocking or spin-waiting on application request threads.
+- **Circuit Breaker & Graceful Degradation:** Any synchronous call to Elasticsearch (cache miss or hard TTL expiry) is protected by a Resilience4j-like Circuit Breaker and appropriate timeouts. On ES timeouts or when the circuit is `OPEN`, the API returns a safe default (empty result set) instead of a 5xx error, ensuring graceful degradation and predictable client behavior.
+- **Operational Benefits:** This design eliminates Thread.sleep-based polling and prevents thread pool starvation, reduces end-to-end tail latency during cache churn, and minimizes stampede risk while maintaining eventual freshness. It also simplifies capacity planning and allows the search path to degrade safely when external systems are impaired.
+- **Cache Invalidation:** Writers (publish/reschedule/cancel) invalidate or update the Redis key and, where necessary, emit events to the background refresher to eagerly repopulate critical search slices. Cache updates always reset both TTLs to maintain correct SWR semantics.
+- **Telemetry & Observability:** Instrument refresh attempts, lock acquisition rate, cache hit/stale/miss ratios, ES response latencies, and circuit-breaker state transitions. Alert on elevated lock contention, high stale-serving ratios, or prolonged circuit-open periods to drive operational responses.
 
 ### Offline Check-in & Synchronization Flow
 
-This sequence illustrates offline capture, local persistence, and server-authoritative reconciliation that prevents duplicate attendance records.
+This sequence illustrates offline capture, local persistence, and server-authoritative reconciliation. It enforces zero-trust by verifying QR signatures on-device, then reconciles sync batches using workshop-scoped bulk fetch and bulk upsert operations to eliminate N+1 queries. Database-level unique constraints and atomic upsert mechanisms deterministically resolve micro-second double-scan races.
 
 ```mermaid
 sequenceDiagram
-  actor Staff as Event Staff
+  actor Staff as Check-in Staff
   participant Mobile as Mobile App
   participant GW as API Gateway
   participant API as Core Backend Monolith
@@ -505,48 +510,46 @@ sequenceDiagram
   end
   Mobile->>GW: POST /api/v1/workshops/{workshopId}/attendances/sync (Batch Array)
   GW->>API: Forward Sync Request
-  API->>API: Validate JWT Role & Staff permission for {workshopId}
+  API->>API: Validate JWT Role (STAFF) and permission for {workshopId}
   alt Unauthorized
     API-->>GW: 403 Forbidden
     GW-->>Mobile: 403 Forbidden
     Mobile->>Mobile: Show authorization error
   else Authorized
-    loop For each record in Batch
-      API->>DB: Verify registration_id exists and status == CONFIRMED
-      DB-->>API: Registration State
-      alt Invalid Registration (Canceled/Not Found)
-        API->>API: Append 'Rejected (Invalid Ticket)' to response array
-      else Valid Registration
-        API->>DB: Check for existing check-in by sync_id OR registration_id
-        DB-->>API: Existing record(s) state
-        alt sync_id exists (Network Retry / Idempotent Hit)
-          API->>API: Append 'Success (Already Synced)' to response
-        else registration_id already checked in (Multi-device collision)
-          API->>API: Append 'Rejected (Ticket Already Used)' to response
-        else New Check-in
-          API->>DB: Insert Check-in Record
-          DB-->>API: Inserted
-          API->>API: Append 'Success' to response array
-        end
+    API->>API: Extract registration_id values from batch payload
+    API->>DB: Bulk fetch ticket status & existing sync history (scoped by registration IDs and {workshopId})
+    DB-->>API: Bulk fetch results
+    loop For each fetched registration
+      alt Not found or status != CONFIRMED
+        API->>API: Mark INVALID_TICKET
+      else Existing attendance and existing_sync_id == payload_sync_id
+        API->>API: Mark SUCCESS
+      else Existing attendance and existing_sync_id != payload_sync_id
+        API->>API: Mark ALREADY_USED
+      else No attendance row
+        API->>API: Add registration_id to in_memory_pending_list
       end
     end
-    API-->>GW: 200 OK / 207 Multi-Status (Array of Results)
-    GW-->>Mobile: 200 OK / 207 Multi-Status
-    Mobile->>Mobile: Bulk Update SQLite (Mark Synced/Rejected)
+    API->>DB: Bulk insert pending check-ins using atomic upsert mechanism, return successfully persisted registration IDs
+    DB-->>API: Returned registration_id list (successful inserts)
+    API->>API: Reconcile in_memory_pending_list against returned list, any missing IDs are marked ALREADY_USED
+    API->>API: Build structured response array of { sync_id, status }
+    API-->>GW: 207 Multi-Status
+    GW-->>Mobile: 207 Multi-Status
+    Mobile->>Mobile: Bulk Update SQLite using status codes
   end
 ```
 
-- **Offline-first capture:** The mobile app records scans locally to keep check-in operational during network drops.
-- **Gateway-routed synchronization:** When connectivity returns, the mobile app submits sync batches through the API Gateway (Nginx), enabling centralized TLS termination, perimeter controls, and rate limiting before traffic reaches the Core Backend Monolith.
-- **Role-based security guard:** The backend explicitly validates cryptographically-signed JWT claims (signed using the system's Asymmetric Private Key) and enforces that only `STAFF` or `ORGANIZER` roles can submit check-in payloads; unauthorized callers are rejected with `403 Forbidden`.
-- **Asymmetric Cryptography for Offline Authentication:** To prevent ticket forgery in a disconnected environment, the system utilizes a Public/Private Key Pair. The Core Backend signs the QR code payload (containing the `registration_id`) using its Private Key. The Check-in Mobile App securely stores the corresponding Public Key. During offline scanning, the app cryptographically verifies the signature to instantly drop forged tickets. This delegates the Proof of Issuance to the offline device, while the backend later handles the Proof of Validity (cancellations and ticket sharing) during the online batch synchronization.
-- **HTTP bulk consistency pattern:** The mobile client sends an array of records in one request, the API processes each record iteratively against PostgreSQL idempotency checks, and the server returns one unified `200/207` array response, preventing fragmented per-row HTTP replies.
-- **Registration Integrity Validation (Zero-Trust Offline Payload):** Because offline mobile payloads are inherently untrusted, the API does not blindly accept check-ins. During batch synchronization, the backend strictly verifies the embedded `registration_id` from the QR code against the authoritative database. If a student attempts to use a forged QR code or a ticket that was explicitly canceled or refunded (status != `CONFIRMED`), the backend silently rejects that specific record within the batch, ensuring absolute on-site security and accurate attendance reconciliation.
-- **Multi-Device Collision & Double-Scan Prevention:** In an offline-first environment, a student might share their QR code with another person and both could be scanned by different staff devices while offline. When batches are synced, the API checks both the `sync_id` and the `registration_id`. If the `sync_id` already exists, it is treated as a network retry and returned as success to clear the mobile queue. If a different `sync_id` attempts to claim an already-used `registration_id`, the backend identifies the collision and silently rejects the anomalous record, enforcing one-ticket-one-entry at the point of reconciliation.
+- **Zero-Trust Offline Payload:** The mobile app verifies the QR signature locally before any record is queued for synchronization. This blocks forged tickets at the edge and ensures the backend only reconciles payloads that were cryptographically issued by the platform.
+- **Bulk Operations:** The API resolves all `registration_id` values with one workshop-scoped bulk fetch and then performs a single bulk upsert for pending inserts. This eliminates per-row database chatter, protects the PostgreSQL connection pool, and keeps the sync path stable under high concurrency.
+- **Workshop Boundary Enforcement:** Every read and write is constrained by `{workshopId}`, so a valid ticket from one workshop cannot be synchronized against another workshop. This closes the Cross-Workshop Ticket Spoofing gap at the data-access layer, not just at the endpoint layer.
+- **In-Memory Idempotent Filter:** The API classifies each fetched record in RAM before writing anything. Existing rows with the same `sync_id` are treated as `SUCCESS` for legitimate retries, while a different `sync_id` against the same `registration_id` is treated as `ALREADY_USED` for a real double scan.
+- **Pessimistic DB constraints with Returned Identifiers:** The system relies on database-level unique constraints and atomic upsert mechanisms provided by the storage engine. Bulk writes return the identifiers that were successfully persisted; the API reconciles this returned list against the attempted inserts. Any attempted insert missing from the returned set lost the micro-second race and is marked `ALREADY_USED`. This approach avoids relying on exception-based control flow and keeps the reconciliation deterministic.
+- **Structured 207 Multi-Status Reconciliation:** The API returns a single `207 Multi-Status` payload with explicit `{ sync_id, status }` objects such as `SUCCESS`, `INVALID_TICKET`, and `ALREADY_USED`. The mobile client uses those exact status codes to reconcile local SQLite state without parsing free-form messages.
 
 ### Async AI Summarization Flow
 
-This sequence shows the asynchronous pipeline for PDF processing using the Spring Modulith event publication registry and brokered workers, including error handling when the AI service is unavailable.
+This sequence shows the asynchronous pipeline for PDF processing using Spring Modulith event publication and brokered workers. The design decouples heavy AI workloads from the core API via event-driven handoff, performs local extraction and chunking to bound payload sizes, and relies on broker retries plus a Dead Letter Queue (DLQ) for fault-tolerant processing and operational visibility.
 
 ```mermaid
 sequenceDiagram
@@ -591,7 +594,7 @@ sequenceDiagram
 
 ### Nightly Legacy CSV Ingestion Flow
 
-This flowchart represents the nightly batch pipeline, showing fault-tolerant parsing, validation, and row-level quarantine without failing the entire job.
+This flowchart represents the nightly batch pipeline for legacy CSV ingestion. It uses chunk-oriented batch processing with bulk upserts to maximize throughput, quarantines invalid rows at row-level to avoid failing the job, and archives processed files to S3 with lifecycle policies for long-term retention and safe replay.
 
 ```mermaid
 flowchart TD
@@ -660,7 +663,7 @@ The API Gateway and Backend Services do not query PostgreSQL for permissions on 
 
 - **Layer 1: UI/Client Layer (React & Mobile):** The client decodes the JWT to gate UI elements (hide menus, disable routes) for user experience. This improves UX but is not a security control.
 - **Layer 2: API Gateway & Controller Layer (Endpoint Security):** Requests are intercepted, JWT signatures are verified, and endpoint access is enforced by role claims (for example, `@PreAuthorize`). This blocks a Student from calling Organizer endpoints directly.
-- **Layer 3: Business/Data Layer (Data Ownership):** Services enforce ownership checks beyond role validation. For example, `PUT /workshops/{id}` verifies `ROLE_ORGANIZER` and confirms `workshops.organizer_id == jwt.sub` to prevent cross-tenant tampering.
+- **Layer 3: Business/Data Layer (Data Ownership):** Services enforce ownership checks beyond role validation. For example, `PUT /workshops/{id}` verifies `ORGANIZER` and confirms `workshops.organizer_id == jwt.sub` to prevent cross-tenant tampering.
 
 ### Authorization Sequence Diagram
 
@@ -697,7 +700,7 @@ sequenceDiagram
 ```
 
 - **Layer 1 (UX/UI Gating):** Provides immediate feedback and hides restricted features from unauthorized users, but is cosmetic and can be bypassed.
-- **Layer 2 (Endpoint Gating):** The API gateway and Spring Security boundary require a `ROLE_ORGANIZER` claim for `PUT /workshops/{id}`.
+- **Layer 2 (Endpoint Gating):** The API gateway and Spring Security boundary require a `ORGANIZER` claim for `PUT /workshops/{id}`.
 - **Layer 3 (Data Gating):** The service enforces ownership by matching `workshops.organizer_id` with `jwt.sub`, preventing IDOR attacks.
 
 ## 5. System Protection Mechanisms
