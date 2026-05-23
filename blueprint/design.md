@@ -131,12 +131,8 @@ sequenceDiagram
     GW-->>Web: 429 Too Many Requests
   else Allowed
     Redis-->>API: Allow
-    API->>DB: Lookup idempotency key
-    alt Key exists
-      API-->>GW: Return cached response (or 409 Conflict if PENDING)
-      GW-->>Web: Return cached response (or 409 Conflict if PENDING)
-    else New request
-      API->>DB: Insert idempotency key (Status: PENDING)
+    API->>DB: Atomic INSERT idempotency key (Primary DB)
+    alt Success (New Request)
       API->>DB: Query existing registrations for time overlap
       alt Schedule Overlap Detected
         DB-->>API: Overlap found
@@ -189,6 +185,10 @@ sequenceDiagram
           end
         end
       end
+    else Unique Constraint Violation (Concurrent Retry)
+      API->>DB: Load cached response (Primary DB)
+      API-->>GW: Return cached response (or 409 Conflict if PENDING)
+      GW-->>Web: Return cached response (or 409 Conflict if PENDING)
     end
   end
 
@@ -269,9 +269,9 @@ sequenceDiagram
     API->>DB: Select current_status from workshops
     DB-->>API: current_status: STATUS
     alt current_status == DRAFT
-      API->>DB: Update Workshop (Status: PUBLISHED)
+      API->>DB: Update Workshop (Status: PUBLISHED, Optimistic Locking check)
       API->>DB: Insert WorkshopPublishedEvent into Outbox
-      DB-->>API: Transaction committed
+      DB-->>API: Transaction committed (Optimistic Locking check)
       API-->>GW: 200 OK (Workshop Published)
       GW-->>Web: 200 OK
       Web-->>Organizer: Show Published Status in UI
@@ -309,16 +309,16 @@ sequenceDiagram
           GW-->>Web: 422 Unprocessable Entity
           Web-->>Organizer: 422 Unprocessable Entity
         else
-          API->>DB: Update Workshop Details (non-core fields)
+          API->>DB: Update Workshop Details (non-core fields, Optimistic Locking check)
           API->>DB: Insert WorkshopUpdatedEvent into Outbox
-          DB-->>API: Transaction committed
+          DB-->>API: Transaction committed (Optimistic Locking check)
           API-->>GW: 200 OK
           GW-->>Web: 200 OK
         end
       else current_status == DRAFT
-        API->>DB: Update Workshop Details (all fields allowed)
+        API->>DB: Update Workshop Details (all fields allowed, Optimistic Locking check)
         Note over API,DB: DRAFT changes do not generate outbox events
-        DB-->>API: Transaction committed
+        DB-->>API: Transaction committed (Optimistic Locking check)
         API-->>GW: 200 OK
         GW-->>Web: 200 OK
       end
@@ -357,9 +357,9 @@ sequenceDiagram
           Web-->>Organizer: 422 Unprocessable Entity
         else Schedule Clear
           DB-->>API: Schedule Clear
-          API->>DB: Update Workshop Schedule (Status remains current)
+          API->>DB: Update Workshop Schedule (Status remains current, Optimistic Locking check)
           API->>DB: Insert WorkshopRescheduledEvent into Outbox
-          DB-->>API: Transaction committed
+          DB-->>API: Transaction committed (Optimistic Locking check)
           API-->>GW: 200 OK
           GW-->>Web: 200 OK
           Web-->>Organizer: 200 OK
@@ -386,9 +386,9 @@ sequenceDiagram
       GW-->>Web: 422 Unprocessable Entity
       Web-->>Organizer: 422 Unprocessable Entity
     else
-      API->>DB: Update Workshop (Status: CANCELED)
+      API->>DB: Update Workshop (Status: CANCELED, Optimistic Locking check)
       API->>DB: Insert WorkshopCanceledEvent into Outbox
-      DB-->>API: Transaction committed
+      DB-->>API: Transaction committed (Optimistic Locking check)
       API-->>GW: 200 OK
       GW-->>Web: 200 OK
       Web-->>Organizer: Show Canceled Status in UI
@@ -426,6 +426,7 @@ sequenceDiagram
 
 - **State Machine Enforcement:** The system enforces strict transitions: `DRAFT` -> `PUBLISHED` -> `COMPLETED`/`CANCELED`. Once a workshop reaches a terminal state (`COMPLETED` or `CANCELED`), the API layer strictly blocks any further mutations and returns `422 Unprocessable Entity` for attempts to modify the record.
 - **Data Ownership & Core Validation:** Modification endpoints validate `jwt.org` against `workshop.organization_id` to enforce logical multi-tenancy (skipped for `Create`). Any ORGANIZER within the same organization can manage its workshops. The `PUT`/`PATCH` handlers dynamically evaluate the current status: full updates are allowed while in `DRAFT`; once `PUBLISHED`, core fields (for example `price`) are immutable and any attempt to change them or reduce capacity below current registrations is rejected with `422 Unprocessable Entity` to protect active attendees.
+- **Optimistic Locking (Concurrent Admin Mutations):** The service uses optimistic concurrency control via a `@Version` field on the workshop entity. If the version has changed between read and update, the database raises a conflict and the API returns `409 Conflict`, preventing lost updates when multiple ORGANIZERs edit or publish the same workshop concurrently.
 - **Automated Event Completion Sweeper:** A dedicated `Sweeper` cron component runs hourly. It queries the database for expired `PUBLISHED` workshops, marks them `COMPLETED`, and writes `WorkshopCompletedEvent` entries into the transactional outbox for downstream processing.
 - **Granular Asynchronous Branching:** The `Registry` component (not the API) extracts committed outbox rows and externalizes them to the message broker. Background workers synchronize to Elasticsearch on publication, updates, rescheduling, and completion events (keeping `DRAFT` items completely isolated); mass notification flows are executed only for disruptive events (Rescheduled, Canceled).
 - **Strict Reschedule Guarantees:** The reschedule endpoint is explicitly blocked for `DRAFT`, `COMPLETED`, or `CANCELED` states. Rescheduling requires a `PUBLISHED` workshop, validates that proposed times are future and form a valid range, and runs a PostgreSQL-level resource collision check (location and speaker availability) to prevent double-booking. Any validation failure returns `422 Unprocessable Entity` and the transaction is not committed.
@@ -717,30 +718,39 @@ The backend securely holds the private key used to sign QR codes. QR payloads ar
 
 ### Traffic Spike Management
 
-Registration demand peaks at 12,000 concurrent users within the first 10 minutes, with 60% concentrated in the initial 3-minute window. To keep the backend stable under that burst, the API Gateway enforces a distributed **Token Bucket** rate limiter using **Bucket4j** with **Redis** as the shared state store.
+Registration demand peaks at 12,000 concurrent users within the first 10 minutes, with 60% concentrated in the initial 3-minute window. To keep the backend stable under that burst, the Core Backend Monolith enforces a distributed **Token Bucket** rate limiter at the application filter layer using **Bucket4j** with **Redis** as the shared state store. The API Gateway remains a forwarding proxy and does not perform rate limiting.
 
 Each user or IP is assigned a bucket with a fixed capacity of tokens. Every `POST /registrations` request consumes a token, and tokens refill at a steady rate. This allows short bursts during the first 3 minutes while still capping sustained throughput, preventing the registration service and database from being overwhelmed.
 
-When a bucket is empty, the gateway rejects the request with HTTP `429 Too Many Requests`. The frontend shows a simple "Please wait" message and retries with backoff, protecting the system while keeping the user informed.
+When a bucket is empty, the Core Backend Monolith returns HTTP `429 Too Many Requests` to the gateway, which relays the response to the client. The frontend shows a simple "Please wait" message and retries with backoff, protecting the system while keeping the user informed.
 
 ```mermaid
-flowchart TD
-  Client[Client] --> Gateway[API Gateway: POST /registrations]
-  Gateway --> Redis[Redis: Check Token Bucket]
-  Redis --> Decision{Tokens available?}
-  Decision -->|Yes| Consume[Consume token]
-  Consume --> API[Backend API]
-  API --> DB[Process DB transaction]
-  DB --> Success[Return success]
-  Decision -->|No| Drop[Drop request]
-  Drop --> Throttle[Return 429 Too Many Requests]
+sequenceDiagram
+  actor Client
+  participant GW as API Gateway
+  participant API as Core Backend Monolith
+  participant Redis as Redis
+  participant DB as Neon PostgreSQL
+
+  Client->>GW: POST /registrations
+  GW->>API: Forward request
+  API->>Redis: Evaluate Token Bucket
+  alt Tokens available
+    API->>DB: Process transaction
+    DB-->>API: Commit success
+    API-->>GW: 201 Created
+    GW-->>Client: 201 Created
+  else Tokens exhausted
+    API-->>GW: 429 Too Many Requests
+    GW-->>Client: 429 Too Many Requests
+  end
 ```
 
 ### Third-Party Service Resilience
 
-External payment gateways are inherently unreliable due to network latency, timeouts, and partial outages. If the backend waits on slow payment calls, request threads queue up and can exhaust the Spring Boot thread pool, causing a cascading failure across the UniHub system.
+External payment gateways are inherently unreliable due to network latency, timeouts, and partial outages. If the backend waits on slow payment calls, request threads queue up and can exhaust the Spring Boot thread pool, causing a cascading failure across the system.
 
-To prevent this, the payment integration uses a Circuit Breaker implemented with Resilience4j. The breaker continuously tracks failure rate and slow-call rate; when thresholds are exceeded, it opens and blocks further payment calls.
+To prevent this, the payment integration uses a **Circuit Breaker** implemented with **Resilience4j**. The breaker continuously tracks failure rate and slow-call rate; when thresholds are exceeded, it opens and blocks further payment calls.
 
 When the circuit is open, the system fails fast instead of hanging. It returns an immediate error or places the registration in a "Payment Pending" state so users can retry later, while free workshop registration and browsing remain fully operational.
 
@@ -755,32 +765,48 @@ stateDiagram-v2
 
 ### Transaction Idempotency
 
-Client retries caused by network drops or impatient clicks can create duplicate `POST /registrations` requests, risking double-booking or double-charging. The system enforces exactly-once processing with an idempotency key strategy backed by PostgreSQL.
+Client retries caused by network drops or impatient clicks can create duplicate `POST /registrations` requests, risking double-booking or double-charging. The system enforces exactly-once processing with an **idempotency key strategy** backed by PostgreSQL.
 
 - **Key generation and transmission:** The React / React Native client generates a UUIDv4 and sends it in the `Idempotency-Key` header.
 - **Storage and duplicate detection:** The backend stores keys in `idempotency_keys` with a `UNIQUE` constraint, creating a database-level barrier against race conditions.
 - **Workflow:** On the first attempt, the key is inserted, the payment is processed, and the final response payload is serialized and stored with the key. On a retry, the API finds the existing key and immediately returns the cached response, bypassing the payment gateway and write logic.
 - **TTL configuration:** Each key includes an `expires_at` timestamp (for example, 24 hours), and a scheduled cleanup job deletes expired records to prevent table bloat.
+- **Primary database routing:** All idempotency reads and writes are routed to the primary database to avoid replica lag and eliminate check-then-act races.
 
 ```mermaid
 sequenceDiagram
   actor Client
   participant GW as API Gateway
+  participant API as Core Backend Monolith
   participant DB as Neon PostgreSQL
   participant Pay as Payment Gateway
 
   Client->>GW: POST /registrations (Idempotency-Key: A)
-  GW->>DB: Lookup key A
-  alt Initial Request
-    DB-->>GW: Not found
-    GW->>DB: Insert key A (lock)
-    GW->>Pay: Charge payment
-    Pay-->>GW: Approved
-    GW->>DB: Store final response for key A
+  GW->>API: Forward request
+  API->>DB: Atomic INSERT idempotency key (Primary DB)
+  alt Success (New Request)
+    API->>Pay: Charge payment
+    Pay-->>API: Approved
+    API->>DB: Store final response for key A
+    API-->>GW: 200 OK (success)
     GW-->>Client: 200 OK (success)
-  else Retry Request (Network drop)
-    DB-->>GW: Found key A
-    GW->>DB: Load cached response
+  else Unique Constraint Violation (Concurrent Retry)
+    API->>DB: Load cached response (Primary DB)
+    API-->>GW: 200 OK (cached)
     GW-->>Client: 200 OK (cached)
   end
+```
+
+### Overbooking Prevention & Race Condition Mitigation
+
+During high-concurrency spikes (12,000+ requests), the "last seat" scenario can trigger a race condition where multiple requests attempt to claim the final slot simultaneously. Relying on database pessimistic locking (for example, `SELECT ... FOR UPDATE`) is an anti-pattern at this scale because it holds database connections open, blocks request threads, and can exhaust the connection pool under burst traffic.
+
+The platform uses a **lock-free atomic pre-check via Redis**. The Core Backend Monolith issues a `DECR` on the workshop capacity key before opening a database transaction. Redis processes the decrement sequentially in microseconds without blocking backend threads. If the returned value is less than zero, the API immediately returns `409 Conflict` and never touches PostgreSQL, preserving database capacity for legitimate requests.
+
+```mermaid
+flowchart TD
+  API[Backend API receives request] --> Decr["Redis Atomic DECR (capacity)"]
+  Decr --> Decision{Is Capacity >= 0?}
+  Decision -->|Yes| DB[Proceed to PostgreSQL transaction]
+  Decision -->|No| Conflict[Return 409 Conflict]
 ```
