@@ -24,6 +24,7 @@ The system architecture is organized into a strict tiered structure to distribut
 - **Backend Tier:** Java and Spring Boot leveraging **Spring Modulith** for internal async event publication registry and modular boundary enforcement.
 - **Data Persistence Tier:** Serverless Neon PostgreSQL for core relational data and ACID transactions; S3-compatible Object Storage for PDF assets and legacy CSV storage, and Elasticsearch for offloading heavy full-text search queries via the CQRS pattern.
 - **Asynchronous & Caching Layer:** Redis for distributed caching; RabbitMQ for reliable, decoupled message brokering.
+- **Observability Stack:** Prometheus (Metrics Scraping & TSDB), Grafana (Centralized Telemetry Dashboards).
 
 ### Core Resilience Strategies
 
@@ -72,6 +73,8 @@ The system architecture is organized into a strict tiered structure to distribut
 | **Cache / Rate Limiter**        | Redis                              | Local Docker                      | Cache-aside reads for performance and shared token-bucket counters used by the gateway for admission control and rate limiting.                                                                                               |
 | **Message Broker**              | RabbitMQ                           | Local Docker                      | Reliable, decoupled queues for event-driven processing, worker retries, and dead-letter handling; integrates with the Core Backend Monolith via the outbox pattern.                                                           |
 | **Object Storage**              | MinIO / S3-compatible              | Local Docker                      | Stores unstructured assets (PDFs and nightly CSV drops); accessed via the S3 API by workers and the Core Backend for ingestion and processing.                                                                                |
+| **Prometheus**                  | Prometheus TSDB                    | Local Docker                      | Periodically scrapes micrometer metrics from the Core Monolith and Background Workers via HTTP; stores time-series data for analysis.                                                                                         |
+| **Grafana**                     | Grafana UI                         | Local Docker                      | Provides a web-based dashboard interface for DevOps and Admins to monitor system health, connection pool saturation, and error rates in real-time.                                                                            |
 
 ## 3. System Architecture
 
@@ -810,3 +813,13 @@ flowchart TD
   Decision -->|Yes| DB[Proceed to PostgreSQL transaction]
   Decision -->|No| Conflict[Return 409 Conflict]
 ```
+
+### System Telemetry & Core Metrics to Track
+
+Micrometer and Grafana MUST track the following telemetry vectors:
+
+- **Database Health:** HikariCP active connections, connection acquisition latency, and lease timeouts.
+- **Traffic & Admission Control:** Bucket4j rate-limiting drop rate (HTTP 429 counts) tracked via Redis counter limits.
+- **Concurrency & Locks:** Frequency of HTTP 409 Conflicts caused by Redis capacity exhaustion or PostgreSQL `@Version` optimistic locking mismatches.
+- **Resilience States:** Resilience4j circuit breaker state transitions (Closed/Open/Half-Open) surrounding the Stripe payment gateway integration.
+- **Message Fabric:** RabbitMQ queue depth and processing lag for transactional outbox externalization.

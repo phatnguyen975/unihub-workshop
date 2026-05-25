@@ -185,15 +185,15 @@
 ### ADR 022: Mobile Local Database
 
 - **Context:** Offline check-in requires durable local storage and deterministic sync.
-- **Decision:** Use SQLite for React Native (for example, `react-native-sqlite-storage`) as the mobile persistence layer.
-- **Rationale:** SQLite provides predictable transactional behavior and supports offline-first queues that can be reconciled reliably. It aligns with the React Native stack and supports high-volume scan buffering without data loss.
+- **Decision:** Use a modern JSI-based SQLite library for React Native (e.g., `expo-sqlite` or `react-native-quick-sqlite`) as the mobile persistence layer.
+- **Rationale:** SQLite provides predictable transactional behavior and supports offline-first queues that can be reconciled reliably. It aligns with the React Native stack and supports high-volume scan buffering without data loss. Using modern JSI bindings ensures synchronous, high-speed inserts without the React Native Bridge overhead, which is critical for maintaining fast QR scanning speeds at the door.
 - **Alternatives Considered:** AsyncStorage was rejected because it lacks transactional querying and cannot support deterministic offline reconciliation at scan volume. WatermelonDB was rejected because the project benefits more from a simpler, broadly supported SQLite layer for controlled sync semantics.
 - **Consequences:** Requires schema migrations on mobile, but delivers durable offline behavior.
 
 ### ADR 023: Offline Sync Conflict Resolution
 
 - **Context:** Multiple devices can scan the same attendee while offline and later sync concurrently.
-- **Decision:** Use server-authoritative reconciliation with workshop-scoped bulk fetch and bulk upsert that returns an HTTP 207 Multi-Status response with per-entry resolution codes (for example: `SUCCESS`, `ALREADY_USED`, `INVALID_TICKET`).
+- **Decision:** Use server-authoritative reconciliation with workshop-scoped bulk fetch and bulk upsert that returns an HTTP 207 Multi-Status response with per-entry resolution codes (e.g., `SUCCESS`, `ALREADY_USED`, `INVALID_TICKET`).
 - **Rationale:** Server-authoritative reconciliation prevents duplicate attendance, preserves auditability, and scales under batch sync. Bulk operations minimize DB chatter and avoid per-row contention during offline sync bursts. Using HTTP 207 avoids exception-based control flow for partial batch failures, allowing the SQLite mobile client to deterministically update local records without failing the entire sync batch.
 - **Alternatives Considered:** Client-side merge or last-write-wins reconciliation was rejected because offline devices cannot safely decide attendance authority without risking double booking. Exception-driven batch failure was rejected because a single bad row would abort the entire sync and make deterministic mobile recovery impossible.
 - **Consequences:** Requires unique constraints and deterministic response handling on the client.
@@ -237,3 +237,12 @@
 - **Rationale:** The backend signs QR payloads with a private key; the mobile app stores the current public key in SQLite and verifies signatures offline. This supports key rotation to invalidate compromised keys globally.
 - **Alternatives Considered:** Symmetric encryption or HMAC were rejected because the mobile client would need to hold the secret key, which is unacceptable if the app is decompiled. Online-only verification was rejected because offline check-in must work without network access.
 - **Consequences:** Requires secure key management and periodic public key refresh on login.
+
+## 8. Observability
+
+### ADR 029: Core Observability and Monitoring Stack
+
+- **Context:** High-concurrency surges can cause silent failures, connection pool starvation, or cache stampedes. We need real-time telemetry without introducing performance overhead to request threads.
+- **Decision:** Use Spring Boot Actuator with Micrometer to expose core metrics at `/actuator/prometheus`. Deploy Prometheus as a pull-based Time Series Database (TSDB) to scrape these metrics, and Grafana for centralized visualization dashboarding.
+- **Rationale:** Micrometer provides out-of-the-box, low-overhead instrumentation for JVM, Tomcat threads, HikariCP, Redis, and Resilience4j components. The pull-model of Prometheus ensures that backend instances are not burdened with pushing telemetry data during traffic spikes.
+- **Consequences:** Adds two lightweight infrastructure containers (Prometheus & Grafana) to the Docker environment. Requires metrics storage provisioning.
