@@ -1,0 +1,14 @@
+{
+  "id": null,
+  "uid": "rabbitmq-metrics",
+  "title": "RabbitMQ - Queues and DLQ",
+  "tags": ["rabbitmq", "queues", "dlq"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [],
+  "templating": {
+    "list": []
+  }
+}

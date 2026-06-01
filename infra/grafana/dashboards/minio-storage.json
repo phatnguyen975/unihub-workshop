@@ -1,0 +1,14 @@
+{
+  "id": null,
+  "uid": "minio-storage",
+  "title": "MinIO - Object Storage",
+  "tags": ["minio", "s3", "storage"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [],
+  "templating": {
+    "list": []
+  }
+}

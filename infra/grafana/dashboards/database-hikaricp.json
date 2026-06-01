@@ -1,0 +1,14 @@
+{
+  "id": null,
+  "uid": "database-hikaricp",
+  "title": "Database - HikariCP",
+  "tags": ["database", "hikaricp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [],
+  "templating": {
+    "list": []
+  }
+}

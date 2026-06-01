@@ -1,0 +1,14 @@
+{
+  "id": null,
+  "uid": "resilience4j-circuit-breaker",
+  "title": "Resilience4j - Circuit Breakers",
+  "tags": ["resilience4j", "circuit-breaker"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [],
+  "templating": {
+    "list": []
+  }
+}

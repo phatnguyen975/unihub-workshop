@@ -1,0 +1,14 @@
+{
+  "id": null,
+  "uid": "redis-bucket4j",
+  "title": "Redis - Bucket4j",
+  "tags": ["redis", "bucket4j", "rate-limiting"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [],
+  "templating": {
+    "list": []
+  }
+}

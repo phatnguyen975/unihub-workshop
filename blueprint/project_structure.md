@@ -445,27 +445,37 @@ flowchart TB
 ### Infrastructure & Observability (`infra/`)
 
 ```text
-infra/                               # Local Docker runtime and observability stack
-├── docker-compose.yml               # Orchestrates Nginx, Redis, RabbitMQ, ES, MinIO, Prometheus, Grafana
-├── .env                             # Infra-only docker-compose variables (ports, admin passwords)
-├── .env.example                     # Sample infra-only variables (apps keep separate .env files)
-├── nginx/                           # API gateway and load balancer config
-│   ├── nginx.conf                   # Base Nginx configuration
-│   └── templates/                   # envsubst templates for dynamic routing
-│       └── api.conf.template        # Reverse proxy and upstream load balancing template
-├── redis/                           # Redis configuration and init scripts
-│   └── redis.conf                   # Cache and rate limiting defaults
-├── rabbitmq/                        # RabbitMQ configuration and definitions
-│   ├── definitions.json             # Exchanges, queues, and bindings
-│   └── rabbitmq.conf                # Broker configuration
-├── elasticsearch/                   # Elasticsearch configuration
-│   └── elasticsearch.yml            # Node and index settings for CQRS search
-├── minio/                           # MinIO (S3-compatible) configuration
-│   └── init/                        # Bucket bootstrap scripts
-│       └── create-buckets.sh        # Creates required buckets for PDFs and CSVs
-├── prometheus/                      # Prometheus configuration
-│   └── prometheus.yml               # Scrape config for backend and workers
-└── grafana/                         # Grafana provisioning and dashboards
-    ├── provisioning/                # Datasources and dashboards provisioning
-    └── dashboards/                  # Prebuilt dashboards for JVM, HikariCP, Redis, RabbitMQ
+infra/                                        # Local Docker runtime and observability stack
+├── docker-compose.yml                        # Orchestrates Nginx, Redis, RabbitMQ, ES, MinIO, Prometheus, Grafana
+├── .env                                      # Infra-only docker-compose variables (ports, admin passwords)
+├── .env.example                              # Sample infra-only variables (apps keep separate .env files)
+├── nginx/                                    # API gateway and load balancer config
+│   ├── nginx.conf                            # Base Nginx configuration
+│   └── templates/                            # envsubst templates for dynamic routing
+│       └── default.conf.template             # Reverse proxy and upstream load balancing template
+├── redis/                                    # Redis configuration and init scripts
+│   └── redis.conf                            # Cache and rate limiting defaults
+├── rabbitmq/                                 # RabbitMQ configuration and definitions
+│   ├── definitions.json.template             # Exchanges, queues, and bindings
+│   └── rabbitmq.conf                         # Broker configuration
+├── elasticsearch/                            # Elasticsearch configuration
+│   └── elasticsearch.yml                     # Node and index settings for CQRS search
+├── minio/                                    # MinIO (S3-compatible) configuration
+│   └── init/                                 # Bucket bootstrap scripts
+│       └── create-buckets.sh                 # Creates required buckets for PDFs and CSVs
+├── prometheus/                               # Prometheus configuration
+│   └── prometheus.yml                        # Scrape config for backend and workers
+└── grafana/                                  # Grafana provisioning and dashboards
+    ├── provisioning/                         # Datasources and dashboards provisioning
+    │   ├── datasources/                      # Grafana datasources (IaC)
+    │   │   └── prometheus.yml                # Prometheus datasource definition
+    │   └── dashboards/                       # Dashboard providers (IaC)
+    │       └── dashboards.yml                # File-based dashboard loader
+    └── dashboards/                           # Dashboard JSON templates
+        ├── jvm-spring-boot.json              # JVM and Spring Boot Micrometer metrics
+        ├── database-hikaricp.json            # HikariCP pool saturation and connection health
+        ├── redis-bucket4j.json               # Redis cache and Bucket4j rate limit telemetry
+        ├── rabbitmq-metrics.json             # Queue depth, consumer lag, and DLQ signals
+        ├── resilience4j-circuit-breaker.json # Circuit breaker state and failure rates
+        └── minio-storage.json                # MinIO object storage health and capacity
 ```

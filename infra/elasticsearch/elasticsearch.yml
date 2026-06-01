@@ -1,0 +1,12 @@
+cluster.name: unihub-local
+node.name: unihub-es-1
+network.host: 0.0.0.0
+http.port: 9200
+
+discovery.type: single-node
+bootstrap.memory_lock: true
+
+xpack.security.enabled: false
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+xpack.ml.enabled: false
