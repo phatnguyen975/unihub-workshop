@@ -20,7 +20,7 @@ This approach balances high-traffic scalability with simplified operational comp
 The system architecture is organized into a strict tiered structure to distribute load and enforce clear operational concerns:
 
 - **Client Tier:** React (TypeScript) for the responsive web portal; React Native (TypeScript) with a local SQLite engine for the offline-first mobile check-in application.
-- **API Gateway Layer:** Nginx acting as the reverse proxy, load balancer, and edge router responsible for SSL termination and global rate-limiting.
+- **API Gateway Layer:** Nginx acting as the reverse proxy, load balancer, and edge router responsible for SSL termination and request forwarding. Token Bucket rate limiting is enforced inside the Core Backend Monolith filter layer (Bucket4j + Redis), not at the gateway.
 - **Backend Tier:** Java and Spring Boot leveraging **Spring Modulith** for internal async event publication registry and modular boundary enforcement.
 - **Data Persistence Tier:** Serverless Neon PostgreSQL for core relational data and ACID transactions; S3-compatible Object Storage for PDF assets and legacy CSV storage, and Elasticsearch for offloading heavy full-text search queries via the CQRS pattern.
 - **Asynchronous & Caching Layer:** Redis for distributed caching; RabbitMQ for reliable, decoupled message brokering.
@@ -28,7 +28,7 @@ The system architecture is organized into a strict tiered structure to distribut
 
 ### Core Resilience Strategies
 
-- **Edge-Level Admission Control (Rate Limiting):** Absorbing sudden traffic spikes directly at the gateway to consistently safeguard backend availability and performance.
+- **Application-Level Admission Control (Rate Limiting):** Absorbing sudden traffic spikes via a distributed Token Bucket (Bucket4j + Redis) enforced inside the Core Backend Monolith filter layer, providing authenticated, per-user traffic shaping with full observability. Nginx remains a pure forwarding proxy and does not perform rate limiting.
 - **Fault Isolation (Circuit Breakers):** Preventing unpredictable failures in external integrations (such as payment providers) from cascading and disrupting unrelated core services like workshop browsing.
 - **Exactly-Once Processing (Idempotency):** Protecting transactional data integrity comprehensively against network drops, timeout resubmissions, and aggressive client retries.
 - **Graceful Degradation:** Offloading heavy, non-critical computations (such as AI document parsing and mass notifications) into deferred background execution threads.
@@ -60,21 +60,21 @@ The system architecture is organized into a strict tiered structure to distribut
   <img src="./diagrams/c4_container_key.png" style="width:100%;" alt="Container Diagram Key">
 </p>
 
-| Container                       | Technology Stack                   | Deployment Target                 | Architectural Purpose                                                                                                                                                                                                         |
-| :------------------------------ | :--------------------------------- | :-------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Web App**                     | React, TypeScript                  | Local Docker                      | Responsive web portal for Students and Organizers; performs client-side validation, renders QR confirmations, authenticates users (JWT), and communicates with the API via the local gateway.                                 |
-| **Mobile App**                  | React Native, TypeScript           | Physical Mobile Device / Emulator | Offline-first check-in application for Check-in Staff; captures scans, queues events locally, and syncs batched events to the backend when connectivity permits.                                                              |
-| **Local SQLite Database**       | SQLite                             | Local Device Storage              | Offline-first queue for pending check-in events; provides durable local persistence, idempotent upserts, and deterministic reconciliation during batch syncs.                                                                 |
-| **API Gateway / Load Balancer** | Nginx                              | Local Docker                      | Edge routing, load balancing, and Token Bucket rate limiting for incoming HTTP traffic inside the local Docker network; forwards validated requests to the Core Backend Monolith.                                             |
-| **Core Backend Monolith**       | Java, Spring Boot, Spring Modulith | Local Docker                      | Implements authoritative domain logic, module-level event publication registry, outbox pattern for reliable event externalization, transactional seat allocation, and payment orchestration.                                  |
-| **Background Workers**          | Java, Spring Boot, Spring Batch    | Local Docker                      | Executes deferred tasks: AI PDF summarization, notification delivery, and nightly CSV ingestion. Consumes brokered events, interacts with object storage and external APIs, and persists async results to the cloud database. |
-| **PostgreSQL**                  | PostgreSQL                         | Neon Cloud Service                | Authoritative transactional datastore for registrations, payments, and attendance. Requires JDBC over SSL/TLS for encrypted access from local services.                                                                       |
-| **Search Engine**               | Elasticsearch                      | Local Docker                      | Offloads read-heavy full-text search queries, enabling high-performance workshop discovery without impacting primary database transactions.                                                                                   |
-| **Cache / Rate Limiter**        | Redis                              | Local Docker                      | Cache-aside reads for performance and shared token-bucket counters used by the gateway for admission control and rate limiting.                                                                                               |
-| **Message Broker**              | RabbitMQ                           | Local Docker                      | Reliable, decoupled queues for event-driven processing, worker retries, and dead-letter handling; integrates with the Core Backend Monolith via the outbox pattern.                                                           |
-| **Object Storage**              | MinIO / S3-compatible              | Local Docker                      | Stores unstructured assets (PDFs and nightly CSV drops); accessed via the S3 API by workers and the Core Backend for ingestion and processing.                                                                                |
-| **Prometheus**                  | Prometheus TSDB                    | Local Docker                      | Periodically scrapes micrometer metrics from the Core Monolith and Background Workers via HTTP; stores time-series data for analysis.                                                                                         |
-| **Grafana**                     | Grafana UI                         | Local Docker                      | Provides a web-based dashboard interface for DevOps and Admins to monitor system health, connection pool saturation, and error rates in real-time.                                                                            |
+| Container                       | Technology Stack                   | Deployment Target                 | Architectural Purpose                                                                                                                                                                                                                     |
+| :------------------------------ | :--------------------------------- | :-------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web App**                     | React, TypeScript                  | Local Docker                      | Responsive web portal for Students and Organizers; performs client-side validation, renders QR confirmations, authenticates users (JWT), and communicates with the API via the local gateway.                                             |
+| **Mobile App**                  | React Native, TypeScript           | Physical Mobile Device / Emulator | Offline-first check-in application for Check-in Staff; captures scans, queues events locally, and syncs batched events to the backend when connectivity permits.                                                                          |
+| **Local SQLite Database**       | SQLite                             | Local Device Storage              | Offline-first queue for pending check-in events; provides durable local persistence, idempotent upserts, and deterministic reconciliation during batch syncs.                                                                             |
+| **API Gateway / Load Balancer** | Nginx                              | Local Docker                      | Edge routing, SSL termination, and least-connections load balancing. Acts as a pure forwarding proxy; does not perform rate limiting. All Token Bucket enforcement (Bucket4j + Redis) runs inside the Core Backend Monolith filter layer. |
+| **Core Backend Monolith**       | Java, Spring Boot, Spring Modulith | Local Docker                      | Implements authoritative domain logic, module-level event publication registry, outbox pattern for reliable event externalization, transactional seat allocation, and payment orchestration.                                              |
+| **Background Workers**          | Java, Spring Boot, Spring Batch    | Local Docker                      | Executes deferred tasks: AI PDF summarization, notification delivery, and nightly CSV ingestion. Consumes brokered events, interacts with object storage and external APIs, and persists async results to the cloud database.             |
+| **PostgreSQL**                  | PostgreSQL                         | Neon Cloud Service                | Authoritative transactional datastore for registrations, payments, and attendance. Requires JDBC over SSL/TLS for encrypted access from local services.                                                                                   |
+| **Search Engine**               | Elasticsearch                      | Local Docker                      | Offloads read-heavy full-text search queries, enabling high-performance workshop discovery without impacting primary database transactions.                                                                                               |
+| **Cache / Rate Limiter**        | Redis                              | Local Docker                      | Cache-aside reads for performance, shared Token Bucket counters for Bucket4j admission control, and `jti` blacklist for JWT revocation. Counters are consumed by the Core Backend Monolith filter layer, not the gateway.                 |
+| **Message Broker**              | RabbitMQ                           | Local Docker                      | Reliable, decoupled queues for event-driven processing, worker retries, and dead-letter handling; integrates with the Core Backend Monolith via the outbox pattern.                                                                       |
+| **Object Storage**              | MinIO / S3-compatible              | Local Docker                      | Stores unstructured assets (PDFs and nightly CSV drops); accessed via the S3 API by workers and the Core Backend for ingestion and processing.                                                                                            |
+| **Prometheus**                  | Prometheus TSDB                    | Local Docker                      | Periodically scrapes micrometer metrics from the Core Monolith and Background Workers via HTTP; stores time-series data for analysis.                                                                                                     |
+| **Grafana**                     | Grafana UI                         | Local Docker                      | Provides a web-based dashboard interface for DevOps and Admins to monitor system health, connection pool saturation, and error rates in real-time.                                                                                        |
 
 ## 3. System Architecture
 
@@ -222,7 +222,71 @@ sequenceDiagram
 - **Lock-Free Concurrency Chokepoint:** To sustain 12,000 concurrent requests without hitting database row contention or thread pool depletion, capacity checks are offloaded entirely to Redis via an atomic decrement operation. The database transaction is only opened after capacity is verified.
 - **Idempotency Lifecycle (Strict State Management):** The system completely guards against double-booking and duplicate charges by tracking the idempotency key state through three phases: `PENDING` (acts as a concurrent lock), `COMPLETED` (serves cached payloads), and `FAILED` (safely releases the lock for client retries).
 - **Transactional Outbox Implementation:** To eliminate distributed transaction vulnerability, event emission is tightly integrated with domain operations. The registration record modifications and event storage occur in the same database transaction, natively mapped to Spring Modulith’s `event_publication` table.
+- **Deferred QR Code Generation:** QR payload and signature are generated and persisted only when a registration transitions to `CONFIRMED` status - never at the `PENDING` insert step. For free workshops, this happens atomically within the single confirmation transaction. For paid workshops, it happens inside the payment-confirmation transaction after the gateway returns `Approved`. This ensures that a cryptographically valid QR code can never be extracted from a `PENDING` record prior to payment completion. The `qr_payload`, `qr_signature`, and `qr_issued_at` columns in the `registrations` table are therefore nullable and are only populated on the `PENDING` -> `CONFIRMED` state transition.
 - **Dual-Case Reconciliation Sweeper:** The background cleanup job acts as a defensive synchronization boundary. Instead of blindly cancelling expired `PENDING` states, it first issues an API call to the Payment Gateway. If a webhook was lost but payment succeeded, it heals the state to `CONFIRMED`. If the checkout was abandoned, it marks it as `FAILED`, refunds the Redis capacity, and unlocks the idempotency state.
+
+### Payment Webhook Handling Flow
+
+The payment gateway sends asynchronous webhook events (for example, `payment_intent.succeeded`, `payment_intent.payment_failed`) to notify the platform of payment outcomes after the synchronous API call returns. This is the **primary confirmation path** for paid registrations. The Dual-Case Reconciliation Sweeper described in the Registration Flow is a **fallback** for lost webhooks only - it must not be the normal path.
+
+```mermaid
+sequenceDiagram
+  participant Pay as Payment Gateway
+  participant GW as API Gateway
+  participant API as Core Backend Monolith
+  participant DB as Neon PostgreSQL
+  participant Redis as Redis
+  participant Registry as Spring Modulith Event Registry
+  participant Broker as RabbitMQ
+  participant Worker as Background Workers
+  participant Notify as Notification Providers
+
+  Pay->>GW: POST /api/v1/payments/webhook (signed event)
+  GW->>API: Forward request (no JWT required)
+  API->>API: Verify webhook signature (HMAC or provider SDK)
+  alt Invalid Signature
+    API-->>GW: 400 Bad Request
+    GW-->>Pay: 400 Bad Request
+  else Valid Signature
+    API->>DB: SELECT payment WHERE provider_payment_id = event.id (Primary DB)
+    alt Payment not found or already in terminal state (COMPLETED / FAILED)
+      API-->>GW: 200 OK (idempotent no-op)
+      GW-->>Pay: 200 OK
+    else Payment found in PENDING state
+      alt Event type = payment_intent.succeeded
+        API->>DB: Begin tx
+        API->>DB: Update Payment (Status: COMPLETED, completed_at: now)
+        API->>DB: Update Registration (Status: CONFIRMED)
+        API->>DB: Set qr_payload, qr_signature, qr_issued_at on Registration
+        API->>DB: Insert WorkshopRegisteredEvent into Outbox
+        API->>DB: Update idempotency_key (Status: COMPLETED, Response: 201)
+        API->>DB: Commit
+        API-->>GW: 200 OK
+        GW-->>Pay: 200 OK
+      else Event type = payment_intent.payment_failed
+        API->>DB: Begin tx
+        API->>DB: Update Payment (Status: FAILED, failed_at: now, failure_code)
+        API->>DB: Update Registration (Status: FAILED)
+        API->>Redis: Increment capacity (compensating action)
+        API->>DB: Update idempotency_key (Status: FAILED, Response: 402)
+        API->>DB: Commit
+        API-->>GW: 200 OK
+        GW-->>Pay: 200 OK
+      end
+      par Async event fan-out
+        Registry->>Broker: Externalize WorkshopRegisteredEvent
+        Broker->>Worker: Deliver event
+        Worker->>Notify: Send confirmation email / in-app notification
+      end
+    end
+  end
+```
+
+- **No JWT authentication:** The webhook endpoint is called by the payment gateway, not a user. Authentication is performed via **webhook signature verification** using the provider's signing secret (for example, Stripe's `Stripe-Signature` header with `HMAC-SHA256`). This secret is stored as an environment variable and never committed to source control.
+- **Idempotent by `provider_payment_id`:** The `payments` table has a `UNIQUE` constraint on `provider_payment_id`. If the gateway retries a webhook, the handler finds the record already in a terminal state and returns `200 OK` immediately without reprocessing - guaranteeing exactly-once state transitions.
+- **Always return 200 OK to the gateway:** Returning any non-2xx response causes the payment gateway to retry the webhook, potentially flooding the endpoint. Even on internal processing errors, the handler should return `200 OK` after logging the failure and routing the event to a dead-letter mechanism for investigation.
+- **Sweeper becomes fallback only:** With the webhook endpoint in place, the Dual-Case Reconciliation Sweeper (described in the Registration Flow) is demoted to a safety net. It handles only cases where webhooks were genuinely lost (network partition, gateway outage). The sweeper's poll interval (every 15 minutes) is acceptable when it is not the primary path.
+- **Timeout window alignment:** Because the webhook is now the primary path, the sweeper timeout for `PENDING` registrations should be extended from 15 minutes to 30 minutes to reduce false-positive sweeper interventions during transient gateway delays, while still providing a reasonable UX recovery window.
 
 ### Workshop Lifecycle Management Flow
 
@@ -813,6 +877,33 @@ flowchart TD
   Decision -->|Yes| DB[Proceed to PostgreSQL transaction]
   Decision -->|No| Conflict[Return 409 Conflict]
 ```
+
+#### Database Constraint as Last-Resort Guard
+
+Redis `DECR` is the first-line defense but is not infallible. The database-level partial unique index on `(workshop_id, student_user_id) WHERE status IN ('PENDING', 'CONFIRMED')` acts as the final safety net. If Redis state is inconsistent during an edge-case concurrent window, the DB constraint will catch the duplicate and the API must handle the resulting unique constraint violation as a `409 Conflict` - identical to a Redis rejection - without propagating a `500` error. This defense-in-depth layering must be explicitly handled in the registration use case implementation.
+
+#### Redis-DB Capacity Reconciliation Job
+
+Redis counter state can drift from the database due to JVM crashes or network interruptions occurring between a successful `DECR` and its corresponding compensating `INCR` on rollback paths (e.g., failed payment, circuit breaker trip). Left unaddressed, this drift causes Redis to permanently under-report available seats even when real capacity exists in PostgreSQL.
+
+A **periodic Capacity Reconciliation Job** runs every 5 minutes to detect and correct drift. It computes ground-truth availability from the database and resets the Redis counter accordingly:
+
+```mermaid
+flowchart TD
+  Cron[Capacity Reconciliation Job - every 5 min] --> Query["Database: SELECT capacity, COUNT(CONFIRMED + PENDING)\n FROM workshops JOIN registrations"]
+  Query --> Compute["Compute: available = capacity - occupied"]
+  Compute --> Compare["Compare with Redis GET capacity:{workshopId}"]
+  Compare --> Drift{Counter drifted?}
+  Drift -->|Yes| Reset["Redis SET capacity:{workshopId} = computed_available"]
+  Drift -->|No| Skip[No-op]
+  Reset --> Log[Emit drift_detected metric to Micrometer]
+  Skip --> Log2[Log: counters consistent]
+```
+
+- **Scope:** Runs only against `PUBLISHED` workshops where Redis counter key exists.
+- **Atomicity:** The Redis `SET` is unconditional - the computed database value is always authoritative. This is safe because the reconciler runs infrequently and the drift window is bounded.
+- **Observability:** Emit a `capacity.drift.detected` counter metric via Micrometer each time a correction is applied. Alert on sustained drift frequency as a signal of systemic rollback failures.
+- **Complementary to Sweeper:** The existing Dual-Case Reconciliation Sweeper already performs `INCR` on `FAILED`/timed-out `PENDING` registrations. This reconciliation job is an additional safety net that resets counters to ground truth regardless of what caused the drift.
 
 ### System Telemetry & Core Metrics to Track
 

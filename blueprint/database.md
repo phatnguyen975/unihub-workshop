@@ -9,7 +9,7 @@
 - **Audit Fields:** Every main table includes `created_at`, `updated_at`, `created_by`, and `updated_by`.
 - **Automated Timestamps:** Add a standard PostgreSQL trigger function to set `updated_at = now()` on every `UPDATE` operation for all tables to guarantee consistency independently of the application layer.
 - **UTC Standardization:** All timestamps are stored in `TIMESTAMPTZ`. The database server, connection pools, and application JVM must be strictly configured to use the **UTC** timezone to prevent scheduling and registration anomalies.
-- **TTL Cleanup Jobs:** Implement scheduled TTL cleanup jobs in the backend to automatically purge expired records from TTL-managed tables and prevent database bloat. This applies to the `expires_at` column in `idempotency_keys`, `refresh_tokens`, and `password_reset_tokens` tables.
+- **TTL Cleanup Jobs:** Implement scheduled TTL cleanup jobs (every 6 hours) in the backend to automatically purge expired records from TTL-managed tables and prevent database bloat. This applies to the `expires_at` column in `idempotency_keys`, `refresh_tokens`, and `password_reset_tokens` tables.
 - **No Hard Deletions (Soft Delete & State Machines):** Due to the financial and auditing nature of registrations and attendances, `DELETE` operations are strictly prohibited for core business entities. Use state machine transitions (for example, `status = 'CANCELED'` or `status = 'INACTIVE'`) to preserve data lineage.
 - **Strict Role Naming:** Role values across the system must strictly be `STUDENT`, `ORGANIZER`, and `STAFF`. `ROLE_` prefixes are strictly forbidden at both the database and application levels.
 
@@ -126,10 +126,10 @@ erDiagram
     UUID id PK
     TEXT listener_id
     TEXT event_type
-    JSONB serialized_event
+    TEXT serialized_event
     TIMESTAMPTZ publication_date
     TIMESTAMPTZ completion_date
-    VARCHAR status
+    TEXT status
     INTEGER completion_attempts
     TIMESTAMPTZ last_resubmission_date
   }
@@ -457,32 +457,35 @@ erDiagram
 
 **Schema Definition Table:**
 
-| Column Name           | Data Type     | Constraints                                                             | Description/UX Logic                        |
-| :-------------------- | :------------ | :---------------------------------------------------------------------- | :------------------------------------------ |
-| id                    | UUID          | PK, NOT NULL, DEFAULT gen_random_uuid()                                 | Registration identifier.                    |
-| workshop_id           | UUID          | FK workshops(id), NOT NULL                                              | Workshop being registered.                  |
-| student_user_id       | UUID          | FK users(id), NOT NULL                                                  | `STUDENT` user registering.                 |
-| status                | VARCHAR(20)   | NOT NULL, CHECK (status IN ('PENDING','CONFIRMED','FAILED','CANCELED')) | Registration state.                         |
-| price_at_registration | NUMERIC(10,2) | NOT NULL, DEFAULT 0                                                     | Price snapshot at time of registration.     |
-| currency              | CHAR(3)       | NOT NULL, DEFAULT 'USD'                                                 | ISO 4217 currency code.                     |
-| idempotency_key_id    | UUID          | FK idempotency_keys(id), NOT NULL                                       | Idempotency reference for exact-once flow.  |
-| qr_payload            | TEXT          | NOT NULL                                                                | Signed QR payload data.                     |
-| qr_signature          | TEXT          | NOT NULL                                                                | QR signature used for offline verification. |
-| qr_issued_at          | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | QR issuance timestamp.                      |
-| expires_at            | TIMESTAMPTZ   | NULL                                                                    | Expiry for `PENDING` registrations.         |
-| created_at            | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                            |
-| updated_at            | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                            |
-| created_by            | UUID          | FK users(id), NOT NULL                                                  | `STUDENT` who registered.                   |
-| updated_by            | UUID          | FK users(id), NOT NULL                                                  | Actor who last updated status.              |
+| Column Name           | Data Type     | Constraints                                                             | Description/UX Logic                                                                                  |
+| :-------------------- | :------------ | :---------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- |
+| id                    | UUID          | PK, NOT NULL, DEFAULT gen_random_uuid()                                 | Registration identifier.                                                                              |
+| workshop_id           | UUID          | FK workshops(id), NOT NULL                                              | Workshop being registered.                                                                            |
+| student_user_id       | UUID          | FK users(id), NOT NULL                                                  | `STUDENT` user registering.                                                                           |
+| status                | VARCHAR(20)   | NOT NULL, CHECK (status IN ('PENDING','CONFIRMED','FAILED','CANCELED')) | Registration state.                                                                                   |
+| price_at_registration | NUMERIC(10,2) | NOT NULL, DEFAULT 0                                                     | Price snapshot at time of registration.                                                               |
+| currency              | CHAR(3)       | NOT NULL, DEFAULT 'USD'                                                 | ISO 4217 currency code.                                                                               |
+| idempotency_key_id    | UUID          | FK idempotency_keys(id), NOT NULL                                       | Idempotency reference for exact-once flow.                                                            |
+| qr_payload            | TEXT          | NULL                                                                    | Signed QR payload data. Populated only when status transitions to `CONFIRMED`.                        |
+| qr_signature          | TEXT          | NULL                                                                    | QR signature for offline verification. Populated only when status transitions to `CONFIRMED`.         |
+| qr_issued_at          | TIMESTAMPTZ   | NULL                                                                    | QR issuance timestamp. Set atomically with `qr_payload` and `qr_signature` on `CONFIRMED` transition. |
+| expires_at            | TIMESTAMPTZ   | NULL                                                                    | Expiry for `PENDING` registrations.                                                                   |
+| created_at            | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                                                                                      |
+| updated_at            | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                                                                                      |
+| created_by            | UUID          | FK users(id), NOT NULL                                                  | `STUDENT` who registered.                                                                             |
+| updated_by            | UUID          | FK users(id), NOT NULL                                                  | Actor who last updated status.                                                                        |
 
 **Indexing Strategy:**
 
-- B-Tree on `workshop_id` and `student_user_id` for lookup.
+- B-Tree on `workshop_id` for workshop-scoped registration lookups.
+- B-Tree on `student_user_id` for student registration history.
 - Partial unique B-Tree on `(workshop_id, student_user_id)` where `status IN ('PENDING','CONFIRMED')` to prevent duplicate active registrations.
-- B-Tree on `status` and `expires_at` for the background sweeper.
+- Composite partial B-Tree on `(expires_at, workshop_id)` where `status = 'PENDING'` for the Dual-Case Reconciliation Sweeper. This index is small (only `PENDING` rows), supports the exact sweeper query `WHERE status = 'PENDING' AND expires_at < NOW()`, and includes `workshop_id` for efficient per-workshop capacity refund operations within the same sweep.
 
 > [!IMPORTANT]
-> All registration creation and idempotency checks must hit the primary database to enforce exactly-once semantics.
+>
+> - All registration creation and idempotency checks must hit the primary database to enforce exactly-once semantics.
+> - `qr_payload`, `qr_signature`, and `qr_issued_at` are intentionally nullable. They must **only** be populated inside the `PENDING` -> `CONFIRMED` state transition transaction - never at the initial `PENDING` insert. For free workshops this occurs in the same transaction as the insert. For paid workshops this occurs only after payment gateway confirmation (synchronous callback or webhook). Application code must enforce this invariant; the database columns are nullable to reflect the deferred lifecycle.
 
 ### Table: `payments`
 
@@ -635,9 +638,6 @@ erDiagram
 **Indexing Strategy:**
 
 - Composite B-Tree on `(user_id, is_read)` to heavily optimize the unread badge counter queries for the UI.
-
-> [!NOTE]
-> In-app notifications are part of the UX audit trail and should not be deleted; use archival policies instead.
 
 ### Table: `notification_delivery_logs`
 

@@ -85,6 +85,10 @@
 - **Rationale:** Redis provides atomic operations (for example, `DECR`), expiring keys, and high throughput for shared counters. It supports non-blocking refresh patterns and rate limiting at scale without overloading PostgreSQL.
 - **Alternatives Considered:** Memcached was rejected because it lacks the durable atomic counter semantics needed for `DECR`-based coordination and lock-free control flow. In-memory local caches were rejected because they fragment state across nodes, making rate limiting and refresh coordination unsafe in a multi-instance deployment.
 - **Consequences:** Requires memory sizing, eviction policy tuning, and Redis HA planning.
+- **Failure Mode & Fallback:** Redis is a critical dependency for two mechanisms - Token Bucket rate limiting and lock-free capacity pre-checks. When Redis is unavailable, the system applies distinct fallback strategies per concern:
+  - **Rate Limiting (Bucket4j):** Configured in **fail-open** mode. When Redis is unreachable, the filter skips bucket evaluation and allows the request through. This is acceptable because: (a) outages are expected to be brief, (b) the primary risk (overbooking) is still protected by the DB-level constraints, and (c) blocking all traffic during a Redis outage is a worse outcome for a university event system. All fail-open decisions must be logged and a `rate_limiter.redis_unavailable` metric emitted for alerting.
+  - **Capacity DECR:** Configured in **fail-closed** mode. When Redis is unreachable, the API returns `503 Service Unavailable` with a `Retry-After: 30` header for registration attempts. This prevents capacity counter state from being bypassed entirely. Workshop browsing and other read paths remain fully operational and must not be gated on Redis availability.
+  - **JTI Blacklist (Token Revocation):** Configured in **fail-closed** mode. If Redis is unreachable, revocation checks cannot be performed and the request is rejected with `503`. This is the safer choice for a security control - allowing potentially revoked tokens is a worse outcome than a brief service interruption.
 
 ### ADR 011: Object Storage
 
@@ -111,6 +115,8 @@
 - **Rationale:** Redis processes atomic decrements sequentially in microseconds, preventing last-seat race conditions without holding database connections or blocking request threads. Pessimistic locking (`SELECT ... FOR UPDATE`) is an anti-pattern at 12,000-user scale due to connection pool exhaustion risk.
 - **Alternatives Considered:** Pessimistic row locking was rejected because it would serialize hot-seat contention and exhaust the JDBC pool during the 3-minute surge. Application-side spin locks or retries were rejected because they waste threads and still cannot guarantee efficient last-seat handling under contention.
 - **Consequences:** Requires compensating increments on rollback paths but preserves database availability during spikes.
+- **Defense-in-Depth:** Redis DECR is the first-line guard. The database partial unique index on `(workshop_id, student_user_id) WHERE status IN ('PENDING', 'CONFIRMED')` is the last-resort safety net for any edge-case Redis inconsistency. The registration use case **must explicitly catch** the resulting unique constraint violation from the database and translate it into a `409 Conflict` response — not a `500 Internal Server Error`. This two-layer design ensures correctness is preserved even under Redis counter drift, while keeping the DB-level contention path rare enough to not impact throughput.
+- **Periodic Reconciliation:** A Capacity Reconciliation Job runs every 5 minutes to detect and correct Redis-DB counter drift caused by missed compensating increments. See the Overbooking Prevention section of `design.md` for the full reconciliation flow.
 
 ### ADR 014: Idempotency Mechanism
 
@@ -159,10 +165,10 @@
 ### ADR 019: Rate Limiting Algorithm
 
 - **Context:** Registrations can spike to 12,000 concurrent users within minutes.
-- **Decision:** Use Bucket4j Token Bucket rate limiting in the Core Backend Monolith filter layer with Redis-backed counters.
-- **Rationale:** Token Bucket smooths bursts while allowing controlled short-term spikes. Placing enforcement in the backend filter layer preserves a dumb gateway and centralizes logic under consistent authentication and telemetry.
-- **Alternatives Considered:** Leaky bucket and fixed-window counters were rejected because they either smooth too aggressively or allow burst edges that are too coarse for the 3-minute spike window. Gateway-only enforcement was rejected because the core backend needs first-class control and observability for authenticated traffic shaping.
-- **Consequences:** Requires tuning refill rates and burst sizes to avoid excessive throttling.
+- **Decision:** Use Bucket4j Token Bucket rate limiting in the Core Backend Monolith filter layer with Redis-backed counters. Nginx acts as a pure forwarding proxy and does not perform rate limiting.
+- **Rationale:** Token Bucket smooths bursts while allowing controlled short-term spikes. Placing enforcement in the backend filter layer preserves a dumb gateway and centralizes logic under consistent authentication and telemetry. Redis-backed shared counters ensure consistent enforcement across all horizontally scaled backend nodes (Node 1 and Node 2).
+- **Alternatives Considered:** Leaky bucket and fixed-window counters were rejected because they either smooth too aggressively or allow burst edges that are too coarse for the 3-minute spike window. Gateway-only enforcement was rejected because the core backend needs first-class control and observability for authenticated traffic shaping. Nginx-level rate limiting was rejected because it cannot distinguish authenticated users and lacks access to JWT claims required for per-user bucket keying.
+- **Consequences:** Requires tuning refill rates and burst sizes per endpoint category (registration endpoints vs general browsing). When Redis is unavailable, the rate limiter operates in fail-open mode (see ADR-010 failure mode) — all fail-open decisions are logged and emitted as metrics for alerting.
 
 ### ADR 020: Circuit Breaker Implementation
 
@@ -180,9 +186,17 @@
 - **Alternatives Considered:** Manual sandbox testing alone was rejected because it cannot systematically reproduce timeout, retry, and duplicate-charge edge cases. Ad hoc mock libraries were rejected because they do not provide the controlled failure injection needed to validate production-grade resilience policies.
 - **Consequences:** Requires strict environment controls so chaos testing cannot reach production.
 
+### ADR 022: Payment Webhook Handling Strategy
+
+- **Context:** After the synchronous payment API call, the platform must receive payment outcome notifications from the external payment gateway (e.g., Stripe `payment_intent.succeeded`, `payment_intent.payment_failed`). Without a reception path for these events, the system must poll or wait, creating unacceptable UX delays for students waiting for registration confirmation.
+- **Decision:** Implement a dedicated, unauthenticated `POST /api/v1/payments/webhook` endpoint that receives gateway-pushed events, verifies the payload signature using the provider's HMAC signing secret, and processes the payment outcome idempotently. The Dual-Case Reconciliation Sweeper (defined in ADR-014) is retained as a fallback-only mechanism for genuinely lost webhooks, with its timeout extended to 30 minutes.
+- **Rationale:** Webhook-driven confirmation is the industry-standard pattern for asynchronous payment flows. It reduces the student's registration confirmation latency from up to 15 minutes (sweeper-driven) to seconds (webhook-driven), which is critical during a high-concurrency event where students expect near-instant feedback. Idempotency on `provider_payment_id` prevents double-processing if the gateway retries the webhook.
+- **Alternatives Considered:** Sweeper-only reconciliation was rejected as the primary path because the 15-minute (or longer) latency creates a degraded UX during the peak registration window — students are left with a `PENDING` registration with no confirmation. Pure synchronous payment confirmation was rejected because payment gateways are inherently asynchronous and synchronous calls block request threads during the 3-minute spike window.
+- **Consequences:** Requires secure storage of the webhook signing secret as an environment variable. The endpoint must always return `200 OK` to the gateway (even on internal processing errors) to prevent retry floods. An internal DLQ or error log must capture events that could not be processed for manual review.
+
 ## 7. Specific Workflows
 
-### ADR 022: Mobile Local Database
+### ADR 023: Mobile Local Database
 
 - **Context:** Offline check-in requires durable local storage and deterministic sync.
 - **Decision:** Use a modern JSI-based SQLite library for React Native (e.g., `expo-sqlite` or `react-native-quick-sqlite`) as the mobile persistence layer.
@@ -190,7 +204,7 @@
 - **Alternatives Considered:** AsyncStorage was rejected because it lacks transactional querying and cannot support deterministic offline reconciliation at scan volume. WatermelonDB was rejected because the project benefits more from a simpler, broadly supported SQLite layer for controlled sync semantics.
 - **Consequences:** Requires schema migrations on mobile, but delivers durable offline behavior.
 
-### ADR 023: Offline Sync Conflict Resolution
+### ADR 024: Offline Sync Conflict Resolution
 
 - **Context:** Multiple devices can scan the same attendee while offline and later sync concurrently.
 - **Decision:** Use server-authoritative reconciliation with workshop-scoped bulk fetch and bulk upsert that returns an HTTP 207 Multi-Status response with per-entry resolution codes (e.g., `SUCCESS`, `ALREADY_USED`, `INVALID_TICKET`).
@@ -198,7 +212,7 @@
 - **Alternatives Considered:** Client-side merge or last-write-wins reconciliation was rejected because offline devices cannot safely decide attendance authority without risking double booking. Exception-driven batch failure was rejected because a single bad row would abort the entire sync and make deterministic mobile recovery impossible.
 - **Consequences:** Requires unique constraints and deterministic response handling on the client.
 
-### ADR 024: Batch Processing Strategy
+### ADR 025: Batch Processing Strategy
 
 - **Context:** Nightly CSV ingestion must tolerate malformed rows and duplicates without failing the entire pipeline.
 - **Decision:** Use Spring Batch with streaming ItemReader/ItemProcessor/ItemWriter, chunk commits, and local reject staging uploaded to S3 on completion.
@@ -206,7 +220,7 @@
 - **Alternatives Considered:** Loading the whole CSV into memory was rejected because large nightly drops would risk OOM and long GC pauses. Direct S3 append or per-row uploads were rejected because object storage is immutable and those patterns would increase API chatter, latency, and operational fragility.
 - **Consequences:** Requires job monitoring and local ephemeral storage on workers.
 
-### ADR 025: AI Summarization Integration
+### ADR 026: AI Summarization Integration
 
 - **Context:** PDF summarization must not block admin workflows and must be resilient to external AI failures.
 - **Decision:** Use an async worker pipeline triggered via transactional outbox events and brokered execution with DLQ handling.
@@ -214,7 +228,7 @@
 - **Alternatives Considered:** Calling the AI API synchronously from the admin request was rejected because it would couple user latency to external inference variability and break resilience under spikes. Sending raw PDFs directly was rejected because payload size, token limits, and external compute costs make pre-chunking necessary for predictable operation.
 - **Consequences:** Introduces eventual consistency and requires job status tracking.
 
-### ADR 026: Pluggable Notification Architecture
+### ADR 027: Pluggable Notification Architecture
 
 - **Context:** The system must support email and in-app notifications, with future channel expansion.
 - **Decision:** Use a provider abstraction with strategy-based adapters and brokered delivery.
@@ -222,7 +236,7 @@
 - **Alternatives Considered:** A monolithic notification service was rejected because channel-specific failures and release cadence would become tightly coupled. Direct provider calls from business workflows were rejected because they would spread vendor logic across the codebase and weaken retry isolation.
 - **Consequences:** Requires adapter contracts and configuration management but avoids vendor lock-in.
 
-### ADR 027: Delegated Creation & Zero-Trust Provisioning
+### ADR 028: Delegated Creation & Zero-Trust Provisioning
 
 - **Context:** `ORGANIZERs` provision `STAFF` and other `ORGANIZER` accounts without a shared admin console, and passwords must not be exposed to the inviter.
 - **Decision:** Use delegated creation with system-generated temporary passwords, mandatory first-login password change, and explicit workshop assignment for `STAFF`.
@@ -230,7 +244,7 @@
 - **Alternatives Considered:** Shared initial passwords were rejected because they expose credentials to the inviter and violate zero-trust principles. Self-service account creation was rejected because `STAFF` and delegated `ORGANIZER` provisioning must remain scoped, auditable, and organization-bound.
 - **Consequences:** Requires email delivery reliability and account-state enforcement on first login.
 
-### ADR 028: Offline QR Verification Cryptography
+### ADR 029: Offline QR Verification Cryptography
 
 - **Context:** QR codes could be forged offline, and `STAFF` devices must verify authenticity without network access.
 - **Decision:** Use PKI-based asymmetric cryptography for QR payload signing and verification.
@@ -240,7 +254,7 @@
 
 ## 8. Observability
 
-### ADR 029: Core Observability and Monitoring Stack
+### ADR 030: Core Observability and Monitoring Stack
 
 - **Context:** High-concurrency surges can cause silent failures, connection pool starvation, or cache stampedes. We need real-time telemetry without introducing performance overhead to request threads.
 - **Decision:** Use Spring Boot Actuator with Micrometer to expose core metrics at `/actuator/prometheus`. Deploy Prometheus as a pull-based Time Series Database (TSDB) to scrape these metrics, and Grafana for centralized visualization dashboarding.
