@@ -1,0 +1,129 @@
+// =============================================================================
+// UniHub Workshop — Core Backend Monolith
+// Spring Boot 4.0.6 · Java 25 · Gradle Groovy
+// =============================================================================
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.6'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.unihub'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+// Required by Spring MVC for parameter-name discovery without debug info
+compileJava.options.compilerArgs += ['-parameters']
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('springModulithVersion', "2.0.6")
+    set('awsSdkVersion', "2.46.0")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
+        mavenBom "software.amazon.awssdk:bom:${awsSdkVersion}"
+    }
+}
+
+dependencies {
+    // --- SPRING BOOT CORE ---
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // --- SPRING MODULITH ---
+    implementation 'org.springframework.modulith:spring-modulith-starter-core'
+    implementation 'org.springframework.modulith:spring-modulith-starter-jpa'
+    implementation 'org.springframework.modulith:spring-modulith-events-amqp'
+    implementation 'org.springframework.modulith:spring-modulith-actuator'
+    runtimeOnly 'org.springframework.modulith:spring-modulith-runtime'
+
+    // --- SECURITY & JWT ---
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    runtimeOnly 'org.bouncycastle:bcprov-jdk18on:1.84'
+
+    // --- PERSISTENCE ---
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // --- CACHE & RATE LIMITING ---
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.bucket4j:bucket4j_jdk17-core:8.19.0'
+    implementation 'com.bucket4j:bucket4j_jdk17-redis-common:8.19.0'
+    implementation 'com.bucket4j:bucket4j_jdk17-lettuce:8.19.0'
+
+    // --- MESSAGING ---
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+    // --- SEARCH ---
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+
+    // --- OBJECT STORAGE ---
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:url-connection-client'
+
+    // --- RESILIENCE ---
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+    implementation 'io.github.resilience4j:resilience4j-spring-boot4:2.4.0'
+
+    // --- OBSERVABILITY ---
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
+    // --- PAYMENT ---
+    implementation 'com.stripe:stripe-java:32.2.0'
+
+    // --- API DOCS ---
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
+    // --- DOTENV ---
+    developmentOnly 'me.paulschwarz:springboot4-dotenv:5.1.0'
+
+    // --- LOGGING ---
+    implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
+
+    // --- BOILERPLATE REDUCTION ---
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // --- MAPPING ---
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    // --- TESTING ---
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'com.h2database:h2'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

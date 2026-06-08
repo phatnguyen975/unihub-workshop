@@ -174,6 +174,9 @@ apps/backend/
 │   │       ├── application.yml
 │   │       ├── application-dev.yml
 │   │       ├── application-prod.yml
+│   │       ├── security/                     # RSA key pair
+│   │       │   ├── private.pem
+│   │       │   └── public.pem
 │   │       └── db/
 │   │           └── migration/                # Flyway migration scripts
 │   │               └── V1__init_schema.sql
@@ -181,6 +184,8 @@ apps/backend/
 │       └── java/
 │           └── com/unihub/workshop/
 │               └── ModulithArchitectureTest.java
+├── .env                                      # Local dev env vars (DB, Redis, RabbitMQ, etc.)
+├── .env.example                              # Env var template committed to source control
 ├── build.gradle                              # Gradle build definition
 └── settings.gradle                           # Gradle settings for the backend module
 ```
@@ -338,6 +343,8 @@ apps/workers/
 │   └── test/
 │       └── java/
 │           └── com/unihub/workshop/workers/
+├── .env                                      # Local dev env vars (DB, RabbitMQ, S3, AI API key)
+├── .env.example                              # Env var template committed to source control
 ├── build.gradle                              # Gradle build definition
 ├── settings.gradle                           # Gradle settings for the workers module
 └── README.md                                 # Worker-specific run and troubleshooting notes

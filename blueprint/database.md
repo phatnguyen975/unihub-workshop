@@ -671,17 +671,17 @@ erDiagram
 
 **Schema Definition Table:**
 
-| Column Name            | Data Type   | Constraints  | Description/UX Logic                                      |
-| :--------------------- | :---------- | :----------- | :-------------------------------------------------------- |
-| id                     | UUID        | PK, NOT NULL | Publication event identifier.                             |
-| listener_id            | TEXT        | NOT NULL     | Listener identifier processing the event.                 |
-| event_type             | TEXT        | NOT NULL     | Fully qualified class name of the event.                  |
-| serialized_event       | TEXT        | NOT NULL     | Serialized serialized event payload.                      |
-| publication_date       | TIMESTAMPTZ | NOT NULL     | Timestamp when the event was published.                   |
-| completion_date        | TIMESTAMPTZ | NULL         | Timestamp when processing completed.                      |
-| status                 | TEXT        | NULL         | Publication status (`INCOMPLETE`, `COMPLETED`, `FAILED`). |
-| completion_attempts    | INTEGER     | NULL         | Number of completion attempts.                            |
-| last_resubmission_date | TIMESTAMPTZ | NULL         | Timestamp of the last retry resubmission.                 |
+| Column Name            | Data Type   | Constraints                                       | Description/UX Logic                                      |
+| :--------------------- | :---------- | :------------------------------------------------ | :-------------------------------------------------------- |
+| id                     | UUID        | PK, NOT NULL                                      | Publication event identifier.                             |
+| listener_id            | TEXT        | NOT NULL                                          | Listener identifier processing the event.                 |
+| event_type             | TEXT        | NOT NULL                                          | Fully qualified class name of the event.                  |
+| serialized_event       | TEXT        | NOT NULL                                          | Serialized serialized event payload.                      |
+| publication_date       | TIMESTAMPTZ | NOT NULL, DEFAULT now()                           | Timestamp when the event was published.                   |
+| completion_date        | TIMESTAMPTZ | NULL                                              | Timestamp when processing completed.                      |
+| status                 | TEXT        | NULL                                              | Publication status (`INCOMPLETE`, `COMPLETED`, `FAILED`). |
+| completion_attempts    | INTEGER     | NULL, DEFAULT 0, CHECK (completion_attempts >= 0) | Number of completion attempts.                            |
+| last_resubmission_date | TIMESTAMPTZ | NULL                                              | Timestamp of the last retry resubmission.                 |
 
 **Indexing Strategy:**
 
