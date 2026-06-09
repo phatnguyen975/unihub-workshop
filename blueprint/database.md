@@ -694,7 +694,7 @@ erDiagram
 
 ### Table Group: `batch_*` (Framework-Managed)
 
-**Table Description & UX Context:** Spring Batch JobRepository metadata tables required for restartability and audit history of the nightly CSV ingestion pipeline.
+**Table Description & UX Context:** Spring Batch `JobRepository` metadata tables required for restartability and audit history of the nightly CSV ingestion pipeline.
 
 **Schema Definition Table:**
 

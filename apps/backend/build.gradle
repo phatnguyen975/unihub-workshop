@@ -18,7 +18,7 @@ java {
     }
 }
 
-// Required by Spring MVC for parameter-name discovery without debug info
+// Required by Spring for parameter-name discovery without debug info
 compileJava.options.compilerArgs += ['-parameters']
 
 configurations {
@@ -77,7 +77,7 @@ dependencies {
     // --- MESSAGING ---
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
 
-    // --- SEARCH ---
+    // --- SEARCH ENGINE ---
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
 
     // --- OBJECT STORAGE ---
@@ -88,15 +88,15 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aspectj'
     implementation 'io.github.resilience4j:resilience4j-spring-boot4:2.4.0'
 
-    // --- OBSERVABILITY ---
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
-
     // --- PAYMENT ---
     implementation 'com.stripe:stripe-java:32.2.0'
 
     // --- API DOCS ---
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
+    // --- OBSERVABILITY ---
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     // --- DOTENV ---
     developmentOnly 'me.paulschwarz:springboot4-dotenv:5.1.0'
@@ -104,7 +104,7 @@ dependencies {
     // --- LOGGING ---
     implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
 
-    // --- BOILERPLATE REDUCTION ---
+    // --- BOILERPLATE ---
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testCompileOnly 'org.projectlombok:lombok'
