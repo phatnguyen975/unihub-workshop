@@ -2,10 +2,14 @@
 
 ## 1. Root Workspace Structure
 
-This repository uses a monorepo approach to separate deliverable applications (Core Backend, Background Workers, Web Portal, and Mobile Check-in) from infrastructure and architecture blueprints. This keeps the Event-Driven Modular Monolith, offline-first JSI SQLite mobile stack, Redis-based SWR caching, RabbitMQ workers, and the Prometheus/Grafana observability stack easy to discover while preserving clean ownership boundaries for each runtime concern.
+This repository uses a monorepo approach to separate deliverable applications (Core Backend, Background Workers, Web Portal, and Mobile Check-in) from infrastructure and architecture blueprints. This keeps the Event-Driven Modular Monolith, offline-first JSI SQLite mobile stack, Redis-based SWR caching, RabbitMQ workers, and the Prometheus/Grafana observability stack easy to discover while preserving clean ownership boundaries for each runtime concern. Agent-assisted development is structured through `.agents/`, which defines reusable skills and slash-command workflows that enforce Spec-Driven and Test-Driven Development across the monorepo.
 
 ```text
 UniHub/
+├── AGENTS.md           # Agent rules + Documentation Map (always loaded)
+├── .agents/            # Agent skills infrastructure
+│   ├── skills/         # Reusable, language-agnostic skill definitions
+│   └── workflows/      # Slash commands (/spec, /plan, /build, /review)
 ├── apps/               # Product applications in the monorepo
 │   ├── backend/        # Spring Boot Modulith core backend API
 │   ├── workers/        # Background workers (batch, notifications, AI)
@@ -13,11 +17,13 @@ UniHub/
 │   └── mobile/         # React Native offline-first check-in app
 ├── infra/              # Local Docker, data services, observability configs
 ├── scripts/            # Executable scripts (Docker deploy, DB seeding, test scenarios)
-├── blueprint/          # Architecture blueprints and decisions
-└── docs/               # Additional product and engineering documentation
+├── docs/               # Architecture, design, database, and API documentation
+└── specs/              # Per-feature spec artifacts produced by the SDD workflow
 ```
 
-This physical separation mirrors Clean Architecture boundaries: `apps/` holds the deployable units, `infra/` defines the local runtime environment (Redis, RabbitMQ, Elasticsearch, MinIO, Prometheus, Grafana), and `blueprint/` anchors the system's authoritative architectural and schema decisions referenced during implementation. Note that PostgreSQL is intentionally omitted from the local `infra/` stack as the system strictly connects to the serverless Neon PostgreSQL Cloud via encrypted JDBC. Operational automation is centralized in `scripts/`, keeping the root directory clean.
+This physical separation mirrors Clean Architecture boundaries: `apps/` holds the deployable units, `infra/` defines the local runtime environment (Redis, RabbitMQ, Elasticsearch, MinIO, Prometheus, Grafana), and `docs/` anchors the system's authoritative architectural and schema decisions referenced during implementation. `specs/` captures the living, per-feature artifacts (`SPEC.md`, `API_CONTRACT.md`, `tasks.md`) produced when a feature goes through the `/spec → /plan → /build → /review` workflow. 
+
+Note that PostgreSQL is intentionally omitted from the local `infra/` stack as the system strictly connects to the serverless Neon PostgreSQL Cloud via encrypted JDBC. Operational automation is centralized in `scripts/`, keeping the root directory clean.
 
 ```mermaid
 ---
@@ -96,7 +102,38 @@ flowchart LR
   style External fill:#fff1f0,stroke:#e53e3e,color:#000000
 ```
 
-## 2. Detailed Application Structures
+## 2. Agent Skills Infrastructure (`.agents/`)
+
+UniHub uses Agent Skills to enforce Spec-Driven Development (SDD) combined with Test-Driven Development (TDD) across the backend and workers codebases.
+
+```text
+.agents/
+├── skills/                                 # Language-agnostic skill definitions
+│   ├── spec-driven-development/
+│   ├── api-contract-design/
+│   ├── test-driven-development/
+│   ├── task-planning-and-breakdown/
+│   ├── incremental-implementation/
+│   ├── modular-boundary-enforcement/
+│   ├── database-schema-evolution/
+│   ├── idempotency-and-exactly-once-design/
+│   ├── security-hardening/
+│   ├── code-review-and-quality/
+│   └── debugging-and-root-cause-analysis/
+└── workflows/                              # Slash commands
+    ├── spec.md                             # /spec
+    ├── plan.md                             # /plan
+    ├── build.md                            # /build
+    └── review.md                           # /review
+
+specs/                                      # Per-feature artifacts
+└── <feature-name>/
+    ├── SPEC.md
+    ├── API_CONTRACT.md
+    └── tasks.md
+```
+
+## 3. Detailed Application Structures
 
 ### Core Backend (`apps/backend/`)
 

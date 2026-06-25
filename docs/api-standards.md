@@ -17,7 +17,7 @@ All collection endpoints use cursor-based (keyset) pagination to guarantee stabl
 
 ### CORS Policy (Web Portal)
 
-Wildcard origins (`*`) are strictly prohibited in production. The backend must explicitly whitelist allowed web origins (staging and production domains). Allowed methods must explicitly include `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`. Custom headers such as `X-Correlation-ID`, `Idempotency-Key`, and `X-RateLimit-*` must be explicitly configured in both `Access-Control-Allow-Headers` and `Access-Control-Expose-Headers` so the React web client can send and read them.
+Wildcard origins (`*`) are strictly prohibited in production. The backend must explicitly whitelist allowed web origins (staging and production domains, or localhost for development). Allowed methods must explicitly include `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`. Custom headers such as `X-Correlation-ID`, `Idempotency-Key`, and `X-RateLimit-*` must be explicitly configured in both `Access-Control-Allow-Headers` and `Access-Control-Expose-Headers` so the React web client can send and read them.
 
 ### HTTP Status Codes
 
