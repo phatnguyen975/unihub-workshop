@@ -1,4 +1,4 @@
-# UniHub Workshop - API Standards
+# UniHub Workshop — API Standards
 
 ## API Design & Versioning Standards
 

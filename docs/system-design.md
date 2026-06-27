@@ -1,4 +1,4 @@
-# UniHub Workshop - Technical Design
+# UniHub Workshop — System Design
 
 ## 1. Architectural Overview
 

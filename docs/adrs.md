@@ -1,4 +1,4 @@
-# UniHub Workshop - Architectural Decision Records
+# UniHub Workshop — Architectural Decision Records
 
 ## 1. Foundation
 

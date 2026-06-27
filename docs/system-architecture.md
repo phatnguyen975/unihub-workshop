@@ -1,3 +1,5 @@
+# UniHub Workshop — System Architecture
+
 ```mermaid
 ---
 config:

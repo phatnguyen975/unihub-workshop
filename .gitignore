@@ -1,0 +1,5 @@
+apps/backend/src/main/resources/security/private.pem
+apps/backend/src/main/resources/security/public.pem
+apps/backend/.env
+apps/workers/.env
+infra/.env

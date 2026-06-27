@@ -1,14 +1,9 @@
 HELP.md
 .gradle
-.env
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
-
-### RSA Key Pair ###
-src/main/resources/security/public.pem
-src/main/resources/security/private.pem
 
 ### STS ###
 .apt_generated

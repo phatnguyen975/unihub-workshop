@@ -1,9 +1,7 @@
 # UniHub Workshop — Agent Rules & Documentation Map
 
-> [!NOTE]
->
-> - This file is the single, always-loaded source of truth for any AI agent working in this repository. It tells the agent **what the project is**, **where to find authoritative information**, **how development must proceed** (SDD + TDD), and **what it must never do**.
-> - Skills (`.agents/skills/`) and Workflows (`.agents/workflows/`) are loaded on demand and must be read in conjunction with this file — they assume the rules below as background context and do not repeat them.
+> This file is the single, always-loaded source of truth for any AI agent working in this repository. It tells the agent **what the project is**, **where to find authoritative information**, **how development must proceed** (SDD + TDD), and **what it must never do**.  
+> Skills (`.agents/skills/`) and Workflows (`.agents/workflows/`) are loaded on demand and must be read in conjunction with this file — they assume the rules below as background context and do not repeat them.
 
 ## 1. Project Overview
 
@@ -70,15 +68,18 @@ always wins in case of conflict with anything stated here.
 
 ## 4. Development Methodology — Spec-Driven + Test-Driven
 
-Every feature in this repository **must** go through this pipeline, driven by six slash commands. **No production code is written without an approved spec.** No business logic is written without a failing test first.
+Every feature in this repository **must** go through this pipeline, driven by five slash commands. **No production code is written without an approved spec.** No business logic is written without a failing test first.
 
-```
-/spec <feature-name> ──► /plan <feature-name> ──► /build <feature-name> <task-id> ──► /review <feature-name> ──► /fix <feature-name> (if findings) ──► /sync-docs <feature-name>
-                                                                                          ▲                         │
-                                                                                          └─────────────────────────┘
+```text
+/spec <feature-name> → /plan <feature-name> → /build <feature-name> <task-id> → /review <feature-name>
+
+/review → /fix → /review  (repeat until zero blocking findings)
 ```
 
-The `/review` is not a terminal step. If it produces findings, the cycle is `/review → /fix → /review` until no blocking findings remain. Only then does `/sync-docs` run once to reconcile `docs/` and `specs/` with what was actually built. This is **not an automated loop** — every arrow above is a separate, explicit human-invoked command. The agent does not chain commands on its own initiative — a human reviews the output of `/spec` and `/plan` and explicitly decides to proceed before the next command is run.
+The `/review` is not a terminal step. If it produces findings, the cycle is `/review → /fix → /review` until no blocking findings remain. This is **not an automated loop** — every arrow above is a separate, explicit human-invoked command. The agent does not chain commands on its own initiative — a human reviews the output of `/spec` and `/plan` and explicitly decides to proceed before the next command is run.
+
+> [!NOTE]
+> `specs/` and `docs/` are kept consistent _as part of_ `/build` itself, at the moment an improvement is proposed and approved — see section 4.4, "Mid-build improvement proposals." By the time a feature reaches `/review`, `specs/` and `docs/` are already expected to be accurate; `/review` and `/fix` exist to catch implementation defects, not specification drift.
 
 ### 4.1 Skills Catalog
 
@@ -95,7 +96,6 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 | 9   | `security-hardening`                  | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                           |
 | 10  | `code-review-and-quality`             | Review       | Multi-axis review before merge                                                     |
 | 11  | `debugging-and-root-cause-analysis`   | Build/Fix    | Reproduce → localize → hypothesize → fix root cause → regression test              |
-| 12  | `documentation-synchronization`       | Sync         | Reconcile `docs/` and `specs/` with what was actually implemented                  |
 
 ### 4.2 `/spec <feature-name>`
 
@@ -109,6 +109,9 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 **Human verification gate (mandatory, blocking):** The human reads `SPEC.md` (and `API_CONTRACT.md` if produced) and explicitly approves before `/plan` may be run. If acceptance criteria are not testable, or a requirement is ambiguous, the agent must stop and ask rather than guess.
 
 **Feature naming:** The agent does **not** choose feature names. The human supplies `<feature-name>` based on a business flow (e.g. `workshop-registration`, `payment-webhook-handling`, `offline-checkin-sync`) — typically one of the flows already named in `docs/system-design.md` in **Core System Flows** section. One module commonly contains several features; the agent must treat the supplied name as a use case, never assume it maps 1:1 to a module. If a supplied name is ambiguous or matches a bare module name (e.g. `registrations`), the agent must ask for clarification instead of guessing scope.
+
+> [!NOTE]
+> The human must read and approve these artifacts first — this is a hard gate, not a suggestion. The agent does not self-approve its own spec. If the human approves, the spec becomes the contract for implementation, then you change the status to `APPROVED`. If the human rejects it, revise these artifacts with the human's feedback and fix them until approval is granted.
 
 ### 4.3 `/plan <feature-name>`
 
@@ -140,7 +143,27 @@ Run once per task in `tasks.md`, in order.
 > [!NOTE]
 >
 > - `ModulithArchitectureTest` (see section 6) must pass as part of the full unit test suite run at the end of every `/build` task and again before `/review` — it is included in "the full unit test suite" referenced throughout this document, not a separate manual step.
-> - If a test fails unexpectedly during a task (not yet a formal review finding), the agent applies `debugging-and-root-cause-analysis` inline before continuing — the same discipline used formally in `/fix`.
+> - If a test fails unexpectedly during a task (not yet a formal review finding), the agent applies `debugging-and-root-cause-analysis` inline before continuing.
+
+> [!IMPORTANT]
+>
+> **Mid-build improvement proposals:** If, while implementing a task, the agent identifies a way the current approach in `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, or any document in `docs/` could be improved — a better design, a stronger pattern, or a constraint discovered only during implementation — the agent must **stop coding immediately** and write the proposal into `specs/<feature-name>/improvement-proposal.md`. The agent never implements an improvement first and explains it afterward.
+>
+> Every proposal must state:
+>
+> - **What** would change, and in which file(s) — `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and/or specific files under `docs/`.
+> - **Why** — a concrete, verifiable justification: a cited best practice, an existing pattern already used elsewhere in this codebase, a documented limitation discovered while coding, or a direct conflict with an existing ADR or constraint. A proposal with no verifiable justification, or one based only on stylistic preference, must not be submitted.
+>
+> This goes through a **two-gate approval**, run in this exact order:
+>
+> 1. **Gate 1 — Approve the proposal.** The human reads `improvement-proposal.md` and replies Approve or Reject.
+>    - **Reject** → the agent discards the proposal and continues implementing exactly per the existing approved spec. No files are changed.
+>    - **Approve** → the agent proceeds to Gate 2. It does not touch any code yet.
+> 2. **Gate 2 — Approve the synchronized artifacts.** The agent updates every affected file in `specs/<feature-name>/` **and** every affected file in `docs/` in the same pass, then presents the diff. The human reviews and replies Approve or Reject.
+>    - **Reject** → the human states what is still out of sync or incorrect; the agent corrects and re-presents the diff. Repeat until approved.
+>    - **Approve** → `specs/` and `docs/` are now the new source of truth. The agent may resume coding the current task **only if** the approved change does not require a new task. If the approved change requires a new task (or removes/reorders an existing one), the agent updates `tasks.md` accordingly and **stops** — it does not start a new task on its own initiative. The human must explicitly invoke `/build <feature-name> <task-id>` to proceed.
+>
+> This is the **only** mechanism that keeps `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` consistent with each other and with the actual implementation.
 
 ### 4.5 `/review <feature-name>`
 
@@ -148,8 +171,10 @@ Run after all tasks for a feature are complete.
 
 **Skills invoked:**
 
-- `code-review-and-quality` — always runs. Multi-axis review (correctness against spec, layer/module boundary adherence, test coverage, style, coding rules), findings classified by severity.
+- `code-review-and-quality` — always runs. Multi-axis review (correctness against the approved `SPEC.md`/`API_CONTRACT.md`/`tasks.md`, layer/module boundary adherence, test coverage, style, coding rules), findings classified by severity.
 - `security-hardening` — re-run in full-checklist mode if the feature touches auth, payments, webhooks, or RBAC.
+
+**Scope:** By this point, `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` are assumed accurate — any legitimate deviation already went through the improvement-proposal flow in section 4.4. `/review` therefore checks the implementation **against** these artifacts; it does not re-open or re-question the artifacts themselves. If the agent believes it has found a genuine specification gap rather than an implementation defect, it must say so explicitly in `review-notes.md` and flag that the human may need to restart an improvement proposal retroactively — but `/review` itself never edits `specs/` or `docs/`.
 
 **Output:** `specs/<feature-name>/review-notes.md`, listing every finding found by the agent, classified by severity (Critical / Should-fix / Nit / FYI). The agent presents this summary and stops — it does not fix anything yet.
 
@@ -163,24 +188,11 @@ Run whenever `/review` produced a human-confirmed list of findings.
 
 - `debugging-and-root-cause-analysis` — always runs, once per finding. **For each finding:** reproduce the minimal failing case → localize the cause → form a hypothesis → fix the root cause (not the symptom) → add a regression test that fails before the fix and passes after.
 
-**Rule:** A fix is never applied without a regression test, even for findings that look trivial. This is the same Red-Green-Refactor discipline as `/build` — a review finding is not exempt from TDD.
+**Rule:** `/fix` only ever changes code and tests to bring the implementation back into line with the already-approved `SPEC.md` / `API_CONTRACT.md` / `tasks.md`. It never edits `specs/` or `docs/` — those are only ever changed through the improvement-proposal flow in section 4.4. A fix is never applied without a regression test, even for findings that look trivial. This is the same Red-Green-Refactor discipline as `/build` — a review finding is not exempt from TDD.
 
-**Triage before fixing:** Not every finding is a code-level bug. Before applying `debugging-and-root-cause-analysis`, the agent must classify each finding into one of two categories:
+**After all findings are fixed:** The agent reports completion and the human re-runs `/review` on the same feature. Repeat `/review → /fix → /review` until zero blocking findings remain. The feature is then considered complete.
 
-- **Implementation defect** — The code does not correctly implement what `SPEC.md` / `API_CONTRACT.md` / `tasks.md` already describe. Proceed directly with the fix-and-regression-test process below.
-- **Spec or plan defect** — The finding reveals that `SPEC.md`, `API_CONTRACT.md`, or `tasks.md` itself is wrong, incomplete, or contradicts `docs/system-design.md`, `docs/adrs.md`, `docs/database-schema.md`, or `docs/api-standards.md`. In this case, the agent must **not** patch the code directly. It must stop, explain why this is a spec/plan defect, and ask the human to re-run `/spec` or `/plan` to correct the source artifact first — only after that correction is approved does `/build` (for new/changed tasks) and then `/fix` (for the remaining implementation-level findings) resume.
-
-**After all findings are fixed:** The agent reports completion and the human re-runs `/review` on the same feature. Repeat `/review → /fix → /review` until zero blocking findings remain.
-
-### 4.7 `/sync-docs <feature-name>`
-
-Run exactly once, after `/review` passes with zero blocking findings.
-
-**Skill invoked:**
-
-- `documentation-synchronization` — always runs. Compares what was actually implemented against `specs/<feature-name>/API_CONTRACT.md`, the relevant tables in `docs/database-schema.md`, any ADR in `docs/adrs.md` that the feature touches, and `docs/project-structure.md` if the feature introduced new packages, modules, or directories not yet reflected there. Updates these files to match reality (e.g. a column that ended up nullable for a reason not originally planned, an endpoint field that changed). If a genuinely new architectural decision was made during implementation, drafts a new ADR entry for human approval rather than silently editing existing ADRs.
-
-**Human verification gate (mandatory, blocking):** The human reviews and approves all document changes before the feature is considered fully closed.
+If `/review → /fix` repeats more than twice for the same feature without converging, treat this as a signal that the feature was under-specified or the task breakdown was too coarse — stop and revisit `/spec` or `/plan` rather than continuing to patch.
 
 ## 5. Testing Standard
 
@@ -223,5 +235,6 @@ These apply to all code regardless of which skill or command produced it.
 - **Never introduce an integration test** of any kind, even if it seems like the most direct way to verify something — see section 5.
 - **Never silently expand a task's scope.** If implementing a task reveals that the spec or plan is wrong or incomplete, stop and surface this rather than improvising beyond what was approved.
 - **Never invent business behavior not present in `docs/`.** If `docs/system-design.md` or `docs/adrs.md` doesn't specify a behavior, ask rather than assume.
-- **Fail-mode decisions (fail-open vs fail-closed)** must match what `docs/adrs.md` (ADR-010, ADR-019) already specifies — do not change these without an explicit human decision.
+- **Fail-mode decisions (fail-open vs fail-closed)** must match what `docs/adrs.md` already specifies — do not change these without an explicit human decision.
 - Never apply a fix from `/fix` without the regression-test discipline described in section 4.6 — a review finding is never patched directly.
+- **Never let implementation silently diverge from the approved spec.** If a better approach is discovered mid-build, follow the two-gate improvement-proposal process in section 4.4 — record it, get it approved, update `specs/` and `docs/` together, get that update approved, then resume — never implement first and reconcile later.

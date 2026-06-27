@@ -1,4 +1,4 @@
-# UniHub Workshop - Project Structure
+# UniHub Workshop — Project Structure
 
 ## 1. Root Workspace Structure
 

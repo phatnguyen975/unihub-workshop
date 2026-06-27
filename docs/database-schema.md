@@ -1,4 +1,4 @@
-# UniHub Workshop - Database Design
+# UniHub Workshop — Database Schema Design
 
 ## 1. Overview & Database Principles
 
