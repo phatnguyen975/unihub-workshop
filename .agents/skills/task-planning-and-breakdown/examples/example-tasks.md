@@ -4,9 +4,10 @@
 > API Contract: specs/resource-reservation-with-capacity-limit/API_CONTRACT.md  
 > Status: APPROVED
 
-> **Note:** This is an illustrative, domain-neutral example showing how to apply this skill. It decomposes the same "resource reservation with capacity limit" feature used as the worked example in the `spec-driven-development` and `api-contract-design` skills, so all three examples can be read together as one consistent walkthrough. It does not belong to any specific project, language, or framework — substitute your own project's actual layer names and file paths.
+> [!NOTE]
 >
-> Each task below is a **complete vertical slice** — it touches every layer the capability needs (commonly Domain, Application, Infrastructure, and Presentation, or this project's equivalent names) and is independently end-to-end testable the moment it's done. No task is scoped to a single layer.
+> - This is an illustrative, domain-neutral example showing how to apply this skill. It decomposes the same "resource reservation with capacity limit" feature used as the worked example in the `spec-driven-development` and `api-contract-design` skills, so all three examples can be read together as one consistent walkthrough. It does not belong to any specific project, language, or framework — substitute your own project's actual layer names and file paths.
+> - Each task below is a **complete vertical slice** — it touches every layer the capability needs (commonly Domain, Application, Infrastructure, and Presentation, or this project's equivalent names) and is independently end-to-end testable the moment it's done. No task is scoped to a single layer.
 
 ## Overview
 
@@ -52,9 +53,9 @@ This plan implements reservation creation and cancellation against a capacity-li
 
 #### Checkpoint: Feature Complete
 
-- [ ] T1 and T2 both pass all of their acceptance criteria when exercised through the actual HTTP endpoints
-- [ ] Full test suite passes (unit tests only, per this project's testing policy)
-- [ ] Ready for `/review`
+- [ ] T1 and T2 both pass all of their acceptance criteria when exercised through the actual HTTP endpoints.
+- [ ] Full test suite passes (unit tests only, per this project's testing policy).
+- [ ] Ready for `/review`.
 
 ## Risks and Mitigations
 

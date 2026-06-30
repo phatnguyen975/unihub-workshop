@@ -6,8 +6,8 @@
 
 ## Overview
 
-<!-- One paragraph: what this plan builds, in plan terms (not spec terms —
-assume the reader has already read the spec). -->
+<!-- One paragraph: what this plan builds, in plan terms
+(not spec terms — assume the reader has already read the spec). -->
 
 ## Architecture Decisions for This Plan
 
@@ -36,18 +36,21 @@ carrying full detail for whoever picks up the task.
 ### Phase 1: <Phase Name — e.g. "Core Reservation Flow">
 
 - [ ] **T1 — <Capability delivered, as a caller-observable outcome, one line>**
-  - **Size:** S | M
+  - **Size:** S or M
   - **Depends on:** — <!-- or: T<n> -->
   - **Layers touched:** <e.g. Domain, Application, Infrastructure, Presentation>
   - **Files:** <expected file path 1>, <expected file path 2>, ...
-  - **Acceptance Criteria:** - <Externally observable condition, e.g. "calling X with Y produces Z", traced to FR-XX / endpoint> - <Another externally observable condition>
+  - **Acceptance Criteria:**
+    - <Externally observable condition, e.g. "calling X with Y produces Z", traced to FR-XX / endpoint>
+    - <Another externally observable condition>
 
 - [ ] **T2 — <Capability delivered, one line>**
-  - **Size:** S | M
+  - **Size:** S or M
   - **Depends on:** T1
   - **Layers touched:** <layers>
   - **Files:** <expected file path>
-  - **Acceptance Criteria:** - <Externally observable condition>
+  - **Acceptance Criteria:**
+    - <Externally observable condition>
 
 #### Checkpoint: <Phase Name>
 
@@ -56,11 +59,12 @@ carrying full detail for whoever picks up the task.
 ### Phase 2: <Phase Name — e.g. "Edge Cases and Secondary Capabilities">
 
 - [ ] **T3 — <Capability delivered, one line>**
-  - **Size:** S | M
+  - **Size:** S or M
   - **Depends on:** T1
   - **Layers touched:** <layers>
   - **Files:** <expected file path>
-  - **Acceptance Criteria:** - <Externally observable condition>
+  - **Acceptance Criteria:**
+    - <Externally observable condition>
 
 #### Checkpoint: <Phase Name>
 
@@ -74,18 +78,19 @@ each individually span all the same layers. -->
 ### Phase N: <Final Phase>
 
 - [ ] **T<k> — <Capability delivered, one line>**
-  - **Size:** S | M
+  - **Size:** S or M
   - **Depends on:** T<...>
   - **Layers touched:** <layers>
   - **Files:** <expected file path>
-  - **Acceptance Criteria:** - <Externally observable condition, traced to an API_CONTRACT.md endpoint if applicable>
+  - **Acceptance Criteria:**
+    - <Externally observable condition, traced to an API_CONTRACT.md endpoint if applicable>
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks above are checked off
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end
-- [ ] Full test suite passes (per the project's testing policy)
-- [ ] Ready for `/review`
+- [ ] All tasks above are checked off.
+- [ ] Every acceptance criterion across all tasks has been verified end-to-end.
+- [ ] Full test suite passes (per the project's testing policy).
+- [ ] Ready for `/review`.
 
 ## Risks and Mitigations
 

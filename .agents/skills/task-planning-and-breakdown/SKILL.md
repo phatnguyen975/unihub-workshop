@@ -43,7 +43,7 @@ This skill produces exactly one artifact: `specs/<feature-name>/tasks.md`.
 
 ```text
     HORIZONTAL (rejected)         │    VERTICAL (required)
-──────────────────────────────────│─────────────────────────────────────
+──────────────────────────────────│──────────────────────────────────
   Task 1: Data model              │  Task 1: Create a reservation
     (all capabilities)            │    (domain → application →
   Task 2: Business logic          │    infrastructure → interface,
@@ -114,11 +114,11 @@ Present `tasks.md` using [`resources/TASKS_TEMPLATE.md`](resources/TASKS_TEMPLAT
 
 Use a simple relative sizing model — the exact unit (story points, hours, "number of files") matters far less than the discipline of consciously sizing every task before accepting it into the plan. Because every task is a vertical slice, its file count naturally spans multiple layers — that's expected, not a sign the task is too big on its own.
 
-| Size           | Rough Scope                                                                                                                                        | Typical File Count (across all layers) | Agent/Engineer Fit                              |
-| :------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------- | :---------------------------------------------- |
-| **S** (Small)  | One small, complete capability with a thin path through each layer it touches (e.g. a simple read endpoint with no business rules beyond a lookup) | 3–5                                    | Ideal — high confidence, easy to review         |
-| **M** (Medium) | One coherent capability with real business logic in at least one layer (e.g. a mutation with a validation rule and a side effect)                  | 5–8                                    | Good — still reviewable as a single diff        |
-| **L** (Large)  | A capability that bundles more than one distinct caller-observable behavior, or has unusually deep logic in multiple layers at once                | 9+                                     | **Too large — split before adding to the plan** |
+| Size           | Rough Scope                                                                                                                                        | Typical File Count | Agent/Engineer Fit                              |
+| :------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------- | :---------------------------------------------- |
+| **S** (Small)  | One small, complete capability with a thin path through each layer it touches (e.g. a simple read endpoint with no business rules beyond a lookup) | 3–6                | Ideal — high confidence, easy to review         |
+| **M** (Medium) | One coherent capability with real business logic in at least one layer (e.g. a mutation with a validation rule and a side effect)                  | 7–10               | Good — still reviewable as a single diff        |
+| **L** (Large)  | A capability that bundles more than one distinct caller-observable behavior, or has unusually deep logic in multiple layers at once                | 10+                | **Too large — split before adding to the plan** |
 
 **Rule:** If a task is sized L or larger, look for a smaller, still-fully-vertical capability inside it to split off first (see Step 3.3) — never resolve an oversized task by flattening it into per-layer pieces. A plan containing an L-sized task, or a plan that "solves" sizing by reverting to horizontal layer tasks, is not a finished plan.
 
@@ -126,17 +126,17 @@ Use a simple relative sizing model — the exact unit (story points, hours, "num
 
 Condensed version — full checklist lives in [`resources/QUALITY_CHECKLIST.md`](resources/QUALITY_CHECKLIST.md):
 
-- [ ] The feature's `SPEC.md` (and `API_CONTRACT.md`, if applicable) exists and is `APPROVED`
-- [ ] No code was written during planning — the output is a document only
-- [ ] Every task is a complete vertical slice through every layer the capability needs — no task is scoped to a single architectural layer
-- [ ] Every task is sized S or M; no L-or-larger task remains unsplit, and no task was "downsized" by flattening it into per-layer pieces
-- [ ] Tasks are ordered by dependency between capabilities — a task never depends on a capability that a later task is supposed to provide
-- [ ] Every task has explicit, falsifiable acceptance criteria stated as externally observable behavior, traced back to the spec/contract
-- [ ] Every task lists its expected file scope across every layer it touches
-- [ ] Every task's dependency on earlier tasks (capabilities) is stated explicitly
-- [ ] Each phase groups related capabilities (by risk or dependency, not by layer) and ends with a checkpoint condition
-- [ ] Risks are listed with impact and mitigation; open questions are listed for the human, not silently resolved
-- [ ] The agent presented the plan and stopped — it did not begin implementing task 1 without explicit human approval
+- [ ] The feature's `SPEC.md` (and `API_CONTRACT.md`, if applicable) exists and is `APPROVED`.
+- [ ] No code was written during planning — the output is a document only.
+- [ ] Every task is a complete vertical slice through every layer the capability needs — no task is scoped to a single architectural layer.
+- [ ] Every task is sized S or M; no L-or-larger task remains unsplit, and no task was "downsized" by flattening it into per-layer pieces.
+- [ ] Tasks are ordered by dependency between capabilities — a task never depends on a capability that a later task is supposed to provide.
+- [ ] Every task has explicit, falsifiable acceptance criteria stated as externally observable behavior, traced back to the spec/contract.
+- [ ] Every task lists its expected file scope across every layer it touches.
+- [ ] Every task's dependency on earlier tasks (capabilities) is stated explicitly.
+- [ ] Each phase groups related capabilities (by risk or dependency, not by layer) and ends with a checkpoint condition.
+- [ ] Risks are listed with impact and mitigation; open questions are listed for the human, not silently resolved.
+- [ ] The agent presented the plan and stopped — it did not begin implementing without explicit human approval.
 
 ## Anti-Patterns
 

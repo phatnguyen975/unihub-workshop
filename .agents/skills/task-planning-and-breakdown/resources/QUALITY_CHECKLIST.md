@@ -19,8 +19,6 @@ Run this checklist against a drafted `tasks.md` before presenting it for human a
 
 ## Per-Task Checks
 
-For **every** task in the plan:
-
 - [ ] The task title is one clear sentence describing what it adds or changes — not a vague verb phrase like "implement the feature" or "handle edge cases."
 - [ ] The task is sized S or M. No task is sized L or larger — if one was found at this size, it has already been split before this checklist is being run.
 - [ ] The task's file scope is listed.
