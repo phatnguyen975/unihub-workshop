@@ -20,11 +20,11 @@ By this point, `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and the project's docum
 
 1. **Invoke `code-review-and-quality`** (always).
    - Confirm the change's size is actually reviewable; if it's too large for a single pass, say so as the first finding.
-   - **Walk all five axes deliberately:** Correctness (against the approved spec/contract), Design (layer and module-boundary compliance — cross-reference `modular-boundary-enforcement`), Security, Test Coverage (right layer, right mocking, per this project's testing policy), Style.
+   - **Walk all six axes deliberately:** Correctness (against the approved spec/contract), Design (layer and module-boundary compliance — cross-reference `modular-boundary-enforcement`), Security, Performace, Test Coverage (right layer, right mocking, per this project's testing policy), Style.
    - **Classify every finding by severity:** Critical / Should-fix / Nit / FYI. Every finding states its concrete impact, not just an instruction.
-2. **Invoke `security-hardening`** (re-run in full-checklist mode if the feature touches authentication, payments, webhooks, or RBAC).
+2. **Invoke `security-and-hardening`** (re-run in full-checklist mode if the feature touches authentication, payments, webhooks, or RBAC).
    - Confirm trust boundaries were mapped and STRIDE was applied during design; confirm the relevant checklist sections (auth, payment, webhook, file upload, general input) were actually satisfied in the implementation, not just assumed.
-3. **Invoke `performance-and-efficiency-engineering`** (if the feature touched a database query, a collection loop, or an external/slow dependency call during `/build`).
+3. **Invoke `performance-and-efficiency-engineering`** (re-run in full-checklist mode if the feature touches database query, collection loop, or external/slow dependency call).
    - Re-scan specifically for the N+1 query shape, missing index support, unbounded result sets, and unguarded hot-path I/O.
    - Confirm any cache introduced has a stated TTL and invalidation strategy.
 4. **Produce `specs/<feature-name>/review-notes.md`**, listing every finding from all skills above, with severity labels and a summary count by severity at the top.

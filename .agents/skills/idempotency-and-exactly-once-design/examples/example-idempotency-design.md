@@ -19,14 +19,14 @@ The key itself is the client-generated `Idempotency-Key` header value already sp
 
 ```
            ┌─────────────┐
-new key ──►│  PENDING    │  (claimed, operation in progress)
+new key ──►│   PENDING   │  (claimed, operation in progress)
            └──────┬──────┘
                   │
       ┌───────────┴───────────┐
       ▼                       ▼
 ┌─────────────┐         ┌─────────────┐
 │  COMPLETED  │         │   FAILED    │
-│ (terminal)  │         │ (terminal)  │
+│  (terminal) │         │  (terminal) │
 └─────────────┘         └─────────────┘
 ```
 

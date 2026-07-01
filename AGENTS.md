@@ -83,19 +83,20 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 
 ### 4.1 Skills Catalog
 
-| #   | Skill                                 | Phase        | Purpose                                                                            |
-| :-- | :------------------------------------ | :----------- | :--------------------------------------------------------------------------------- |
-| 1   | `spec-driven-development`             | Spec         | Write FR/BR/AC-based spec before any code                                          |
-| 2   | `api-contract-design`                 | Spec         | Design REST contract conformant to `docs/api-standards.md`                         |
-| 3   | `test-driven-development`             | Build        | Red-Green-Refactor; 4-layer mock-based unit testing                                |
-| 4   | `task-planning-and-breakdown`         | Plan         | Break approved spec into ordered atomic tasks                                      |
-| 5   | `incremental-implementation`          | Build        | Implement one vertical slice per task, Clean Architecture order                    |
-| 6   | `modular-boundary-enforcement`        | Build        | Keep cross-module access through `contracts/` only; run `ModulithArchitectureTest` |
-| 7   | `database-schema-evolution`           | Build        | Safe, additive-only schema migrations                                              |
-| 8   | `idempotency-and-exactly-once-design` | Build        | Exactly-once semantics for retry-risk mutations                                    |
-| 9   | `security-hardening`                  | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                           |
-| 10  | `code-review-and-quality`             | Review       | Multi-axis review before merge                                                     |
-| 11  | `debugging-and-root-cause-analysis`   | Build/Fix    | Reproduce → localize → hypothesize → fix root cause → regression test              |
+| #   | Skill                                    | Phase        | Purpose                                                                                                |
+| :-- | :--------------------------------------- | :----------- | :----------------------------------------------------------------------------------------------------- |
+| 1   | `spec-driven-development`                | Spec         | Write FR/BR/AC-based spec before any code                                                              |
+| 2   | `api-contract-design`                    | Spec         | Design REST contract conformant to `docs/api-standards.md`                                             |
+| 3   | `task-planning-and-breakdown`            | Plan         | Break approved spec into vertical-slice tasks — one capability per task, spanning every layer it needs |
+| 4   | `test-driven-development`                | Build        | Red-Green-Refactor; 4-layer mock-based unit testing                                                    |
+| 5   | `incremental-implementation`             | Build        | Build one task's vertical slice layer by layer, innermost-to-outermost                                 |
+| 6   | `modular-boundary-enforcement`           | Build        | Keep cross-module access through `contracts/` only; run `ModulithArchitectureTest`                     |
+| 7   | `database-schema-evolution`              | Build        | Safe, additive-only schema migrations                                                                  |
+| 8   | `idempotency-and-exactly-once-design`    | Build        | Exactly-once semantics for retry-risk mutations                                                        |
+| 9   | `security-and-hardening`                 | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                                               |
+| 10  | `performance-and-efficiency-engineering` | Build/Review | N+1 queries, indexing, unbounded results, hot-path I/O, caching                                        |
+| 11  | `code-review-and-quality`                | Review       | Multi-axis review before merge                                                                         |
+| 12  | `debugging-and-root-cause-analysis`      | Fix/Build    | Reproduce → localize → hypothesize → fix root cause → regression test                                  |
 
 ### 4.2 `/spec <feature-name>`
 
@@ -117,9 +118,9 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 
 **Skill invoked:**
 
-- `task-planning-and-breakdown` — always runs. Reads the approved `SPEC.md` or `API_CONTRACT.md` and produces `specs/<feature-name>/tasks.md` — an ordered list of atomic tasks following Clean Architecture layer order (Domain → Application → Infrastructure → Presentation), each with acceptance criteria and the expected file list.
+- `task-planning-and-breakdown` — always runs. Reads the approved `SPEC.md` or `API_CONTRACT.md` and produces `specs/<feature-name>/tasks.md` — an ordered list of vertical-slice tasks, each one a complete, independently end-to-end-testable capability spanning every Clean Architecture layer it needs (Domain → Application → Infrastructure → Presentation), never a task scoped to a single layer. Each task has acceptance criteria stated as externally observable behavior and the expected file list across all layers it touches.
 
-**Human verification gate (mandatory, blocking):** The human reviews `tasks.md` for correct ordering, scope, and granularity (no task should span more than ~5 files) before `/build` may begin.
+**Human verification gate (mandatory, blocking):** The human reviews `tasks.md` for correct ordering, scope, and granularity (no task should span more than ~10 files) before `/build` may begin.
 
 ### 4.4 `/build <feature-name> <task-id>`
 
@@ -127,14 +128,15 @@ Run once per task in `tasks.md`, in order.
 
 **Skills invoked, conditionally:**
 
-| Skill                                 | Always runs? | Condition                                                                                |
-| :------------------------------------ | :----------- | :--------------------------------------------------------------------------------------- |
-| `incremental-implementation`          | Yes          | Every task                                                                               |
-| `test-driven-development`             | Yes          | Every task — Red → Green → Refactor, strictly unit-test-only (see section 5)             |
-| `modular-boundary-enforcement`        | Conditional  | Task involves a cross-module call or new module-level class                              |
-| `database-schema-evolution`           | Conditional  | Task adds/modifies a table, column, index, or constraint                                 |
-| `idempotency-and-exactly-once-design` | Conditional  | Task is a mutation endpoint with retry risk (payment, registration, webhook, batch sync) |
-| `security-hardening`                  | Conditional  | Task touches auth, RBAC, payment, webhook, file upload, or any external input            |
+| Skill                                    | Always runs? | Condition                                                                                                           |
+| :--------------------------------------- | :----------- | :------------------------------------------------------------------------------------------------------------------ |
+| `incremental-implementation`             | Yes          | Every task                                                                                                          |
+| `test-driven-development`                | Yes          | Every task — Red → Green → Refactor, strictly unit-test-only (see section 5)                                        |
+| `modular-boundary-enforcement`           | Conditional  | Task involves a cross-module call or new module-level class                                                         |
+| `database-schema-evolution`              | Conditional  | Task adds/modifies a table, column, index, or constraint                                                            |
+| `idempotency-and-exactly-once-design`    | Conditional  | Task is a mutation endpoint with retry risk (payment, registration, webhook, batch sync)                            |
+| `security-and-hardening`                 | Conditional  | Task touches auth, RBAC, payment, webhook, file upload, or any external input                                       |
+| `performance-and-efficiency-engineering` | Conditional  | Task touches a database query, a loop over a collection with per-item I/O, or a call to an external/slow dependency |
 
 **Agent responsibility:** Implement exactly the current task, nothing beyond its declared scope. Stay within Clean Architecture layering as defined in `docs/project-structure.md`. Run the full unit test suite before considering a task complete.
 
@@ -157,10 +159,10 @@ Run once per task in `tasks.md`, in order.
 > This goes through a **two-gate approval**, run in this exact order:
 >
 > 1. **Gate 1 — Approve the proposal.** The human reads `improvement-proposal.md` and replies Approve or Reject.
->    - **Reject** → the agent discards the proposal and continues implementing exactly per the existing approved spec. No files are changed.
->    - **Approve** → the agent proceeds to Gate 2. It does not touch any code yet.
+>    - **Reject** → The agent discards the proposal and continues implementing exactly per the existing approved spec. No files are changed.
+>    - **Approve** → The agent proceeds to Gate 2. It does not touch any code yet.
 > 2. **Gate 2 — Approve the synchronized artifacts.** The agent updates every affected file in `specs/<feature-name>/` **and** every affected file in `docs/` in the same pass, then presents the diff. The human reviews and replies Approve or Reject.
->    - **Reject** → the human states what is still out of sync or incorrect; the agent corrects and re-presents the diff. Repeat until approved.
+>    - **Reject** → The human states what is still out of sync or incorrect; the agent corrects and re-presents the diff. Repeat until approved.
 >    - **Approve** → `specs/` and `docs/` are now the new source of truth. The agent may resume coding the current task **only if** the approved change does not require a new task. If the approved change requires a new task (or removes/reorders an existing one), the agent updates `tasks.md` accordingly and **stops** — it does not start a new task on its own initiative. The human must explicitly invoke `/build <feature-name> <task-id>` to proceed.
 >
 > This is the **only** mechanism that keeps `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` consistent with each other and with the actual implementation.
@@ -172,7 +174,8 @@ Run after all tasks for a feature are complete.
 **Skills invoked:**
 
 - `code-review-and-quality` — always runs. Multi-axis review (correctness against the approved `SPEC.md`/`API_CONTRACT.md`/`tasks.md`, layer/module boundary adherence, test coverage, style, coding rules), findings classified by severity.
-- `security-hardening` — re-run in full-checklist mode if the feature touches auth, payments, webhooks, or RBAC.
+- `security-and-hardening` — re-run in full-checklist mode if the feature touches auth, payments, webhooks, or RBAC.
+- `performance-and-efficiency-engineering` — invoked when the feature touched any database query, a loop over a collection, or a call to an external/slow dependency during `/build`. Re-checks specifically for N+1 query shapes, missing indexes, unbounded results, and unguarded hot-path I/O — independently of whatever was already checked during `/build`, since this category of defect is easy to miss once and obvious once flagged.
 
 **Scope:** By this point, `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` are assumed accurate — any legitimate deviation already went through the improvement-proposal flow in section 4.4. `/review` therefore checks the implementation **against** these artifacts; it does not re-open or re-question the artifacts themselves. If the agent believes it has found a genuine specification gap rather than an implementation defect, it must say so explicitly in `review-notes.md` and flag that the human may need to restart an improvement proposal retroactively — but `/review` itself never edits `specs/` or `docs/`.
 

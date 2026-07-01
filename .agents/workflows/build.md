@@ -27,7 +27,7 @@ Skills invoked, conditionally — evaluate each one against the current task's a
 | `modular-boundary-enforcement`           | Conditional  | Task involves a cross-module call or a new module-level class                                           |
 | `database-schema-evolution`              | Conditional  | Task adds/modifies a table, column, index, or constraint                                                |
 | `idempotency-and-exactly-once-design`    | Conditional  | Task is a mutation with retry risk (payment, registration, webhook, batch sync)                         |
-| `security-hardening`                     | Conditional  | Task touches auth, RBAC, payment, webhook, file upload, or any external input                           |
+| `security-and-hardening`                 | Conditional  | Task touches auth, RBAC, payment, webhook, file upload, or any external input                           |
 | `performance-and-efficiency-engineering` | Conditional  | Task touches a database query, a collection loop with per-item I/O, or an external/slow dependency call |
 
 Step-by-step instructions for completing a task:

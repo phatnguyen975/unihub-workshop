@@ -1,8 +1,8 @@
 # Implementation Plan: <Feature Name>
 
-> Spec: specs/<feature-name>/SPEC.md  
-> API Contract: specs/<feature-name>/API_CONTRACT.md <!-- omit this line if not applicable -->  
-> Status: DRAFT or APPROVED
+> **Spec:** specs/<feature-name>/SPEC.md  
+> **API Contract:** specs/<feature-name>/API_CONTRACT.md <!-- omit this line if not applicable -->  
+> **Status:** DRAFT or APPROVED
 
 ## Overview
 

@@ -1,8 +1,8 @@
 # Implementation Plan: Resource Reservation With Capacity Limit
 
-> Spec: specs/resource-reservation-with-capacity-limit/SPEC.md  
-> API Contract: specs/resource-reservation-with-capacity-limit/API_CONTRACT.md  
-> Status: APPROVED
+> **Spec:** specs/resource-reservation-with-capacity-limit/SPEC.md  
+> **API Contract:** specs/resource-reservation-with-capacity-limit/API_CONTRACT.md  
+> **Status:** APPROVED
 
 > [!NOTE]
 >

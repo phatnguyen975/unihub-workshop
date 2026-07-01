@@ -3,5 +3,5 @@
   <small>
     <strong>Author:</strong> Nguyễn Tấn Phát
   </small> <br />
-  <sub>May 18, 2026</sub>
+  <sub>June 01, 2026</sub>
 </div>

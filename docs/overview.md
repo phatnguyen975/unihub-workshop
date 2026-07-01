@@ -1,4 +1,4 @@
-# UniHub Workshop — Overview of the Project
+# UniHub Workshop — Project's Overview
 
 ## 1. Executive Summary
 

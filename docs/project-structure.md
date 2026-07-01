@@ -21,7 +21,7 @@ UniHub/
 └── specs/              # Per-feature spec artifacts produced by the SDD workflow
 ```
 
-This physical separation mirrors Clean Architecture boundaries: `apps/` holds the deployable units, `infra/` defines the local runtime environment (Redis, RabbitMQ, Elasticsearch, MinIO, Prometheus, Grafana), and `docs/` anchors the system's authoritative architectural and schema decisions referenced during implementation. `specs/` captures the living, per-feature artifacts (`SPEC.md`, `API_CONTRACT.md`, `tasks.md`) produced when a feature goes through the `/spec → /plan → /build → /review` workflow. 
+This physical separation mirrors Clean Architecture boundaries: `apps/` holds the deployable units, `infra/` defines the local runtime environment (Redis, RabbitMQ, Elasticsearch, MinIO, Prometheus, Grafana), and `docs/` anchors the system's authoritative architectural and schema decisions referenced during implementation. `specs/` captures the living, per-feature artifacts (`SPEC.md`, `API_CONTRACT.md`, `tasks.md`) produced when a feature goes through the `/spec → /plan → /build → /review` workflow.
 
 Note that PostgreSQL is intentionally omitted from the local `infra/` stack as the system strictly connects to the serverless Neon PostgreSQL Cloud via encrypted JDBC. Operational automation is centralized in `scripts/`, keeping the root directory clean.
 
@@ -111,26 +111,29 @@ UniHub uses Agent Skills to enforce Spec-Driven Development (SDD) combined with 
 ├── skills/                                 # Language-agnostic skill definitions
 │   ├── spec-driven-development/
 │   ├── api-contract-design/
-│   ├── test-driven-development/
 │   ├── task-planning-and-breakdown/
 │   ├── incremental-implementation/
+│   ├── test-driven-development/
 │   ├── modular-boundary-enforcement/
 │   ├── database-schema-evolution/
 │   ├── idempotency-and-exactly-once-design/
-│   ├── security-hardening/
+│   ├── security-and-hardening/
+│   ├── performance-and-efficiency-engineering/
 │   ├── code-review-and-quality/
 │   └── debugging-and-root-cause-analysis/
 └── workflows/                              # Slash commands
     ├── spec.md                             # /spec
     ├── plan.md                             # /plan
     ├── build.md                            # /build
-    └── review.md                           # /review
+    ├── review.md                           # /review
+    └── fix.md                              # /fix
 
 specs/                                      # Per-feature artifacts
 └── <feature-name>/
     ├── SPEC.md
     ├── API_CONTRACT.md
-    └── tasks.md
+    ├── tasks.md
+    └── review-notes.md
 ```
 
 ## 3. Detailed Application Structures
