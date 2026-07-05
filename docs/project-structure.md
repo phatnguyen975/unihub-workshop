@@ -9,7 +9,7 @@ UniHub/
 ├── AGENTS.md           # Agent rules + Documentation Map (always loaded)
 ├── .agents/            # Agent skills infrastructure
 │   ├── skills/         # Reusable, language-agnostic skill definitions
-│   └── workflows/      # Slash commands (/spec, /plan, /build, /review)
+│   └── commands/       # Slash commands (/spec, /plan, /build, /review, /fix)
 ├── apps/               # Product applications in the monorepo
 │   ├── backend/        # Spring Boot Modulith core backend API
 │   ├── workers/        # Background workers (batch, notifications, AI)
@@ -121,7 +121,7 @@ UniHub uses Agent Skills to enforce Spec-Driven Development (SDD) combined with 
 │   ├── performance-and-efficiency-engineering/
 │   ├── code-review-and-quality/
 │   └── debugging-and-root-cause-analysis/
-└── workflows/                              # Slash commands
+└── commands/                               # Slash commands
     ├── spec.md                             # /spec
     ├── plan.md                             # /plan
     ├── build.md                            # /build

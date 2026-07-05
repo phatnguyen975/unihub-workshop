@@ -1,7 +1,7 @@
 # UniHub Workshop — Agent Rules & Documentation Map
 
 > This file is the single, always-loaded source of truth for any AI agent working in this repository. It tells the agent **what the project is**, **where to find authoritative information**, **how development must proceed** (SDD + TDD), and **what it must never do**.  
-> Skills (`.agents/skills/`) and Workflows (`.agents/workflows/`) are loaded on demand and must be read in conjunction with this file — they assume the rules below as background context and do not repeat them.
+> Skills (`.agents/skills/`) and Commands (`.agents/commands/`) are loaded on demand and must be read in conjunction with this file — they assume the rules below as background context and do not repeat them.
 
 ## 1. Project Overview
 
