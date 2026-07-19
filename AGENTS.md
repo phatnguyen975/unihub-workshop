@@ -39,10 +39,7 @@ The repository is a monorepo: `apps/backend/`, `apps/workers/`, `apps/web/`, `ap
 
 ## 3. Documentation Map
 
-All authoritative project knowledge lives in `docs/`. **Before writing any
-spec, contract, or code, the agent must read every document relevant to
-the task.** This file only summarizes; `docs/` is the source of truth and
-always wins in case of conflict with anything stated here.
+All authoritative project knowledge lives in `docs/`. **Before writing any spec, contract, or code, the agent must read every document relevant to the task.** This file only summarizes; `docs/` is the source of truth and always wins in case of conflict with anything stated here.
 
 | File                          | What it contains?                                                                                                                                                                                                                                                                                                       | Read this when?                                                                                                |
 | :---------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
