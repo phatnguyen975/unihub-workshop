@@ -1,0 +1,84 @@
+name: CI — Workers
+
+on:
+  push:
+    branches-ignore:
+      - "dependabot/**"
+  pull_request:
+    branches:
+      - main
+
+# Cancel in-flight runs for the same branch/PR to save runner minutes
+concurrency:
+  group: ci-workers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect Changed Paths
+    runs-on: ubuntu-latest
+    outputs:
+      workers: ${{ steps.filter.outputs.workers }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changes in workers
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            workers:
+              - "apps/workers/**"
+              - ".github/workflows/ci-workers.yml"
+
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.workers == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history required for Gitleaks
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [changes, secret-scan]
+    if: needs.changes.outputs.workers == 'true'
+    defaults:
+      run:
+        working-directory: apps/workers
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+          cache-dependency-path: apps/workers/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Grant execute permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew test --no-daemon --continue
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workers-test-report
+          path: apps/workers/build/reports/tests/test/
+          retention-days: 7
