@@ -32,7 +32,7 @@ services:
     mem_limit: 128m
     cpus: "0.25"
     networks:
-      - unihub_network
+      - unihub-network
 
   redis:
     image: redis:8.6-alpine
@@ -42,7 +42,7 @@ services:
       - "6379:6379"
     volumes:
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-      - redis_data:/data
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -53,7 +53,7 @@ services:
     mem_limit: 256m
     cpus: "0.50"
     networks:
-      - unihub_network
+      - unihub-network
 
   rabbitmq:
     image: rabbitmq:4.3-management-alpine
@@ -68,7 +68,7 @@ services:
       - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - ./rabbitmq/definitions.json.template:/etc/rabbitmq/definitions.json.template:ro
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq-data:/var/lib/rabbitmq
     command: >
       /bin/sh -c 'sed -e "s/__RABBITMQ_USER__/$$RABBITMQ_DEFAULT_USER/g" -e "s/__RABBITMQ_PASSWORD__/$$RABBITMQ_DEFAULT_PASS/g" /etc/rabbitmq/definitions.json.template > /etc/rabbitmq/definitions.json && exec rabbitmq-server'
     healthcheck:
@@ -81,7 +81,7 @@ services:
     mem_limit: 512m
     cpus: "0.75"
     networks:
-      - unihub_network
+      - unihub-network
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
@@ -93,7 +93,7 @@ services:
       - "9300:9300"
     volumes:
       - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
-      - elasticsearch_data:/usr/share/elasticsearch/data
+      - elasticsearch-data:/usr/share/elasticsearch/data
     ulimits:
       memlock:
         soft: -1
@@ -112,7 +112,7 @@ services:
     mem_limit: 1g
     cpus: "1.00"
     networks:
-      - unihub_network
+      - unihub-network
 
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
@@ -127,7 +127,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio_data:/data
+      - minio-data:/data
     healthcheck:
       test:
         [
@@ -142,7 +142,7 @@ services:
     mem_limit: 512m
     cpus: "0.50"
     networks:
-      - unihub_network
+      - unihub-network
 
   minio-init:
     image: minio/mc:RELEASE.2025-08-13T08-35-41Z
@@ -168,7 +168,7 @@ services:
     mem_limit: 128m
     cpus: "0.25"
     networks:
-      - unihub_network
+      - unihub-network
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:1.5.1
@@ -182,7 +182,7 @@ services:
     mem_limit: 64m
     cpus: "0.25"
     networks:
-      - unihub_network
+      - unihub-network
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.84.0
@@ -196,7 +196,7 @@ services:
     mem_limit: 64m
     cpus: "0.25"
     networks:
-      - unihub_network
+      - unihub-network
 
   prometheus:
     image: prom/prometheus:v3.12.0
@@ -210,7 +210,7 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
+      - prometheus-data:/prometheus
     depends_on:
       nginx:
         condition: service_healthy
@@ -230,7 +230,7 @@ services:
     mem_limit: 512m
     cpus: "0.50"
     networks:
-      - unihub_network
+      - unihub-network
 
   grafana:
     image: grafana/grafana:13.1.0-25893932881
@@ -245,7 +245,7 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
     depends_on:
       prometheus:
         condition: service_healthy
@@ -263,23 +263,23 @@ services:
     mem_limit: 512m
     cpus: "0.50"
     networks:
-      - unihub_network
+      - unihub-network
 
 volumes:
-  redis_data:
-    name: unihub_redis_data
-  rabbitmq_data:
-    name: unihub_rabbitmq_data
-  elasticsearch_data:
-    name: unihub_elasticsearch_data
-  minio_data:
-    name: unihub_minio_data
-  prometheus_data:
-    name: unihub_prometheus_data
-  grafana_data:
-    name: unihub_grafana_data
+  redis-data:
+    name: unihub-redis-data
+  rabbitmq-data:
+    name: unihub-rabbitmq-data
+  elasticsearch-data:
+    name: unihub-elasticsearch-data
+  minio-data:
+    name: unihub-minio-data
+  prometheus-data:
+    name: unihub-prometheus-data
+  grafana-data:
+    name: unihub-grafana-data
 
 networks:
-  unihub_network:
-    name: unihub_network
+  unihub-network:
+    name: unihub-network
     driver: bridge
