@@ -4,6 +4,9 @@ services:
     container_name: unihub-nginx
     ports:
       - "80:80"
+    environment:
+      - BACKEND_1_HOST=${BACKEND_1_HOST:-host.docker.internal:8081}
+      - BACKEND_2_HOST=${BACKEND_2_HOST:-host.docker.internal:8082}
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/templates/default.conf.template:/etc/nginx/templates/default.conf.template:ro
@@ -38,6 +41,8 @@ services:
     image: redis:8.6-alpine
     container_name: unihub-redis
     command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
     ports:
       - "6379:6379"
     volumes:
@@ -59,8 +64,8 @@ services:
     image: rabbitmq:4.3-management-alpine
     container_name: unihub-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-unihub}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-unihub_dev_secret}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-rabbit}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -119,8 +124,8 @@ services:
     container_name: unihub-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-unihub}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-unihub_dev_secret}
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-admin}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minio123}
       MINIO_REGION: ${AWS_REGION:-ap-southeast-1}
       MINIO_PROMETHEUS_AUTH_TYPE: "public"
     ports:
@@ -151,8 +156,8 @@ services:
       minio:
         condition: service_healthy
     environment:
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-unihub}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-unihub_dev_secret}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-admin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minio123}
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
       AWS_S3_ENDPOINT: http://minio:9000
     volumes:
@@ -206,8 +211,13 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=7d"
       - "--web.enable-lifecycle"
+      - "--enable-feature=envvar-expansion"
     ports:
       - "9090:9090"
+    environment:
+      - BACKEND_1_HOST=${BACKEND_1_HOST:-host.docker.internal:8081}
+      - BACKEND_2_HOST=${BACKEND_2_HOST:-host.docker.internal:8082}
+      - WORKERS_HOST=${WORKERS_HOST:-host.docker.internal:8083}
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus

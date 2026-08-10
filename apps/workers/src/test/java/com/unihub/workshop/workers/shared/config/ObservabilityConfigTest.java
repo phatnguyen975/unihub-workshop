@@ -1,0 +1,103 @@
+package com.unihub.workshop.workers.shared.config;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Unit tests for {@link ObservabilityConfig} in the workers runtime.
+ */
+class ObservabilityConfigTest {
+
+    private static final String APPLICATION_NAME = "unihub-workers";
+
+    /**
+     * Builds a {@link MeterRegistry} with the specified application name and host.
+     *
+     * @param applicationName the name of the application
+     * @param host            the host name
+     * @return the configured meter registry
+     */
+    private MeterRegistry buildRegistryWithConfig(String applicationName, String host) {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ObservabilityConfig config = new ObservabilityConfig(applicationName, host);
+        config.configureCommonTags(registry);
+        return registry;
+    }
+
+    @Test
+    void shouldRegisterApplicationTag_whenRegistryIsConfigured() {
+        // Arrange
+        MeterRegistry registry = buildRegistryWithConfig(APPLICATION_NAME, "node-1");
+
+        // Act
+        registry.counter("test.counter").increment();
+
+        // Assert
+        String applicationTagValue = registry.find("test.counter").counter()
+                .getId().getTags().stream()
+                .filter(t -> "application".equals(t.getKey()))
+                .findFirst()
+                .map(Tag::getValue)
+                .orElse(null);
+        assertThat(applicationTagValue).isEqualTo(APPLICATION_NAME);
+    }
+
+    @Test
+    void shouldRegisterHostTag_whenRegistryIsConfigured() {
+        // Arrange
+        String expectedHost = "worker-node-1";
+        MeterRegistry registry = buildRegistryWithConfig(APPLICATION_NAME, expectedHost);
+
+        // Act
+        registry.counter("test.counter").increment();
+
+        // Assert
+        String hostTagValue = registry.find("test.counter").counter()
+                .getId().getTags().stream()
+                .filter(t -> "host".equals(t.getKey()))
+                .findFirst()
+                .map(Tag::getValue)
+                .orElse(null);
+        assertThat(hostTagValue).isEqualTo(expectedHost);
+    }
+
+    @Test
+    void shouldNotUseBackendApplicationName() {
+        // Arrange
+        MeterRegistry registry = buildRegistryWithConfig(APPLICATION_NAME, "node-1");
+
+        // Act
+        registry.counter("test.counter").increment();
+
+        // Assert
+        String applicationTagValue = registry.find("test.counter").counter()
+                .getId().getTags().stream()
+                .filter(t -> "application".equals(t.getKey()))
+                .findFirst()
+                .map(Tag::getValue)
+                .orElse(null);
+        assertThat(applicationTagValue).isNotEqualTo("unihub-backend");
+    }
+
+    @Test
+    void shouldRegisterBothApplicationAndHostTags_onTheSameMeter() {
+        // Arrange
+        MeterRegistry registry = buildRegistryWithConfig(APPLICATION_NAME, "worker-99");
+
+        // Act
+        registry.counter("test.counter").increment();
+
+        // Assert
+        List<String> tagKeys = registry.find("test.counter").counter()
+                .getId().getTags().stream()
+                .map(Tag::getKey)
+                .toList();
+        assertThat(tagKeys).contains("application", "host");
+    }
+}

@@ -22,7 +22,7 @@ This plan wires the full observability stack into the UniHub runtime. The Promet
 
 _Highest-risk phase: Spring Boot auto-configuration wiring can fail silently (wrong property keys, classpath conflicts). Verifying both runtimes emit correct metrics before proceeding eliminates the risk of building later tasks on a broken foundation._
 
-- [ ] **T1 — Backend emits a valid Prometheus metrics payload at `/actuator/prometheus`, tagged with `application="unihub-backend"` and `host`, with all other Actuator endpoints returning 404**
+- [x] **T1 — Backend emits a valid Prometheus metrics payload at `/actuator/prometheus`, tagged with `application="unihub-backend"` and `host`, with all other Actuator endpoints returning 404**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Config/Infrastructure (`shared/config`), Resources (`application.yml`, profile YAMLs), Test
@@ -38,7 +38,7 @@ _Highest-risk phase: Spring Boot auto-configuration wiring can fail silently (wr
     - `GET /actuator/env` (direct) returns HTTP `404` — traced to Scenario 2 (FR-03)
     - `./gradlew test` passes clean in `apps/backend`
 
-- [ ] **T2 — Workers emits a valid Prometheus metrics payload at its `/actuator/prometheus`, tagged with `application="unihub-workers"`, with all other Actuator endpoints returning 404**
+- [x] **T2 — Workers emits a valid Prometheus metrics payload at its `/actuator/prometheus`, tagged with `application="unihub-workers"`, with all other Actuator endpoints returning 404**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Config/Infrastructure (`shared/config`), Resources (`application.yml`, profile YAMLs), Test
@@ -56,10 +56,10 @@ _Highest-risk phase: Spring Boot auto-configuration wiring can fail silently (wr
 
 #### Checkpoint: Phase 1
 
-- [ ] `./gradlew test` passes in both `apps/backend` and `apps/workers` with zero failures
-- [ ] Both `/actuator/prometheus` endpoints reachable directly (bypassing Nginx), returning Prometheus text with correct `application` labels
-- [ ] Both `/actuator/env` return `404`
-- [ ] Phase 2 may begin
+- [x] `./gradlew test` passes in both `apps/backend` and `apps/workers` with zero failures
+- [x] Both `/actuator/prometheus` endpoints reachable directly (bypassing Nginx), returning Prometheus text with correct `application` labels
+- [x] Both `/actuator/env` return `404`
+- [x] Phase 2 may begin
 
 ### Phase 2: HTTP Request Logging Filter
 

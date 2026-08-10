@@ -1,3 +1,30 @@
+# =============================================================================
+# Spring Boot Application Configuration
+# =============================================================================
 spring:
   application:
-    name: backend
+    name: unihub-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_PRIMARY_URL}
+    username: ${SPRING_DATASOURCE_PRIMARY_USERNAME}
+    password: ${SPRING_DATASOURCE_PRIMARY_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+# =============================================================================
+# Actuator — Expose only prometheus and health; disable everything else
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health
+  endpoint:
+    health:
+      show-details: never
+    prometheus:
+      enabled: true
+  # Common metric tags applied to every meter
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      host: ${HOSTNAME:unknown}

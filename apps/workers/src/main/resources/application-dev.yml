@@ -1,0 +1,13 @@
+# =============================================================================
+# Dev Profile — Workers
+# Active when: spring.profiles.active=dev (default for local development)
+# =============================================================================
+
+spring:
+  application:
+    name: unihub-workers
+
+logging:
+  level:
+    root: INFO
+    com.unihub: DEBUG

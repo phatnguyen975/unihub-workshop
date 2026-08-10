@@ -4,5 +4,4 @@ apps/backend/.env
 apps/workers/.env
 apps/web/.env
 apps/mobile/.env
-apps/workers/.env
 infra/.env
