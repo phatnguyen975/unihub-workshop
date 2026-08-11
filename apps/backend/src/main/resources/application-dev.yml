@@ -3,10 +3,6 @@
 # Active when: spring.profiles.active=dev (default for local development)
 # =============================================================================
 
-spring:
-  application:
-    name: unihub-backend
-
 logging:
   level:
     root: INFO

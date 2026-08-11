@@ -58,7 +58,7 @@ public class ObservabilityConfig {
      *
      * @param registry the registry to configure
      */
-    public void configureCommonTags(MeterRegistry registry) {
+    void configureCommonTags(MeterRegistry registry) {
         registry.config()
                 .commonTags("application", applicationName, "host", host);
     }

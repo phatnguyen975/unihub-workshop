@@ -95,7 +95,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             MDC.put(MDC_HTTP_STATUS, String.valueOf(status));
             MDC.put(MDC_DURATION_MS, String.valueOf(durationMs));
 
-            writeLog(status, request.getMethod(), request.getRequestURI(), status, durationMs);
+            writeLog(status);
 
             // Clear MDC unconditionally so no context bleeds into the next request
             MDC.clear();
@@ -111,7 +111,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
      *   <li>5xx (or any other) → {@code ERROR}</li>
      * </ul>
      */
-    private void writeLog(int status, String method, String uri, int httpStatus, long durationMs) {
+    private void writeLog(int status) {
         String level = resolveLogLevel(status);
         String message = "API Request Completed";
         switch (level) {
@@ -125,7 +125,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
      * Maps an HTTP status code to a log level string.
      *
      * <p>
-     * Package-visible to allow direct unit testing without involving the Servlet
+     * Package-private to allow direct unit testing without involving the Servlet
      * API.
      *
      * @param status the HTTP response status code
@@ -145,10 +145,23 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     }
 
     private static String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader(X_FORWARDED_FOR_HEADER);
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        
+        // Trust X-Forwarded-For only if the request comes from an internal Docker network
+        boolean isInternal = remoteAddr != null && (
+                remoteAddr.startsWith("10.") || 
+                remoteAddr.startsWith("172.") || 
+                remoteAddr.startsWith("192.168.") || 
+                remoteAddr.equals("127.0.0.1") || 
+                remoteAddr.equals("0:0:0:0:0:0:0:1")
+        );
+        
+        if (isInternal) {
+            String xForwardedFor = request.getHeader(X_FORWARDED_FOR_HEADER);
+            if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+                return xForwardedFor.split(",")[0].trim();
+            }
         }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "";
+        return remoteAddr != null ? remoteAddr : "";
     }
 }

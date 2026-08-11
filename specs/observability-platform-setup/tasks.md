@@ -77,7 +77,7 @@ _This is the most logic-dense new code: MDC lifecycle management, log level by H
   - **Acceptance Criteria:**
     - All five `RequestLoggingFilterTest` test cases pass — traced to FR-17, FR-18, FR-19, FR-20, Scenarios 9, 12, 15, BR-11
     - `./gradlew test` passes clean
-    - Manual smoke (`dev` profile): any request produces a single-line text log matching the pattern `[LEVEL] [<uuid>] METHOD /path -> STATUS (Xms) -> nodeId` — traced to Scenario 10 (FR-21)
+    - Manual smoke (`dev` profile): any request produces a single-line text log matching the pattern `[LEVEL] <uuid> METHOD /path -> STATUS (Xms) -> nodeId` — traced to Scenario 10 (FR-21)
     - Manual smoke (`prod` profile): any request produces a JSON line on stdout containing `traceId` at root and `mdc.correlationId`, `mdc.http.method`, `mdc.http.uri`, `mdc.http.status`, `mdc.duration_ms`, `mdc.processedBy`, `mdc.clientIp`, `mdc.userAgent` in the mdc object — traced to Scenario 9 (FR-19, FR-21)
     - Two sequential requests on the same thread produce two separate log entries with distinct `traceId` values, no MDC bleeding — traced to Scenario 12 (FR-20)
     - An unauthenticated request (no `Authorization` header) still produces a log entry and the request is not blocked — traced to Scenario 15 (BR-11)
