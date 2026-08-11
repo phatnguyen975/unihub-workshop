@@ -25,6 +25,10 @@ server {
         deny all;
     }
 
+    location ~ ^/actuator {
+        return 404;
+    }
+
     location / {
         proxy_pass http://unihub_backend;
         proxy_http_version 1.1;

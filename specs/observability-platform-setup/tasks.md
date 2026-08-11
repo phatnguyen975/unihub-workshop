@@ -93,7 +93,7 @@ _This is the most logic-dense new code: MDC lifecycle management, log level by H
 
 _Two independent capabilities — Nginx security block and infra file fixes — grouped together because both are pure configuration changes with no application code dependency, and both are verifiable by restarting containers._
 
-- [ ] **T4 — Nginx returns 404 for any request to `/actuator/*` from external callers, while internal Prometheus scraping continues to reach backend nodes directly**
+- [x] **T4 — Nginx returns 404 for any request to `/actuator/*` from external callers, while internal Prometheus scraping continues to reach backend nodes directly**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Infrastructure (Nginx config)
@@ -105,7 +105,7 @@ _Two independent capabilities — Nginx security block and infra file fixes — 
     - `curl http://localhost:8081/actuator/prometheus` (direct, bypassing Nginx) still returns `200` — confirms internal scrape path is intact
     - Prometheus UI `/targets` still shows backend and workers scrape targets as `UP` after Nginx config reload — traced to Scenario 5 (FR-07, FR-08)
 
-- [ ] **T5 — Prometheus retains metrics for ≥ 15 days and Grafana IaC-provisioned dashboards are protected from accidental deletion via the UI**
+- [x] **T5 — Prometheus retains metrics for ≥ 15 days and Grafana IaC-provisioned dashboards are protected from accidental deletion via the UI**
   - **Size:** S
   - **Depends on:** —
   - **Layers touched:** Infrastructure (Prometheus Docker config, Grafana provisioning YAML)
@@ -120,12 +120,12 @@ _Two independent capabilities — Nginx security block and infra file fixes — 
 
 #### Checkpoint: Phase 3
 
-- [ ] `curl http://localhost/actuator/prometheus` through Nginx returns `404`
-- [ ] `curl http://localhost:8081/actuator/prometheus` direct returns `200`
-- [ ] Prometheus retention flag is `15d` (verified via `docker inspect unihub-prometheus`)
-- [ ] All Prometheus targets show `UP`
-- [ ] Grafana shows all 6 dashboards after a cold restart, and `disableDeletion` prevents permanent deletion
-- [ ] Phase 4 may begin
+- [x] `curl http://localhost/actuator/prometheus` through Nginx returns `404`
+- [x] `curl http://localhost:8081/actuator/prometheus` direct returns `200`
+- [x] Prometheus retention flag is `15d` (verified via `docker inspect unihub-prometheus`)
+- [x] All Prometheus targets show `UP`
+- [x] Grafana shows all 6 dashboards after a cold restart, and `disableDeletion` prevents permanent deletion
+- [x] Phase 4 may begin
 
 ### Phase 4: Modulith Architecture Enforcement
 
