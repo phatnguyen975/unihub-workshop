@@ -195,7 +195,7 @@ Logging is configured in `logback-spring.xml` with a dual-profile strategy to ba
 
 Local and dev environments use a fixed-width, terminal-friendly format optimized for multiplexers and quick scanning.
 
-**Format:** `[LEVEL] [TRACEID] [METHOD] [URI] -> [STATUS] ([DURATION]ms) -> [PROCESSED_BY]`
+**Format:** `[LEVEL] traceId METHOD URI -> STATUS (DURATIONms) -> PROCESSED_BY`
 
 ```text
 [INFO] 7f6f7c9b2d0b4d8c GET /api/v1/workshops -> 200 (12ms) -> unihub-app-1

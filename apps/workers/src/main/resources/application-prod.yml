@@ -1,0 +1,13 @@
+# =============================================================================
+# Prod Profile — Workers
+# Active when: spring.profiles.active=prod
+# =============================================================================
+
+spring:
+  application:
+    name: unihub-workers
+
+logging:
+  level:
+    root: WARN
+    com.unihub: INFO

@@ -1,0 +1,9 @@
+# =============================================================================
+# Dev Profile — Backend
+# Active when: spring.profiles.active=dev (default for local development)
+# =============================================================================
+
+logging:
+  level:
+    root: INFO
+    com.unihub: DEBUG

@@ -1,0 +1,13 @@
+# =============================================================================
+# Prod Profile — Backend
+# Active when: spring.profiles.active=prod
+# =============================================================================
+
+spring:
+  application:
+    name: unihub-backend
+
+logging:
+  level:
+    root: WARN
+    com.unihub: INFO

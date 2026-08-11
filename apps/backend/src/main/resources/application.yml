@@ -1,3 +1,42 @@
+# =============================================================================
+# Spring Boot Application Configuration
+# =============================================================================
 spring:
   application:
-    name: backend
+    name: unihub-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: ${SPRING_DATASOURCE_PRIMARY_URL}
+    username: ${SPRING_DATASOURCE_PRIMARY_USERNAME}
+    password: ${SPRING_DATASOURCE_PRIMARY_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
+
+# =============================================================================
+# Actuator — Expose only prometheus and health; disable everything else
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus,health
+  endpoint:
+    health:
+      show-details: never
+    prometheus:
+      enabled: true
+  # Common metric tags applied to every meter
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      host: ${HOSTNAME:unknown}
