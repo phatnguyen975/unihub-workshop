@@ -131,7 +131,7 @@ _Two independent capabilities — Nginx security block and infra file fixes — 
 
 _Final task — depends on all shared packages being fully established by T1 and T3. This test enforces the project's modular boundary rules as a permanent, build-breaking guard._
 
-- [ ] **T6 — A build-breaking `ModulithArchitectureTest` verifies that `shared/config`, `shared/web`, and `shared/observability` do not violate Spring Modulith package boundary rules**
+- [x] **T6 — A build-breaking `ModulithArchitectureTest` verifies that `shared/config`, `shared/web`, and `shared/observability` do not violate Spring Modulith package boundary rules**
   - **Size:** S
   - **Depends on:** T1, T3
   - **Layers touched:** Test (`src/test`)
@@ -143,13 +143,13 @@ _Final task — depends on all shared packages being fully established by T1 and
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1–T6 are checked off
-- [ ] `./gradlew test` passes in `apps/backend` (covers T1, T3, T6) and `apps/workers` (covers T2) with zero failures
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end (not just unit-tested)
-- [ ] Prometheus UI `/targets`: all jobs `UP`
-- [ ] Grafana: all 6 dashboards loaded without manual import, `disableDeletion` confirmed active
-- [ ] Nginx: `/actuator/*` blocked externally, internal scrape unaffected
-- [ ] Ready for `/review observability-platform-setup`
+- [x] All tasks T1–T6 are checked off
+- [x] `./gradlew test` passes in `apps/backend` (covers T1, T3, T6) and `apps/workers` (covers T2) with zero failures
+- [x] Every acceptance criterion across all tasks has been verified end-to-end (not just unit-tested)
+- [x] Prometheus UI `/targets`: all jobs `UP`
+- [x] Grafana: all 6 dashboards loaded without manual import, `disableDeletion` confirmed active
+- [x] Nginx: `/actuator/*` blocked externally, internal scrape unaffected
+- [x] Ready for `/review observability-platform-setup`
 
 ## Risks and Mitigations
 
