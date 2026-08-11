@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+
+    <!-- ===================================================================
+         dev profile — Readable, colour-friendly single-line format
+         =================================================================== -->
+    <springProfile name="dev">
+        <appender name="API_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                <pattern>[%level] %X{traceId} %X{http.method} %X{http.uri} -&gt; %X{http.status} \(%X{duration_ms}ms\) -&gt; %X{processedBy}%n</pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+
+        <!-- Only the RequestLoggingFilter uses the custom text format -->
+        <logger name="com.unihub.workshop.shared.web.RequestLoggingFilter" level="INFO" additivity="false">
+            <appender-ref ref="API_CONSOLE"/>
+        </logger>
+
+        <!-- Everything else uses default Spring Boot console format -->
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- ===================================================================
+         prod profile — JSON, one object per line (Logstash-compatible)
+         =================================================================== -->
+    <springProfile name="prod">
+        <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp>
+                        <fieldName>@timestamp</fieldName>
+                    </timestamp>
+                    <logLevel>
+                        <fieldName>level</fieldName>
+                    </logLevel>
+                    <loggerName>
+                        <fieldName>logger_name</fieldName>
+                    </loggerName>
+                    <message/>
+                    <mdc>
+                        <includeMdcKeyName>traceId</includeMdcKeyName>
+                    </mdc>
+                    <stackTrace>
+                        <fieldName>stack_trace</fieldName>
+                    </stackTrace>
+                    <nestedField>
+                        <fieldName>mdc</fieldName>
+                        <providers>
+                            <mdc>
+                                <excludeMdcKeyName>traceId</excludeMdcKeyName>
+                            </mdc>
+                        </providers>
+                    </nestedField>
+                </providers>
+            </encoder>
+        </appender>
+
+        <!-- In prod, all logs are JSON -->
+        <root level="INFO">
+            <appender-ref ref="STDOUT_JSON"/>
+        </root>
+    </springProfile>
+
+    <!-- ===================================================================
+         Fallback — Used when neither dev nor prod profile is active
+         =================================================================== -->
+    <springProfile name="!dev &amp; !prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>

@@ -65,29 +65,29 @@ _Highest-risk phase: Spring Boot auto-configuration wiring can fail silently (wr
 
 _This is the most logic-dense new code: MDC lifecycle management, log level by HTTP status, dual-profile Logback, and `traceId` propagation. Isolated in its own phase so it can be reviewed and verified on its own merits._
 
-- [ ] **T3 — Every inbound HTTP request to the backend produces one structured log entry with `traceId`, `correlationId`, `processedBy`, and all FR-19 fields; log format switches between human-readable (dev) and JSON (prod) by Spring profile; MDC is cleared after each request**
+- [x] **T3 — Every inbound HTTP request to the backend produces one structured log entry with `traceId`, `correlationId`, `processedBy`, `clientIp`, `userAgent`, and all FR-19 fields; log format switches between human-readable (dev) and JSON (prod) by Spring profile; MDC is cleared after each request**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Web/Filter (`shared/web`), Config (`shared/config`), Resources (`logback-spring.xml`), Test
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/web/RequestLoggingFilter.java` — `[NEW]` `OncePerRequestFilter`: generates `traceId` (UUID), reads `X-Correlation-ID` header, resolves `processedBy` from config, injects all three into MDC before delegating to chain, logs a single entry after response commit with all FR-19 fields (level driven by response status: `INFO` for 2xx/3xx, `WARN` for 4xx, `ERROR` for 5xx), clears MDC in `finally`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/web/RequestLoggingFilter.java` — `[NEW]` `OncePerRequestFilter`: generates `traceId` (UUID), reads `X-Correlation-ID`, `User-Agent`, extracts client IP, resolves `processedBy` from config, injects all into MDC before delegating to chain, logs a single entry after response commit with all fields (level driven by response status: `INFO` for 2xx/3xx, `WARN` for 4xx, `ERROR` for 5xx), clears MDC in `finally`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/WebConfig.java` — `[NEW]` registers `RequestLoggingFilter` as `FilterRegistrationBean` at `Ordered.HIGHEST_PRECEDENCE` so it fires before Spring Security; maps to `/*`
     - `apps/backend/src/main/resources/logback-spring.xml` — `[NEW]` dual-profile config: `<springProfile name="dev">` → `PatternLayoutEncoder` with format `[%level] [%X{traceId}] %X{http.method} %X{http.uri} -> %X{http.status} (%X{duration_ms}ms) -> %X{processedBy}`; `<springProfile name="prod">` → `LogstashEncoder` JSON appender (dependency already on classpath: `logstash-logback-encoder`)
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/web/RequestLoggingFilterTest.java` — `[NEW]` unit tests using `MockHttpServletRequest` / `MockHttpServletResponse` / `MockFilterChain`: (a) MDC contains `traceId`, `correlationId`, `processedBy` during chain execution; (b) MDC is empty after filter completes; (c) log level is `INFO` for 200, `WARN` for 404, `ERROR` for 500; (d) missing `X-Correlation-ID` → `correlationId` is empty string; (e) filter exception does not swallow the original response
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/web/RequestLoggingFilterTest.java` — `[NEW]` unit tests using `MockHttpServletRequest` / `MockHttpServletResponse` / `MockFilterChain`: (a) MDC contains all required fields during chain execution; (b) MDC is empty after filter completes; (c) log level is `INFO` for 200, `WARN` for 404, `ERROR` for 500; (d) missing headers fallback correctly; (e) filter exception does not swallow the original response
   - **Acceptance Criteria:**
     - All five `RequestLoggingFilterTest` test cases pass — traced to FR-17, FR-18, FR-19, FR-20, Scenarios 9, 12, 15, BR-11
     - `./gradlew test` passes clean
     - Manual smoke (`dev` profile): any request produces a single-line text log matching the pattern `[LEVEL] [<uuid>] METHOD /path -> STATUS (Xms) -> nodeId` — traced to Scenario 10 (FR-21)
-    - Manual smoke (`prod` profile): any request produces a JSON line on stdout containing `traceId`, `mdc.correlationId`, `mdc.http.method`, `mdc.http.uri`, `mdc.http.status`, `mdc.duration_ms`, `mdc.processedBy` — traced to Scenario 9 (FR-19, FR-21)
+    - Manual smoke (`prod` profile): any request produces a JSON line on stdout containing `traceId` at root and `mdc.correlationId`, `mdc.http.method`, `mdc.http.uri`, `mdc.http.status`, `mdc.duration_ms`, `mdc.processedBy`, `mdc.clientIp`, `mdc.userAgent` in the mdc object — traced to Scenario 9 (FR-19, FR-21)
     - Two sequential requests on the same thread produce two separate log entries with distinct `traceId` values, no MDC bleeding — traced to Scenario 12 (FR-20)
     - An unauthenticated request (no `Authorization` header) still produces a log entry and the request is not blocked — traced to Scenario 15 (BR-11)
 
 #### Checkpoint: Phase 2
 
-- [ ] All unit tests pass (`./gradlew test` in `apps/backend`)
-- [ ] Manual smoke confirms correct log format in both `dev` and `prod` profiles
-- [ ] No MDC bleeding observed between two sequential requests
-- [ ] Phase 3 may begin
+- [x] All unit tests pass (`./gradlew test` in `apps/backend`)
+- [x] Manual smoke confirms correct log format in both `dev` and `prod` profiles
+- [x] No MDC bleeding observed between two sequential requests
+- [x] Phase 3 may begin
 
 ### Phase 3: Security Boundary & Infra IaC Corrections
 
