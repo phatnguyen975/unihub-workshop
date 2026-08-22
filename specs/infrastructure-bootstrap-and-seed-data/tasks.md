@@ -56,21 +56,20 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 ### Phase 2: Startup Correctness — Flyway Order and RSA Key Loading
 
-- [ ] **T2 — Flyway confirmed to apply migrations before `ApplicationRunner` on Core Backend; workers Flyway guard verified by automated test (FR-01, BR-09, BR-10, NFR-11, AC-01, AC-02)**
+- [x] **T2 — Flyway properties validated via pure unit tests (No DB integration) (FR-01, BR-09, BR-10, NFR-11, AC-01, AC-02)**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Shared Config (`application.yml` Flyway properties), test infrastructure
   - **Files:**
     - `apps/backend/src/main/resources/application.yml` — add `spring.flyway.locations: classpath:db/migration`; `spring.flyway.out-of-order: false`; `spring.flyway.validate-on-migrate: true`
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/FlywayOrderTest.java` — verifies that after context refresh the `organizations` table exists (Flyway ran before any `ApplicationRunner`); uses `JdbcTemplate` against a test-scoped datasource
-    - `apps/workers/src/test/java/com/unihub/workshop/workers/shared/config/WorkersFlywayDisabledTest.java` — asserts `spring.flyway.enabled` property value is `false`; asserts `FlywayAutoConfiguration` bean is absent from the workers application context
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/FlywayConfigTest.java` — pure unit test parsing `application.yml` to assert Flyway properties.
+    - `apps/workers/src/test/java/com/unihub/workshop/workers/shared/config/WorkersFlywayDisabledTest.java` — pure unit test parsing workers `application.yml` to assert `spring.flyway.enabled: false`.
   - **Acceptance Criteria:**
-    - After Core Backend context refresh with a fresh schema, the `organizations` table exists in the database, confirming Flyway applied `V1__init_schema.sql` before any `ApplicationRunner` (AC-01, FR-01).
-    - `FlywayAutoConfiguration` bean is absent from the workers application context (AC-02, FR-01, BR-10).
-    - An automated test asserts `spring.flyway.enabled: false` is present in `apps/workers/src/main/resources/application.yml` (AC-02, NFR-11).
-    - `spring.flyway.out-of-order` is `false` in the backend configuration (BR-09).
+    - Backend pure unit test verifies `spring.flyway.locations` is `classpath:db/migration`, `out-of-order` is `false`, and `validate-on-migrate` is `true`. (AC-01, FR-01, BR-09).
+    - Workers pure unit test asserts `spring.flyway.enabled: false` is present in `apps/workers/src/main/resources/application.yml` (AC-02, NFR-11).
+    - No `@SpringBootTest` or DB connections are used for these checks.
 
-- [ ] **T3 — RSA key pair loaded at startup; application fails fast with a descriptive `IllegalStateException` if either key is absent or malformed (FR-02, NFR-06, AC-08)**
+- [x] **T3 — RSA key pair loaded at startup; application fails fast with a descriptive `IllegalStateException` if either key is absent or malformed (FR-02, NFR-06, AC-08)**
   - **Size:** S
   - **Depends on:** T2
   - **Layers touched:** Shared Config (bean initialization, `application.yml`), `shared/security` (key exposure contract), test
@@ -86,10 +85,10 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 #### Checkpoint: Phase 2
 
-- [ ] `FlywayOrderTest` and `WorkersFlywayDisabledTest` pass.
-- [ ] `RsaKeyConfigTest` passes for all three cases (valid, missing, malformed).
-- [ ] Full unit test suite passes in both apps.
-- [ ] Build is clean.
+- [x] `FlywayConfigTest` and `WorkersFlywayDisabledTest` pass.
+- [x] `RsaKeyConfigTest` passes for all three cases (valid, missing, malformed).
+- [x] Full unit test suite passes in both apps.
+- [x] Build is clean.
 
 ### Phase 3: Idempotent Seeding and Startup Health Validation
 

@@ -6,3 +6,4 @@ apps/web/.env
 apps/mobile/.env
 infra/.env
 specs/**/review-notes.md
+specs/**/improvement-proposal.md
