@@ -57,9 +57,9 @@ dependencies {
     runtimeOnly 'org.springframework.modulith:spring-modulith-runtime'
 
     // --- SECURITY & JWT ---
-    // implementation 'org.springframework.boot:spring-boot-starter-security'
-    // implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
-    // runtimeOnly 'org.bouncycastle:bcprov-jdk18on:1.84'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    runtimeOnly 'org.bouncycastle:bcprov-jdk18on:1.84'
 
     // --- PERSISTENCE ---
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
