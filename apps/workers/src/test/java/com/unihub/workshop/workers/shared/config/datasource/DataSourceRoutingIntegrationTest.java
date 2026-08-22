@@ -1,4 +1,4 @@
-package com.unihub.workshop.workers.shared.config;
+package com.unihub.workshop.workers.shared.config.datasource;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

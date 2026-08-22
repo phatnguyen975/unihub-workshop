@@ -1,4 +1,4 @@
-package com.unihub.workshop.shared.config;
+package com.unihub.workshop.workers.shared.config.datasource;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

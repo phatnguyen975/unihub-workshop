@@ -28,15 +28,15 @@ No REST endpoints are introduced. Every task is verified through unit tests that
   - **Layers touched (workers):** Shared Config (infrastructure beans), `application.yml` (externalized config)
   - **Files:**
     - `apps/backend/src/main/resources/application.yml` — remove `spring.datasource.url`; add `datasource.primary.*` and `datasource.replica.*` blocks with env-var placeholders; add `datasource.*.hikari.maximum-pool-size` properties; add `spring.flyway.enabled: true`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/DataSourceProperties.java` — `@ConfigurationProperties("datasource")` record binding `primary` and `replica` sub-groups (url, username, password, hikari)
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/TransactionAwareRoutingDataSource.java` — `AbstractRoutingDataSource` subclass; `determineCurrentLookupKey()` reads `TransactionSynchronizationManager.isCurrentTransactionReadOnly()`; returns `"replica"` when `true`, `"primary"` otherwise
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/DataSourceRoutingConfig.java` — `@Configuration`; defines `primaryDataSource()` and `replicaDataSource()` as `HikariDataSource` beans; defines `routingDataSource()` as `@Primary DataSource` targeting both
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/DataSourceRoutingConfigTest.java` — unit tests: routing bean is `TransactionAwareRoutingDataSource`; `readOnly=true` transaction → key `"replica"`; `readOnly=false` transaction → key `"primary"`; no active transaction → key `"primary"`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/datasource/DataSourceProperties.java` — `@ConfigurationProperties("datasource")` record binding `primary` and `replica` sub-groups (url, username, password, hikari)
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/datasource/TransactionAwareRoutingDataSource.java` — `AbstractRoutingDataSource` subclass; `determineCurrentLookupKey()` reads `TransactionSynchronizationManager.isCurrentTransactionReadOnly()`; returns `"replica"` when `true`, `"primary"` otherwise
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/datasource/DataSourceRoutingConfig.java` — `@Configuration`; defines `primaryDataSource()` and `replicaDataSource()` as `HikariDataSource` beans; defines `routingDataSource()` as `@Primary DataSource` targeting both
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/datasource/DataSourceRoutingConfigTest.java` — unit tests: routing bean is `TransactionAwareRoutingDataSource`; `readOnly=true` transaction → key `"replica"`; `readOnly=false` transaction → key `"primary"`; no active transaction → key `"primary"`
     - `apps/workers/src/main/resources/application.yml` — same YAML restructuring as backend; add `spring.flyway.enabled: false`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/config/DataSourceProperties.java` — `@ConfigurationProperties` record (workers package)
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/config/TransactionAwareRoutingDataSource.java` — mirrors backend routing logic (workers package)
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/config/DataSourceRoutingConfig.java` — mirrors backend config (workers package)
-    - `apps/workers/src/test/java/com/unihub/workshop/workers/shared/config/DataSourceRoutingConfigTest.java` — mirrors backend routing tests (workers package)
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/config/datasource/DataSourceProperties.java` — `@ConfigurationProperties` record (workers package)
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/config/datasource/TransactionAwareRoutingDataSource.java` — mirrors backend routing logic (workers package)
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/config/datasource/DataSourceRoutingConfig.java` — mirrors backend config (workers package)
+    - `apps/workers/src/test/java/com/unihub/workshop/workers/shared/config/datasource/DataSourceRoutingConfigTest.java` — mirrors backend routing tests (workers package)
   - **Acceptance Criteria:**
     - The backend application context exposes a `@Primary DataSource` bean that is an instance of `TransactionAwareRoutingDataSource` (FR-10, AC-13).
     - The workers application context exposes the same type as the `@Primary DataSource` bean (AC-15, FR-10).
@@ -92,18 +92,18 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 ### Phase 3: Idempotent Seeding and Startup Health Validation
 
-- [ ] **T4 — `ApplicationRunner` seeds organizations and root organizers idempotently using `INSERT … ON CONFLICT DO NOTHING`; logs at INFO/DEBUG; fails fast on unknown org slug; validates at least one org exists post-seed (FR-03, FR-04, FR-05, FR-06, FR-07, FR-09, BR-01–BR-08, AC-03–AC-07, AC-09, AC-12)**
+- [x] **T4 — `ApplicationRunner` seeds organizations and root organizers idempotently using `INSERT … ON CONFLICT DO NOTHING`; logs at INFO/DEBUG; fails fast on unknown org slug; validates at least one org exists post-seed (FR-03, FR-04, FR-05, FR-06, FR-07, FR-09, BR-01–BR-08, AC-03–AC-07, AC-09, AC-12)**
   - **Size:** M
   - **Depends on:** T3
   - **Layers touched:** Application (`ApplicationRunner` orchestration), Infrastructure (raw JDBC `INSERT … ON CONFLICT DO NOTHING` via `JdbcTemplate`), Shared Config (config-properties binding), test
   - **Files:**
     - `apps/backend/src/main/resources/application.yml` — add `seed.organizations: ${SEED_ORGANIZATIONS:[]}` and `seed.root-organizers: ${SEED_ROOT_ORGANIZERS:[]}`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/SeedProperties.java` — `@ConfigurationProperties("seed")` record binding `organizations: String` and `rootOrganizers: String` (raw JSON strings)
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/OrganizationSeedEntry.java` — record: `name`, `slug`, `description`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/SeedProperties.java` — `@ConfigurationProperties("seed")` record binding `organizations: String` and `rootOrganizers: String` (raw JSON strings)
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/OrganizationSeedEntry.java` — record: `name`, `slug`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/OrganizerSeedEntry.java` — record: `email`, `displayName`, `orgSlug`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/PasswordGenerator.java` — generates 24-char cryptographically secure random password; hashes with `Argon2PasswordEncoder`; returns both plaintext and hash
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/SeedRunner.java` — `ApplicationRunner`; (1) parses `SEED_ORGANIZATIONS` JSON; for each: `INSERT INTO organizations … ON CONFLICT (slug) DO NOTHING` via `JdbcTemplate`; logs INFO on insert / DEBUG on skip; (2) parses `SEED_ROOT_ORGANIZERS` JSON; for each: resolves `organization_id` by slug (fail-fast `IllegalStateException` if absent); inserts `users` row with `role='ORGANIZER'`, `is_temporary_password=true`, hashed password via `ON CONFLICT (email) DO NOTHING`; logs plaintext at INFO exactly once; (3) queries `COUNT(*) FROM organizations`; logs WARN if zero
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/seed/SeedRunnerTest.java` — unit tests (mocked `JdbcTemplate`): org seeded on first run; org skipped on re-run; organizer seeded with `role='ORGANIZER'` (no `ROLE_` prefix), `is_temporary_password=true`; organizer skipped on re-run; unknown `orgSlug` → `IllegalStateException`; plaintext logged exactly once; empty arrays → zero inserts, WARN logged; concurrent run simulation — second identical insert does not raise exception
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/SeedRunnerTest.java` — unit tests (mocked `JdbcTemplate`): org seeded on first run; org skipped on re-run; organizer seeded with `role='ORGANIZER'` (no `ROLE_` prefix), `is_temporary_password=true`; organizer skipped on re-run; unknown `orgSlug` → `IllegalStateException`; plaintext logged exactly once; empty arrays → zero inserts, WARN logged; concurrent run simulation — second identical insert does not raise exception
   - **Acceptance Criteria:**
     - First startup with `SEED_ORGANIZATIONS=[{"name":"Engineering","slug":"engineering"}]` inserts one row and logs `"Seeded organization: engineering"` at INFO (AC-03, FR-03).
     - Restart with same env produces no new row and logs a DEBUG skip message; no exception (AC-04, FR-03).
@@ -116,9 +116,9 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 #### Checkpoint: Phase 3
 
-- [ ] `SeedRunnerTest` passes all cases: first run, re-run, unknown slug, concurrent run, empty arrays.
-- [ ] Full unit test suite passes.
-- [ ] Build is clean.
+- [x] `SeedRunnerTest` passes all cases: first run, re-run, unknown slug, concurrent run, empty arrays.
+- [x] Full unit test suite passes.
+- [x] Build is clean.
 
 ### Phase 4: TTL Cleanup Scheduler
 

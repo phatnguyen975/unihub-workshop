@@ -1,4 +1,4 @@
-package com.unihub.workshop.workers.shared.config;
+package com.unihub.workshop.shared.config.datasource;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

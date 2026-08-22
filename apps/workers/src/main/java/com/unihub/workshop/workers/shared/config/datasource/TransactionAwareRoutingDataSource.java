@@ -1,4 +1,4 @@
-package com.unihub.workshop.shared.config;
+package com.unihub.workshop.workers.shared.config.datasource;
 
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
