@@ -5,3 +5,4 @@ apps/workers/.env
 apps/web/.env
 apps/mobile/.env
 infra/.env
+specs/**/review-notes.md

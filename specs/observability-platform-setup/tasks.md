@@ -1,6 +1,6 @@
 # Implementation Plan: Observability Platform Setup
 
-> **Spec:** specs/observability-platform-setup/SPEC.md  
+> **Spec:** `specs/observability-platform-setup/SPEC.md`  
 > **Status:** APPROVED
 
 ## Overview
@@ -56,10 +56,10 @@ _Highest-risk phase: Spring Boot auto-configuration wiring can fail silently (wr
 
 #### Checkpoint: Phase 1
 
-- [x] `./gradlew test` passes in both `apps/backend` and `apps/workers` with zero failures
-- [x] Both `/actuator/prometheus` endpoints reachable directly (bypassing Nginx), returning Prometheus text with correct `application` labels
-- [x] Both `/actuator/env` return `404`
-- [x] Phase 2 may begin
+- [x] `./gradlew test` passes in both `apps/backend` and `apps/workers` with zero failures.
+- [x] Both `/actuator/prometheus` endpoints reachable directly (bypassing Nginx), returning Prometheus text with correct `application` labels.
+- [x] Both `/actuator/env` return `404`.
+- [x] Phase 2 may begin.
 
 ### Phase 2: HTTP Request Logging Filter
 
@@ -84,10 +84,10 @@ _This is the most logic-dense new code: MDC lifecycle management, log level by H
 
 #### Checkpoint: Phase 2
 
-- [x] All unit tests pass (`./gradlew test` in `apps/backend`)
-- [x] Manual smoke confirms correct log format in both `dev` and `prod` profiles
-- [x] No MDC bleeding observed between two sequential requests
-- [x] Phase 3 may begin
+- [x] All unit tests pass (`./gradlew test` in `apps/backend`).
+- [x] Manual smoke confirms correct log format in both `dev` and `prod` profiles.
+- [x] No MDC bleeding observed between two sequential requests.
+- [x] Phase 3 may begin.
 
 ### Phase 3: Security Boundary & Infra IaC Corrections
 
@@ -120,12 +120,12 @@ _Two independent capabilities — Nginx security block and infra file fixes — 
 
 #### Checkpoint: Phase 3
 
-- [x] `curl http://localhost/actuator/prometheus` through Nginx returns `404`
-- [x] `curl http://localhost:8081/actuator/prometheus` direct returns `200`
-- [x] Prometheus retention flag is `15d` (verified via `docker inspect unihub-prometheus`)
-- [x] All Prometheus targets show `UP`
-- [x] Grafana shows all 6 dashboards after a cold restart, and `disableDeletion` prevents permanent deletion
-- [x] Phase 4 may begin
+- [x] `curl http://localhost/actuator/prometheus` through Nginx returns `404`.
+- [x] `curl http://localhost:8081/actuator/prometheus` direct returns `200`.
+- [x] Prometheus retention flag is `15d` (verified via `docker inspect unihub-prometheus`).
+- [x] All Prometheus targets show `UP`.
+- [x] Grafana shows all 6 dashboards after a cold restart, and `disableDeletion` prevents permanent deletion.
+- [x] Phase 4 may begin.
 
 ### Phase 4: Modulith Architecture Enforcement
 
@@ -143,13 +143,13 @@ _Final task — depends on all shared packages being fully established by T1 and
 
 #### Checkpoint: Feature Complete
 
-- [x] All tasks T1–T6 are checked off
-- [x] `./gradlew test` passes in `apps/backend` (covers T1, T3, T6) and `apps/workers` (covers T2) with zero failures
-- [x] Every acceptance criterion across all tasks has been verified end-to-end (not just unit-tested)
-- [x] Prometheus UI `/targets`: all jobs `UP`
-- [x] Grafana: all 6 dashboards loaded without manual import, `disableDeletion` confirmed active
-- [x] Nginx: `/actuator/*` blocked externally, internal scrape unaffected
-- [x] Ready for `/review observability-platform-setup`
+- [x] All tasks T1–T6 are checked off.
+- [x] `./gradlew test` passes in `apps/backend` (covers T1, T3, T6) and `apps/workers` (covers T2) with zero failures.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end (not just unit-tested).
+- [x] Prometheus UI `/targets`: all jobs `UP`.
+- [x] Grafana: all 6 dashboards loaded without manual import, `disableDeletion` confirmed active.
+- [x] Nginx: `/actuator/*` blocked externally, internal scrape unaffected.
+- [x] Ready for `/review observability-platform-setup`.
 
 ## Risks and Mitigations
 
@@ -158,3 +158,7 @@ _Final task — depends on all shared packages being fully established by T1 and
 | `OncePerRequestFilter` registration order may place the logging filter _after_ the Spring Security filter chain — security-rejected requests (401/403) would bypass logging, violating BR-11                         | Medium | Register at `Ordered.HIGHEST_PRECEDENCE` in `WebConfig`; add a dedicated unit test that asserts the filter logs even when the downstream chain throws a security exception               |
 | `logback-spring.xml` introduced in T3 may conflict with existing `logging.*` keys in `application.yml` — Spring Boot loads `logback-spring.xml` first and ignores YAML logging properties if the XML file is present | Low    | Remove any `logging.*` keys from `application.yml` that would duplicate `logback-spring.xml` configuration; verify in manual smoke that log output format switches correctly per profile |
 | Grafana `dashboards.yml` uses `disableDeletion` (camelCase) vs the Grafana API field name `disable_deletion` (snake_case) — wrong casing would silently ignore the setting                                           | Low    | T5 verifies the setting empirically by performing a delete action in the Grafana UI after container restart and confirming the dashboard reappears                                       |
+
+## Open Questions
+
+None — all design decisions in the spec are resolved.
