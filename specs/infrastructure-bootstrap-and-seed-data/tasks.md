@@ -21,7 +21,7 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 ### Phase 1: Foundational DataSource Infrastructure
 
-- [ ] **T1 — `RoutingDataSource` bean initialized in both apps; `application.yml` restructured to `datasource.primary.*` + `datasource.replica.*`; workers `spring.flyway.enabled: false` added (FR-10, BR-10, BR-11, BR-12, BR-13, AC-13, AC-14, AC-15)**
+- [x] **T1 — `RoutingDataSource` bean initialized in both apps; `application.yml` restructured to `datasource.primary.*` + `datasource.replica.*`; workers `spring.flyway.enabled: false` added (FR-10, BR-10, BR-11, BR-12, BR-13, AC-13, AC-14, AC-15)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched (backend):** Shared Config (infrastructure beans), `application.yml` (externalized config)
@@ -48,11 +48,11 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 #### Checkpoint: Phase 1
 
-- [ ] `DataSourceRoutingConfigTest` passes in both `apps/backend` and `apps/workers`.
-- [ ] Neither `application.yml` contains `spring.datasource.url`; both contain `datasource.primary.*` and `datasource.replica.*`.
-- [ ] `spring.flyway.enabled: false` is present in the workers `application.yml`.
-- [ ] Full unit test suite passes in both apps (including `ModulithArchitectureTest` in backend).
-- [ ] Build is clean (`./gradlew test` green for both apps).
+- [x] `DataSourceRoutingConfigTest` passes in both `apps/backend` and `apps/workers`.
+- [x] Neither `application.yml` contains `spring.datasource.url`; both contain `datasource.primary.*` and `datasource.replica.*`.
+- [x] `spring.flyway.enabled: false` is present in the workers `application.yml`.
+- [x] Full unit test suite passes in both apps (including `ModulithArchitectureTest` in backend).
+- [x] Build is clean (`./gradlew test` green for both apps).
 
 ### Phase 2: Startup Correctness — Flyway Order and RSA Key Loading
 
