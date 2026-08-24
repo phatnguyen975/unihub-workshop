@@ -6,16 +6,32 @@ spring:
     name: unihub-workers
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-  datasource:
-    url: ${SPRING_DATASOURCE_PRIMARY_URL}
-    username: ${SPRING_DATASOURCE_PRIMARY_USERNAME}
-    password: ${SPRING_DATASOURCE_PRIMARY_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: false
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:localhost}
     port: ${SPRING_RABBITMQ_PORT:5672}
     username: ${SPRING_RABBITMQ_USERNAME}
     password: ${SPRING_RABBITMQ_PASSWORD}
+
+# =============================================================================
+# Datasource Configuration
+# =============================================================================
+datasource:
+  primary:
+    url: ${SPRING_DATASOURCE_PRIMARY_URL}
+    username: ${SPRING_DATASOURCE_PRIMARY_USERNAME}
+    password: ${SPRING_DATASOURCE_PRIMARY_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_PRIMARY_HIKARI_MAXIMUM_POOL_SIZE:10}
+  replica:
+    url: ${SPRING_DATASOURCE_REPLICA_URL}
+    username: ${SPRING_DATASOURCE_REPLICA_USERNAME}
+    password: ${SPRING_DATASOURCE_REPLICA_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_REPLICA_HIKARI_MAXIMUM_POOL_SIZE:10}
 
 # =============================================================================
 # Actuator — Expose only prometheus and health; disable everything else

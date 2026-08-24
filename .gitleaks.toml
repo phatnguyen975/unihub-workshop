@@ -1,0 +1,10 @@
+title = "UniHub Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore security test fixtures used only for unit testing"
+paths = [
+    '''apps/backend/src/test/resources/security/.*\.pem'''
+]

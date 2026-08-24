@@ -56,48 +56,60 @@ This feature allows an authenticated end user to reserve one unit of a finite-ca
 
 ### Scenario 1: Successful reservation with available capacity
 
-- **Given** an authenticated user with no existing active reservation for resource R
-- **And** resource R has at least 1 unit of remaining capacity
-- **When** the user requests a reservation for resource R
-- **Then** the reservation is created with status `ACTIVE`
-- **And** resource R's remaining capacity is decremented by exactly 1
+```gherkin
+Given an authenticated user with no existing active reservation for resource R
+And resource R has at least 1 unit of remaining capacity
+When the user requests a reservation for resource R
+Then the reservation is created with status ACTIVE
+And resource R's remaining capacity is decremented by exactly 1
+```
 
 ### Scenario 2: Reservation rejected when capacity is exhausted
 
-- **Given** resource R has 0 remaining capacity
-- **When** an authenticated user requests a reservation for resource R
-- **Then** the request is rejected with a capacity-exhausted error
-- **And** no reservation record is created
-- **And** resource R's remaining capacity is unchanged
+```gherkin
+Given resource R has 0 remaining capacity
+When an authenticated user requests a reservation for resource R
+Then the request is rejected with a capacity-exhausted error
+And no reservation record is created
+And resource R's remaining capacity is unchanged
+```
 
 ### Scenario 3: Duplicate reservation attempt is rejected
 
-- **Given** a user already holds an active reservation for resource R
-- **When** the same user requests another reservation for resource R
-- **Then** the request is rejected with a duplicate-reservation error
-- **And** resource R's remaining capacity is unchanged
+```gherkin
+Given a user already holds an active reservation for resource R
+When the same user requests another reservation for resource R
+Then the request is rejected with a duplicate-reservation error
+And resource R's remaining capacity is unchanged
+```
 
 ### Scenario 4: Retried request with the same idempotency token returns the original result
 
-- **Given** a user successfully created a reservation for resource R using idempotency token T
-- **When** the same user retries the request using the same idempotency token T
-- **Then** the system returns the original reservation result
-- **And** resource R's remaining capacity is not decremented a second time
+```gherkin
+Given a user successfully created a reservation for resource R using idempotency token T
+When the same user retries the request using the same idempotency token T
+Then the system returns the original reservation result
+And resource R's remaining capacity is not decremented a second time
+```
 
 ### Scenario 5: Concurrent requests for the last unit of capacity
 
-- **Given** resource R has exactly 1 remaining unit of capacity
-- **When** two different users simultaneously request a reservation for resource R
-- **Then** exactly one request succeeds with status `ACTIVE`
-- **And** the other request is rejected with a capacity-exhausted error
-- **And** resource R's remaining capacity ends at 0, not negative
+```gherkin
+Given resource R has exactly 1 remaining unit of capacity
+When two different users simultaneously request a reservation for resource R
+Then exactly one request succeeds with status ACTIVE
+And the other request is rejected with a capacity-exhausted error
+And resource R's remaining capacity ends at 0, not negative
+```
 
 ### Scenario 6: Only the owner can cancel a reservation
 
-- **Given** user A holds an active reservation for resource R
-- **When** user B (not the owner) attempts to cancel that reservation
-- **Then** the request is rejected with an authorization error
-- **And** the reservation remains `ACTIVE`
+```gherkin
+Given user A holds an active reservation for resource R
+When user B (not the owner) attempts to cancel that reservation
+Then the request is rejected with an authorization error
+And the reservation remains ACTIVE
+```
 
 ## 8. Out of Scope
 

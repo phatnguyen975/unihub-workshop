@@ -1,6 +1,7 @@
 # Spec: Observability Platform Setup
 
 > **Status:** APPROVED  
+> **Domain:** 10 — System Reliability & Infrastructure  
 > **Owner/area:** `shared/observability` (Core Backend), `shared/config` (Core Backend + Workers), `infra/prometheus/`, `infra/grafana/`  
 > **Last revised:** 2026-07-22 — first version
 
@@ -153,108 +154,138 @@ This feature is cross-cutting infrastructure — it does not instrument specific
 
 ### Scenario 1: Prometheus endpoint returns metrics on the backend (FR-01, FR-02, FR-04)
 
-- **Given** the Core Backend Monolith is started
-- **When** a GET request is made to its `/actuator/prometheus` endpoint from within the internal network
-- **Then** the response HTTP status is `200 OK`
-- **And** the `Content-Type` header contains `text/plain`
-- **And** the response body contains metric families including `jvm_memory_used_bytes`, `hikaricp_connections_active`, `tomcat_threads_current_threads`, and `logback_events_total`
+```gherkin
+Given the Core Backend Monolith is started
+When a GET request is made to its /actuator/prometheus endpoint from within the internal network
+Then the response HTTP status is 200 OK
+And the Content-Type header contains text/plain
+And the response body contains metric families including jvm_memory_used_bytes, hikaricp_connections_active, tomcat_threads_current_threads, and logback_events_total
+```
 
 ### Scenario 2: Non-health, non-prometheus Actuator endpoints are inaccessible (FR-03)
 
-- **Given** the Core Backend Monolith is running
-- **When** a GET request is made to `/actuator/env`
-- **Then** the response HTTP status is `404 Not Found` or `401 Unauthorized`
-- **And** the endpoint does not return any application configuration or environment data
+```gherkin
+Given the Core Backend Monolith is running
+When a GET request is made to /actuator/env
+Then the response HTTP status is 404 Not Found or 401 Unauthorized
+And the endpoint does not return any application configuration or environment data
+```
 
 ### Scenario 3: Metrics carry application and host tags (FR-05, FR-06)
 
-- **Given** the Core Backend Monolith is running with `application` tag configured as `unihub-backend`
-- **When** the `/actuator/prometheus` payload is inspected
-- **Then** all metric families include a label `application="unihub-backend"`
-- **And** all metric families include a label identifying the specific hosting instance
+```gherkin
+Given the Core Backend Monolith is running with application tag configured as unihub-backend
+When the /actuator/prometheus payload is inspected
+Then all metric families include a label application="unihub-backend"
+And all metric families include a label identifying the specific hosting instance
+```
 
 ### Scenario 4: Workers application exposes its own Prometheus endpoint (FR-01, FR-02, FR-05)
 
-- **Given** the Workers application is started
-- **When** a GET request is made to its `/actuator/prometheus` endpoint
-- **Then** the response is `200 OK`
-- **And** the metrics payload includes a label `application="unihub-workers"` distinct from the backend's label
+```gherkin
+Given the Workers application is started
+When a GET request is made to its /actuator/prometheus endpoint
+Then the response is 200 OK
+And the metrics payload includes a label application="unihub-workers" distinct from the backend's label
+```
 
 ### Scenario 5: Prometheus scrapes all targets successfully (FR-07, FR-08, FR-25)
 
-- **Given** the full infrastructure stack is running
-- **And** `prometheus.yml` references the correct internal hostnames (backend, workers, minio, rabbitmq)
-- **When** the Prometheus UI at `/targets` is loaded
-- **Then** all scrape targets show `State: UP`
-- **And** the last successful scrape time is within the configured scrape interval
+```gherkin
+Given the full infrastructure stack is running
+And prometheus.yml references the correct internal hostnames (backend, workers, minio, rabbitmq)
+When the Prometheus UI at /targets is loaded
+Then all scrape targets show State: UP
+And the last successful scrape time is within the configured scrape interval
+```
 
 ### Scenario 6: Grafana starts with all six dashboards pre-provisioned (FR-11, FR-12, FR-13, FR-16)
 
-- **Given** the Docker Compose stack is running
-- **And** the Grafana container has provisioning directories mounted
-- **When** a user logs into Grafana without importing any dashboard manually
-- **Then** the Grafana Dashboards list contains exactly the following dashboards: JVM & Spring Boot, Database – HikariCP, Redis & Bucket4j, RabbitMQ Metrics, Resilience4j Circuit Breaker, MinIO Storage
+```
+Given the Docker Compose stack is running
+And the Grafana container has provisioning directories mounted
+When a user logs into Grafana without importing any dashboard manually
+Then the Grafana Dashboards list contains exactly the following dashboards: JVM & Spring Boot, Database – HikariCP, Redis & Bucket4j, RabbitMQ Metrics, Resilience4j Circuit Breaker, MinIO Storage
+```
 
 ### Scenario 7: Grafana dashboards display live data from Prometheus (FR-11, FR-13, FR-14)
 
-- **Given** Prometheus is successfully scraping the backend
-- **When** a user opens the `JVM & Spring Boot` dashboard and sets the time range to "Last 5 minutes"
-- **Then** at least one panel (e.g., JVM Memory Used) displays a non-zero data series
-- **And** the `instance` template variable is populated with the scraped instance labels
+```gherkin
+Given Prometheus is successfully scraping the backend
+When a user opens the JVM & Spring Boot dashboard and sets the time range to "Last 5 minutes"
+Then at least one panel (e.g., JVM Memory Used) displays a non-zero data series
+And the instance template variable is populated with the scraped instance labels
+```
 
 ### Scenario 8: IaC-provisioned dashboards cannot be permanently deleted via UI (FR-15)
 
-- **Given** a Grafana Admin user is logged in
-- **When** the user deletes an IaC-provisioned dashboard from the Grafana UI
-- **Then** the dashboard reappears upon the next Grafana restart or reload
-- **And** the source JSON file in `infra/grafana/dashboards/` is unchanged
+```gherkin
+Given a Grafana Admin user is logged in
+When the user deletes an IaC-provisioned dashboard from the Grafana UI
+Then the dashboard reappears upon the next Grafana restart or reload
+And the source JSON file in infra/grafana/dashboards/ is unchanged
+```
 
 ### Scenario 9: Structured JSON log entry is emitted for each request in prod profile (FR-17, FR-18, FR-19, FR-21)
 
-- **Given** the Core Backend Monolith is running with the `prod` Spring profile
-- **When** a GET request with header `X-Correlation-ID: req-abc123` is made to `/api/v1/workshops`
-- **Then** a JSON log entry is written to stdout containing: a top-level `traceId` field with a non-empty value; `mdc.correlationId` equal to `req-abc123`; `mdc.http.method` equal to `GET`; `mdc.http.uri` equal to `/api/v1/workshops`; `mdc.http.status` matching the response status code; `mdc.duration_ms` with a positive integer; and `mdc.processedBy` with the configured node ID
+```
+Given the Core Backend Monolith is running with the prod Spring profile
+When a GET request with header X-Correlation-ID: req-abc123 is made to /api/v1/workshops
+Then a JSON log entry is written to stdout containing: a top-level traceId field with a non-empty value; mdc.correlationId equal to req-abc123; mdc.http.method equal to GET; mdc.http.uri equal to /api/v1/workshops; mdc.http.status matching the response status code; mdc.duration_ms with a positive integer; and mdc.processedBy with the configured node ID
+```
 
 ### Scenario 10: Human-readable text log is emitted in dev profile (FR-21)
 
-- **Given** the Core Backend Monolith is running with the `dev` Spring profile
-- **When** a POST request is made to `/api/v1/auth/login`
-- **Then** a log line matching the format `[LEVEL] traceId POST /api/v1/auth/login -> STATUS (DURATIONms) -> PROCESSED_BY` is written to stdout
+```gherkin
+Given the Core Backend Monolith is running with the dev Spring profile
+When a POST request is made to /api/v1/auth/login
+Then a log line matching the format [LEVEL] traceId POST /api/v1/auth/login -> STATUS (DURATIONms) -> PROCESSED_BY is written to stdout
+```
 
 ### Scenario 11: traceId is consistent between log entry and success response (FR-22, FR-19)
 
-- **Given** the Core Backend Monolith is running
-- **When** a GET request is made to any resource endpoint that returns a 2xx response
-- **Then** the JSON response body contains `metadata.traceId` with a non-empty string value
-- **And** the corresponding structured log entry contains a `traceId` field with the identical value
+```gherkin
+Given the Core Backend Monolith is running
+When a GET request is made to any resource endpoint that returns a 2xx response
+Then the JSON response body contains metadata.traceId with a non-empty string value
+And the corresponding structured log entry contains a traceId field with the identical value
+```
 
 ### Scenario 12: MDC is cleared between requests (FR-20)
 
-- **Given** the Core Backend Monolith is running under a thread-pool model
-- **When** two successive requests are processed (potentially on the same thread)
-- **Then** the MDC fields (`traceId`, `correlationId`, `processedBy`) of the first request do not appear in the log entry of the second request
-- **And** each log entry contains only MDC values from that specific request
+```gherkin
+Given the Core Backend Monolith is running under a thread-pool model
+When two successive requests are processed (potentially on the same thread)
+Then the MDC fields (traceId, correlationId, processedBy) of the first request do not appear in the log entry of the second request
+And each log entry contains only MDC values from that specific request
+```
 
 ### Scenario 13: /actuator/prometheus is not routable through Nginx (FR-23)
 
-- **Given** Nginx is running as the public-facing gateway
-- **When** an external HTTP client makes a GET request to the public gateway path `/actuator/prometheus`
-- **Then** Nginx returns `404 Not Found` or `403 Forbidden`
-- **And** the backend metrics payload is not exposed to the external caller
+```gherkin
+Given Nginx is running as the public-facing gateway
+When an external HTTP client makes a GET request to the public gateway path /actuator/prometheus
+Then Nginx returns 404 Not Found or 403 Forbidden
+And the backend metrics payload is not exposed to the external caller
+```
 
 ### Scenario 14: Container restart preserves metrics history and dashboards (FR-26, FR-27)
 
-- **Given** Prometheus has scraped metrics for at least 5 minutes and Grafana has loaded all dashboards
-- **When** the `prometheus` and `grafana` containers are stopped and restarted (volumes are preserved)
-- **Then** the Prometheus TSDB retains historical metrics data from before the restart
-- **And** Grafana shows all six dashboards without re-importing
+```gherkin
+Given Prometheus has scraped metrics for at least 5 minutes and Grafana has loaded all dashboards
+When the prometheus and grafana containers are stopped and restarted (volumes are preserved)
+Then the Prometheus TSDB retains historical metrics data from before the restart
+And Grafana shows all six dashboards without re-importing
+```
 
 ### Scenario 15: Logging filter operates on unauthenticated requests (FR-17, BR-11)
 
-- **Given** the Core Backend Monolith is running
-- **When** a POST request without an `Authorization` header is made to `/api/v1/payments/webhook`
-- **Then** a structured log entry is still emitted for the request
-- **And** the request is not blocked or altered by the logging filter
+```gherkin
+Given the Core Backend Monolith is running
+When a POST request without an Authorization header is made to /api/v1/payments/webhook
+Then a structured log entry is still emitted for the request
+And the request is not blocked or altered by the logging filter
+```
 
 ## 8. Out of Scope
 

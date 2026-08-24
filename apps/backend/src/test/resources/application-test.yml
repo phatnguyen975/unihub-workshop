@@ -1,0 +1,3 @@
+rsa:
+  private-key: classpath:security/valid-private.pem
+  public-key: classpath:security/valid-public.pem
