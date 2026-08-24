@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -17,8 +19,8 @@ import java.util.List;
 import java.util.UUID;
 
 @Component
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "spring.flyway", name = "enabled", matchIfMissing = true)
-@org.springframework.boot.context.properties.EnableConfigurationProperties(SeedProperties.class)
+@ConditionalOnProperty(prefix = "spring.flyway", name = "enabled", matchIfMissing = true)
+@EnableConfigurationProperties(SeedProperties.class)
 @Order(10)
 public class SeedRunner implements ApplicationRunner {
 
@@ -64,20 +66,26 @@ public class SeedRunner implements ApplicationRunner {
 
     private void seedOrganizers(List<OrganizerSeedEntry> organizers) {
         for (OrganizerSeedEntry organizer : organizers) {
-            UUID orgId = resolveOrganizationId(organizer.orgSlug());
+            Boolean exists = jdbcTemplate.queryForObject(
+                    "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", Boolean.class, organizer.email());
+            if (Boolean.TRUE.equals(exists)) {
+                log.debug("Skipped existing root organizer: {}", organizer.email());
+                continue;
+            }
 
+            UUID orgId = resolveOrganizationId(organizer.orgSlug());
             PasswordGenerator.GeneratedPassword generatedPassword = passwordGenerator.generate();
 
             String sql = "INSERT INTO users (organization_id, role, email, password_hash, full_name, is_temporary_password) "
                     + "VALUES (?, 'ORGANIZER', ?, ?, ?, true) ON CONFLICT (email) DO NOTHING";
-
             int rowsAffected = jdbcTemplate.update(sql, orgId, organizer.email(), generatedPassword.hash(),
                     organizer.displayName());
 
             if (rowsAffected > 0) {
+                // TODO: remove plaintext password from logs in production
+                // TODO: publish domain event or send notification email to organizer.email()
                 log.info("Seeded root organizer: {} with temporary password: {}", organizer.email(),
                         generatedPassword.plaintext());
-                // TODO: publish domain event or send notification email to organizer.email()
             } else {
                 log.debug("Skipped existing root organizer: {}", organizer.email());
             }

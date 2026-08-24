@@ -26,15 +26,15 @@ class TtlCleanupSchedulerTest {
     private TtlCleanupScheduler scheduler;
 
     @Test
-    void cleanExpiredTokens_when1200ExpiredRows_callsUpdateThreeTimes() {
+    void cleanExpiredTokens_when1200ExpiredRowsInOneTable_batchesIntoThreeDeletes() {
         String query1 = "DELETE FROM idempotency_keys WHERE id IN (SELECT id FROM idempotency_keys WHERE expires_at < NOW() LIMIT 500)";
         String query2 = "DELETE FROM refresh_tokens WHERE id IN (SELECT id FROM refresh_tokens WHERE expires_at < NOW() LIMIT 500)";
         String query3 = "DELETE FROM password_reset_tokens WHERE id IN (SELECT id FROM password_reset_tokens WHERE expires_at < NOW() LIMIT 500)";
 
-        // Idempotency keys has 1200 items (500 + 500 + 200 + 0)
+        // idempotency_keys has 1200 expired rows: 500 + 500 + 200 then 0 to exit loop
         when(jdbcTemplate.update(eq(query1))).thenReturn(500, 500, 200);
 
-        // Others have 0
+        // Other tables have 0 expired rows
         when(jdbcTemplate.update(eq(query2))).thenReturn(0);
         when(jdbcTemplate.update(eq(query3))).thenReturn(0);
 
@@ -68,7 +68,6 @@ class TtlCleanupSchedulerTest {
         Transactional transactional = method.getAnnotation(Transactional.class);
 
         assertThat(transactional).isNotNull();
-        // Should use default readOnly = false
         assertThat(transactional.readOnly()).isFalse();
     }
 }

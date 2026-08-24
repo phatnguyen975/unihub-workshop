@@ -1,59 +1,50 @@
 package com.unihub.workshop.workers.shared.config.datasource;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DataSourceRoutingConfigTest {
 
+    private static class TestableRoutingDataSource extends TransactionAwareRoutingDataSource {
+        public Object currentLookupKey() {
+            return determineCurrentLookupKey();
+        }
+    }
+
     @Test
-    void determineCurrentLookupKey_whenReadOnlyTransaction_returnsReplica() throws Exception {
-        TransactionAwareRoutingDataSource routingDataSource = new TransactionAwareRoutingDataSource();
+    void determineCurrentLookupKey_whenReadOnlyTransaction_returnsReplica() {
+        TestableRoutingDataSource routingDataSource = new TestableRoutingDataSource();
 
         try {
             TransactionSynchronizationManager.initSynchronization();
             TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
 
-            Method method = AbstractRoutingDataSource.class.getDeclaredMethod("determineCurrentLookupKey");
-            method.setAccessible(true);
-            Object key = method.invoke(routingDataSource);
-
-            assertThat(key).isEqualTo("replica");
+            assertThat(routingDataSource.currentLookupKey()).isEqualTo("replica");
         } finally {
             TransactionSynchronizationManager.clear();
         }
     }
 
     @Test
-    void determineCurrentLookupKey_whenWriteTransaction_returnsPrimary() throws Exception {
-        TransactionAwareRoutingDataSource routingDataSource = new TransactionAwareRoutingDataSource();
+    void determineCurrentLookupKey_whenWriteTransaction_returnsPrimary() {
+        TestableRoutingDataSource routingDataSource = new TestableRoutingDataSource();
 
         try {
             TransactionSynchronizationManager.initSynchronization();
             TransactionSynchronizationManager.setCurrentTransactionReadOnly(false);
 
-            Method method = AbstractRoutingDataSource.class.getDeclaredMethod("determineCurrentLookupKey");
-            method.setAccessible(true);
-            Object key = method.invoke(routingDataSource);
-
-            assertThat(key).isEqualTo("primary");
+            assertThat(routingDataSource.currentLookupKey()).isEqualTo("primary");
         } finally {
             TransactionSynchronizationManager.clear();
         }
     }
 
     @Test
-    void determineCurrentLookupKey_whenNoTransaction_returnsPrimary() throws Exception {
-        TransactionAwareRoutingDataSource routingDataSource = new TransactionAwareRoutingDataSource();
+    void determineCurrentLookupKey_whenNoTransaction_returnsPrimary() {
+        TestableRoutingDataSource routingDataSource = new TestableRoutingDataSource();
 
-        Method method = AbstractRoutingDataSource.class.getDeclaredMethod("determineCurrentLookupKey");
-        method.setAccessible(true);
-        Object key = method.invoke(routingDataSource);
-
-        assertThat(key).isEqualTo("primary");
+        assertThat(routingDataSource.currentLookupKey()).isEqualTo("primary");
     }
 }

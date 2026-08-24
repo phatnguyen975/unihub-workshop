@@ -97,7 +97,7 @@ The system **SHALL** register a `@Scheduled` job that executes every 6 hours (cr
 | `refresh_tokens`        | `expires_at < NOW()` |
 | `password_reset_tokens` | `expires_at < NOW()` |
 
-The system **SHALL** execute each table's purge as a bounded `DELETE` (`DELETE … WHERE expires_at < NOW() LIMIT 500`) to avoid long-running transactions and table locks. The system **SHALL** repeat the bounded delete in a loop until zero rows are affected.
+The system **SHALL** execute each table's purge as a bounded `DELETE` (`DELETE FROM <table> WHERE id IN (SELECT id FROM <table> WHERE expires_at < NOW() LIMIT 500)`) to avoid long-running transactions and table locks. The system **SHALL** repeat the bounded delete in a loop until zero rows are affected.
 
 The system **SHALL** log at `INFO` level the number of rows deleted per table per execution.
 
@@ -148,7 +148,7 @@ The existing `spring.datasource.url` key in both `application.yml` files **SHALL
 - **BR-03:** Root `ORGANIZER` accounts are identified by `email` (CITEXT, UNIQUE) for conflict detection. Comparison is case-insensitive.
 - **BR-04:** `is_temporary_password = TRUE` is mandatory for every seeded account. The first-login password change flow (feature: `password-reset`) enforces this flag.
 - **BR-05:** `ROLE_` prefixes are strictly forbidden. The `role` column value must be `'ORGANIZER'` (not `'ROLE_ORGANIZER'`). See `docs/database-schema.md §1 — Strict Role Naming`.
-- **BR-06:** The TTL cleanup job must use bounded `DELETE` batches to prevent holding long-running table locks. An unbounded `DELETE WHERE expires_at < NOW()` on a large table is an operational risk.
+- **BR-06:** The TTL cleanup job must use bounded `DELETE` batches to prevent holding long-running table locks. An unbounded `DELETE FROM <table> WHERE expires_at < NOW()` on a large table is an operational risk.
 - **BR-07:** The TTL cleanup job must target the primary database. The `@Transactional` annotation (not `readOnly`) on the scheduler method ensures `RoutingDataSource` selects primary.
 - **BR-08:** `created_by` and `updated_by` on seeded `organizations` and `users` rows are `NULL`, representing system-generated records. This is the only permitted case for `NULL` on these audit fields per `docs/database-schema.md §organizations`.
 - **BR-09:** Flyway's `spring.flyway.out-of-order=false` must remain the default on the Core Backend. Out-of-order migrations can corrupt the schema.
@@ -219,13 +219,13 @@ This feature does not define a user-visible domain entity with a state machine. 
 [Scheduler fires at 0 0 */6 * * *]
       │
       ▼  @Transactional (readOnly = false) → RoutingDataSource → Primary
-[Bounded loop: DELETE FROM idempotency_keys WHERE expires_at < NOW() LIMIT 500]
+[Bounded loop: DELETE FROM idempotency_keys WHERE id IN (SELECT id FROM idempotency_keys WHERE expires_at < NOW() LIMIT 500)]
       │  (repeat until 0 rows affected)
       ▼
-[Bounded loop: DELETE FROM refresh_tokens WHERE expires_at < NOW() LIMIT 500]
+[Bounded loop: DELETE FROM refresh_tokens WHERE id IN (SELECT id FROM refresh_tokens WHERE expires_at < NOW() LIMIT 500)]
       │  (repeat until 0 rows affected)
       ▼
-[Bounded loop: DELETE FROM password_reset_tokens WHERE expires_at < NOW() LIMIT 500]
+[Bounded loop: DELETE FROM password_reset_tokens WHERE id IN (SELECT id FROM password_reset_tokens WHERE expires_at < NOW() LIMIT 500)]
       │  (repeat until 0 rows affected)
       ▼
 [Log total rows deleted per table at INFO]
@@ -233,19 +233,19 @@ This feature does not define a user-visible domain entity with a state machine. 
 
 ## 6. Non-Functional Requirements
 
-| ID     | Category      | Requirement                                                                                                                                                                                                 |
-| :----- | :------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| NFR-01 | Correctness   | The seed operation must be idempotent: running it 100 times against a populated database must produce zero additional rows and zero errors.                                                                 |
-| NFR-02 | Safety        | The seed operation must never overwrite existing production data. Only `ON CONFLICT DO NOTHING` is permitted for seed paths. `ON CONFLICT DO UPDATE` is forbidden.                                          |
-| NFR-03 | Performance   | The `ApplicationRunner` must complete in under 5 seconds on a cold Neon primary with up to 20 organizations and 50 accounts seeded.                                                                         |
-| NFR-04 | Performance   | Each TTL cleanup batch must not hold a lock for longer than 1 second per DELETE. The 500-row `LIMIT` per batch achieves this when `expires_at` is indexed (all three TTL tables have this index).           |
-| NFR-05 | Security      | Plaintext temporary passwords must never appear in stored logs, database fields, or HTTP responses. They may only appear in the startup `INFO` log for the initial operator handover.                       |
-| NFR-06 | Security      | RSA private key material must never be logged or included in Actuator responses. Actuator `env` and `configprops` endpoints must be secured or excluded from public exposure.                               |
-| NFR-07 | Startup Order | On the Core Backend, Flyway must complete before `RoutingDataSource` is used for seeding. On the Workers app, `RoutingDataSource` is available immediately on startup without a Flyway phase.               |
-| NFR-08 | Observability | The TTL cleanup job must emit a log line at `INFO` per table per run with the count of deleted rows.                                                                                                        |
-| NFR-09 | Resilience    | If Neon PostgreSQL is transiently unavailable at startup, the application must fail cleanly (not hang) so the orchestrator (Docker/K8s) can restart the pod.                                                |
-| NFR-10 | Correctness   | The `RoutingDataSource` must transparently handle connection acquisition for all Spring Data JPA repositories, `JdbcTemplate` usages, and `@Scheduled` jobs without per-class configuration.                |
-| NFR-11 | Safety        | A CI check or unit test must verify that `spring.flyway.enabled: false` is present in the workers' `application.yml` as a documented safeguard, so the setting is not silently removed in future refactors. |
+| ID     | Category      | Requirement                                                                                                                                                                                                       |
+| :----- | :------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NFR-01 | Correctness   | The seed operation must be idempotent: running it 100 times against a populated database must produce zero additional rows and zero errors.                                                                       |
+| NFR-02 | Safety        | The seed operation must never overwrite existing production data. Only `ON CONFLICT DO NOTHING` is permitted for seed paths. `ON CONFLICT DO UPDATE` is forbidden.                                                |
+| NFR-03 | Performance   | The `ApplicationRunner` must complete in under 5 seconds on a cold Neon primary with up to 20 organizations and 50 accounts seeded.                                                                               |
+| NFR-04 | Performance   | Each TTL cleanup batch must not hold a lock for longer than 1 second per DELETE. The 500-row `LIMIT` in the subquery per batch achieves this when `expires_at` is indexed (all three TTL tables have this index). |
+| NFR-05 | Security      | Plaintext temporary passwords must never appear in stored logs, database fields, or HTTP responses. They may only appear in the startup `INFO` log for the initial operator handover.                             |
+| NFR-06 | Security      | RSA private key material must never be logged or included in Actuator responses. Actuator `env` and `configprops` endpoints must be secured or excluded from public exposure.                                     |
+| NFR-07 | Startup Order | On the Core Backend, Flyway must complete before `RoutingDataSource` is used for seeding. On the Workers app, `RoutingDataSource` is available immediately on startup without a Flyway phase.                     |
+| NFR-08 | Observability | The TTL cleanup job must emit a log line at `INFO` per table per run with the count of deleted rows.                                                                                                              |
+| NFR-09 | Resilience    | If Neon PostgreSQL is transiently unavailable at startup, the application must fail cleanly (not hang) so the orchestrator (Docker/K8s) can restart the pod.                                                      |
+| NFR-10 | Correctness   | The `RoutingDataSource` must transparently handle connection acquisition for all Spring Data JPA repositories, `JdbcTemplate` usages, and `@Scheduled` jobs without per-class configuration.                      |
+| NFR-11 | Safety        | A CI check or unit test must verify that `spring.flyway.enabled: false` is present in the workers' `application.yml` as a documented safeguard, so the setting is not silently removed in future refactors.       |
 
 ## 7. Acceptance Criteria
 
@@ -352,9 +352,10 @@ Given the idempotency_keys table contains 1200 rows with expires_at < NOW()
 And the cleanup batch size is 500
 When the TTL cleanup scheduler fires
 Then all 1200 expired rows are deleted across three successive DELETE operations (500 + 500 + 200)
-And each batch runs in its own transaction
 And the scheduler logs the total rows deleted at INFO
 ```
+
+> **Design Note (ADR):** All `DELETE` batches within a single scheduler run execute inside **one** `@Transactional` method, not per-batch transactions. This was chosen because: (1) PostgreSQL's `WHERE id IN (SELECT … LIMIT 500)` only row-locks the 500 targeted rows, so a wrapping transaction does not block concurrent writes to other rows; (2) each Neon serverless commit is a network round-trip — a single commit per run is significantly cheaper than N commits for N batches; (3) TTL cleanup is fully idempotent — if the run is interrupted, the next scheduled run (6 hours later) will clean the remaining rows with no data loss.
 
 ### AC-11: TTL cleanup does not delete non-expired rows
 

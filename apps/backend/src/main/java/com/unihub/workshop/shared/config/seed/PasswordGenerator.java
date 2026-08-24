@@ -22,10 +22,9 @@ public class PasswordGenerator {
         byte[] randomBytes = new byte[18];
         secureRandom.nextBytes(randomBytes);
         String rawPassword = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        String finalPassword = rawPassword.length() > 24 ? rawPassword.substring(0, 24) : rawPassword;
 
-        String hash = encoder.encode(finalPassword);
-        return new GeneratedPassword(finalPassword, hash);
+        String hash = encoder.encode(rawPassword);
+        return new GeneratedPassword(rawPassword, hash);
     }
 
     public record GeneratedPassword(String plaintext, String hash) {

@@ -41,6 +41,10 @@ class SeedRunnerTest {
 
         when(jdbcTemplate.update(anyString(), eq("Engineering"), eq("engineering"))).thenReturn(1);
 
+        // User does not exist yet — existence check returns false
+        when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), eq("admin@engineering.com")))
+                .thenReturn(false);
+
         UUID orgId = UUID.randomUUID();
         when(jdbcTemplate.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<UUID>>any(),
                 eq("engineering")))
@@ -64,7 +68,7 @@ class SeedRunnerTest {
     }
 
     @Test
-    void run_skipsExistingRows_onRestart() {
+    void run_skipsExistingOrganizer_onRestart_withoutHashing() {
         SeedProperties props = new SeedProperties(
                 "[{\"name\":\"Engineering\",\"slug\":\"engineering\"}]",
                 "[{\"email\":\"admin@engineering.com\",\"orgSlug\":\"engineering\",\"displayName\":\"Admin\"}]");
@@ -72,23 +76,19 @@ class SeedRunnerTest {
 
         when(jdbcTemplate.update(anyString(), eq("Engineering"), eq("engineering"))).thenReturn(0);
 
-        UUID orgId = UUID.randomUUID();
-        when(jdbcTemplate.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<UUID>>any(),
-                eq("engineering")))
-                .thenReturn(List.of(orgId));
-
-        when(passwordGenerator.generate())
-                .thenReturn(new PasswordGenerator.GeneratedPassword("plaintext123", "hashed123"));
-        when(jdbcTemplate.update(anyString(), eq(orgId), eq("admin@engineering.com"), eq("hashed123"),
-                eq("Admin"))).thenReturn(0);
+        // User already exists — hashing is skipped entirely
+        when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), eq("admin@engineering.com")))
+                .thenReturn(true);
 
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(1);
 
         runner.run(args);
 
         verify(jdbcTemplate).update(anyString(), eq("Engineering"), eq("engineering"));
-        verify(jdbcTemplate).update(anyString(), eq(orgId), eq("admin@engineering.com"), eq("hashed123"),
-                eq("Admin"));
+        // Argon2 must NOT be called when organizer already exists
+        verify(passwordGenerator, never()).generate();
+        // No user INSERT attempted for existing organizer
+        verify(jdbcTemplate, never()).update(anyString(), eq("admin@engineering.com"));
     }
 
     @Test
@@ -97,6 +97,10 @@ class SeedRunnerTest {
                 "[]",
                 "[{\"email\":\"admin@engineering.com\",\"orgSlug\":\"unknown\",\"displayName\":\"Admin\"}]");
         SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+
+        // User does not exist — proceed to resolveOrganizationId
+        when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), eq("admin@engineering.com")))
+                .thenReturn(false);
 
         when(jdbcTemplate.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<UUID>>any(),
                 eq("unknown")))
@@ -120,7 +124,7 @@ class SeedRunnerTest {
     }
 
     @Test
-    void run_concurrentExecution_behavesIdempotently() {
+    void run_withSingleOrgAndNoOrganizers_insertsOrgAndValidates() {
         SeedProperties props = new SeedProperties(
                 "[{\"name\":\"Engineering\",\"slug\":\"engineering\"}]",
                 "[]");
@@ -132,5 +136,15 @@ class SeedRunnerTest {
         runner.run(args);
 
         verify(jdbcTemplate).update(anyString(), eq("Engineering"), eq("engineering"));
+    }
+
+    @Test
+    void run_withMalformedOrganizationsJson_throwsIllegalStateException() {
+        SeedProperties props = new SeedProperties("not-valid-json", "[]");
+        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+
+        assertThatThrownBy(() -> runner.run(args))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to parse seed JSON");
     }
 }

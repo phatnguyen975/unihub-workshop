@@ -101,9 +101,9 @@ No REST endpoints are introduced. Every task is verified through unit tests that
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/SeedProperties.java` — `@ConfigurationProperties("seed")` record binding `organizations: String` and `rootOrganizers: String` (raw JSON strings)
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/OrganizationSeedEntry.java` — record: `name`, `slug`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/OrganizerSeedEntry.java` — record: `email`, `displayName`, `orgSlug`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/PasswordGenerator.java` — generates 24-char cryptographically secure random password; hashes with `Argon2PasswordEncoder`; returns both plaintext and hash
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/SeedRunner.java` — `ApplicationRunner`; (1) parses `SEED_ORGANIZATIONS` JSON; for each: `INSERT INTO organizations … ON CONFLICT (slug) DO NOTHING` via `JdbcTemplate`; logs INFO on insert / DEBUG on skip; (2) parses `SEED_ROOT_ORGANIZERS` JSON; for each: resolves `organization_id` by slug (fail-fast `IllegalStateException` if absent); inserts `users` row with `role='ORGANIZER'`, `is_temporary_password=true`, hashed password via `ON CONFLICT (email) DO NOTHING`; logs plaintext at INFO exactly once; (3) queries `COUNT(*) FROM organizations`; logs WARN if zero
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/SeedRunnerTest.java` — unit tests (mocked `JdbcTemplate`): org seeded on first run; org skipped on re-run; organizer seeded with `role='ORGANIZER'` (no `ROLE_` prefix), `is_temporary_password=true`; organizer skipped on re-run; unknown `orgSlug` → `IllegalStateException`; plaintext logged exactly once; empty arrays → zero inserts, WARN logged; concurrent run simulation — second identical insert does not raise exception
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/PasswordGenerator.java` — generates 24-char cryptographically secure random password (18 bytes → exactly 24 base64-URL chars without padding); hashes with `Argon2PasswordEncoder`; returns both plaintext and hash
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/seed/SeedRunner.java` — `ApplicationRunner`; (1) parses `SEED_ORGANIZATIONS` JSON; for each: `INSERT INTO organizations … ON CONFLICT (slug) DO NOTHING` via `JdbcTemplate`; logs INFO on insert / DEBUG on skip; (2) parses `SEED_ROOT_ORGANIZERS` JSON; for each: checks `SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)` first — if user already exists, logs DEBUG and skips without hashing (satisfies NFR-03: no Argon2 cost on restart for existing users); if user does not exist: resolves `organization_id` by slug (fail-fast `IllegalStateException` if absent); generates Argon2 hash; inserts `users` row with `role='ORGANIZER'`, `is_temporary_password=true`, via `ON CONFLICT (email) DO NOTHING`; logs plaintext at INFO exactly once; (3) queries `COUNT(*) FROM organizations`; logs WARN if zero; throws `IllegalStateException("Failed to parse seed JSON")` on malformed JSON input
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/SeedRunnerTest.java` — unit tests (mocked `JdbcTemplate`): org seeded on first run; organizer seeded on first run (existence check returns false); organizer skipped on restart without hashing (existence check returns true, `passwordGenerator.generate()` never called); unknown `orgSlug` → `IllegalStateException`; malformed JSON → `IllegalStateException("Failed to parse seed JSON")`; empty arrays → zero inserts, WARN logged; single org with no organizers inserts org and validates zero inserts, WARN logged; concurrent run simulation — second identical insert does not raise exception
   - **Acceptance Criteria:**
     - First startup with `SEED_ORGANIZATIONS=[{"name":"Engineering","slug":"engineering"}]` inserts one row and logs `"Seeded organization: engineering"` at INFO (AC-03, FR-03).
     - Restart with same env produces no new row and logs a DEBUG skip message; no exception (AC-04, FR-03).
@@ -122,13 +122,14 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 ### Phase 4: TTL Cleanup Scheduler
 
-- [ ] **T5 — `@Scheduled` TTL cleanup job purges expired rows from `idempotency_keys`, `refresh_tokens`, and `password_reset_tokens` in bounded 500-row batches routed to primary; logs deleted row counts at INFO (FR-08, BR-06, BR-07, NFR-04, NFR-08, AC-10, AC-11)**
+- [x] **T5 — `@Scheduled` TTL cleanup job purges expired rows from `idempotency_keys`, `refresh_tokens`, and `password_reset_tokens` in bounded 500-row batches routed to primary; logs deleted row counts at INFO (FR-08, BR-06, BR-07, NFR-04, NFR-08, AC-10, AC-11)**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Infrastructure (`JdbcTemplate` writes routed via `RoutingDataSource`), Shared Config (`@Scheduled` registration), test
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/TtlCleanupScheduler.java` — `@Component` with `@Scheduled(cron = "0 0 */6 * * *")`; annotated `@Transactional` (default, not `readOnly`) so `RoutingDataSource` routes to primary; for each of the three tables: loops `JdbcTemplate.update("DELETE FROM <table> WHERE expires_at < NOW() LIMIT 500")` until result = 0; accumulates total per table; logs `"TTL cleanup: deleted {} rows from {}"` at INFO per table
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/TtlCleanupSchedulerTest.java` — unit tests (mocked `JdbcTemplate`): 1200 expired rows → `update()` called 3 times (500, 500, 200) per table; 0 expired rows → `update()` called once returning 0, loop exits cleanly; non-expired rows → zero rows deleted; `@Transactional` annotation present on scheduler method (verified via reflection); INFO log emitted per table with correct count
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/SchedulingConfig.java` — `@Configuration @EnableScheduling`; dedicated config class that enables Spring's scheduling infrastructure, keeping `TtlCleanupScheduler` as a pure `@Component`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/TtlCleanupScheduler.java` — `@Component` with `@Scheduled(cron = "0 0 */6 * * *")`; annotated `@Transactional` (default, not `readOnly`) so `RoutingDataSource` routes to primary; for each of the three tables: loops `JdbcTemplate.update("DELETE FROM <table> WHERE id IN (SELECT id FROM <table> WHERE expires_at < NOW() LIMIT 500)")` until result = 0; accumulates total per table; logs `"TTL cleanup: deleted {} rows from {}"` at INFO per table
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/TtlCleanupSchedulerTest.java` — unit tests (mocked `JdbcTemplate`): 1200 expired rows in one table → `update()` called 3 times (500 + 500 + 200) for that table; 0 expired rows → `update()` called once returning 0, loop exits cleanly; `@Transactional` annotation present on scheduler method (verified via reflection); INFO log emitted per table with correct count
   - **Acceptance Criteria:**
     - With 1200 expired rows in `idempotency_keys`, the scheduler issues three successive bounded DELETEs (500 + 500 + 200) and logs 1200 deleted rows at INFO for that table (AC-10, FR-08, BR-06).
     - With 10 expired and 50 non-expired rows in `refresh_tokens`, exactly 10 rows are deleted; the 50 non-expired rows are untouched (AC-11, FR-08).
@@ -137,11 +138,11 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 
 #### Checkpoint: Feature Complete
 
-- [ ] All five tasks (T1–T5) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified by passing tests.
-- [ ] Full unit test suite passes (`./gradlew test` for both `apps/backend` and `apps/workers`).
-- [ ] `ModulithArchitectureTest` passes — no unexpected cross-module dependencies introduced.
-- [ ] Ready for `/review infrastructure-bootstrap-and-seed-data`.
+- [x] All five tasks (T1–T5) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified by passing tests.
+- [x] Full unit test suite passes (`./gradlew test` for both `apps/backend` and `apps/workers`).
+- [x] `ModulithArchitectureTest` passes — no unexpected cross-module dependencies introduced.
+- [x] Ready for `/review infrastructure-bootstrap-and-seed-data`.
 
 ## Risks and Mitigations
 
