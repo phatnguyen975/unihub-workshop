@@ -19,7 +19,7 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
 
 ### Phase 1: Core Enforcement Path
 
-- [ ] **T1 — Authenticated users are rate-limited via a per-user Token Bucket backed by Redis, with `X-RateLimit-*` headers returned on every protected response**
+- [x] **T1 — Authenticated users are rate-limited via a per-user Token Bucket backed by Redis, with `X-RateLimit-*` headers returned on every protected response**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Config (Bucket4j + Redis bean, `application.yml` properties, startup validation), Web/Filter (HTTP filter, key extraction, RFC 7807 429 response, header attachment)

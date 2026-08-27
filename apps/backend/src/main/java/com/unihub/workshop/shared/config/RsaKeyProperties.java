@@ -1,4 +1,4 @@
-package com.unihub.workshop.shared.security;
+package com.unihub.workshop.shared.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

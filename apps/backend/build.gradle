@@ -18,8 +18,8 @@ java {
     }
 }
 
-// Required by Spring for parameter-name discovery without debug info
-compileJava.options.compilerArgs += ['-parameters']
+compileJava.options.compilerArgs += ['-parameters', '-Xlint:deprecation', '-Xlint:unchecked']
+compileTestJava.options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked']
 
 configurations {
     compileOnly {

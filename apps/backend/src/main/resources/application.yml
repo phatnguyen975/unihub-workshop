@@ -71,5 +71,18 @@ rsa:
 # Seed Data Configuration — Organizations & Root Organizers
 # =============================================================================
 seed:
-  organizations: '${SEED_ORGANIZATIONS:[]}'
-  root-organizers: '${SEED_ROOT_ORGANIZERS:[]}'
+  organizations: ${SEED_ORGANIZATIONS:[]}
+  root-organizers: ${SEED_ROOT_ORGANIZERS:[]}
+
+# =============================================================================
+# Rate Limit Configuration
+# =============================================================================
+rate-limit:
+  registration-tier:
+    capacity: 5
+    refill-tokens: 5
+    refill-duration: 10s
+  browsing-tier:
+    capacity: 100
+    refill-tokens: 100
+    refill-duration: 60s
