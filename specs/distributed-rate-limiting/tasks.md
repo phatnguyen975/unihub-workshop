@@ -88,7 +88,7 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
 
 ### Phase 2: Configuration Compliance and Observability Verification
 
-- [ ] **T5 — The `X-RateLimit-*` headers are exposed in the CORS configuration so the web client can read them, and the Nginx configuration contains no rate-limiting directives**
+- [x] **T5 — The `X-RateLimit-*` headers are exposed in the CORS configuration so the web client can read them, and the Nginx configuration contains no rate-limiting directives**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Config (Spring CORS bean), Infra (Nginx config files)
@@ -104,11 +104,11 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1–T5 are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end (including Scenarios 1–8 from `SPEC.md §7`).
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Full unit test suite is green; build is clean.
-- [ ] Ready for `/review distributed-rate-limiting`.
+- [x] All tasks T1–T5 are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end (including Scenarios 1–8 from `SPEC.md §7`).
+- [x] `ModulithArchitectureTest` passes.
+- [x] Full unit test suite is green; build is clean.
+- [x] Ready for `/review distributed-rate-limiting`.
 
 ## Risks and Mitigations
 
