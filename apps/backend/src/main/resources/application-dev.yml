@@ -7,3 +7,7 @@ logging:
   level:
     root: INFO
     com.unihub: DEBUG
+
+chaos:
+  latency-ms: ${CHAOS_LATENCY_MS:0}
+  error-rate: ${CHAOS_ERROR_RATE:0.0}
