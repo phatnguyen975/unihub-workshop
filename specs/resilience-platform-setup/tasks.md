@@ -16,7 +16,7 @@ This plan establishes the shared `resilience-platform-setup` infrastructure with
 
 ### Phase 1: Core Circuit Breaker Foundation
 
-- [ ] **T1 — Default Circuit Breaker Configuration & Metrics Exporter**
+- [x] **T1 — Default Circuit Breaker Configuration & Metrics Exporter**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Infrastructure
@@ -29,12 +29,12 @@ This plan establishes the shared `resilience-platform-setup` infrastructure with
 
 #### Checkpoint: Core Circuit Breaker Foundation
 
-- [ ] T1 passes its integration tests confirming the state machine transitions and metric exposure.
-- [ ] Build is clean and dependencies are correctly aligned.
+- [x] T1 passes its integration tests confirming the state machine transitions and metric exposure.
+- [x] Build is clean and dependencies are correctly aligned.
 
 ### Phase 2: Resilience Testing Utilities
 
-- [ ] **T2 — Dev-Profile ChaosMockAdapter Injection**
+- [x] **T2 — Dev-Profile ChaosMockAdapter Injection**
   - **Size:** S
   - **Depends on:** —
   - **Layers touched:** Infrastructure
@@ -46,10 +46,10 @@ This plan establishes the shared `resilience-platform-setup` infrastructure with
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks above are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end via Spring Boot integration tests.
-- [ ] Full test suite passes.
-- [ ] Ready for `/review`.
+- [x] All tasks above are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end via Spring Boot integration tests.
+- [x] Full test suite passes.
+- [x] Ready for `/review`.
 
 ## Risks and Mitigations
 
