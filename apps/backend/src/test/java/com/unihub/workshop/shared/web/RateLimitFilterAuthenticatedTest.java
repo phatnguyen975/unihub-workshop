@@ -1,5 +1,7 @@
 package com.unihub.workshop.shared.web;
 
+import com.unihub.workshop.shared.config.RateLimitProperties;
+import com.unihub.workshop.shared.observability.RateLimitMetrics;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
@@ -13,7 +15,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import com.unihub.workshop.shared.config.RateLimitProperties;
 import java.time.Duration;
 
 class RateLimitFilterAuthenticatedTest {
@@ -28,7 +29,7 @@ class RateLimitFilterAuthenticatedTest {
         RateLimitProperties props = new RateLimitProperties(
                 new RateLimitProperties.Tier(5, 5, Duration.ofSeconds(10)),
                 new RateLimitProperties.Tier(100, 100, Duration.ofSeconds(60)), java.util.List.of());
-        filter = new RateLimitFilter(proxyManager, props, mock(com.unihub.workshop.shared.observability.RateLimitMetrics.class));
+        filter = new RateLimitFilter(proxyManager, props, mock(RateLimitMetrics.class));
     }
 
     private void stubConsumption(boolean isConsumed, long remainingTokens, long nanosToWaitForRefill) {

@@ -1,60 +1,80 @@
 package com.unihub.workshop.shared.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.shared.config.RateLimitProperties;
+import com.unihub.workshop.shared.observability.RateLimitMetrics;
 import io.github.bucket4j.BucketConfiguration;
-import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.util.AntPathMatcher;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RateLimitFilter.class);
+    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
     private final ProxyManager<byte[]> proxyManager;
     private final RateLimitProperties properties;
     private final AntPathMatcher pathMatcher;
-    private final com.unihub.workshop.shared.observability.RateLimitMetrics metrics;
+    private final RateLimitMetrics metrics;
+    private final ObjectMapper objectMapper;
+
+    private final BucketConfiguration registrationConfig;
+    private final BucketConfiguration browsingConfig;
 
     public RateLimitFilter(ProxyManager<byte[]> proxyManager, RateLimitProperties properties,
-            com.unihub.workshop.shared.observability.RateLimitMetrics metrics) {
+            RateLimitMetrics metrics) {
         this.proxyManager = proxyManager;
         this.properties = properties;
         this.metrics = metrics;
+        this.objectMapper = new ObjectMapper();
         this.pathMatcher = new AntPathMatcher();
+
+        this.registrationConfig = BucketConfiguration.builder()
+                .addLimit(limit -> limit.capacity(properties.registrationTier().capacity())
+                        .refillGreedy(properties.registrationTier().refillTokens(),
+                                properties.registrationTier().refillDuration()))
+                .build();
+
+        this.browsingConfig = BucketConfiguration.builder()
+                .addLimit(limit -> limit.capacity(properties.browsingTier().capacity())
+                        .refillGreedy(properties.browsingTier().refillTokens(),
+                                properties.browsingTier().refillDuration()))
+                .build();
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String bucketKey = extractKey(request);
-
         RateLimitProperties.Tier tier = resolveTier(request.getRequestURI());
-
-        BucketConfiguration configuration = BucketConfiguration.builder()
-                .addLimit(limit -> limit.capacity(tier.capacity()).refillGreedy(tier.refillTokens(),
-                        tier.refillDuration()))
-                .build();
+        BucketConfiguration configuration = (tier == properties.registrationTier()) ? registrationConfig
+                : browsingConfig;
 
         try {
-            Bucket bucket = proxyManager.builder()
+            var bucket = proxyManager.builder()
                     .build(bucketKey.getBytes(StandardCharsets.UTF_8), () -> configuration);
             ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
 
@@ -69,17 +89,21 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
                 response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 
-                String traceId = org.slf4j.MDC.get("traceId");
+                String traceId = MDC.get("traceId");
                 if (traceId == null) {
-                    traceId = java.util.UUID.randomUUID().toString();
+                    traceId = UUID.randomUUID().toString();
                 }
 
-                String problemJson = String.format(
-                        "{\"type\":\"urn:unihub:error:rate-limit\",\"title\":\"Too Many Requests\",\"status\":429,\"detail\":\"Rate limit exceeded. Try again in %d seconds.\",\"instance\":\"%s\",\"traceId\":\"%s\"}",
-                        TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()),
-                        request.getRequestURI(),
-                        traceId);
-                response.getWriter().write(problemJson);
+                String detail = String.format("Rate limit exceeded. Try again in %d seconds.",
+                        TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
+
+                ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, detail);
+                problem.setType(URI.create("urn:unihub:error:rate-limit"));
+                problem.setTitle("Too Many Requests");
+                problem.setInstance(URI.create(request.getRequestURI()));
+                problem.setProperty("traceId", traceId);
+
+                response.getWriter().write(objectMapper.writeValueAsString(problem));
             }
         } catch (Exception ex) {
             log.warn("Redis unavailable for rate limiting. Failing open. Key: {}, Path: {}, Error: {}",

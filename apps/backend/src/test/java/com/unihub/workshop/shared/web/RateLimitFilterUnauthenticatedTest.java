@@ -57,7 +57,6 @@ class RateLimitFilterUnauthenticatedTest {
         when(probe.isConsumed()).thenReturn(true);
         when(probe.getRemainingTokens()).thenReturn(99L);
         when(probe.getNanosToWaitForRefill()).thenReturn(0L);
-
         when(bucket.tryConsumeAndReturnRemaining(1)).thenReturn(probe);
 
         when(proxyManager.builder()).thenReturn(builderMock);
@@ -66,37 +65,36 @@ class RateLimitFilterUnauthenticatedTest {
     }
 
     @Test
-    void shouldKeyByIpWhenNoAuthHeader() throws Exception {
-        request.setRemoteAddr("192.168.1.50");
+    void shouldExtractIpWhenNoAuthHeaderIsPresent() throws Exception {
+        request.setRemoteAddr("192.168.1.1");
 
-        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilter(request, response, filterChain);
 
-        verify(builderMock).build(eq("rate_limit:192.168.1.50".getBytes(StandardCharsets.UTF_8)),
+        verify(builderMock).build(eq("rate_limit:192.168.1.1".getBytes(StandardCharsets.UTF_8)),
                 org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any());
         verify(filterChain).doFilter(request, response);
     }
 
     @Test
-    void shouldKeyByIpFromXForwardedForWhenNoAuthHeader() throws Exception {
-        request.setRemoteAddr("10.0.0.1");
-        request.addHeader("X-Forwarded-For", "203.0.113.1, 10.0.0.2");
+    void shouldExtractIpFromXForwardedForWhenPresent() throws Exception {
+        request.setRemoteAddr("10.0.0.1"); // internal proxy IP
+        request.addHeader("X-Forwarded-For", "203.0.113.195, 198.51.100.1");
 
-        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilter(request, response, filterChain);
 
-        verify(builderMock).build(eq("rate_limit:203.0.113.1".getBytes(StandardCharsets.UTF_8)),
+        verify(builderMock).build(eq("rate_limit:203.0.113.195".getBytes(StandardCharsets.UTF_8)),
                 org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any());
         verify(filterChain).doFilter(request, response);
     }
 
     @Test
-    void shouldFallbackToIpWhenJwtIsMalformed() throws Exception {
-        request.setRemoteAddr("192.168.1.50");
-        request.addHeader("Authorization", "Bearer not.a.valid.jwt");
+    void shouldExtractIpWhenAuthHeaderIsMalformed() throws Exception {
+        request.setRemoteAddr("192.168.1.5");
+        request.addHeader("Authorization", "Bearer invalid.token.format");
 
-        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilter(request, response, filterChain);
 
-        // Fallback to IP key, without throwing 400/401
-        verify(builderMock).build(eq("rate_limit:192.168.1.50".getBytes(StandardCharsets.UTF_8)),
+        verify(builderMock).build(eq("rate_limit:192.168.1.5".getBytes(StandardCharsets.UTF_8)),
                 org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any());
         verify(filterChain).doFilter(request, response);
     }

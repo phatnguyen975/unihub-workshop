@@ -25,6 +25,12 @@ spring:
     username: ${SPRING_RABBITMQ_USERNAME}
     password: ${SPRING_RABBITMQ_PASSWORD}
 
+app:
+  cors:
+    allowed-origin-patterns:
+      - "http://localhost:[*]"
+      - "https://app.unihub.com"
+
 # =============================================================================
 # Datasource Configuration
 # =============================================================================

@@ -1,5 +1,6 @@
 package com.unihub.workshop.shared.config;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -7,26 +8,29 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
-import java.util.List;
 
 @Configuration
+@EnableConfigurationProperties(CorsProperties.class)
 public class CorsConfig {
+
+    private final CorsProperties properties;
+
+    public CorsConfig(CorsProperties properties) {
+        this.properties = properties;
+    }
 
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-
-        // Allows localhost and other development/production domains
-        config.setAllowedOriginPatterns(List.of(
-            "http://localhost:[*]",
-            "https://*.unihub.com" // Adjust as needed for production domains
-        ));
+        
+        config.setAllowedOriginPatterns(properties.allowedOriginPatterns());
         
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         
         config.setAllowedHeaders(Arrays.asList(
             "Authorization", 
-            "Content-Type", 
+            "Content-Type",
+            "Accept",
             "X-Correlation-ID", 
             "Idempotency-Key", 
             "X-RateLimit-Limit", 

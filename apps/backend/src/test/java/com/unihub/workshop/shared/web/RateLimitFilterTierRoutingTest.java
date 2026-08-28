@@ -44,7 +44,8 @@ class RateLimitFilterTierRoutingTest {
         filter = new RateLimitFilter(proxyManager, properties,
                 mock(com.unihub.workshop.shared.observability.RateLimitMetrics.class));
 
-        io.github.bucket4j.distributed.BucketProxy bucket = mock(io.github.bucket4j.distributed.BucketProxy.class);
+        io.github.bucket4j.distributed.BucketProxy bucket = mock(
+                io.github.bucket4j.distributed.BucketProxy.class);
         ConsumptionProbe probe = mock(ConsumptionProbe.class);
 
         when(probe.isConsumed()).thenReturn(true);
@@ -53,7 +54,8 @@ class RateLimitFilterTierRoutingTest {
         when(bucket.tryConsumeAndReturnRemaining(1)).thenReturn(probe);
 
         when(proxyManager.builder()).thenReturn(builderMock);
-        when(builderMock.build(any(byte[].class), org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any()))
+        when(builderMock.build(any(byte[].class),
+                org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any()))
                 .thenReturn(bucket);
     }
 

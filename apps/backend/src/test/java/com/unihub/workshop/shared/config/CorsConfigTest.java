@@ -7,6 +7,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.filter.CorsFilter;
 
+import java.util.List;
+
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.containsString;
@@ -17,7 +19,8 @@ class CorsConfigTest {
 
     @BeforeEach
     void setUp() {
-        CorsConfig corsConfig = new CorsConfig();
+        CorsProperties props = new CorsProperties(List.of("http://localhost:[*]", "https://app.unihub.com"));
+        CorsConfig corsConfig = new CorsConfig(props);
         CorsFilter corsFilter = corsConfig.corsFilter();
 
         // Set up MockMvc in standalone mode with just the CorsFilter
@@ -29,7 +32,7 @@ class CorsConfigTest {
     @Test
     void optionsRequestShouldExposeRateLimitHeaders() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.options("/api/v1/workshops")
-                .header("Origin", "http://localhost:3000")
+                .header("Origin", "https://app.unihub.com")
                 .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-RateLimit-Limit")))
