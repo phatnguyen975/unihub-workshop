@@ -1,8 +1,8 @@
-# Spec: `infrastructure-bootstrap-and-seed-data`
+# Spec: Infrastructure Bootstrap and Seed Data
 
 > **Status:** APPROVED  
 > **Domain:** 10 — System Reliability & Infrastructure  
-> **Feature Catalog Entry:** `docs/feature-catalog.md §10.4`  
+> **Owner/area:** `docs/feature-catalog.md §10.4`  
 > **Last revised:** 2026-08-17 — first version
 
 ## 1. Overview

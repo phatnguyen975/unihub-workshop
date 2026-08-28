@@ -75,7 +75,7 @@ No REST endpoints are introduced. Every task is verified through unit tests that
   - **Layers touched:** Shared Config (bean initialization, `application.yml`), `shared/security` (key exposure contract), test
   - **Files:**
     - `apps/backend/src/main/resources/application.yml` — add `rsa.private-key: classpath:security/private.pem` and `rsa.public-key: classpath:security/public.pem`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/security/RsaKeyProperties.java` — `@ConfigurationProperties("rsa")` record holding `privateKey: RSAPrivateKey` and `publicKey: RSAPublicKey`; bound via Spring Security's `RsaKeyConverters`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/RsaKeyProperties.java` — `@ConfigurationProperties("rsa")` record holding `privateKey: RSAPrivateKey` and `publicKey: RSAPublicKey`; bound via Spring Security's `RsaKeyConverters`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/config/RsaKeyConfig.java` — `@Configuration` that validates both fields on `RsaKeyProperties` are non-null; throws `IllegalStateException` with a descriptive message if either is null; exposes the validated bean
     - `apps/backend/src/test/java/com/unihub/workshop/shared/config/RsaKeyConfigTest.java` — three test cases: (1) valid PEM files → bean present, both keys non-null; (2) missing `private.pem` → `IllegalStateException` before `ApplicationRunner` phase; (3) malformed PEM content → `IllegalStateException`
   - **Acceptance Criteria:**

@@ -1,6 +1,5 @@
 package com.unihub.workshop.shared.config;
 
-import com.unihub.workshop.shared.security.RsaKeyProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.convert.ApplicationConversionService;

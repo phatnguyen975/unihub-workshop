@@ -1,3 +1,29 @@
+# =============================================================================
+# Spring Boot Application Configuration
+# =============================================================================
+spring:
+  data:
+    redis:
+      password: ${SPRING_DATA_REDIS_PASSWORD}
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
 rsa:
   private-key: classpath:security/valid-private.pem
   public-key: classpath:security/valid-public.pem
+
+# =============================================================================
+# Rate Limit Configuration
+# =============================================================================
+rate-limit:
+  registration-path-patterns:
+    - "/api/v1/registrations/**"
+  registration-tier:
+    capacity: 5
+    refill-tokens: 5
+    refill-duration: 10s
+  browsing-tier:
+    capacity: 100
+    refill-tokens: 100
+    refill-duration: 60s
