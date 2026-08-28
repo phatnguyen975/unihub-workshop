@@ -50,7 +50,7 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
     - (Scenario 8) A request with a malformed or expired JWT does not produce a `400` or `500`; the filter silently falls back to IP keying and continues; downstream filters receive the request normally.
     - (NFR Security) When `X-Forwarded-For` contains multiple comma-separated values, only the leftmost (real client) is used as the key.
 
-- [ ] **T3 — Requests to registration endpoints are governed by the tighter registration-tier bucket; all other requests use the relaxed browsing-tier bucket**
+- [x] **T3 — Requests to registration endpoints are governed by the tighter registration-tier bucket; all other requests use the relaxed browsing-tier bucket**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Web/Filter (tier-dispatch logic in `RateLimitFilter`), Config (`RateLimitProperties` path-matcher list)
@@ -65,7 +65,7 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
     - (FR-05) Changing `rate-limit.registration-path-patterns` in `application.yml` changes which paths use the registration-tier bucket — no code change required.
     - (Scenario 5) The startup validation (T1) still enforces that registration-tier capacity ≤ browsing-tier capacity; this check continues to pass after adding the path matcher config.
 
-- [ ] **T4 — When Redis is unreachable during bucket evaluation, the filter fails open: the request is allowed through, a WARN log is written, and the `rate_limiter.redis_unavailable` Micrometer counter is incremented**
+- [x] **T4 — When Redis is unreachable during bucket evaluation, the filter fails open: the request is allowed through, a WARN log is written, and the `rate_limiter.redis_unavailable` Micrometer counter is incremented**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Web/Filter (exception handling branch in `RateLimitFilter`), Observability (`rate_limiter.redis_unavailable` counter registered via `MeterRegistry`)
@@ -81,10 +81,10 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
 
 #### Checkpoint: Phase 1 — Core Enforcement Complete
 
-- [ ] All T1–T4 acceptance criteria pass end-to-end with a running Redis (for happy paths) and mocked Redis (for fail-open paths).
-- [ ] `ModulithArchitectureTest` passes — no module boundary violations introduced.
-- [ ] Full unit test suite is green; no existing tests broken.
-- [ ] The filter is registered in the correct position in the Spring Security filter chain (before the JWT authentication filter).
+- [x] All T1–T4 acceptance criteria pass end-to-end with a running Redis (for happy paths) and mocked Redis (for fail-open paths).
+- [x] `ModulithArchitectureTest` passes — no module boundary violations introduced.
+- [x] Full unit test suite is green; no existing tests broken.
+- [x] The filter is registered in the correct position in the Spring Security filter chain (before the JWT authentication filter).
 
 ### Phase 2: Configuration Compliance and Observability Verification
 

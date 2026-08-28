@@ -27,8 +27,8 @@ class RateLimitFilterAuthenticatedTest {
         proxyManager = mock(ProxyManager.class);
         RateLimitProperties props = new RateLimitProperties(
                 new RateLimitProperties.Tier(5, 5, Duration.ofSeconds(10)),
-                new RateLimitProperties.Tier(100, 100, Duration.ofSeconds(60)));
-        filter = new RateLimitFilter(proxyManager, props);
+                new RateLimitProperties.Tier(100, 100, Duration.ofSeconds(60)), java.util.List.of());
+        filter = new RateLimitFilter(proxyManager, props, mock(com.unihub.workshop.shared.observability.RateLimitMetrics.class));
     }
 
     private void stubConsumption(boolean isConsumed, long remainingTokens, long nanosToWaitForRefill) {

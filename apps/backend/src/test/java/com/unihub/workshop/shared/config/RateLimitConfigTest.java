@@ -11,7 +11,7 @@ class RateLimitConfigTest {
     void testValidationFailsIfRegistrationTierCapacityGreaterThanBrowsingTier() {
         RateLimitProperties props = new RateLimitProperties(
                 new RateLimitProperties.Tier(100, 10, Duration.ofSeconds(10)),
-                new RateLimitProperties.Tier(50, 50, Duration.ofSeconds(60)));
+                new RateLimitProperties.Tier(50, 50, Duration.ofSeconds(60)), java.util.List.of());
 
         RateLimitConfig config = new RateLimitConfig(props);
 
@@ -24,7 +24,7 @@ class RateLimitConfigTest {
     void testValidationFailsIfRegistrationTierRefillGreaterThanBrowsingTier() {
         RateLimitProperties props = new RateLimitProperties(
                 new RateLimitProperties.Tier(50, 100, Duration.ofSeconds(10)),
-                new RateLimitProperties.Tier(50, 50, Duration.ofSeconds(60)));
+                new RateLimitProperties.Tier(50, 50, Duration.ofSeconds(60)), java.util.List.of());
 
         RateLimitConfig config = new RateLimitConfig(props);
 

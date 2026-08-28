@@ -43,9 +43,10 @@ class RateLimitFilterUnauthenticatedTest {
     void setUp() {
         RateLimitProperties.Tier regTier = new RateLimitProperties.Tier(5, 5, Duration.ofSeconds(10));
         RateLimitProperties.Tier browsTier = new RateLimitProperties.Tier(100, 100, Duration.ofSeconds(60));
-        properties = new RateLimitProperties(regTier, browsTier);
+        properties = new RateLimitProperties(regTier, browsTier, java.util.List.of());
 
-        filter = new RateLimitFilter(proxyManager, properties);
+        filter = new RateLimitFilter(proxyManager, properties,
+                mock(com.unihub.workshop.shared.observability.RateLimitMetrics.class));
 
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();

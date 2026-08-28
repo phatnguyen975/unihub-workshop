@@ -17,6 +17,8 @@ rsa:
 # Rate Limit Configuration
 # =============================================================================
 rate-limit:
+  registration-path-patterns:
+    - "/api/v1/registrations/**"
   registration-tier:
     capacity: 5
     refill-tokens: 5
