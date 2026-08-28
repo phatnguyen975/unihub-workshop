@@ -6,6 +6,9 @@ spring:
     name: unihub-backend
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  mvc:
+    problemdetails:
+      enabled: true
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -59,6 +62,9 @@ management:
     tags:
       application: ${spring.application.name}
       host: ${HOSTNAME:unknown}
+  mvc:
+    problemdetails:
+      enabled: true
 
 # =============================================================================
 # Security Configuration

@@ -60,10 +60,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 
+            String traceId = org.slf4j.MDC.get("traceId");
+            if (traceId == null) {
+                traceId = java.util.UUID.randomUUID().toString();
+            }
+
             String problemJson = String.format(
-                    "{\"type\":\"about:blank\",\"title\":\"Too Many Requests\",\"status\":429,\"detail\":\"Rate limit exceeded. Try again in %d seconds.\",\"instance\":\"%s\"}",
+                    "{\"type\":\"urn:unihub:error:rate-limit\",\"title\":\"Too Many Requests\",\"status\":429,\"detail\":\"Rate limit exceeded. Try again in %d seconds.\",\"instance\":\"%s\",\"traceId\":\"%s\"}",
                     TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()),
-                    request.getRequestURI());
+                    request.getRequestURI(),
+                    traceId);
             response.getWriter().write(problemJson);
         }
     }
@@ -90,6 +96,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
             }
         }
         // Fallback for unauthenticated requests
-        return "rate_limit:" + request.getRemoteAddr();
+        return "rate_limit:" + ClientIpExtractor.extractIp(request);
     }
 }

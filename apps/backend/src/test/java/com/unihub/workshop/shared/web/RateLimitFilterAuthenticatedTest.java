@@ -60,8 +60,7 @@ class RateLimitFilterAuthenticatedTest {
         filter.doFilter(request, response, filterChain);
 
         assertThat(response.getStatus()).isEqualTo(200);
-        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("100"); // default is browsing-tier for unmapped
-                                                                              // paths
+        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("100");
         assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("4");
         assertThat(response.getHeader("X-RateLimit-Retry-After")).isEqualTo("0");
     }
@@ -81,7 +80,7 @@ class RateLimitFilterAuthenticatedTest {
         assertThat(response.getStatus()).isEqualTo(429);
         assertThat(response.getContentType()).isEqualTo("application/problem+json");
         assertThat(response.getContentAsString()).contains("\"status\":429");
-        assertThat(response.getContentAsString()).contains("\"type\":\"about:blank\"");
+        assertThat(response.getContentAsString()).contains("\"type\":\"urn:unihub:error:rate-limit\"");
         assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("100");
         assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
         assertThat(response.getHeader("X-RateLimit-Retry-After")).isEqualTo("5"); // 5 seconds

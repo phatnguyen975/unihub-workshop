@@ -36,7 +36,7 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
     - (BR-05) Starting the application with registration-tier capacity > browsing-tier capacity fails with a descriptive `ApplicationContext` exception at startup.
     - (BR-04) Redis bucket keys are prefixed `rate_limit:` — no collision with `capacity:` or `jti:blacklist:` namespaces.
 
-- [ ] **T2 — Unauthenticated requests and requests with malformed JWTs are rate-limited using the client's real IP address as the bucket key**
+- [x] **T2 — Unauthenticated requests and requests with malformed JWTs are rate-limited using the client's real IP address as the bucket key**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Web/Filter (key-resolution branch in `RateLimitFilter`; IP extraction utility), Config (no new beans; browsing-tier bucket is reused for IP-keyed buckets)
