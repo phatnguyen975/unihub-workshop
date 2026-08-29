@@ -301,7 +301,7 @@ erDiagram
 | id              | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid()                             | Student directory identifier.               |
 | organization_id | UUID         | FK organizations(id), NOT NULL                                      | Tenant boundary for faculty or department.  |
 | student_number  | VARCHAR(50)  | NOT NULL                                                            | Institution student identifier.             |
-| email           | CITEXT       | NOT NULL, UNIQUE                                                    | Official student email.                     |
+| email           | CITEXT       | NOT NULL                                                            | Official student email.                     |
 | full_name       | VARCHAR(200) | NOT NULL                                                            | Student legal or preferred name.            |
 | faculty         | VARCHAR(200) | NULL                                                                | Optional faculty/department metadata.       |
 | status          | VARCHAR(20)  | NOT NULL, DEFAULT 'ACTIVE', CHECK (status IN ('ACTIVE','INACTIVE')) | Enrollment status used during registration. |

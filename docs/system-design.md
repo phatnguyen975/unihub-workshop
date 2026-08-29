@@ -668,35 +668,40 @@ This flowchart represents the nightly batch pipeline for legacy CSV ingestion. I
 ```mermaid
 flowchart TD
   Scheduler[Scheduler] --> Job[Spring Batch Job]
-  Legacy[Legacy Student System] --> S3[S3 CSV Drop]
-  Job --> FileValidate{"File-Level Validation (headers / size)"}
-  FileValidate -->|Invalid| Abort[Abort Job]
-  Abort --> Alert[Publish Alert]
+  Legacy[Legacy Student System] --> Inbox["S3 inbox/org-id CSV drop"]
+  Job --> Discover[Discover unarchived inbox files by creation time]
+  Discover --> FileValidate{"File-Level Validation (headers / size)"}
+  FileValidate -->|Invalid| Rejected[Move source file to rejected/org-id]
+  Rejected --> Alert[Publish organization-scoped failure event]
+  Alert --> Notify[Notify all organization ORGANIZERs by in-app and email]
   FileValidate -->|Valid| Stream[Stream CSV via S3 Object InputStream]
 
   Stream --> ItemReader["ItemReader (streaming rows)"]
   ItemReader --> ItemProcessor["ItemProcessor (validate / dedupe intra-chunk)"]
-  ItemProcessor -->|Invalid Row| WriteReject["WriteReject: write invalid row to local disk (/tmp/rejects.csv)"]
+  ItemProcessor -->|Invalid Row| WriteReject["WriteReject: write invalid row to local disk (/tmp/rejects-job-execution-id.csv)"]
   WriteReject --> ItemProcessor
   ItemProcessor -->|Valid Row| Chunk[Add row to in-memory chunk buffer]
   Chunk -->|Chunk Full| ItemWriter[ItemWriter: Bulk Upsert to persistent store]
   ItemWriter --> Commit["Commit Transaction & Update JobRepository (chunk offset)"]
   Commit --> ItemReader
 
-  ItemReader -->|All rows processed| UploadReject[Upload local /tmp/rejects.csv to S3]
-  UploadReject --> Archive[Archive original file in S3]
+  ItemReader -->|All rows processed| HasRejects{"Any rejected rows?"}
+  HasRejects -->|Yes| UploadReject[Upload local reject file to unique S3 reject artifact key]
+  HasRejects -->|No| Archive[Move original file to archive/org-id]
+  UploadReject --> Archive
   Archive --> Complete[Job complete with metrics]
-  Complete --> Publish["Publish Job Summary to RabbitMQ (include reject file S3 link)"]
-  Publish --> Notify[Notify Admins]
+  Complete --> Publish["Publish organization-scoped job summary event to RabbitMQ (include reject file S3 link when present)"]
+  Publish --> Notify
 ```
 
-- **File-level Guardrails:** Validate headers, required columns, and size limits before streaming. Invalid files are rejected immediately to avoid partial processing and wasted compute.
+- **File Discovery and Guardrails:** The job discovers only unarchived files in each organization-scoped `inbox/` prefix, ordered by object creation time. Validate headers, required columns, and size limits before streaming. Invalid files are moved to the corresponding `rejected/` prefix and alerted immediately to avoid partial processing and repeated attempts.
 - **Streaming File Reader:** The pipeline streams the CSV from S3 via an Object InputStream into the Spring Batch `ItemReader`, ensuring a flat memory footprint and eliminating OOM risk for large files.
-- **ItemReader / ItemProcessor / ItemWriter:** The job follows Spring Batch patterns: `ItemReader` streams rows, `ItemProcessor` validates and performs intra-chunk deduplication, and `ItemWriter` performs bulk upserts for committed chunks.
-- **Persistent Quarantine (Local Staging then Upload):** Reject rows are appended to a local ephemeral file (for example `/tmp/rejects.csv`) during chunk processing. After the job completes, the worker uploads the reject file to S3 in a single PUT operation; the job notification includes the S3 link for ops to review. This avoids unsupported S3 append operations.
+- **ItemReader / ItemProcessor / ItemWriter:** The job follows Spring Batch patterns: `ItemReader` streams rows, `ItemProcessor` validates that each row belongs to the trusted faculty configured for the organization-scoped prefix and performs intra-chunk deduplication, and `ItemWriter` performs bulk upserts for committed chunks.
+- **Persistent Quarantine (Local Staging then Upload):** Reject rows are appended to a local ephemeral file unique to the job execution (for example, `/tmp/rejects-<job-execution-id>.csv`) during chunk processing. When one or more rows were rejected, the worker uploads that file to a reject artifact key unique to the ingestion attempt in a single PUT operation; the job notification includes the S3 link for ops to review. Clean runs do not upload an empty reject artifact. This avoids unsupported S3 append operations and filename collisions between concurrent jobs.
 - **Chunk Commit & JobRepository (Restartability):** Transactions and chunk offsets are committed at the chunk boundary. If the pod crashes after chunk N, the next execution resumes at chunk N+1 based on JobRepository state, preventing duplicate processing.
 - **Intra-chunk Deduplication vs Bulk Upsert:** The `ItemProcessor` de-duplicates rows within the chunk in-memory to avoid intra-chunk constraint conflicts; the `ItemWriter` uses atomic bulk upserts to safely handle inter-chunk duplicates.
-- **Archiving & Retention:** Processed files and reject artifacts are archived in S3 and subject to lifecycle policies; job summaries include direct links to reject artifacts for remediation.
+- **Archiving & Retention:** Successfully processed source files move from `inbox/` to `archive/`; file-level validation failures move from `inbox/` to `rejected/`. Reject artifacts are retained in S3 and subject to lifecycle policies; job summaries include direct links to reject artifacts when they exist for remediation.
+- **Organizer Notification Routing:** The ingestion worker publishes an organization-scoped completion event after each successful attempt and a failure event after each file-level rejection. The downstream notifications worker is responsible for broadcasting both event types to every `ORGANIZER` in the target organization through in-app and email channels; the ingestion worker never delivers those channels directly. Until that worker is implemented, the event-publication boundary must carry a code comment documenting the deferred fan-out responsibility.
 
 ## 5. Access Control Design
 

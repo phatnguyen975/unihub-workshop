@@ -180,7 +180,7 @@ Before writing anything, state in one sentence the single behavior this cycle wi
 
 ### Step 2 — RED: Write the Failing Test
 
-Write a test that exercises exactly that one behavior, at the correct architectural layer (see the pyramid above), following your project's test-naming convention (commonly `should<ExpectedOutcome>_when<Condition>` or an equivalent descriptive pattern your project has already adopted).
+Write a test that exercises exactly that one behavior, at the correct architectural layer (see the pyramid above), following your project's test-naming convention (commonly `should<ExpectedOutcome>_when<Condition>` or an equivalent descriptive pattern your project has already adopted). If there are contraints on the input (e.g. a required field, a maximum length, a non-nullable value), must use the domain testing technique to create valid and invalid test cases.
 
 Structure the test body with **Arrange-Act-Assert** — Set up the scenario (Arrange), perform the one action under test (Act), verify the outcome (Assert). Keeping these three parts visually distinct — even with a blank line or comment between them — makes a test readable as a specification at a glance, and makes it obvious when a test is doing too much (e.g. two "Act" steps means it's testing two behaviors, not one).
 
