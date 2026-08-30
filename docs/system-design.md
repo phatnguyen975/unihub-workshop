@@ -668,10 +668,10 @@ This flowchart represents the nightly batch pipeline for legacy CSV ingestion. I
 ```mermaid
 flowchart TD
   Scheduler[Scheduler] --> Job[Spring Batch Job]
-  Legacy[Legacy Student System] --> Inbox["S3 inbox/org-id CSV drop"]
+  Legacy[Legacy Student System] --> Inbox["S3 inbox/organization-slug CSV drop"]
   Job --> Discover[Discover unarchived inbox files by creation time]
   Discover --> FileValidate{"File-Level Validation (headers / size)"}
-  FileValidate -->|Invalid| Rejected[Move source file to rejected/org-id]
+  FileValidate -->|Invalid| Rejected[Move source to rejected/organization-slug/source-files]
   Rejected --> Alert[Publish organization-scoped failure event]
   Alert --> Notify[Notify all organization ORGANIZERs by in-app and email]
   FileValidate -->|Valid| Stream[Stream CSV via S3 Object InputStream]
@@ -686,21 +686,21 @@ flowchart TD
   Commit --> ItemReader
 
   ItemReader -->|All rows processed| HasRejects{"Any rejected rows?"}
-  HasRejects -->|Yes| UploadReject[Upload local reject file to unique S3 reject artifact key]
-  HasRejects -->|No| Archive[Move original file to archive/org-id]
+  HasRejects -->|Yes| UploadReject[Upload local reject file to rejected/organization-slug/row-reports/job-id.csv]
+  HasRejects -->|No| Archive[Move original file to archive/organization-slug]
   UploadReject --> Archive
   Archive --> Complete[Job complete with metrics]
   Complete --> Publish["Publish organization-scoped job summary event to RabbitMQ (include reject file S3 link when present)"]
   Publish --> Notify
 ```
 
-- **File Discovery and Guardrails:** The job discovers only unarchived files in each organization-scoped `inbox/` prefix, ordered by object creation time. Validate headers, required columns, and size limits before streaming. Invalid files are moved to the corresponding `rejected/` prefix and alerted immediately to avoid partial processing and repeated attempts.
+- **File Discovery and Guardrails:** The job discovers only unarchived files in each `inbox/<organization-slug>/` prefix, ordered by object creation time. It resolves the unique slug through the seeded organization registry before validating headers, required columns, and size limits. Invalid source files are moved to `rejected/<organization-slug>/source-files/` and alerted immediately to avoid partial processing and repeated attempts.
 - **Streaming File Reader:** The pipeline streams the CSV from S3 via an Object InputStream into the Spring Batch `ItemReader`, ensuring a flat memory footprint and eliminating OOM risk for large files.
-- **ItemReader / ItemProcessor / ItemWriter:** The job follows Spring Batch patterns: `ItemReader` streams rows, `ItemProcessor` validates that each row belongs to the trusted faculty configured for the organization-scoped prefix and performs intra-chunk deduplication, and `ItemWriter` performs bulk upserts for committed chunks.
-- **Persistent Quarantine (Local Staging then Upload):** Reject rows are appended to a local ephemeral file unique to the job execution (for example, `/tmp/rejects-<job-execution-id>.csv`) during chunk processing. When one or more rows were rejected, the worker uploads that file to a reject artifact key unique to the ingestion attempt in a single PUT operation; the job notification includes the S3 link for ops to review. Clean runs do not upload an empty reject artifact. This avoids unsupported S3 append operations and filename collisions between concurrent jobs.
-- **Chunk Commit & JobRepository (Restartability):** Transactions and chunk offsets are committed at the chunk boundary. If the pod crashes after chunk N, the next execution resumes at chunk N+1 based on JobRepository state, preventing duplicate processing.
+- **ItemReader / ItemProcessor / ItemWriter:** The job follows Spring Batch patterns: `ItemReader` streams rows; `ItemProcessor` validates that each `student_number` matches `23` plus six digits (faculty code plus student sequence), that each email is exactly `<student_number>@student.hcmus.edu.vn`, resolves the organization slug from the prefix to its seeded ID and name, requires that name in the Workers-only `INGESTION_EXPECTED_FACULTIES` allow-list, verifies that row faculty matches it, and performs intra-chunk deduplication; and `ItemWriter` performs bulk upserts for committed chunks.
+- **Persistent Quarantine (Local Staging then Upload):** Reject rows are appended to a local ephemeral file unique to the job execution (for example, `/tmp/rejects-<job-execution-id>.csv`) during chunk processing. When one or more rows were rejected, the worker uploads that file once to `rejected/<organization-slug>/row-reports/<job-execution-id>.csv`; the organization-scoped completion event includes the key for organizer reporting. Clean runs do not upload an empty row report. This avoids unsupported S3 append operations and filename collisions between concurrent jobs.
+- **Chunk Commit & JobRepository (Restartability and Reporting):** Transactions and chunk offsets are committed at the chunk boundary. If the pod crashes after chunk N, the next execution resumes at chunk N+1 based on JobRepository state, preventing duplicate processing. On a final outcome, the worker writes an application-owned `ingestion_job_reports` record with the organization ID, source key, metrics, and exactly one applicable rejection key: a moved source-file key or a row-report key. The organizer report uses this indexed tenant-bound record rather than serialized Spring Batch context or an object key supplied by the client.
 - **Intra-chunk Deduplication vs Bulk Upsert:** The `ItemProcessor` de-duplicates rows within the chunk in-memory to avoid intra-chunk constraint conflicts; the `ItemWriter` uses atomic bulk upserts to safely handle inter-chunk duplicates.
-- **Archiving & Retention:** Successfully processed source files move from `inbox/` to `archive/`; file-level validation failures move from `inbox/` to `rejected/`. Reject artifacts are retained in S3 and subject to lifecycle policies; job summaries include direct links to reject artifacts when they exist for remediation.
+- **Archiving & Retention:** Successfully processed source files move from `inbox/<organization-slug>/` to `archive/<organization-slug>/`; file-level validation failures move to `rejected/<organization-slug>/source-files/`; and row-level reports are retained at `rejected/<organization-slug>/row-reports/`. Job summaries include the applicable rejection key for remediation.
 - **Organizer Notification Routing:** The ingestion worker publishes an organization-scoped completion event after each successful attempt and a failure event after each file-level rejection. The downstream notifications worker is responsible for broadcasting both event types to every `ORGANIZER` in the target organization through in-app and email channels; the ingestion worker never delivers those channels directly. Until that worker is implemented, the event-publication boundary must carry a code comment documenting the deferred fan-out responsibility.
 
 ## 5. Access Control Design

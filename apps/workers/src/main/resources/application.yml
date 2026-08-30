@@ -51,3 +51,9 @@ management:
     tags:
       application: ${spring.application.name}
       host: ${HOSTNAME:unknown}
+
+# =============================================================================
+# Nightly Student CSV Ingestion
+# =============================================================================
+ingestion:
+  expected-faculties: ${INGESTION_EXPECTED_FACULTIES:}

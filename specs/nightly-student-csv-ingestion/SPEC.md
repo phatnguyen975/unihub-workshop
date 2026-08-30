@@ -11,11 +11,11 @@ This feature synchronizes authoritative student identity data from nightly CSV e
 
 ## 2. Actors & Preconditions
 
-| Actor                                             | Precondition                                                                                                                                          |
-| :------------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Legacy Student Management System                  | It has placed a CSV export in the configured organization-scoped inbox location in object storage.                                                    |
-| Scheduled ingestion process                       | The configured nightly schedule has occurred and the worker can access its configured object-storage, database, and message-broker dependencies.      |
-| `ORGANIZER` users in the source-file organization | Receive a broadcast in-app and email notification after an ingestion attempt finishes or is rejected; this feature does not provide a direct trigger. |
+| Actor                                             | Precondition                                                                                                                                                                                                                                                                               |
+| :------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Legacy Student Management System                  | It has fully uploaded a CSV export to the configured `inbox/<organization-slug>/` location in object storage before the scheduled run begins.                                                                                                                                              |
+| Scheduled ingestion process                       | The configured nightly schedule has occurred; the worker can access its configured object-storage, database, and message-broker dependencies; and its environment provides `INGESTION_EXPECTED_FACULTIES`, a separate allow-list of names for organizations already seeded by the backend. |
+| `ORGANIZER` users in the source-file organization | Receive a broadcast in-app and email notification after an ingestion attempt finishes or is rejected; this feature does not provide a direct trigger.                                                                                                                                      |
 
 ## 3. Functional Requirements
 
@@ -24,20 +24,20 @@ This feature synchronizes authoritative student identity data from nightly CSV e
 - **FR-01:** The system SHALL run the ingestion process nightly according to its configured schedule.
 - **FR-02:** The system SHALL consider only CSV files in the configured organization-scoped inbox location that have not been archived.
 - **FR-03:** The system SHALL process each eligible file for an organization in ascending object-creation-time order.
-- **FR-04:** The system SHALL derive the target organization from the organization-scoped inbox location when it begins an eligible file.
+- **FR-04:** The system SHALL derive the organization slug from the inbox location, resolve that unique slug to the seeded organization ID and name, and reject an unresolvable or inactive slug before processing an eligible file.
 - **FR-05:** The system SHALL reject an eligible file before processing any student row when its size exceeds 100 MB.
 - **FR-06:** The system SHALL reject an eligible file before processing any student row when its header omits any of `student_number`, `email`, `full_name`, or `faculty`, or contains either `organization_id` or `status`.
-- **FR-07:** The system SHALL move a file that fails file-level validation from its inbox location to the organization-scoped rejected location before publishing an organization-scoped failure notification event.
+- **FR-07:** The system SHALL move a file that fails file-level validation from its inbox location to `rejected/<organization-slug>/source-files/` before publishing an organization-scoped failure notification event.
 
 ### Row processing and synchronization
 
 - **FR-08:** The system SHALL process a valid file without loading its complete contents into memory.
 - **FR-09:** The system SHALL quarantine a row when any required field is blank after trimming surrounding whitespace.
-- **FR-10:** The system SHALL quarantine a row when `email` is not a valid email address.
+- **FR-10:** The system SHALL quarantine a row when `student_number` does not match `23` followed by exactly six digits, or when `email` is not exactly `<student_number>@student.hcmus.edu.vn`.
 - **FR-11:** The system SHALL quarantine a row when `student_number` exceeds 50 characters or `full_name` or `faculty` exceeds 200 characters.
 - **FR-12:** The system SHALL quarantine a row when its `faculty` value does not match the trusted expected faculty configured for the organization derived from the source-file location.
 - **FR-13:** The system SHALL keep the first occurrence of a duplicate student row within a processing chunk and quarantine every later occurrence from that chunk with a duplicate reason.
-- **FR-14:** The system SHALL create or update a valid student-directory record using its organization together with the student number and email as the documented uniqueness keys.
+- **FR-14:** The system SHALL create or update the one student-directory record identified by the valid organization's deterministic student-number and email pair.
 - **FR-15:** The system SHALL set the status of every created student-directory record to `ACTIVE` when the valid source row is processed.
 - **FR-16:** The system SHALL record the source file key and import time for every created or updated student-directory record.
 - **FR-17:** The system SHALL not delete, deactivate, or otherwise change a student-directory record solely because it is absent from a processed file.
@@ -47,27 +47,29 @@ This feature synchronizes authoritative student identity data from nightly CSV e
 
 - **FR-19:** The system SHALL append every quarantined row and its rejection reason to a reject artifact for that ingestion attempt.
 - **FR-20:** The system SHALL upload a reject artifact to object storage only when the ingestion attempt quarantined one or more rows.
-- **FR-21:** The system SHALL assign every uploaded reject artifact an object key that is unique to its ingestion attempt.
+- **FR-21:** The system SHALL upload every row-level reject artifact under `rejected/<organization-slug>/row-reports/` with an object key unique to its ingestion attempt.
 - **FR-22:** The system SHALL archive a successfully completed source file after all of its rows have been handled and any required reject artifact has been uploaded.
 - **FR-23:** The system SHALL publish an ingestion summary after a successful ingestion attempt, including the source file key, outcome metrics, and the reject artifact key when one exists.
 - **FR-24:** The system SHALL publish an ingestion summary with `rejectCount` equal to zero and no reject artifact key when a successful ingestion attempt has no quarantined rows.
 - **FR-25:** The system SHALL publish an organization-scoped completion notification event after a successful ingestion attempt, targeting every `ORGANIZER` user in the source-file organization.
+- **FR-26:** The system SHALL persist, in an application-owned ingestion-job report, the source-file organization ID, source-file key, final outcome metrics, and the one applicable rejection key: the moved file-level source key or the row-level report key. This enables a later organizer-facing report without accepting a client-supplied object key.
 
 ## 4. Business Rules
 
 - **BR-01:** A source CSV MUST contain `student_number`, `email`, `full_name`, and `faculty`; it MUST NOT contain `organization_id` or `status`.
-- **BR-02:** The organization is derived from the configured organization-scoped inbox location, never from a source-row value.
-- **BR-03:** Valid source rows are bounded by the `student_directory` schema: student number up to 50 characters, email as a valid email address, full name up to 200 characters, and faculty up to 200 characters.
+- **BR-02:** The organization slug is derived from the configured `inbox/<organization-slug>/` location, never from a source-row value. The worker resolves that unique slug to its seeded organization ID and name in the trusted organization registry, and accepts it only when the name is present in the Workers-only `INGESTION_EXPECTED_FACULTIES` allow-list; that name is the expected faculty.
+- **BR-03:** A valid student number matches `23` followed by exactly six digits: the middle three digits are the faculty code and the final three digits are the student sequence. Its email is exactly `<student_number>@student.hcmus.edu.vn`; full name and faculty are each up to 200 characters.
 - **BR-04:** The student directory is a verification source, not an authentication source.
 - **BR-05:** Duplicate rows within one processing chunk preserve the first occurrence; later occurrences are quarantined and do not replace it.
 - **BR-06:** A bad row is quarantined and MUST NOT abort the rest of its valid file.
-- **BR-07:** A file-level validation failure aborts that file before any row is processed, moves it to the organization-scoped rejected location, and publishes a failure notification event for every `ORGANIZER` user in that organization.
+- **BR-07:** A file-level validation failure aborts that file before any row is processed, moves it to `rejected/<organization-slug>/source-files/`, and publishes a failure notification event for every `ORGANIZER` user in that organization.
 - **BR-08:** An archived source file is not eligible for later ingestion; the archive is the completion marker that prevents it from being selected again.
-- **BR-09:** A reject artifact is created only when at least one row was quarantined; a clean run is represented by zero rejects and no artifact key.
+- **BR-09:** A row-level reject artifact is created only when at least one row was quarantined and is stored under `rejected/<organization-slug>/row-reports/`; a clean run is represented by zero rejects and no rejection key.
 - **BR-10:** The synchronization is additive and updating only: absence from an export is not evidence that a student should be removed or made inactive.
-- **BR-11:** The organization-scoped inbox contains eligible source files, the rejected location contains files that failed file-level validation, and the archive contains successfully completed source files.
+- **BR-11:** The organization-scoped inbox contains eligible source files; `rejected/<organization-slug>/source-files/` contains files that failed file-level validation; `rejected/<organization-slug>/row-reports/` contains row-level reports; and the archive contains successfully completed source files.
 - **BR-12:** An organization-scoped source file contains rows for that organization's configured faculty only; a row whose `faculty` value differs is invalid.
 - **BR-13:** The ingestion worker publishes notification events but does not send in-app notifications or emails directly; the downstream notifications feature fans out each event to every `ORGANIZER` user in the target organization through both channels.
+- **BR-14:** The application-owned ingestion-job report is the authoritative tenant binding for a later ingestion report. A clean run has no rejection key; a file-level rejection has only its moved source key; and a completed run with bad rows has only its row-report key.
 
 ## 5. State Transitions
 
@@ -79,9 +81,9 @@ N/A — this feature does not introduce or modify an application-owned stateful 
 - **Concurrency:** For a given organization, eligible files MUST be selected in ascending object-creation-time order. Database writes MUST preserve the documented uniqueness of organization plus student number and organization plus email.
 - **Idempotency:** Persisted chunk progress and atomic create-or-update behavior MUST prevent an interrupted execution from duplicating already committed student data when it resumes.
 - **Rate-limiting:** N/A — this feature has no client-facing network endpoint.
-- **Security:** The worker MUST derive tenant scope and the expected faculty only from trusted configuration and the object-storage location; it MUST NOT accept tenant scope, student status, or a mismatched faculty value from the CSV.
+- **Security:** The worker MUST derive the organization slug from the object-storage location, resolve its tenant scope and faculty through the trusted seeded organization registry, and require that faculty to be in the Workers-only `INGESTION_EXPECTED_FACULTIES` allow-list. It MUST NOT accept tenant scope, student status, a mismatched faculty value, or a nonconforming student identifier/email pair from the CSV.
 - **Reliability / Failure modes:** A file-level validation failure MUST cause no partial student-data update for that file, move the source file to the rejected location, and publish a failure notification event. A malformed row MUST be quarantined while remaining rows continue to be processed. A source file MUST be archived only after successful completion.
-- **Observability:** Each completed ingestion attempt MUST publish outcome metrics sufficient to identify the source file, organization, processed-row count, quarantined-row count, and reject artifact key when present. File-level failure and completion notification events MUST identify the target organization so the downstream notifications feature can broadcast in-app and email notifications to all of its `ORGANIZER` users.
+- **Observability:** Each final ingestion outcome MUST persist and publish metrics sufficient to identify the source file, organization, processed-row count, quarantined-row count, and applicable rejection key when present. File-level failure and completion notification events MUST identify the target organization so the downstream notifications feature can broadcast in-app and email notifications to all of its `ORGANIZER` users.
 
 ## 7. Acceptance Criteria
 
@@ -92,7 +94,7 @@ Given an organization inbox contains two eligible CSV files created at different
 And neither file has been archived
 When the nightly ingestion process runs
 Then it processes the earlier file before the later file
-And it derives the same organization's scope from each file's inbox location
+And it resolves the same organization's scope from each file's inbox slug
 ```
 
 _(Traces to: FR-01, FR-02, FR-03, FR-04)_
@@ -150,7 +152,7 @@ _(Traces to: FR-17)_
 ### Scenario 6: Quarantines malformed rows while continuing valid rows
 
 ```gherkin
-Given a valid CSV file contains one row with an invalid email and one valid row
+Given a valid CSV file contains one row whose email does not equal its student number followed by @student.hcmus.edu.vn and one valid row
 When the ingestion process handles the rows
 Then it quarantines the invalid row with its rejection reason
 And it creates or updates the record for the valid row
@@ -202,14 +204,26 @@ _(Traces to: FR-18)_
 Given a valid CSV file has one or more quarantined rows
 When all rows have been handled successfully
 Then the system uploads one reject artifact containing the quarantined rows and their reasons
-And the reject artifact key is unique to that ingestion attempt
+And it stores the artifact at `rejected/<organization-slug>/row-reports/` with a key unique to that ingestion attempt
 And it archives the source file
 And it publishes a summary containing the source file key, outcome metrics, and reject artifact key
 ```
 
 _(Traces to: FR-19, FR-20, FR-21, FR-22, FR-23)_
 
-### Scenario 11: Completes a clean file without an empty reject artifact
+### Scenario 11: Persists an organization-scoped report record
+
+```gherkin
+Given an ingestion attempt has reached a final outcome
+When its Spring Batch execution is finalized
+Then its application-owned ingestion-job report records the source organization ID and source file key
+And it records its outcome metrics
+And it records exactly one applicable rejection key: the moved source-file key for a file-level rejection or the row-report key for quarantined rows
+```
+
+_(Traces to: FR-26, BR-14)_
+
+### Scenario 12: Completes a clean file without an empty reject artifact
 
 ```gherkin
 Given a valid CSV file has no quarantined rows
@@ -222,7 +236,7 @@ And it does not upload an empty reject artifact
 
 _(Traces to: FR-20, FR-22, FR-24)_
 
-### Scenario 12: Broadcasts a successful ingestion result to organization organizers
+### Scenario 13: Broadcasts a successful ingestion result to organization organizers
 
 ```gherkin
 Given an organization has two ORGANIZER users

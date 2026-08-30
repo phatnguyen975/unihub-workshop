@@ -7,7 +7,8 @@ This guide simulates the legacy Student Management System dropping a nightly CSV
 - Run the commands from the repository root unless a step says otherwise.
 - Docker and Docker Compose are installed and running.
 - You have the MinIO credentials configured for this local environment. Use the credentials from your local infrastructure configuration; do not add credentials to this document or commit them.
-- Choose an existing organization UUID as `<organization-id>`. The upload location is tenant-scoped, so this value identifies the organization that owns the student records.
+- Choose an existing backend-seeded organization slug as `<organization-slug>`. The upload location is tenant-scoped, but a slug is an integration-friendly stable identifier: the worker resolves it to the platform's internal UUID. For the sample fixtures, use `information-technology` and ensure that `Information Technology` is present in the Workers-only `INGESTION_EXPECTED_FACULTIES` configuration.
+- Set `INGESTION_EXPECTED_FACULTIES` in `apps/workers/.env` to a comma-separated list of exact backend-seeded organization names, for example `Information Technology,Mathematics,Physics,Chemistry`.
 
 ## 1. Start MinIO and create the required bucket
 
@@ -25,31 +26,38 @@ Wait until `minio` is running and `minio-init` has completed successfully. The i
 The current architecture does not mandate a file-name format; object creation time determines processing order. Use the following development convention so that a file's intended export time is clear to operators. The faculty is deliberately not repeated in the file name because the organization-scoped prefix determines it.
 
 ```text
-unihub-csv-drops/inbox/<organization-id>/students-YYYY-MM-DDTHHMMSSZ.csv
+unihub-csv-drops/inbox/<organization-slug>/students-YYYY-MM-DDTHHMMSSZ.csv
 ```
 
 Example:
 
 ```text
-unihub-csv-drops/inbox/00000000-0000-0000-0000-000000000001/students-2026-08-30T010000Z.csv
+unihub-csv-drops/inbox/information-technology/students-2026-08-30T010000Z.csv
 ```
 
 The object-storage lifecycle uses three organization-scoped prefixes:
 
 ```text
-inbox/<organization-id>/     # New source files eligible for ingestion
-archive/<organization-id>/   # Successfully completed source files
-rejected/<organization-id>/  # Source files that failed file-level validation
+inbox/<organization-slug>/                  # New source files eligible for ingestion
+archive/<organization-slug>/                # Successfully completed source files
+rejected/<organization-slug>/source-files/  # Source files that failed file-level validation
+rejected/<organization-slug>/row-reports/   # Reports of invalid rows from completed files
 ```
 
-Upload development fixtures only to `inbox/<organization-id>/`. Each inbox prefix belongs to one faculty organization, and every CSV row must use that organization's configured faculty value. The ingestion worker moves files to `archive/` or `rejected/`; do not move them manually when testing the worker.
+Upload development fixtures only to `inbox/<organization-slug>/`. Each inbox prefix belongs to one faculty organization. The worker resolves the prefix slug to the seeded organization UUID and name, requires that name in `INGESTION_EXPECTED_FACULTIES`, and validates every CSV row against that resolved faculty value. Ensure the upload has completed before the scheduled ingestion run starts. The ingestion worker moves invalid source files to `rejected/<organization-slug>/source-files/` and uploads row reports to `rejected/<organization-slug>/row-reports/`; do not move either manually when testing the worker.
 
 ## 3. Upload with the MinIO Console
 
 1. Open `http://localhost:9001` in a browser.
 2. Sign in using the MinIO credentials from your local infrastructure configuration.
 3. Open the `unihub-csv-drops` bucket.
-4. Create the prefix path `inbox/<organization-id>/` if it does not already exist.
+4. Create the prefix path `inbox/<organization-slug>/` if it does not already exist.
 5. Upload `docs/data/students-csv/students-2026-08-30T010000Z.csv` into that prefix.
 6. Keep the existing file name when prompted.
-7. Confirm that the resulting object key exactly matches the convention in Step 2.
+7. Wait for the upload to finish and confirm that the resulting object key exactly matches the convention in Step 2 before running the ingestion worker.
+
+## 4. Test the second fixture as an insert-only follow-up
+
+After the first fixture has been ingested and moved to `archive/<organization-slug>/`, upload `docs/data/students-csv/students-2026-08-31T010000Z.csv` to the same `inbox/<organization-slug>/` prefix. Wait for that upload to complete before the next scheduled run.
+
+The second fixture contains students `23127001` through `23127040`. It preserves the first 20 records and adds 20 new ones, so the expected result is 20 unchanged updates and 20 inserted records. Do not upload both fixtures before the same test run if you want to observe those two outcomes separately.

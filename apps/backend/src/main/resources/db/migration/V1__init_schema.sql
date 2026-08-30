@@ -223,6 +223,47 @@ ALTER TABLE users
 
 
 -- =============================================================================
+-- TABLE: ingestion_job_reports
+-- =============================================================================
+-- Tenant-scoped, application-owned reporting metadata for each final nightly
+-- CSV source-file outcome. This is deliberately separate from Spring Batch's
+-- framework-managed batch_* tables so organizer report queries can filter and
+-- paginate by organization without reading serialized execution context.
+CREATE TABLE ingestion_job_reports (
+    id                        UUID        NOT NULL DEFAULT gen_random_uuid(),
+    job_execution_id          BIGINT      NOT NULL,
+    organization_id           UUID        NOT NULL,
+    source_file_key           TEXT        NOT NULL,
+    outcome                   VARCHAR(32) NOT NULL CHECK (outcome IN ('COMPLETED', 'FILE_REJECTED')),
+    processed_row_count       INTEGER     NOT NULL DEFAULT 0 CHECK (processed_row_count >= 0),
+    rejected_row_count        INTEGER     NOT NULL DEFAULT 0 CHECK (rejected_row_count >= 0),
+    file_rejection_source_key TEXT        NULL,
+    reject_artifact_key       TEXT        NULL,
+    completed_at              TIMESTAMPTZ NOT NULL,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT pk_ingestion_job_reports PRIMARY KEY (id),
+    CONSTRAINT uq_ingestion_job_reports_execution UNIQUE (job_execution_id),
+    CONSTRAINT chk_ingestion_job_reports_file_rejection
+        CHECK (outcome = 'COMPLETED'
+            OR (processed_row_count = 0 AND rejected_row_count = 0
+                AND file_rejection_source_key IS NOT NULL AND reject_artifact_key IS NULL)),
+    CONSTRAINT chk_ingestion_job_reports_completed_artifacts
+        CHECK (outcome = 'FILE_REJECTED' OR file_rejection_source_key IS NULL),
+    CONSTRAINT fk_ingestion_job_reports_organization FOREIGN KEY (organization_id) REFERENCES organizations (id)
+);
+
+-- Index: supports stable, tenant-scoped cursor pagination for organizer report views
+CREATE INDEX idx_ingestion_job_reports_org_completed
+    ON ingestion_job_reports (organization_id, completed_at DESC, id DESC);
+
+CREATE TRIGGER trg_ingestion_job_reports_updated_at
+    BEFORE UPDATE ON ingestion_job_reports
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+
+-- =============================================================================
 -- TABLE: workshops
 -- =============================================================================
 -- Core entity for the platform. Lifecycle: DRAFT → PUBLISHED → COMPLETED / CANCELED.
