@@ -16,6 +16,7 @@ spring:
 
 app:
   batch-ingestion:
+    cron: ${INGESTION_CRON:0 0 2 * * ?}
     expected-faculties: ${INGESTION_EXPECTED_FACULTIES:}
   storage:
     buckets:

@@ -3,6 +3,8 @@ package com.unihub.workshop.workers.batch_ingestion.inbound;
 import com.unihub.workshop.workers.batch_ingestion.core.models.StudentDirectoryRow;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.StudentDirectoryWriter;
 import com.unihub.workshop.workers.batch_ingestion.core.pipeline.StreamingStudentCsvReader;
+import com.unihub.workshop.workers.batch_ingestion.core.pipeline.StudentRowValidator;
+import com.unihub.workshop.workers.batch_ingestion.core.pipeline.ChunkDuplicateResolver;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -11,6 +13,8 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemReader;
 import org.springframework.batch.infrastructure.item.ItemWriter;
+import org.springframework.batch.infrastructure.item.ItemProcessor;
+import org.springframework.batch.infrastructure.item.support.CompositeItemProcessor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,12 +38,25 @@ public class StudentCsvBatchJobConfiguration {
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             ItemReader<StudentDirectoryRow> studentCsvItemReader,
+            ItemProcessor<StudentDirectoryRow, StudentDirectoryRow> compositeProcessor,
+            ChunkDuplicateResolver deduplicator,
             ItemWriter<StudentDirectoryRow> studentDirectoryItemWriter) {
         return new StepBuilder("processCsvStep", jobRepository)
                 .<StudentDirectoryRow, StudentDirectoryRow>chunk(100).transactionManager(transactionManager)
                 .reader(studentCsvItemReader)
+                .processor(compositeProcessor)
                 .writer(studentDirectoryItemWriter)
+                .listener(deduplicator)
                 .build();
+    }
+
+    @Bean
+    @StepScope
+    public ItemProcessor<StudentDirectoryRow, StudentDirectoryRow> compositeProcessor(
+            StudentRowValidator validator, ChunkDuplicateResolver deduplicator) {
+        CompositeItemProcessor<StudentDirectoryRow, StudentDirectoryRow> processor = new CompositeItemProcessor<>();
+        processor.setDelegates(List.of(validator, deduplicator));
+        return processor;
     }
 
     @Bean

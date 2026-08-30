@@ -54,7 +54,7 @@ This plan delivers the worker in three independently verifiable capabilities: sa
 
 ### Phase 3: Quarantine and Organizer Reporting
 
-- [ ] **T3 — Continue a valid export after bad rows, preserve a unique reject artifact, and publish the organizer-facing result**
+- [x] **T3 — Continue a valid export after bad rows, preserve a unique reject artifact, and publish the organizer-facing result**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Core row-validation pipeline and ports, Outbound MinIO and RabbitMQ adapters, Inbound scheduler delegation, Unit tests
@@ -67,14 +67,14 @@ This plan delivers the worker in three independently verifiable capabilities: sa
 
 #### Checkpoint: Quarantine and Organizer Reporting
 
-- [ ] All documented invalid-row conditions continue processing valid rows; reject artifacts are unique and only created when needed; notification-event behavior is unit-tested with the publishing port mocked.
+- [x] All documented invalid-row conditions continue processing valid rows; reject artifacts are unique and only created when needed; notification-event behavior is unit-tested with the publishing port mocked.
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks above are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified with unit tests.
-- [ ] The full workers unit-test suite passes, including static architecture checks where applicable.
-- [ ] Ready for `/review`.
+- [x] All tasks above are checked off.
+- [x] Every acceptance criterion across all tasks has been verified with unit tests.
+- [x] The full workers unit-test suite passes, including static architecture checks where applicable.
+- [x] Ready for `/review`.
 
 ## Risks and Mitigations
 

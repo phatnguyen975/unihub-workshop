@@ -9,30 +9,36 @@ import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionJobRe
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionObjectStore;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionEventPublisher;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.OrganizationDirectory;
+import com.unihub.workshop.workers.batch_ingestion.core.ports.out.RejectArtifactStore;
+import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.UUID;
 import java.util.Optional;
 
-public class CleanCsvIngestionService implements IngestStudentCsv {
+@Service
+public class CsvIngestionWithQuarantineService implements IngestStudentCsv {
 
     private final IngestionCheckpointStore checkpointStore;
     private final IngestionObjectStore objectStore;
     private final IngestionJobReportWriter reportWriter;
     private final IngestionEventPublisher eventPublisher;
     private final OrganizationDirectory organizationDirectory;
+    private final RejectArtifactStore rejectArtifactStore;
 
-    public CleanCsvIngestionService(
+    public CsvIngestionWithQuarantineService(
             IngestionCheckpointStore checkpointStore,
             IngestionObjectStore objectStore,
             IngestionJobReportWriter reportWriter,
             IngestionEventPublisher eventPublisher,
-            OrganizationDirectory organizationDirectory) {
+            OrganizationDirectory organizationDirectory,
+            RejectArtifactStore rejectArtifactStore) {
         this.checkpointStore = checkpointStore;
         this.objectStore = objectStore;
         this.reportWriter = reportWriter;
         this.eventPublisher = eventPublisher;
         this.organizationDirectory = organizationDirectory;
+        this.rejectArtifactStore = rejectArtifactStore;
     }
 
     @Override
@@ -41,12 +47,20 @@ public class CleanCsvIngestionService implements IngestStudentCsv {
                 .findBySlug(file.organizationSlug());
 
         if (orgInfoOpt.isEmpty()) {
-            return; // invalid slug, should have been caught in admission
+            return;
         }
 
         UUID organizationId = orgInfoOpt.get().id();
         long jobExecutionId = checkpointStore.startIngestionJob(file.key(), organizationId, file.organizationSlug());
         IngestionMetrics metrics = checkpointStore.getMetrics(jobExecutionId);
+
+        String rejectArtifactKey = null;
+        if (metrics.rejectCount() > 0) {
+            rejectArtifactStore.uploadAndCleanUp(jobExecutionId, file.organizationSlug());
+            rejectArtifactKey = String.format("rejected/%s/row-reports/%d.csv", file.organizationSlug(),
+                    jobExecutionId);
+        }
+
         objectStore.moveToArchive(file.key(), file.organizationSlug());
 
         IngestionJobReport report = new IngestionJobReport(
@@ -58,7 +72,7 @@ public class CleanCsvIngestionService implements IngestStudentCsv {
                 metrics.processedRowCount(),
                 metrics.rejectCount(),
                 null,
-                null,
+                rejectArtifactKey,
                 Instant.now(),
                 Instant.now(),
                 Instant.now());
