@@ -18,7 +18,7 @@ This plan delivers the worker in three independently verifiable capabilities: sa
 
 ### Phase 1: Safe File Admission
 
-- [ ] **T1 — Reject invalid source files without changing student data and publish the affected organization’s result**
+- [X] **T1 — Reject invalid source files without changing student data and publish the affected organization’s result**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Inbound scheduler, Core use case and ports, Outbound MinIO, PostgreSQL, and RabbitMQ adapters, Configuration, Unit tests
@@ -31,7 +31,7 @@ This plan delivers the worker in three independently verifiable capabilities: sa
 
 #### Checkpoint: Safe File Admission
 
-- [ ] The invalid-file path has unit coverage across core, storage-adapter mapping, messaging-adapter mapping, and scheduler delegation; no invalid file can reach student-directory persistence.
+- [X] The invalid-file path has unit coverage across core, storage-adapter mapping, messaging-adapter mapping, and scheduler delegation; no invalid file can reach student-directory persistence.
 
 ### Phase 2: Restart-Safe Clean Export Synchronization
 

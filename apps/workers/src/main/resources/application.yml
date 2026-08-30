@@ -14,6 +14,13 @@ spring:
     username: ${SPRING_RABBITMQ_USERNAME}
     password: ${SPRING_RABBITMQ_PASSWORD}
 
+app:
+  batch-ingestion:
+    expected-faculties: ${INGESTION_EXPECTED_FACULTIES:}
+  storage:
+    buckets:
+      csv: unihub-csv-drops
+
 # =============================================================================
 # Datasource Configuration
 # =============================================================================
@@ -51,9 +58,3 @@ management:
     tags:
       application: ${spring.application.name}
       host: ${HOSTNAME:unknown}
-
-# =============================================================================
-# Nightly Student CSV Ingestion
-# =============================================================================
-ingestion:
-  expected-faculties: ${INGESTION_EXPECTED_FACULTIES:}
