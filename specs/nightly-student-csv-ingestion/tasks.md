@@ -18,7 +18,7 @@ This plan delivers the worker in three independently verifiable capabilities: sa
 
 ### Phase 1: Safe File Admission
 
-- [X] **T1 — Reject invalid source files without changing student data and publish the affected organization’s result**
+- [x] **T1 — Reject invalid source files without changing student data and publish the affected organization’s result**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Inbound scheduler, Core use case and ports, Outbound MinIO, PostgreSQL, and RabbitMQ adapters, Configuration, Unit tests
@@ -31,11 +31,11 @@ This plan delivers the worker in three independently verifiable capabilities: sa
 
 #### Checkpoint: Safe File Admission
 
-- [X] The invalid-file path has unit coverage across core, storage-adapter mapping, messaging-adapter mapping, and scheduler delegation; no invalid file can reach student-directory persistence.
+- [x] The invalid-file path has unit coverage across core, storage-adapter mapping, messaging-adapter mapping, and scheduler delegation; no invalid file can reach student-directory persistence.
 
 ### Phase 2: Restart-Safe Clean Export Synchronization
 
-- [ ] **T2 — Synchronize a valid clean CSV in restart-safe chunks and archive its source file**
+- [x] **T2 — Synchronize a valid clean CSV in restart-safe chunks and archive its source file**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Inbound Spring Batch job configuration, Core pipeline and ports, Outbound PostgreSQL and MinIO adapters, Unit tests
@@ -50,7 +50,7 @@ This plan delivers the worker in three independently verifiable capabilities: sa
 
 #### Checkpoint: Restart-Safe Clean Export Synchronization
 
-- [ ] A clean organization-scoped export can be admitted, restart-safely synchronized, archived, and summarized with unit tests covering core behavior and outbound query/object mapping.
+- [x] A clean organization-scoped export can be admitted, restart-safely synchronized, archived, and summarized with unit tests covering core behavior and outbound query/object mapping.
 
 ### Phase 3: Quarantine and Organizer Reporting
 

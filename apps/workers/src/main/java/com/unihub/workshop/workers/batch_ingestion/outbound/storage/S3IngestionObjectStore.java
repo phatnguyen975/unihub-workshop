@@ -109,4 +109,24 @@ public class S3IngestionObjectStore implements IngestionObjectStore {
 
         return destinationKey;
     }
+
+    @Override
+    public String moveToArchive(String fileKey, String organizationSlug) {
+        String filename = fileKey.substring(fileKey.lastIndexOf('/') + 1);
+        String destinationKey = "archive/" + organizationSlug + "/" + filename;
+
+        s3Client.copyObject(CopyObjectRequest.builder()
+                .sourceBucket(bucketName)
+                .sourceKey(fileKey)
+                .destinationBucket(bucketName)
+                .destinationKey(destinationKey)
+                .build());
+
+        s3Client.deleteObject(DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(fileKey)
+                .build());
+
+        return destinationKey;
+    }
 }

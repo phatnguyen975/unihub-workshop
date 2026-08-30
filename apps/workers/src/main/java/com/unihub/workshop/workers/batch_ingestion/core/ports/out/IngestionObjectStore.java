@@ -9,4 +9,6 @@ public interface IngestionObjectStore {
     boolean hasValidHeader(String fileKey);
 
     String moveToRejected(String fileKey, String organizationSlug);
+
+    String moveToArchive(String fileKey, String organizationSlug);
 }

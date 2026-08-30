@@ -23,7 +23,21 @@ public class RabbitMqIngestionEventPublisher implements IngestionEventPublisher 
                 event);
     }
 
+    @Override
+    public void publishFileCompletedEvent(UUID organizationId, String sourceFileKey) {
+        FileCompletedEvent event = new FileCompletedEvent(organizationId, sourceFileKey);
+        rabbitTemplate.convertAndSend(
+                "unihub.events",
+                "notifications",
+                event);
+    }
+
     public record FileRejectedEvent(
+            @JsonProperty("organizationId") UUID organizationId,
+            @JsonProperty("sourceFileKey") String sourceFileKey) {
+    }
+
+    public record FileCompletedEvent(
             @JsonProperty("organizationId") UUID organizationId,
             @JsonProperty("sourceFileKey") String sourceFileKey) {
     }

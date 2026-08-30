@@ -22,7 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         "SPRING_DATASOURCE_REPLICA_USERNAME=sa",
         "SPRING_DATASOURCE_REPLICA_PASSWORD=",
         "datasource.primary.driver-class-name=org.h2.Driver",
-        "datasource.replica.driver-class-name=org.h2.Driver"
+        "datasource.replica.driver-class-name=org.h2.Driver",
+        "AWS_ACCESS_KEY_ID=test-key",
+        "AWS_SECRET_ACCESS_KEY=test-secret"
 })
 class DataSourceRoutingIntegrationTest {
 
