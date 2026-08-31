@@ -27,11 +27,13 @@ public class SpringBatchCheckpointStore implements IngestionCheckpointStore {
     }
 
     @Override
-    public long startIngestionJob(String sourceFileKey, UUID organizationId, String organizationSlug) {
+    public long startIngestionJob(String sourceFileKey, UUID organizationId, String organizationSlug,
+            String organizationName) {
         JobParameters params = new JobParametersBuilder()
                 .addString("sourceFileKey", sourceFileKey)
                 .addString("organizationId", organizationId.toString())
                 .addString("organizationSlug", organizationSlug)
+                .addString("organizationName", organizationName)
                 .addLong("time", System.currentTimeMillis())
                 .toJobParameters();
 

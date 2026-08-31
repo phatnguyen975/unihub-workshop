@@ -5,5 +5,5 @@ import com.unihub.workshop.workers.batch_ingestion.core.models.RejectedStudentRo
 public interface RejectArtifactStore {
     void append(long jobExecutionId, RejectedStudentRow row);
 
-    void uploadAndCleanUp(long jobExecutionId, String organizationSlug);
+    String uploadAndCleanUp(long jobExecutionId, String organizationSlug, String sourceFileKey);
 }

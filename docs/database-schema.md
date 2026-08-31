@@ -335,7 +335,7 @@ erDiagram
 | Column Name               | Data Type   | Constraints                                                | Description/UX Logic                                                            |
 | :------------------------ | :---------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------ |
 | id                        | UUID        | PK, NOT NULL, DEFAULT gen_random_uuid()                    | Report identifier.                                                              |
-| job_execution_id          | BIGINT      | NOT NULL, UNIQUE                                           | Corresponding Spring Batch execution ID; logical reference, no framework FK.    |
+| job_execution_id          | BIGINT      | NULL, UNIQUE                                               | Corresponding Spring Batch execution ID; logical reference, no framework FK.    |
 | organization_id           | UUID        | FK organizations(id), NOT NULL                             | Immutable tenant boundary for organizer authorization.                          |
 | source_file_key           | TEXT        | NOT NULL                                                   | Original organization-scoped inbox object key.                                  |
 | outcome                   | VARCHAR(32) | NOT NULL, CHECK (outcome IN ('COMPLETED','FILE_REJECTED')) | Final source-file outcome displayed to organizers.                              |
@@ -736,7 +736,7 @@ erDiagram
 | batch_job_execution_context  | Serialized execution context for a job.            |
 | batch_step_execution_context | Serialized execution context for a step.           |
 | batch_job_execution_seq      | Sequence generator for job execution IDs.          |
-| batch_job_seq                | Sequence generator for job IDs.                    |
+| batch_job_instance_seq       | Sequence generator for job instance IDs.           |
 | batch_step_execution_seq     | Sequence generator for step execution IDs.         |
 
 **Indexing Strategy:**

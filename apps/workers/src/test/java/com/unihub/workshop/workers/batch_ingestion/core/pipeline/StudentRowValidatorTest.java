@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,13 +22,13 @@ class StudentRowValidatorTest {
     @BeforeEach
     void setUp() {
         rejectArtifactStore = mock(RejectArtifactStore.class);
-        validator = new StudentRowValidator(List.of("FIT", "FMT"), rejectArtifactStore, jobExecutionId);
+        validator = new StudentRowValidator("Information Technology", rejectArtifactStore, jobExecutionId);
     }
 
     @Test
     void shouldReturnItemWhenValid() {
         StudentDirectoryRow row = new StudentDirectoryRow(UUID.randomUUID(), "23120001",
-                "23120001@student.hcmus.edu.vn", "John Doe", "FIT");
+                "23120001@student.hcmus.edu.vn", "John Doe", "Information Technology");
         StudentDirectoryRow result = validator.process(row);
 
         assertThat(result).isNotNull();
@@ -39,7 +38,7 @@ class StudentRowValidatorTest {
     @Test
     void shouldRejectWhenBlankFields() {
         StudentDirectoryRow row = new StudentDirectoryRow(UUID.randomUUID(), "", "23120001@student.hcmus.edu.vn",
-                "John Doe", "FIT");
+                "John Doe", "Information Technology");
         StudentDirectoryRow result = validator.process(row);
 
         assertThat(result).isNull();
@@ -52,7 +51,7 @@ class StudentRowValidatorTest {
     @Test
     void shouldRejectWhenInvalidStudentNumberFormat() {
         StudentDirectoryRow row = new StudentDirectoryRow(UUID.randomUUID(), "22120001",
-                "22120001@student.hcmus.edu.vn", "John Doe", "FIT");
+                "22120001@student.hcmus.edu.vn", "John Doe", "Information Technology");
         StudentDirectoryRow result = validator.process(row);
 
         assertThat(result).isNull();
@@ -64,7 +63,7 @@ class StudentRowValidatorTest {
     @Test
     void shouldRejectWhenEmailDoesNotMatch() {
         StudentDirectoryRow row = new StudentDirectoryRow(UUID.randomUUID(), "23120001", "wrong@student.hcmus.edu.vn",
-                "John Doe", "FIT");
+                "John Doe", "Information Technology");
         StudentDirectoryRow result = validator.process(row);
 
         assertThat(result).isNull();
@@ -82,6 +81,6 @@ class StudentRowValidatorTest {
         assertThat(result).isNull();
         ArgumentCaptor<RejectedStudentRow> captor = ArgumentCaptor.forClass(RejectedStudentRow.class);
         verify(rejectArtifactStore).append(eq(jobExecutionId), captor.capture());
-        assertThat(captor.getValue().rejectReason()).isEqualTo("Faculty does not match expected faculties");
+        assertThat(captor.getValue().rejectReason()).isEqualTo("Faculty does not match expected faculty");
     }
 }

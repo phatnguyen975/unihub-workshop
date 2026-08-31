@@ -10,6 +10,7 @@ import java.util.Set;
 public class BatchIngestionProperties {
 
     private Set<String> expectedFaculties = Set.of();
+    private long maxFileSize = 104857600L; // default 100MB
 
     public Set<String> getExpectedFaculties() {
         return expectedFaculties;
@@ -17,5 +18,13 @@ public class BatchIngestionProperties {
 
     public void setExpectedFaculties(Set<String> expectedFaculties) {
         this.expectedFaculties = expectedFaculties;
+    }
+
+    public long getMaxFileSize() {
+        return maxFileSize;
+    }
+
+    public void setMaxFileSize(long maxFileSize) {
+        this.maxFileSize = maxFileSize;
     }
 }

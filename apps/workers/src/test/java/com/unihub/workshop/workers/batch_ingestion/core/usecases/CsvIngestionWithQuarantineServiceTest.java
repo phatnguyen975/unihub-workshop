@@ -51,15 +51,15 @@ class CsvIngestionWithQuarantineServiceTest {
         SourceFile file = new SourceFile(fileKey, "it", 1000L, Instant.now());
 
         when(organizationDirectory.findBySlug("it"))
-                .thenReturn(Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "it")));
-        when(checkpointStore.startIngestionJob(fileKey, orgId, "it")).thenReturn(123L);
+                .thenReturn(Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
+        when(checkpointStore.startIngestionJob(fileKey, orgId, "it", "Information Technology")).thenReturn(123L);
         when(checkpointStore.getMetrics(123L)).thenReturn(new IngestionMetrics(50, 0));
 
         service.ingest(file);
 
-        verify(checkpointStore).startIngestionJob(fileKey, orgId, "it");
+        verify(checkpointStore).startIngestionJob(fileKey, orgId, "it", "Information Technology");
         verify(checkpointStore).getMetrics(123L);
-        verify(rejectArtifactStore, never()).uploadAndCleanUp(anyLong(), anyString());
+        verify(rejectArtifactStore, never()).uploadAndCleanUp(anyLong(), anyString(), anyString());
         verify(objectStore).moveToArchive(fileKey, "it");
         verify(eventPublisher).publishFileCompletedEvent(orgId, fileKey);
 
@@ -77,13 +77,15 @@ class CsvIngestionWithQuarantineServiceTest {
         SourceFile file = new SourceFile(fileKey, "it", 1000L, Instant.now());
 
         when(organizationDirectory.findBySlug("it"))
-                .thenReturn(Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "it")));
-        when(checkpointStore.startIngestionJob(fileKey, orgId, "it")).thenReturn(123L);
+                .thenReturn(Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
+        when(checkpointStore.startIngestionJob(fileKey, orgId, "it", "Information Technology")).thenReturn(123L);
         when(checkpointStore.getMetrics(123L)).thenReturn(new IngestionMetrics(40, 10));
+        when(rejectArtifactStore.uploadAndCleanUp(123L, "it", fileKey))
+                .thenReturn("rejected/it/row-reports/students-quarantine.csv");
 
         service.ingest(file);
 
-        verify(rejectArtifactStore).uploadAndCleanUp(123L, "it");
+        verify(rejectArtifactStore).uploadAndCleanUp(123L, "it", fileKey);
         verify(objectStore).moveToArchive(fileKey, "it");
         verify(eventPublisher).publishFileCompletedEvent(orgId, fileKey);
 
@@ -91,6 +93,6 @@ class CsvIngestionWithQuarantineServiceTest {
         verify(reportWriter).save(reportCaptor.capture());
 
         IngestionJobReport saved = reportCaptor.getValue();
-        assertThat(saved.rejectArtifactKey()).isEqualTo("rejected/it/row-reports/123.csv");
+        assertThat(saved.rejectArtifactKey()).isEqualTo("rejected/it/row-reports/students-quarantine.csv");
     }
 }

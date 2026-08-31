@@ -2,6 +2,7 @@ package com.unihub.workshop.workers.batch_ingestion.outbound.messaging;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.util.UUID;
@@ -14,22 +15,44 @@ import static org.mockito.Mockito.verify;
 class RabbitMqIngestionEventPublisherTest {
 
     @Test
-    void shouldPublishFileRejectedEvent() {
+    void shouldPublishFileRejectedEvent() throws Exception {
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
         RabbitMqIngestionEventPublisher publisher = new RabbitMqIngestionEventPublisher(rabbitTemplate);
-        
+
         UUID orgId = UUID.randomUUID();
         String fileKey = "inbox/it/file.csv";
 
         publisher.publishFileRejectedEvent(orgId, fileKey);
 
-        ArgumentCaptor<RabbitMqIngestionEventPublisher.FileRejectedEvent> captor = 
-            ArgumentCaptor.forClass(RabbitMqIngestionEventPublisher.FileRejectedEvent.class);
+        ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
 
-        verify(rabbitTemplate).convertAndSend(eq("unihub.events"), eq("notifications"), captor.capture());
+        verify(rabbitTemplate).send(eq("unihub.events"), eq("notifications"), captor.capture());
 
-        var event = captor.getValue();
-        assertThat(event.organizationId()).isEqualTo(orgId);
-        assertThat(event.sourceFileKey()).isEqualTo(fileKey);
+        Message message = captor.getValue();
+        assertThat(message.getMessageProperties().getContentType()).isEqualTo("application/json");
+        String body = new String(message.getBody());
+        assertThat(body).contains(orgId.toString());
+        assertThat(body).contains(fileKey);
+    }
+
+    @Test
+    void shouldPublishFileCompletedEvent() throws Exception {
+        RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+        RabbitMqIngestionEventPublisher publisher = new RabbitMqIngestionEventPublisher(rabbitTemplate);
+
+        UUID orgId = UUID.randomUUID();
+        String fileKey = "inbox/it/file.csv";
+
+        publisher.publishFileCompletedEvent(orgId, fileKey);
+
+        ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
+
+        verify(rabbitTemplate).send(eq("unihub.events"), eq("notifications"), captor.capture());
+
+        Message message = captor.getValue();
+        assertThat(message.getMessageProperties().getContentType()).isEqualTo("application/json");
+        String body = new String(message.getBody());
+        assertThat(body).contains(orgId.toString());
+        assertThat(body).contains(fileKey);
     }
 }

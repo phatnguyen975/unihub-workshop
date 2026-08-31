@@ -8,6 +8,9 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   flyway:
     enabled: false
+  batch:
+    job:
+      enabled: false
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:localhost}
     port: ${SPRING_RABBITMQ_PORT:5672}
@@ -17,7 +20,9 @@ spring:
 app:
   batch-ingestion:
     cron: ${INGESTION_CRON:0 0 2 * * ?}
-    expected-faculties: ${INGESTION_EXPECTED_FACULTIES:}
+    expected-faculties: ${INGESTION_EXPECTED_FACULTIES:Information Technology,Mathematics,Physics,Chemistry}
+    reject-dir: ${INGESTION_REJECT_DIR:resources}
+    max-file-size: ${INGESTION_MAX_FILE_SIZE:104857600}
   storage:
     buckets:
       csv: unihub-csv-drops

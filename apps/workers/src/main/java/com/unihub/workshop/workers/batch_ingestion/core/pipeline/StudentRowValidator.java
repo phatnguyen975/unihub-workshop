@@ -8,23 +8,22 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.regex.Pattern;
 
 @Component
 @StepScope
 public class StudentRowValidator implements ItemProcessor<StudentDirectoryRow, StudentDirectoryRow> {
 
-    private final List<String> expectedFaculties;
+    private final String expectedOrganizationName;
     private final RejectArtifactStore rejectArtifactStore;
     private final Long jobExecutionId;
     private static final Pattern STUDENT_NUMBER_PATTERN = Pattern.compile("^23\\d{6}$");
 
     public StudentRowValidator(
-            @Value("${app.batch-ingestion.expected-faculties}") List<String> expectedFaculties,
+            @Value("#{jobParameters['organizationName']}") String expectedOrganizationName,
             RejectArtifactStore rejectArtifactStore,
             @Value("#{stepExecution.jobExecutionId}") Long jobExecutionId) {
-        this.expectedFaculties = expectedFaculties;
+        this.expectedOrganizationName = expectedOrganizationName;
         this.rejectArtifactStore = rejectArtifactStore;
         this.jobExecutionId = jobExecutionId;
     }
@@ -54,8 +53,8 @@ public class StudentRowValidator implements ItemProcessor<StudentDirectoryRow, S
             return null;
         }
 
-        if (!expectedFaculties.contains(item.faculty())) {
-            rejectArtifactStore.append(jobExecutionId, createReject(item, "Faculty does not match expected faculties"));
+        if (expectedOrganizationName == null || !expectedOrganizationName.equals(item.faculty())) {
+            rejectArtifactStore.append(jobExecutionId, createReject(item, "Faculty does not match expected faculty"));
             return null;
         }
 

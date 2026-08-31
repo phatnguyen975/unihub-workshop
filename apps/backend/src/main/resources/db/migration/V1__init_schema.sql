@@ -231,7 +231,7 @@ ALTER TABLE users
 -- paginate by organization without reading serialized execution context.
 CREATE TABLE ingestion_job_reports (
     id                        UUID        NOT NULL DEFAULT gen_random_uuid(),
-    job_execution_id          BIGINT      NOT NULL,
+    job_execution_id          BIGINT      NULL,
     organization_id           UUID        NOT NULL,
     source_file_key           TEXT        NOT NULL,
     outcome                   VARCHAR(32) NOT NULL CHECK (outcome IN ('COMPLETED', 'FILE_REJECTED')),

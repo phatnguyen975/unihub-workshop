@@ -50,15 +50,17 @@ public class CsvIngestionWithQuarantineService implements IngestStudentCsv {
             return;
         }
 
-        UUID organizationId = orgInfoOpt.get().id();
-        long jobExecutionId = checkpointStore.startIngestionJob(file.key(), organizationId, file.organizationSlug());
+        OrganizationDirectory.OrganizationInfo orgInfo = orgInfoOpt.get();
+        UUID organizationId = orgInfo.id();
+
+        long jobExecutionId = checkpointStore.startIngestionJob(file.key(), organizationId, file.organizationSlug(),
+                orgInfo.name());
         IngestionMetrics metrics = checkpointStore.getMetrics(jobExecutionId);
 
         String rejectArtifactKey = null;
         if (metrics.rejectCount() > 0) {
-            rejectArtifactStore.uploadAndCleanUp(jobExecutionId, file.organizationSlug());
-            rejectArtifactKey = String.format("rejected/%s/row-reports/%d.csv", file.organizationSlug(),
-                    jobExecutionId);
+            rejectArtifactKey = rejectArtifactStore.uploadAndCleanUp(jobExecutionId, file.organizationSlug(),
+                    file.key());
         }
 
         objectStore.moveToArchive(file.key(), file.organizationSlug());

@@ -17,25 +17,26 @@ import java.util.UUID;
 
 public class FileAdmissionService implements RunFileAdmission {
 
-    private static final long MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
-
     private final IngestionObjectStore objectStore;
     private final OrganizationDirectory organizationDirectory;
     private final IngestionJobReportWriter reportWriter;
     private final IngestionEventPublisher eventPublisher;
     private final Set<String> expectedFaculties;
+    private final long maxFileSizeBytes;
 
     public FileAdmissionService(
             IngestionObjectStore objectStore,
             OrganizationDirectory organizationDirectory,
             IngestionJobReportWriter reportWriter,
             IngestionEventPublisher eventPublisher,
-            Set<String> expectedFaculties) {
+            Set<String> expectedFaculties,
+            long maxFileSizeBytes) {
         this.objectStore = objectStore;
         this.organizationDirectory = organizationDirectory;
         this.reportWriter = reportWriter;
         this.eventPublisher = eventPublisher;
         this.expectedFaculties = expectedFaculties;
+        this.maxFileSizeBytes = maxFileSizeBytes;
     }
 
     @Override
@@ -52,7 +53,6 @@ public class FileAdmissionService implements RunFileAdmission {
                 .findBySlug(file.organizationSlug());
 
         if (orgInfoOpt.isEmpty()) {
-            // Slug not found in directory -> cannot proceed. We can only move the file.
             objectStore.moveToRejected(file.key(), file.organizationSlug());
             return;
         }
@@ -64,7 +64,7 @@ public class FileAdmissionService implements RunFileAdmission {
             return;
         }
 
-        if (file.sizeBytes() > MAX_FILE_SIZE_BYTES) {
+        if (file.sizeBytes() > maxFileSizeBytes) {
             rejectFile(file, orgInfo.id());
             return;
         }
@@ -73,8 +73,6 @@ public class FileAdmissionService implements RunFileAdmission {
             rejectFile(file, orgInfo.id());
             return;
         }
-
-        // File is valid, leave it in inbox. Spring Batch job will pick it up in T2.
     }
 
     private void rejectFile(SourceFile file, UUID organizationId) {
@@ -82,7 +80,7 @@ public class FileAdmissionService implements RunFileAdmission {
 
         IngestionJobReport report = new IngestionJobReport(
                 UUID.randomUUID(),
-                -1L, // Logical placeholder, file admission doesn't have a Spring Batch jobExecutionId yet
+                null,
                 organizationId,
                 file.key(),
                 IngestionJobReport.Outcome.FILE_REJECTED,

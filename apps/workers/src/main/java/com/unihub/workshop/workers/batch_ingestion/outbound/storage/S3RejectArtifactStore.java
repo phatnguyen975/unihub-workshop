@@ -20,19 +20,22 @@ public class S3RejectArtifactStore implements RejectArtifactStore {
 
     private final S3Client s3Client;
     private final String bucketName;
+    private final String rejectDir;
     private final ConcurrentHashMap<Long, File> jobExecutionFiles = new ConcurrentHashMap<>();
 
     public S3RejectArtifactStore(
             S3Client s3Client,
-            @Value("${app.storage.buckets.csv}") String bucketName) {
+            @Value("${app.storage.buckets.csv}") String bucketName,
+            @Value("${app.batch-ingestion.reject-dir:resources}") String rejectDir) {
         this.s3Client = s3Client;
         this.bucketName = bucketName;
+        this.rejectDir = rejectDir;
     }
 
     private File getFile(long jobExecutionId) {
         return jobExecutionFiles.computeIfAbsent(jobExecutionId, id -> {
             try {
-                Path dir = Paths.get("apps", "workers", "resources");
+                Path dir = Paths.get(rejectDir);
                 if (!Files.exists(dir)) {
                     Files.createDirectories(dir);
                 }
@@ -63,10 +66,15 @@ public class S3RejectArtifactStore implements RejectArtifactStore {
     }
 
     @Override
-    public void uploadAndCleanUp(long jobExecutionId, String organizationSlug) {
+    public String uploadAndCleanUp(long jobExecutionId, String organizationSlug, String sourceFileKey) {
         File file = jobExecutionFiles.remove(jobExecutionId);
         if (file != null && file.exists()) {
-            String objectKey = String.format("rejected/%s/row-reports/%d.csv", organizationSlug, jobExecutionId);
+            String originalFileName = Paths.get(sourceFileKey).getFileName().toString();
+            if (originalFileName.endsWith(".csv")) {
+                originalFileName = originalFileName.substring(0, originalFileName.length() - 4);
+            }
+            String objectKey = String.format("rejected/%s/row-reports/%s-quarantine.csv", organizationSlug,
+                    originalFileName);
 
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
@@ -80,7 +88,9 @@ public class S3RejectArtifactStore implements RejectArtifactStore {
             } catch (IOException e) {
                 // ignore
             }
+            return objectKey;
         }
+        return null;
     }
 
     private String escapeCsv(String value) {

@@ -21,7 +21,7 @@ class S3RejectArtifactStoreTest {
     @BeforeEach
     void setUp() {
         s3Client = mock(S3Client.class);
-        store = new S3RejectArtifactStore(s3Client, "unihub-csv-drops");
+        store = new S3RejectArtifactStore(s3Client, "unihub-csv-drops", "build/tmp/test-resources");
     }
 
     @Test
@@ -30,7 +30,7 @@ class S3RejectArtifactStoreTest {
         RejectedStudentRow row = new RejectedStudentRow("23120002", "email", "name", "FIT", "reason");
 
         store.append(jobId, row);
-        store.uploadAndCleanUp(jobId, "it");
+        store.uploadAndCleanUp(jobId, "it", "inbox/it/students.csv");
 
         ArgumentCaptor<PutObjectRequest> putCaptor = ArgumentCaptor.forClass(PutObjectRequest.class);
         ArgumentCaptor<Path> pathCaptor = ArgumentCaptor.forClass(Path.class);
@@ -39,7 +39,7 @@ class S3RejectArtifactStoreTest {
 
         PutObjectRequest request = putCaptor.getValue();
         assertThat(request.bucket()).isEqualTo("unihub-csv-drops");
-        assertThat(request.key()).isEqualTo("rejected/it/row-reports/999.csv");
+        assertThat(request.key()).isEqualTo("rejected/it/row-reports/students-quarantine.csv");
 
         // Path should have been deleted, but we can check the path captured
         assertThat(pathCaptor.getValue().toString()).contains("rejected_999.csv");

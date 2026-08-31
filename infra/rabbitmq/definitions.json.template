@@ -50,16 +50,6 @@
       }
     },
     {
-      "name": "q.csv.ingestion",
-      "vhost": "/",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {
-        "x-dead-letter-exchange": "unihub.dlx",
-        "x-dead-letter-routing-key": "dlq"
-      }
-    },
-    {
       "name": "q.notifications",
       "vhost": "/",
       "durable": true,
@@ -84,14 +74,6 @@
       "destination": "q.ai.summarization",
       "destination_type": "queue",
       "routing_key": "ai.summarization",
-      "arguments": {}
-    },
-    {
-      "source": "unihub.events",
-      "vhost": "/",
-      "destination": "q.csv.ingestion",
-      "destination_type": "queue",
-      "routing_key": "csv.ingestion",
       "arguments": {}
     },
     {

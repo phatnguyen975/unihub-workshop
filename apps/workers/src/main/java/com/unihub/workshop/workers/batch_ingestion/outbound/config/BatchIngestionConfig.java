@@ -23,6 +23,7 @@ public class BatchIngestionConfig {
                 organizationDirectory,
                 reportWriter,
                 eventPublisher,
-                properties.getExpectedFaculties());
+                properties.getExpectedFaculties(),
+                properties.getMaxFileSize());
     }
 }
