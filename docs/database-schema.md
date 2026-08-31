@@ -301,7 +301,7 @@ erDiagram
 | id              | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid()                             | Student directory identifier.               |
 | organization_id | UUID         | FK organizations(id), NOT NULL                                      | Tenant boundary for faculty or department.  |
 | student_number  | VARCHAR(50)  | NOT NULL                                                            | Institution student identifier.             |
-| email           | CITEXT       | NOT NULL, UNIQUE                                                    | Official student email.                     |
+| email           | CITEXT       | NOT NULL                                                            | Official student email.                     |
 | full_name       | VARCHAR(200) | NOT NULL                                                            | Student legal or preferred name.            |
 | faculty         | VARCHAR(200) | NULL                                                                | Optional faculty/department metadata.       |
 | status          | VARCHAR(20)  | NOT NULL, DEFAULT 'ACTIVE', CHECK (status IN ('ACTIVE','INACTIVE')) | Enrollment status used during registration. |
@@ -324,7 +324,36 @@ erDiagram
 > [!NOTE]
 >
 > - This table is a validation source, not an authentication source. Student login accounts are stored in `users`.
-> - The CSV must NOT contain an `organization_id` or `status` column. The Spring Batch job implicitly injects `organization_id` based on the tenant running the job and defaults `status` to `ACTIVE`. The `student_number` and `email` serve as composite deduplication keys during chunk processing.
+> - The CSV must NOT contain an `organization_id` or `status` column. The Spring Batch job derives an `organization_slug` from the `inbox/<organization-slug>/` object prefix, resolves its seeded ID and name in the organization registry, requires that name in the Workers-only `INGESTION_EXPECTED_FACULTIES` allow-list, and defaults `status` to `ACTIVE`. The `student_number` must match `23` plus six digits (faculty code plus student sequence), and `email` must be exactly `<student_number>@student.hcmus.edu.vn`; together they are one deterministic student identity, not two independently selectable records. The two organization-scoped unique constraints protect that same identity during chunk processing and upsert.
+
+### Table: `ingestion_job_reports`
+
+**Table Description & UX Context:** Application-owned, tenant-indexed report metadata written by the nightly CSV worker for every final source-file outcome. It is the read model for organizer-facing ingestion history and reject-artifact authorization; it does not alter Spring Batch framework tables.
+
+**Schema Definition Table:**
+
+| Column Name               | Data Type   | Constraints                                                | Description/UX Logic                                                            |
+| :------------------------ | :---------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------ |
+| id                        | UUID        | PK, NOT NULL, DEFAULT gen_random_uuid()                    | Report identifier.                                                              |
+| job_execution_id          | BIGINT      | NULL, UNIQUE                                               | Corresponding Spring Batch execution ID; logical reference, no framework FK.    |
+| organization_id           | UUID        | FK organizations(id), NOT NULL                             | Immutable tenant boundary for organizer authorization.                          |
+| source_file_key           | TEXT        | NOT NULL                                                   | Original organization-scoped inbox object key.                                  |
+| outcome                   | VARCHAR(32) | NOT NULL, CHECK (outcome IN ('COMPLETED','FILE_REJECTED')) | Final source-file outcome displayed to organizers.                              |
+| processed_row_count       | INTEGER     | NOT NULL, DEFAULT 0, CHECK (processed_row_count >= 0)      | Number of handled valid rows.                                                   |
+| rejected_row_count        | INTEGER     | NOT NULL, DEFAULT 0, CHECK (rejected_row_count >= 0)       | Number of quarantined row-level rejects.                                        |
+| file_rejection_source_key | TEXT        | NULL                                                       | Moved source key under `rejected/<slug>/source-files/`; only file rejection.    |
+| reject_artifact_key       | TEXT        | NULL                                                       | Attempt-unique row report under `rejected/<slug>/row-reports/`; NULL otherwise. |
+| completed_at              | TIMESTAMPTZ | NOT NULL                                                   | Finalization time for ordering the organizer report.                            |
+| created_at                | TIMESTAMPTZ | NOT NULL, DEFAULT now()                                    | Audit timestamp.                                                                |
+| updated_at                | TIMESTAMPTZ | NOT NULL, DEFAULT now()                                    | Audit timestamp.                                                                |
+
+**Indexing Strategy:**
+
+- Unique B-Tree on `job_execution_id` for one report per final batch execution.
+- Composite B-Tree on `(organization_id, completed_at DESC, id DESC)` for tenant-scoped, stable cursor pagination.
+
+> [!NOTE]
+> The worker writes this record on a final outcome. A clean completed run has no rejection key. A file-level source rejection stores its moved source key under `rejected/<organization-slug>/source-files/`; a completed run with bad rows stores its row report under `rejected/<organization-slug>/row-reports/`. The database enforces that a `FILE_REJECTED` report has zero handled/rejected rows, has a source-file key, and has no row-report key. `ingestion-reject-report` must filter this table by `jwt.org` before generating any pre-signed URL, and must never query a client-supplied MinIO key.
 
 ### Table: `workshops`
 
@@ -707,7 +736,7 @@ erDiagram
 | batch_job_execution_context  | Serialized execution context for a job.            |
 | batch_step_execution_context | Serialized execution context for a step.           |
 | batch_job_execution_seq      | Sequence generator for job execution IDs.          |
-| batch_job_seq                | Sequence generator for job IDs.                    |
+| batch_job_instance_seq       | Sequence generator for job instance IDs.           |
 | batch_step_execution_seq     | Sequence generator for step execution IDs.         |
 
 **Indexing Strategy:**
