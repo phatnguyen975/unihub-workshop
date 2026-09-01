@@ -81,7 +81,7 @@ class RateLimitFilterAuthenticatedTest {
         assertThat(response.getStatus()).isEqualTo(429);
         assertThat(response.getContentType()).isEqualTo("application/problem+json");
         assertThat(response.getContentAsString()).contains("\"status\":429");
-        assertThat(response.getContentAsString()).contains("\"type\":\"urn:unihub:error:rate-limit\"");
+        assertThat(response.getContentAsString()).contains("\"type\":\"urn:unihub:error:rate-limited\"");
         assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("100");
         assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
         assertThat(response.getHeader("X-RateLimit-Retry-After")).isEqualTo("5"); // 5 seconds

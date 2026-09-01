@@ -67,10 +67,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception ex, Object body, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         String instance = ((ServletWebRequest) request).getRequest().getRequestURI();
+
+        String type = "urn:unihub:error:internal";
+        HttpStatus httpStatus = HttpStatus.valueOf(status.value());
+
+        if (httpStatus == HttpStatus.BAD_REQUEST)
+            type = "urn:unihub:error:validation";
+        else if (httpStatus == HttpStatus.NOT_FOUND)
+            type = "urn:unihub:error:not-found";
+        else if (httpStatus == HttpStatus.FORBIDDEN)
+            type = "urn:unihub:error:forbidden";
+        else if (httpStatus == HttpStatus.UNAUTHORIZED)
+            type = "urn:unihub:error:unauthorized";
+        else if (httpStatus == HttpStatus.TOO_MANY_REQUESTS)
+            type = "urn:unihub:error:rate-limited";
+
         ProblemDetail problem = createProblemDetail(
-                HttpStatus.valueOf(status.value()),
-                "urn:unihub:error:internal",
-                HttpStatus.valueOf(status.value()).getReasonPhrase(),
+                httpStatus,
+                type,
+                httpStatus.getReasonPhrase(),
                 ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred.",
                 instance);
         return ResponseEntity.status(status).body(problem);
@@ -109,6 +124,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "Authentication is required to access this resource.",
                 request.getRequestURI());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
+    }
+
+    @ExceptionHandler(com.unihub.workshop.shared.security.JtiValidationException.class)
+    public ResponseEntity<ProblemDetail> handleJtiValidationException(
+            com.unihub.workshop.shared.security.JtiValidationException ex,
+            HttpServletRequest request) {
+        ProblemDetail problem = createProblemDetail(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "urn:unihub:error:service-unavailable",
+                "Service Unavailable",
+                "Authentication service is temporarily unavailable. Please try again later.",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
     }
 
     @Override

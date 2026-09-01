@@ -26,6 +26,15 @@ spring:
     password: ${SPRING_RABBITMQ_PASSWORD}
 
 app:
+  security:
+    presign-ttl-minutes: 15
+    public-paths:
+      - "/api/v1/payments/webhook"
+      - "/.well-known/jwks.json"
+      - "/swagger-ui.html"
+      - "/swagger-ui/**"
+      - "/v3/api-docs/**"
+      - "/actuator/**"
   cors:
     allowed-origin-patterns:
       - "http://localhost:[*]"

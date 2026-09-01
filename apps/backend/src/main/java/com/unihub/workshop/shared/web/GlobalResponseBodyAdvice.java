@@ -34,6 +34,14 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
             Class<? extends HttpMessageConverter<?>> selectedConverterType,
             ServerHttpRequest request, ServerHttpResponse response) {
 
+        if (body instanceof org.springframework.http.ProblemDetail) {
+            return body;
+        }
+
+        if (body instanceof org.springframework.core.io.Resource || body instanceof byte[]) {
+            return body;
+        }
+
         if (body instanceof String) {
             return body;
         }

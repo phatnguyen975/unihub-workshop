@@ -98,7 +98,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
 
                 ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, detail);
-                problem.setType(URI.create("urn:unihub:error:rate-limit"));
+                problem.setType(URI.create("urn:unihub:error:rate-limited"));
                 problem.setTitle("Too Many Requests");
                 problem.setInstance(URI.create(request.getRequestURI()));
                 problem.setProperty("traceId", traceId);
