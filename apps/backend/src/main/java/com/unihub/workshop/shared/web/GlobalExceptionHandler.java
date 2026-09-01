@@ -111,6 +111,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
     }
 
+    @ExceptionHandler(com.unihub.workshop.shared.security.JtiValidationException.class)
+    public ResponseEntity<ProblemDetail> handleJtiValidationException(
+            com.unihub.workshop.shared.security.JtiValidationException ex,
+            HttpServletRequest request) {
+        ProblemDetail problem = createProblemDetail(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "urn:unihub:error:service-unavailable",
+                "Service Unavailable",
+                "Authentication service is temporarily unavailable. Please try again later.",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
+    }
+
     @Override
     protected ResponseEntity<Object> handleNoHandlerFoundException(
             NoHandlerFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {

@@ -22,7 +22,7 @@ This plan builds the backend for Feature 9.2 in three vertical slices: first a r
 
 This phase establishes the security baseline required by every authenticated endpoint in this and all future features. It is the highest-risk task in the plan — a wrong security posture cascades across the entire backend — so it is built and verified independently before any business endpoint is written.
 
-- [ ] **T1 — Authenticated requests to `/api/v1/**` are rejected with 401/403 based on JWT validity and role; public endpoints (Swagger, Actuator, JWKS, Stripe webhook) remain accessible without a token**
+- [x] **T1 — Authenticated requests to `/api/v1/**` are rejected with 401/403 based on JWT validity and role; public endpoints (Swagger, Actuator, JWKS, Stripe webhook) remain accessible without a token**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Shared/Security (new), Application config (`application.yml` / `application-prod.yml`), Shared/Config (RSA key, already present)
@@ -47,9 +47,9 @@ This phase establishes the security baseline required by every authenticated end
 
 #### Checkpoint: Phase 1 — Security Foundation
 
-- [ ] T1 acceptance criteria all pass end-to-end (filter behavior verified by `SecurityConfigTest`).
-- [ ] No existing tests broken; `ModulithArchitectureTest` passes.
-- [ ] Build is clean (`./gradlew test`).
+- [x] T1 acceptance criteria all pass end-to-end (filter behavior verified by `SecurityConfigTest`).
+- [x] No existing tests broken; `ModulithArchitectureTest` passes.
+- [x] Build is clean (`./gradlew test`).
 
 ### Phase 2: Business Capabilities
 
