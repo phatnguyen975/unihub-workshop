@@ -4,7 +4,6 @@ import com.unihub.workshop.workshops.application.ports.out.ArtifactPresignPort;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
-import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +28,7 @@ public class GetRejectArtifactUrlUseCase {
         this.presignTtlMinutes = presignTtlMinutes;
     }
 
-    public RejectArtifactUrlResponse execute(UUID jobId, UUID organizationId) {
+    public RejectArtifactUrlResult execute(UUID jobId, UUID organizationId) {
         // Must use primary data source to prevent replication lag
         IngestionJobReport report = repository.findByIdAndOrganizationIdFromPrimary(jobId, organizationId)
                 .orElseThrow(() -> new IllegalArgumentException("IngestionJobReport not found"));
@@ -55,7 +54,7 @@ public class GetRejectArtifactUrlUseCase {
 
         URL downloadUrl = presignPort.generateDownloadUrl(objectKey, ttl);
 
-        return new RejectArtifactUrlResponse(
+        return new RejectArtifactUrlResult(
                 jobId,
                 artifactType,
                 downloadUrl.toString(),

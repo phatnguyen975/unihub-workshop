@@ -1,6 +1,7 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
+import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.workshops.application.usecases.GetRejectArtifactUrlUseCase;
 import com.unihub.workshop.workshops.application.usecases.ListIngestionJobsUseCase;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
@@ -67,7 +68,7 @@ public class IngestionJobController {
     }
 
     @GetMapping("/{jobId}/reject-artifact")
-    public RejectArtifactUrlResponse getRejectArtifactUrl(
+    public ApiResponse<RejectArtifactUrlResponse> getRejectArtifactUrl(
             @PathVariable String jobId,
             Authentication authentication) {
 
@@ -86,7 +87,13 @@ public class IngestionJobController {
         UUID orgId = UUID.fromString(orgIdStr);
 
         try {
-            return getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
+            var result = getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
+            RejectArtifactUrlResponse responseDto = new RejectArtifactUrlResponse(
+                    result.jobId(),
+                    result.artifactType(),
+                    result.downloadUrl(),
+                    result.expiresAt());
+            return new ApiResponse<>(responseDto, "Pre-signed download URL generated");
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }

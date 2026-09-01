@@ -44,11 +44,11 @@ public class MinioArtifactPresignAdapter implements ArtifactPresignPort {
         this.bucketName = bucketName;
     }
 
-    public void setS3Presigner(S3Presigner s3Presigner) {
+    void setS3Presigner(S3Presigner s3Presigner) {
         this.s3Presigner = s3Presigner;
     }
 
-    public void setBucketName(String bucketName) {
+    void setBucketName(String bucketName) {
         this.bucketName = bucketName;
     }
 

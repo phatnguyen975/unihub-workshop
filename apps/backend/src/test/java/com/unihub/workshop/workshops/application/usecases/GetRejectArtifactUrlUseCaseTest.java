@@ -4,7 +4,6 @@ import com.unihub.workshop.workshops.application.ports.out.ArtifactPresignPort;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
-import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +44,7 @@ class GetRejectArtifactUrlUseCaseTest {
         when(presignPort.generateDownloadUrl("rejected_source.csv", Duration.ofMinutes(TTL_MINUTES)))
                 .thenReturn(java.net.URI.create("https://minio/source").toURL());
 
-        RejectArtifactUrlResponse response = useCase.execute(JOB_ID, ORG_ID);
+        RejectArtifactUrlResult response = useCase.execute(JOB_ID, ORG_ID);
 
         assertEquals(JOB_ID, response.jobId());
         assertEquals("SOURCE_FILE", response.artifactType());
@@ -64,7 +63,7 @@ class GetRejectArtifactUrlUseCaseTest {
         when(presignPort.generateDownloadUrl("reject_artifact.csv", Duration.ofMinutes(TTL_MINUTES)))
                 .thenReturn(java.net.URI.create("https://minio/row").toURL());
 
-        RejectArtifactUrlResponse response = useCase.execute(JOB_ID, ORG_ID);
+        RejectArtifactUrlResult response = useCase.execute(JOB_ID, ORG_ID);
 
         assertEquals(JOB_ID, response.jobId());
         assertEquals("ROW_REPORT", response.artifactType());
@@ -78,6 +77,19 @@ class GetRejectArtifactUrlUseCaseTest {
         IngestionJobReport report = new IngestionJobReport(
                 JOB_ID, 123L, ORG_ID, "source.csv", IngestionJobOutcome.COMPLETED,
                 100, 0, null, null, FIXED_NOW, FIXED_NOW, FIXED_NOW);
+
+        when(repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)).thenReturn(Optional.of(report));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> useCase.execute(JOB_ID, ORG_ID));
+        assertTrue(ex.getMessage().contains("does not have an applicable reject artifact"));
+    }
+
+    @Test
+    void execute_WhenFileRejectedButNoKey_ThrowsException() {
+        IngestionJobReport report = new IngestionJobReport(
+                JOB_ID, 123L, ORG_ID, "source.csv", IngestionJobOutcome.FILE_REJECTED,
+                0, 0, null, null, FIXED_NOW, FIXED_NOW, FIXED_NOW);
 
         when(repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)).thenReturn(Optional.of(report));
 

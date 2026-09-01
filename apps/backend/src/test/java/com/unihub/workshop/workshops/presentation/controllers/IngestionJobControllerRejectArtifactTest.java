@@ -3,11 +3,12 @@ package com.unihub.workshop.workshops.presentation.controllers;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.workshops.application.usecases.GetRejectArtifactUrlUseCase;
 import com.unihub.workshop.workshops.application.usecases.ListIngestionJobsUseCase;
-import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
+import com.unihub.workshop.workshops.application.usecases.RejectArtifactUrlResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -32,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "datasource.primary.driver-class-name=org.h2.Driver",
         "datasource.replica.driver-class-name=org.h2.Driver"
 })
-@org.springframework.test.context.ActiveProfiles("test")
+@ActiveProfiles("test")
 class IngestionJobControllerRejectArtifactTest {
 
     private MockMvc mockMvc;
@@ -65,15 +66,17 @@ class IngestionJobControllerRejectArtifactTest {
 
     @Test
     void getRejectArtifactUrl_Success() throws Exception {
-        RejectArtifactUrlResponse response = new RejectArtifactUrlResponse(
+        RejectArtifactUrlResult result = new RejectArtifactUrlResult(
                 JOB_ID, "SOURCE_FILE", "https://minio/artifact", Instant.parse("2026-08-31T02:30:00Z"));
 
-        when(getRejectArtifactUrlUseCase.execute(JOB_ID, ORG_ID)).thenReturn(response);
+        when(getRejectArtifactUrlUseCase.execute(JOB_ID, ORG_ID)).thenReturn(result);
 
         mockMvc.perform(get("/api/v1/admin/ingestion-jobs/{jobId}/reject-artifact", JOB_ID.toString())
                 .with(authentication(auth))
                 .with(csrf()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Pre-signed download URL generated"))
                 .andExpect(jsonPath("$.data.jobId").value(JOB_ID.toString()))
                 .andExpect(jsonPath("$.data.artifactType").value("SOURCE_FILE"))
                 .andExpect(jsonPath("$.data.downloadUrl").value("https://minio/artifact"))
@@ -85,7 +88,8 @@ class IngestionJobControllerRejectArtifactTest {
         mockMvc.perform(get("/api/v1/admin/ingestion-jobs/not-a-uuid/reject-artifact")
                 .with(authentication(auth))
                 .with(csrf()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:unihub:error:validation"));
     }
 
     @Test
@@ -96,7 +100,8 @@ class IngestionJobControllerRejectArtifactTest {
         mockMvc.perform(get("/api/v1/admin/ingestion-jobs/{jobId}/reject-artifact", JOB_ID.toString())
                 .with(authentication(auth))
                 .with(csrf()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:unihub:error:not-found"));
     }
 
     @Test
@@ -107,6 +112,7 @@ class IngestionJobControllerRejectArtifactTest {
         mockMvc.perform(get("/api/v1/admin/ingestion-jobs/{jobId}/reject-artifact", JOB_ID.toString())
                 .with(authentication(auth))
                 .with(csrf()))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("urn:unihub:error:internal"));
     }
 }
