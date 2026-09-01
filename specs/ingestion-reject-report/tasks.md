@@ -55,7 +55,7 @@ This phase establishes the security baseline required by every authenticated end
 
 With the security foundation in place, both business endpoints are implemented in dependency order. T2 establishes the domain model and persistence layer shared by both; T3 builds directly on top of T2's domain types.
 
-- [ ] **T2 — An authenticated ORGANIZER can retrieve their organization's paginated ingestion job history list, org-scoped exclusively to their JWT, with correct `artifactAvailable` flag and cursor-based pagination**
+- [x] **T2 — An authenticated ORGANIZER can retrieve their organization's paginated ingestion job history list, org-scoped exclusively to their JWT, with correct `artifactAvailable` flag and cursor-based pagination**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain (new — `IngestionJobReport` read model), Application (new — use case + outbound port), Infrastructure (new — JDBC/JPA repository, replica routing), Presentation (new — controller + DTOs)
