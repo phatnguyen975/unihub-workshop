@@ -21,7 +21,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 ### Phase 1: Public Key Infrastructure
 
-- [ ] **T1 — JWKS endpoint: expose RSA public key for downstream JWT verification**
+- [x] **T1 — JWKS endpoint: expose RSA public key for downstream JWT verification**
   - **Size:** S
   - **Depends on:** — (RSA key pair already loaded by `infrastructure-bootstrap-and-seed-data`)
   - **Layers touched:** Shared/Security (presentation), Application/Config
@@ -38,7 +38,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 #### Checkpoint: Phase 1
 
-- [ ] `GET /.well-known/jwks.json` returns a well-formed JWK Set with the correct RSA public key, verified by a unit test against the key loaded from `classpath:security/public.pem`. Build is clean. `ModulithArchitectureTest` passes.
+- [x] `GET /.well-known/jwks.json` returns a well-formed JWK Set with the correct RSA public key, verified by a unit test against the key loaded from `classpath:security/public.pem`. Build is clean. `ModulithArchitectureTest` passes.
 
 ### Phase 2: Core Authentication Flow (Login)
 
