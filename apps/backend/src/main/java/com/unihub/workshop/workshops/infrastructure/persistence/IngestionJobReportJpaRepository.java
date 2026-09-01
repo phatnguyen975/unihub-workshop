@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface IngestionJobReportJpaRepository extends JpaRepository<IngestionJobReportJpaEntity, UUID> {
+    java.util.Optional<IngestionJobReportJpaEntity> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
     @Query("SELECT r FROM IngestionJobReportJpaEntity r WHERE r.organizationId = :orgId " +
             "AND (:cursorTime IS NULL OR r.completedAt < :cursorTime OR (r.completedAt = :cursorTime AND r.id < :cursorId)) "

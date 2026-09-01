@@ -1,12 +1,14 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
+import com.unihub.workshop.workshops.application.usecases.GetRejectArtifactUrlUseCase;
 import com.unihub.workshop.workshops.application.usecases.ListIngestionJobsUseCase;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.CursorResponse;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.IngestionJobItem;
+import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +23,12 @@ import java.util.stream.Collectors;
 public class IngestionJobController {
 
     private final ListIngestionJobsUseCase listUseCase;
+    private final GetRejectArtifactUrlUseCase getRejectArtifactUrlUseCase;
 
-    public IngestionJobController(ListIngestionJobsUseCase listUseCase) {
+    public IngestionJobController(ListIngestionJobsUseCase listUseCase,
+            GetRejectArtifactUrlUseCase getRejectArtifactUrlUseCase) {
         this.listUseCase = listUseCase;
+        this.getRejectArtifactUrlUseCase = getRejectArtifactUrlUseCase;
     }
 
     @GetMapping
@@ -59,5 +64,31 @@ public class IngestionJobController {
 
         CursorResponse cursorResponse = new CursorResponse(page.nextCursor(), page.hasMore());
         return new IngestionJobListResponse(items, cursorResponse);
+    }
+
+    @GetMapping("/{jobId}/reject-artifact")
+    public RejectArtifactUrlResponse getRejectArtifactUrl(
+            @PathVariable String jobId,
+            Authentication authentication) {
+
+        UUID jobUuid;
+        try {
+            jobUuid = UUID.fromString(jobId);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid UUID format");
+        }
+
+        JwtAuthenticatedPrincipal principal = (JwtAuthenticatedPrincipal) authentication.getPrincipal();
+        String orgIdStr = principal.org();
+        if (orgIdStr == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Missing org claim in token");
+        }
+        UUID orgId = UUID.fromString(orgIdStr);
+
+        try {
+            return getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 }

@@ -81,7 +81,7 @@ With the security foundation in place, both business endpoints are implemented i
     - The repository query uses the composite index `(organization_id, completed_at DESC, id DESC)` for keyset pagination (verifiable via query inspection in tests). _(Traces to: FR-10, BR-09)_
     - `ModulithArchitectureTest` passes. _(Definition of Done)_
 
-- [ ] **T3 — An authenticated ORGANIZER can obtain a pre-signed MinIO download URL for an artifact-bearing report belonging to their org; non-owned, non-existent, or artifact-free reports return 404**
+- [x] **T3 — An authenticated ORGANIZER can obtain a pre-signed MinIO download URL for an artifact-bearing report belonging to their org; non-owned, non-existent, or artifact-free reports return 404**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Domain (new rule — artifact key selection logic added to `IngestionJobReport`), Application (new use case + outbound port for MinIO), Infrastructure (new MinIO presign adapter, primary datasource lookup), Presentation (new controller method + DTOs)
@@ -108,13 +108,13 @@ With the security foundation in place, both business endpoints are implemented i
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks (T1, T2, T3) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end (not just compiled).
-- [ ] Full test suite passes: `./gradlew test` is clean, including `ModulithArchitectureTest`.
-- [ ] `GET /api/v1/admin/ingestion-jobs` — happy path, 401, 403, pagination, and `artifactAvailable` flag all verified.
-- [ ] `GET /api/v1/admin/ingestion-jobs/{jobId}/reject-artifact` — both artifact types, 404 (clean run), 404 (wrong org), 400 (bad UUID), 500 (MinIO error) all verified.
-- [ ] Public endpoints (Swagger, Actuator) accessible without a token.
-- [ ] Ready for `/review ingestion-reject-report`.
+- [x] All tasks (T1, T2, T3) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end (not just compiled).
+- [x] Full test suite passes: `./gradlew test` is clean, including `ModulithArchitectureTest`.
+- [x] `GET /api/v1/admin/ingestion-jobs` — happy path, 401, 403, pagination, and `artifactAvailable` flag all verified.
+- [x] `GET /api/v1/admin/ingestion-jobs/{jobId}/reject-artifact` — both artifact types, 404 (clean run), 404 (wrong org), 400 (bad UUID), 500 (MinIO error) all verified.
+- [x] Public endpoints (Swagger, Actuator) accessible without a token.
+- [x] Ready for `/review ingestion-reject-report`.
 
 ## Risks and Mitigations
 

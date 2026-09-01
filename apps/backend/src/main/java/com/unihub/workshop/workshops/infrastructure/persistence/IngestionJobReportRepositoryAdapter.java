@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -68,6 +69,13 @@ public class IngestionJobReportRepositoryAdapter implements IngestionJobReportRe
         }
 
         return new CursorPage<>(items, nextCursor, hasMore);
+    }
+
+    @Override
+    @Transactional
+    public Optional<IngestionJobReport> findByIdAndOrganizationIdFromPrimary(UUID id, UUID organizationId) {
+        return repository.findByIdAndOrganizationId(id, organizationId)
+                .map(this::toDomain);
     }
 
     private IngestionJobReport toDomain(IngestionJobReportJpaEntity entity) {
