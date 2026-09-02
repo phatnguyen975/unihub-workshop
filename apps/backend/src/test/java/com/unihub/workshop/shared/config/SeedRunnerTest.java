@@ -1,8 +1,8 @@
 package com.unihub.workshop.shared.config;
 
-import com.unihub.workshop.shared.config.seed.SeedRunner;
-import com.unihub.workshop.shared.config.seed.SeedProperties;
-import com.unihub.workshop.shared.config.seed.PasswordGenerator;
+import com.unihub.workshop.shared.seed.SeedRunner;
+import com.unihub.workshop.shared.seed.SeedProperties;
+import com.unihub.workshop.shared.seed.PasswordGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

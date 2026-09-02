@@ -39,10 +39,10 @@ class RedisJtiValidatorTest {
     }
 
     @Test
-    void shouldThrowJtiValidationException_whenRedisIsUnavailable() {
+    void shouldThrowDomainException_whenRedisIsUnavailable() {
         when(valueOperations.get(anyString())).thenThrow(new RedisConnectionFailureException("Connection refused"));
 
-        JtiValidationException exception = assertThrows(JtiValidationException.class,
+        com.unihub.workshop.shared.exception.AppException exception = assertThrows(com.unihub.workshop.shared.exception.AppException.class,
                 () -> validator.isTokenValid("jti-123"));
         assertEquals("Failed to check token revocation status. Failing closed.", exception.getMessage());
         assertTrue(exception.getCause() instanceof RedisConnectionFailureException);

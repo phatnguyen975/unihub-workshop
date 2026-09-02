@@ -102,12 +102,18 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ```json
 {
-  "type": "urn:unihub:error:authentication",
-  "title": "Unauthorized",
-  "status": 401,
-  "detail": "Invalid email or password.",
-  "instance": "/api/v1/auth/login",
-  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:authentication",
+    "title": "Unauthorized",
+    "status": 401,
+    "detail": "Invalid email or password.",
+    "instance": "/api/v1/auth/login"
+  },
+  "metadata": {
+    "processedBy": "unihub-backend-1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+  }
 }
 ```
 
@@ -115,12 +121,18 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ```json
 {
-  "type": "urn:unihub:error:temporary-password",
-  "title": "Forbidden",
-  "status": 403,
-  "detail": "Mandatory password change required before accessing the system.",
-  "instance": "/api/v1/auth/login",
-  "traceId": "4bf92f3577b34da6a3ce929d0e0e4737"
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:temporary-password",
+    "title": "Forbidden",
+    "status": 403,
+    "detail": "Mandatory password change required before accessing the system.",
+    "instance": "/api/v1/auth/login"
+  },
+  "metadata": {
+    "processedBy": "unihub-backend-1",
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4737"
+  }
 }
 ```
 

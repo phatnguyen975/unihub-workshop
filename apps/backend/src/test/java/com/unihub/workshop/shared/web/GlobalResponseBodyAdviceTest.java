@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.server.ServerHttpRequest;
 
@@ -31,22 +32,8 @@ class GlobalResponseBodyAdviceTest {
     }
 
     @Test
-    void supports_ShouldReturnTrue_WhenReturningApiResponse() throws NoSuchMethodException {
-        MethodParameter methodParameter = new MethodParameter(TestController.class.getMethod("getApiResponse"), -1);
-        boolean supports = advice.supports(methodParameter, null);
-        assertThat(supports).isTrue();
-    }
-
-    @Test
-    void supports_ShouldReturnFalse_WhenReturningProblemDetail() throws NoSuchMethodException {
+    void supports_ShouldReturnTrue_ForAnyType() throws NoSuchMethodException {
         MethodParameter methodParameter = new MethodParameter(TestController.class.getMethod("getProblemDetail"), -1);
-        boolean supports = advice.supports(methodParameter, null);
-        assertThat(supports).isFalse();
-    }
-
-    @Test
-    void supports_ShouldReturnTrue_WhenReturningOtherObjects() throws NoSuchMethodException {
-        MethodParameter methodParameter = new MethodParameter(TestController.class.getMethod("getString"), -1);
         boolean supports = advice.supports(methodParameter, null);
         assertThat(supports).isTrue();
     }
@@ -60,7 +47,8 @@ class GlobalResponseBodyAdviceTest {
         MDC.put(RequestLoggingFilter.MDC_TRACE_ID, traceId);
         MDC.put(RequestLoggingFilter.MDC_PROCESSED_BY, "test-node");
 
-        ApiResponse<String> existingResponse = new ApiResponse<>("Custom Data", "Custom Message");
+        ApiResponse<String> existingResponse = ApiResponse.success("Custom Data", "Custom Message");
+        existingResponse.setMetadata(new ApiResponse.Metadata(traceId, "test-node"));
         Object result = advice.beforeBodyWrite(existingResponse, null, null, null, request, null);
 
         assertThat(result).isSameAs(existingResponse);
@@ -114,20 +102,31 @@ class GlobalResponseBodyAdviceTest {
     }
 
     @Test
-    void beforeBodyWrite_ShouldWrapWithUnknownDefaults_WhenNotInMDC() {
+    void beforeBodyWrite_ShouldWrapProblemDetailInErrorApiResponse() {
         ServerHttpRequest request = mock(ServerHttpRequest.class);
         when(request.getURI()).thenReturn(URI.create("/api/v1/test"));
 
-        Object body = new Object();
-        Object result = advice.beforeBodyWrite(body, null, null, null, request, null);
+        String traceId = UUID.randomUUID().toString();
+        MDC.put(RequestLoggingFilter.MDC_TRACE_ID, traceId);
+        MDC.put(RequestLoggingFilter.MDC_PROCESSED_BY, "test-node");
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Not found");
+        problemDetail.setProperty("traceId", traceId); // simulate it was set earlier
+
+        Object result = advice.beforeBodyWrite(problemDetail, null, null, null, request, null);
 
         assertThat(result).isInstanceOf(ApiResponse.class);
         ApiResponse<?> apiResponse = (ApiResponse<?>) result;
-        assertThat(apiResponse.getData()).isSameAs(body);
-        assertThat(apiResponse.isSuccess()).isTrue();
-        assertThat(apiResponse.getMessage()).isEqualTo("Success");
-        assertThat(apiResponse.getMetadata().getTraceId()).isEqualTo("unknown");
-        assertThat(apiResponse.getMetadata().getProcessedBy()).isEqualTo("unknown");
+        assertThat(apiResponse.isSuccess()).isFalse();
+        assertThat(apiResponse.getData()).isNull();
+        assertThat(apiResponse.getMessage()).isNull();
+        
+        ProblemDetail pdResult = (ProblemDetail) apiResponse.getError();
+        assertThat(pdResult).isSameAs(problemDetail);
+        assertThat(pdResult.getProperties()).doesNotContainKey("traceId");
+        
+        assertThat(apiResponse.getMetadata().getTraceId()).isEqualTo(traceId);
+        assertThat(apiResponse.getMetadata().getProcessedBy()).isEqualTo("test-node");
     }
 
     @SuppressWarnings("unused")

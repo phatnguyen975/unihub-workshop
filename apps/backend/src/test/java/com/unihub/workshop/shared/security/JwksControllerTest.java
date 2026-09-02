@@ -1,6 +1,5 @@
 package com.unihub.workshop.shared.security;
 
-import com.unihub.workshop.shared.config.RsaKeyProperties;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

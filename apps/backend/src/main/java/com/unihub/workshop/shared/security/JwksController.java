@@ -3,20 +3,17 @@ package com.unihub.workshop.shared.security;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
-import com.unihub.workshop.shared.config.RsaKeyProperties;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
 @RestController
+@RequiredArgsConstructor
 public class JwksController {
 
     private final RsaKeyProperties rsaKeyProperties;
-
-    public JwksController(RsaKeyProperties rsaKeyProperties) {
-        this.rsaKeyProperties = rsaKeyProperties;
-    }
 
     @GetMapping("/.well-known/jwks.json")
     public JwksResponse getJwks() {

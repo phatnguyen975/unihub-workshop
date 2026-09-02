@@ -7,5 +7,7 @@ import java.util.List;
 @ConfigurationProperties(prefix = "app.security")
 public record SecurityProperties(
         List<String> publicPaths,
-        int presignTtlMinutes) {
+        int presignTtlMinutes,
+        int accessTokenTtlMinutes,
+        int refreshTokenTtlDays) {
 }

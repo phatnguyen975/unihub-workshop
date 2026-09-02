@@ -4,7 +4,8 @@ title = "UniHub Gitleaks Config"
 useDefault = true
 
 [allowlist]
-description = "Ignore security test fixtures used only for unit testing"
+description = "Ignore dummy secrets in test fixtures and documentation specs"
 paths = [
-    '''apps/backend/src/test/resources/security/.*\.pem'''
+    '''apps/backend/src/test/resources/security/.*\.pem''',
+    '''specs/.*'''
 ]

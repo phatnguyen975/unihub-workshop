@@ -63,13 +63,14 @@ With the security foundation in place, both business endpoints are implemented i
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/domain/model/IngestionJobReport.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/domain/model/IngestionJobOutcome.java` _(new — enum: `COMPLETED`, `FILE_REJECTED`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/IngestionJobReportRepository.java` _(new — outbound port interface)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/ListIngestionJobsUseCase.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/in/ListIngestionJobsUseCase.java` _(new — inbound port interface)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/ListIngestionJobsUseCaseImpl.java` _(new — inbound port interface)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/IngestionJobReportJpaRepository.java` _(new — Spring Data JPA, replica datasource)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/IngestionJobReportJpaEntity.java` _(new — `@Entity` mapping to `ingestion_job_reports`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/IngestionJobReportRepositoryAdapter.java` _(new — implements port, applies keyset cursor)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/IngestionJobController.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/IngestionJobListResponse.java` _(new)_
-    - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/ListIngestionJobsUseCaseTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/ListIngestionJobsUseCaseImplTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/infrastructure/persistence/IngestionJobReportRepositoryAdapterTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/IngestionJobControllerTest.java` _(new — MockMvc, T1 security wired)_
   - **Acceptance Criteria:**
@@ -87,11 +88,12 @@ With the security foundation in place, both business endpoints are implemented i
   - **Layers touched:** Domain (new rule — artifact key selection logic added to `IngestionJobReport`), Application (new use case + outbound port for MinIO), Infrastructure (new MinIO presign adapter, primary datasource lookup), Presentation (new controller method + DTOs)
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/ArtifactPresignPort.java` _(new — outbound port for URL generation)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/GetRejectArtifactUrlUseCase.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/in/GetRejectArtifactUrlUseCase.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/GetRejectArtifactUrlUseCaseImpl.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/storage/MinioArtifactPresignAdapter.java` _(new — implements `ArtifactPresignPort` using MinIO SDK)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/RejectArtifactUrlResponse.java` _(new)_
     - `apps/backend/src/main/resources/application.yml` _(updated if `app.security.presign-ttl-minutes` was not added in T1)_
-    - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/GetRejectArtifactUrlUseCaseTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/GetRejectArtifactUrlUseCaseImplTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/infrastructure/storage/MinioArtifactPresignAdapterTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/IngestionJobControllerRejectArtifactTest.java` _(new — MockMvc)_
   - **Acceptance Criteria:**

@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
+import com.unihub.workshop.shared.exception.AppException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -60,7 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (JwtException | IllegalArgumentException ex) {
             exceptionResolver.resolveException(request, response, null,
                     new AuthenticationCredentialsNotFoundException(ex.getMessage(), ex));
-        } catch (AuthenticationException ex) {
+        } catch (AuthenticationException | AppException ex) {
             exceptionResolver.resolveException(request, response, null, ex);
         }
     }

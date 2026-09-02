@@ -134,7 +134,7 @@ The system **SHALL** expose a public endpoint at `/.well-known/jwks.json` that r
 - `n`: base64url-encoded RSA public modulus
 - `e`: base64url-encoded RSA public exponent
 
-The endpoint **SHALL** require no authentication (public). The public key material **SHALL** be the same key already loaded at startup by `shared/config.RsaKeyConfig` (the single source of truth for key material).
+The endpoint **SHALL** require no authentication (public). The public key material **SHALL** be the same key already loaded at startup by `shared/security/RsaKeyConfig` (the single source of truth for key material).
 
 ### FR-13 — Access token validation on every protected request
 

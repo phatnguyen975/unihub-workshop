@@ -1,9 +1,10 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
-import com.unihub.workshop.workshops.application.usecases.GetRejectArtifactUrlUseCase;
-import com.unihub.workshop.workshops.application.usecases.ListIngestionJobsUseCase;
+import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
 import com.unihub.workshop.workshops.application.usecases.RejectArtifactUrlResult;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,19 +90,19 @@ class IngestionJobControllerRejectArtifactTest {
                 .with(authentication(auth))
                 .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("urn:unihub:error:validation"));
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"));
     }
 
     @Test
     void getRejectArtifactUrl_NotFound_Returns404() throws Exception {
         when(getRejectArtifactUrlUseCase.execute(JOB_ID, ORG_ID))
-                .thenThrow(new IllegalArgumentException("IngestionJobReport not found"));
+                .thenThrow(new com.unihub.workshop.shared.exception.AppException(org.springframework.http.HttpStatus.NOT_FOUND, "urn:unihub:error:not-found", "IngestionJobReport not found"));
 
         mockMvc.perform(get("/api/v1/admin/ingestion-jobs/{jobId}/reject-artifact", JOB_ID.toString())
                 .with(authentication(auth))
                 .with(csrf()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.type").value("urn:unihub:error:not-found"));
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:not-found"));
     }
 
     @Test
@@ -113,6 +114,6 @@ class IngestionJobControllerRejectArtifactTest {
                 .with(authentication(auth))
                 .with(csrf()))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.type").value("urn:unihub:error:internal"));
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:internal"));
     }
 }

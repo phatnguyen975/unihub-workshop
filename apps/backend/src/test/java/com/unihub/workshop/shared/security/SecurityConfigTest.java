@@ -150,7 +150,7 @@ class SecurityConfigTest {
                 .build();
 
         when(jwtDecoder.decode(anyString())).thenReturn(validJwt);
-        doThrow(new JtiValidationException("Redis is down", new RuntimeException()))
+        doThrow(new com.unihub.workshop.shared.exception.AppException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "urn:unihub:error:service-unavailable", "Redis is down"))
                 .when(redisJtiValidator).isTokenValid("jti-789");
 
         mockMvc.perform(get("/api/v1/admin/dummy")

@@ -42,7 +42,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 ### Phase 2: Core Authentication Flow (Login)
 
-- [ ] **T2 — Login: validate credentials, enforce security gates, and issue access + refresh token pair**
+- [x] **T2 — Login: validate credentials, enforce security gates, and issue access + refresh token pair**
   - **Size:** M
   - **Depends on:** T1 (JWT signing infrastructure introduced here reuses the RSA key confirmed in T1)
   - **Layers touched:** Domain, Application, Infrastructure/Persistence, Presentation
@@ -81,7 +81,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 #### Checkpoint: Phase 2
 
-- [ ] `POST /api/v1/auth/login` is fully functional end-to-end for all three actors (STUDENT, ORGANIZER, STAFF) and all three rejection gates (wrong credentials, inactive, temporary password). All unit tests pass. `ModulithArchitectureTest` passes. Build is clean.
+- [x] `POST /api/v1/auth/login` is fully functional end-to-end for all three actors (`STUDENT`, `ORGANIZER`, `STAFF`) and all three rejection gates (wrong credentials, inactive, temporary password). All unit tests pass. `ModulithArchitectureTest` passes. Build is clean.
 
 ### Phase 3: Session Continuation (Token Refresh)
 
