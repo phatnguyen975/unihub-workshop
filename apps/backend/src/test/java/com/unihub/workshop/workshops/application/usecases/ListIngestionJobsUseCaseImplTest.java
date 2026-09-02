@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.application.usecases;
 
+import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
@@ -23,16 +24,14 @@ class ListIngestionJobsUseCaseImplImplTest {
 
     @Test
     void execute_withNullOrganizationId_throwsException() {
-        com.unihub.workshop.shared.exception.AppException ex = assertThrows(com.unihub.workshop.shared.exception.AppException.class,
-                () -> useCase.execute(null, null, 20));
+        AppException ex = assertThrows(AppException.class, () -> useCase.execute(null, null, 20));
         assertEquals("organizationId must not be null", ex.getMessage());
     }
 
     @Test
     void execute_withSizeLessThanOne_throwsException() {
         UUID orgId = UUID.randomUUID();
-        com.unihub.workshop.shared.exception.AppException ex = assertThrows(com.unihub.workshop.shared.exception.AppException.class,
-                () -> useCase.execute(orgId, null, 0));
+        AppException ex = assertThrows(AppException.class, () -> useCase.execute(orgId, null, 0));
         assertEquals("size must be at least 1", ex.getMessage());
     }
 

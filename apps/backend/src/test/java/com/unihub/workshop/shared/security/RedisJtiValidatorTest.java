@@ -6,6 +6,8 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import com.unihub.workshop.shared.exception.AppException;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -42,8 +44,7 @@ class RedisJtiValidatorTest {
     void shouldThrowDomainException_whenRedisIsUnavailable() {
         when(valueOperations.get(anyString())).thenThrow(new RedisConnectionFailureException("Connection refused"));
 
-        com.unihub.workshop.shared.exception.AppException exception = assertThrows(com.unihub.workshop.shared.exception.AppException.class,
-                () -> validator.isTokenValid("jti-123"));
+        AppException exception = assertThrows(AppException.class, () -> validator.isTokenValid("jti-123"));
         assertEquals("Failed to check token revocation status. Failing closed.", exception.getMessage());
         assertTrue(exception.getCause() instanceof RedisConnectionFailureException);
     }

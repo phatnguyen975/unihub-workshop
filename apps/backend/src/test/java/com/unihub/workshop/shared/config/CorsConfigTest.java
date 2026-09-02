@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
@@ -40,9 +42,9 @@ class CorsConfigTest {
                 .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-RateLimit-Retry-After")));
     }
 
-    @org.springframework.web.bind.annotation.RestController
+    @RestController
     static class DummyController {
-        @org.springframework.web.bind.annotation.GetMapping("/api/v1/workshops")
+        @GetMapping("/api/v1/workshops")
         public String get() {
             return "ok";
         }

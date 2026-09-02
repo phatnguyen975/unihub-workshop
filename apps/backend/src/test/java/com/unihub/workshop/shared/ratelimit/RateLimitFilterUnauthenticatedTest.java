@@ -2,12 +2,14 @@ package com.unihub.workshop.shared.ratelimit;
 
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.distributed.proxy.RemoteBucketBuilder;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -44,13 +46,12 @@ class RateLimitFilterUnauthenticatedTest {
         RateLimitProperties.Tier browsTier = new RateLimitProperties.Tier(100, 100, Duration.ofSeconds(60));
         properties = new RateLimitProperties(regTier, browsTier, java.util.List.of());
 
-        filter = new RateLimitFilter(proxyManager, properties,
-                mock(com.unihub.workshop.shared.ratelimit.RateLimitMetrics.class));
+        filter = new RateLimitFilter(proxyManager, properties, mock(RateLimitMetrics.class));
 
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
 
-        io.github.bucket4j.distributed.BucketProxy bucket = mock(io.github.bucket4j.distributed.BucketProxy.class);
+        BucketProxy bucket = mock(BucketProxy.class);
         ConsumptionProbe probe = mock(ConsumptionProbe.class);
 
         when(probe.isConsumed()).thenReturn(true);
@@ -59,7 +60,7 @@ class RateLimitFilterUnauthenticatedTest {
         when(bucket.tryConsumeAndReturnRemaining(1)).thenReturn(probe);
 
         when(proxyManager.builder()).thenReturn(builderMock);
-        when(builderMock.build(any(byte[].class), org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any()))
+        when(builderMock.build(any(byte[].class), ArgumentMatchers.<Supplier<BucketConfiguration>>any()))
                 .thenReturn(bucket);
     }
 
@@ -70,7 +71,7 @@ class RateLimitFilterUnauthenticatedTest {
         filter.doFilter(request, response, filterChain);
 
         verify(builderMock).build(eq("rate_limit:192.168.1.1".getBytes(StandardCharsets.UTF_8)),
-                org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any());
+                ArgumentMatchers.<Supplier<BucketConfiguration>>any());
         verify(filterChain).doFilter(request, response);
     }
 
@@ -82,7 +83,7 @@ class RateLimitFilterUnauthenticatedTest {
         filter.doFilter(request, response, filterChain);
 
         verify(builderMock).build(eq("rate_limit:203.0.113.195".getBytes(StandardCharsets.UTF_8)),
-                org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any());
+                ArgumentMatchers.<Supplier<BucketConfiguration>>any());
         verify(filterChain).doFilter(request, response);
     }
 
@@ -94,7 +95,7 @@ class RateLimitFilterUnauthenticatedTest {
         filter.doFilter(request, response, filterChain);
 
         verify(builderMock).build(eq("rate_limit:192.168.1.5".getBytes(StandardCharsets.UTF_8)),
-                org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any());
+                ArgumentMatchers.<Supplier<BucketConfiguration>>any());
         verify(filterChain).doFilter(request, response);
     }
 }

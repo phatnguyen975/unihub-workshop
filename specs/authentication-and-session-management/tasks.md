@@ -113,7 +113,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 ### Phase 4: Session Termination (Logout)
 
-- [ ] **T4 — Logout: blacklist JTI in Redis and revoke refresh token in DB, with fail-closed semantics**
+- [x] **T4 — Logout: blacklist JTI in Redis and revoke refresh token in DB, with fail-closed semantics**
   - **Size:** M
   - **Depends on:** T2 (requires a valid access token and refresh token issued by login), T3 (richer test: logout, then verify old refresh token also fails refresh)
   - **Layers touched:** Application, Infrastructure/Redis, Infrastructure/Persistence, Presentation
@@ -136,11 +136,11 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1–T4 are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end (endpoint called, response inspected, DB/Redis state confirmed).
-- [ ] Full unit test suite passes, including `ModulithArchitectureTest`.
-- [ ] No raw password or raw refresh token appears in any log output.
-- [ ] Ready for `/review authentication-and-session-management`.
+- [x] All tasks T1–T4 are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end (endpoint called, response inspected, DB/Redis state confirmed).
+- [x] Full unit test suite passes, including `ModulithArchitectureTest`.
+- [x] No raw password or raw refresh token appears in any log output.
+- [x] Ready for `/review authentication-and-session-management`.
 
 ## Risks and Mitigations
 

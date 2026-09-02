@@ -1,12 +1,17 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
+import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
+import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
+import com.unihub.workshop.shared.exception.ForbiddenException;
+import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -25,7 +30,9 @@ class AuthControllerTest {
     @BeforeEach
     void setUp() {
         loginUseCase = mock(LoginUseCase.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(loginUseCase, mock(com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase.class)))
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new AuthController(loginUseCase, mock(RefreshTokenUseCase.class), mock(LogoutUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }
@@ -56,7 +63,8 @@ class AuthControllerTest {
     @Test
     void shouldReturn401OnInvalidCredentials() throws Exception {
         when(loginUseCase.login(any(), any(), any(), any()))
-                .thenThrow(new com.unihub.workshop.shared.exception.UnauthorizedException("urn:unihub:error:authentication", "Invalid credentials"));
+                .thenThrow(new UnauthorizedException(
+                        "urn:unihub:error:authentication", "Invalid credentials"));
 
         String requestBody = """
                 {
@@ -75,7 +83,8 @@ class AuthControllerTest {
     @Test
     void shouldReturn403OnAccountDisabled() throws Exception {
         when(loginUseCase.login(any(), any(), any(), any()))
-                .thenThrow(new com.unihub.workshop.shared.exception.ForbiddenException("urn:unihub:error:account-disabled", "Account disabled"));
+                .thenThrow(new ForbiddenException(
+                        "urn:unihub:error:account-disabled", "Account disabled"));
 
         String requestBody = """
                 {
@@ -87,15 +96,16 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:account-disabled"));
     }
-    
+
     @Test
     void shouldReturn403OnTemporaryPassword() throws Exception {
         when(loginUseCase.login(any(), any(), any(), any()))
-                .thenThrow(new com.unihub.workshop.shared.exception.ForbiddenException("urn:unihub:error:temporary-password", "Temporary password change required"));
+                .thenThrow(new com.unihub.workshop.shared.exception.ForbiddenException(
+                        "urn:unihub:error:temporary-password", "Temporary password change required"));
 
         String requestBody = """
                 {
@@ -107,7 +117,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
+                .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:temporary-password"));
     }

@@ -44,4 +44,9 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 entity.getExpiresAt(),
                 entity.getRevokedAt());
     }
+
+    @Override
+    public void revokeAllActiveTokensForUser(java.util.UUID userId, java.time.Instant revokedAt) {
+        repository.revokeAllActiveTokensForUser(userId, revokedAt);
+    }
 }

@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.domain.model.User;
+import com.unihub.workshop.iam.domain.utils.TokenHashUtils;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
@@ -13,9 +14,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -47,7 +45,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
     @Override
     @Transactional
     public LoginResult refresh(String refreshTokenString, String userAgent, String ipAddress) {
-        String tokenHash = hashToken(refreshTokenString);
+        String tokenHash = TokenHashUtils.hash(refreshTokenString);
 
         RefreshToken oldToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> {
@@ -96,7 +94,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
                 user.organizationId().toString());
 
         String rawNewRefreshToken = generateSecureToken();
-        String newTokenHash = hashToken(rawNewRefreshToken);
+        String newTokenHash = TokenHashUtils.hash(rawNewRefreshToken);
         Instant newExpiresAt = now.plus(securityProperties.refreshTokenTtlDays(), ChronoUnit.DAYS);
 
         RefreshToken newRefreshToken = new RefreshToken(
@@ -123,23 +121,5 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private String hashToken(String rawToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedHash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder(2 * encodedHash.length);
-            for (byte b : encodedHash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0');
-                }
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not found", e);
-        }
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -61,7 +62,7 @@ class ResilienceConfigTest {
 
         // Record minimum number of calls + enough failures to breach 50%
         for (int i = 0; i < 5; i++) {
-            cb.onError(0, java.util.concurrent.TimeUnit.SECONDS, new RuntimeException("Test Error"));
+            cb.onError(0, TimeUnit.SECONDS, new RuntimeException("Test Error"));
         }
 
         // Should transition to OPEN

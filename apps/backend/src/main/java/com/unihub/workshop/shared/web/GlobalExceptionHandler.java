@@ -19,6 +19,7 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 
 import java.net.URI;
 import java.util.List;
@@ -40,7 +41,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ex.getProperties().forEach(problem::setProperty);
         }
 
-        return ResponseEntity.status(ex.getStatus()).body(problem);
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(ex.getStatus());
+
+        if (ex instanceof ServiceUnavailableException) {
+            builder.header("Retry-After", "30");
+        }
+
+        return builder.body(problem);
     }
 
     @Override
@@ -179,6 +186,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleAllExceptions(Exception ex, HttpServletRequest request) {
+        ex.printStackTrace();
         ProblemDetail problem = createProblemDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "urn:unihub:error:internal",

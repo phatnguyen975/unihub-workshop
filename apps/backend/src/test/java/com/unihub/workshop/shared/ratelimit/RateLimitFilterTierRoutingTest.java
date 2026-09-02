@@ -2,12 +2,14 @@ package com.unihub.workshop.shared.ratelimit;
 
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.distributed.proxy.RemoteBucketBuilder;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentMatchers;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -40,11 +42,9 @@ class RateLimitFilterTierRoutingTest {
         RateLimitProperties properties = new RateLimitProperties(regTier, browsTier,
                 List.of("/api/v1/registrations/**"));
 
-        filter = new RateLimitFilter(proxyManager, properties,
-                mock(com.unihub.workshop.shared.ratelimit.RateLimitMetrics.class));
+        filter = new RateLimitFilter(proxyManager, properties, mock(RateLimitMetrics.class));
 
-        io.github.bucket4j.distributed.BucketProxy bucket = mock(
-                io.github.bucket4j.distributed.BucketProxy.class);
+        BucketProxy bucket = mock(BucketProxy.class);
         ConsumptionProbe probe = mock(ConsumptionProbe.class);
 
         when(probe.isConsumed()).thenReturn(true);
@@ -53,8 +53,7 @@ class RateLimitFilterTierRoutingTest {
         when(bucket.tryConsumeAndReturnRemaining(1)).thenReturn(probe);
 
         when(proxyManager.builder()).thenReturn(builderMock);
-        when(builderMock.build(any(byte[].class),
-                org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any()))
+        when(builderMock.build(any(byte[].class), ArgumentMatchers.<Supplier<BucketConfiguration>>any()))
                 .thenReturn(bucket);
     }
 
@@ -75,7 +74,7 @@ class RateLimitFilterTierRoutingTest {
         // Verify the X-RateLimit-Limit header matches the expected tier capacity
         assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo(expectedLimit);
         verify(builderMock).build(eq("rate_limit:10.0.0.1".getBytes(StandardCharsets.UTF_8)),
-                org.mockito.ArgumentMatchers.<Supplier<BucketConfiguration>>any());
+                ArgumentMatchers.<Supplier<BucketConfiguration>>any());
         verify(filterChain).doFilter(request, response);
     }
 }

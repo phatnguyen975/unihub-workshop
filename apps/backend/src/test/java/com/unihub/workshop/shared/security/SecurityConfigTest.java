@@ -2,8 +2,10 @@ package com.unihub.workshop.shared.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -11,6 +13,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.WebApplicationContext;
+
+import com.unihub.workshop.shared.exception.AppException;
+
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,13 +42,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecurityConfigTest {
 
     @Autowired
-    private org.springframework.web.context.WebApplicationContext context;
+    private WebApplicationContext context;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setup() {
-        when(redisJtiValidator.isTokenValid(org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+        when(redisJtiValidator.isTokenValid(ArgumentMatchers.anyString())).thenReturn(true);
         mockMvc = MockMvcBuilders
                 .webAppContextSetup(context)
                 .apply(springSecurity())
@@ -150,7 +156,8 @@ class SecurityConfigTest {
                 .build();
 
         when(jwtDecoder.decode(anyString())).thenReturn(validJwt);
-        doThrow(new com.unihub.workshop.shared.exception.AppException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "urn:unihub:error:service-unavailable", "Redis is down"))
+        doThrow(new AppException(HttpStatus.SERVICE_UNAVAILABLE, "urn:unihub:error:service-unavailable",
+                "Redis is down"))
                 .when(redisJtiValidator).isTokenValid("jti-789");
 
         mockMvc.perform(get("/api/v1/admin/dummy")

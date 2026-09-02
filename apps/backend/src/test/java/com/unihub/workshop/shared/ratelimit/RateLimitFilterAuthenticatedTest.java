@@ -3,6 +3,7 @@ package com.unihub.workshop.shared.ratelimit;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
+import io.github.bucket4j.distributed.proxy.RemoteBucketBuilder;
 import io.github.bucket4j.distributed.BucketProxy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,8 +39,7 @@ class RateLimitFilterAuthenticatedTest {
         when(probe.getNanosToWaitForRefill()).thenReturn(nanosToWaitForRefill);
         when(bucket.tryConsumeAndReturnRemaining(1)).thenReturn(probe);
         @SuppressWarnings("unchecked")
-        io.github.bucket4j.distributed.proxy.RemoteBucketBuilder<byte[]> builderMock = mock(
-                io.github.bucket4j.distributed.proxy.RemoteBucketBuilder.class);
+        RemoteBucketBuilder<byte[]> builderMock = mock(RemoteBucketBuilder.class);
         when(proxyManager.builder()).thenReturn(builderMock);
         when(builderMock.build(any(byte[].class),
                 org.mockito.ArgumentMatchers.<java.util.function.Supplier<BucketConfiguration>>any()))

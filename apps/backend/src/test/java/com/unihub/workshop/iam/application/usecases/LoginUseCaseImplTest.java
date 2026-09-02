@@ -5,6 +5,7 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -79,7 +80,7 @@ class LoginUseCaseImplTest {
         when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> loginUseCase.login(email, "password", "device-1", "127.0.0.1"))
-                .isInstanceOf(com.unihub.workshop.shared.exception.AppException.class)
+                .isInstanceOf(AppException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED);
 
         assertThat(meterRegistry.counter("auth.login.attempts", "outcome", "failure", "reason", "invalid_credentials")
@@ -95,7 +96,7 @@ class LoginUseCaseImplTest {
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> loginUseCase.login(email, "wrong-password", "device-1", "127.0.0.1"))
-                .isInstanceOf(com.unihub.workshop.shared.exception.AppException.class)
+                .isInstanceOf(AppException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED);
 
         assertThat(meterRegistry.counter("auth.login.attempts", "outcome", "failure", "reason", "invalid_credentials")
@@ -111,7 +112,7 @@ class LoginUseCaseImplTest {
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> loginUseCase.login(email, "password", "device-1", "127.0.0.1"))
-                .isInstanceOf(com.unihub.workshop.shared.exception.AppException.class)
+                .isInstanceOf(AppException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.FORBIDDEN);
 
         assertThat(meterRegistry.counter("auth.login.attempts", "outcome", "failure", "reason", "account_disabled")
@@ -127,7 +128,7 @@ class LoginUseCaseImplTest {
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> loginUseCase.login(email, "password", "device-1", "127.0.0.1"))
-                .isInstanceOf(com.unihub.workshop.shared.exception.AppException.class)
+                .isInstanceOf(AppException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.FORBIDDEN);
 
         assertThat(meterRegistry.counter("auth.login.attempts", "outcome", "failure", "reason", "temporary_password")

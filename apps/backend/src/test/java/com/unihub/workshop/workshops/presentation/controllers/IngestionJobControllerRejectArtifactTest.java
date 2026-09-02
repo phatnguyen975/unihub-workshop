@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
+import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
@@ -96,7 +97,8 @@ class IngestionJobControllerRejectArtifactTest {
     @Test
     void getRejectArtifactUrl_NotFound_Returns404() throws Exception {
         when(getRejectArtifactUrlUseCase.execute(JOB_ID, ORG_ID))
-                .thenThrow(new com.unihub.workshop.shared.exception.AppException(org.springframework.http.HttpStatus.NOT_FOUND, "urn:unihub:error:not-found", "IngestionJobReport not found"));
+                .thenThrow(new AppException(org.springframework.http.HttpStatus.NOT_FOUND, "urn:unihub:error:not-found",
+                        "IngestionJobReport not found"));
 
         mockMvc.perform(get("/api/v1/admin/ingestion-jobs/{jobId}/reject-artifact", JOB_ID.toString())
                 .with(authentication(auth))

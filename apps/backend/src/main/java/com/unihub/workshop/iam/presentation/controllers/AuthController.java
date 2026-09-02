@@ -1,14 +1,22 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
+import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.presentation.dto.LoginRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginResponse;
+import com.unihub.workshop.iam.presentation.dto.LogoutRequest;
 import com.unihub.workshop.iam.presentation.dto.RefreshTokenRequest;
 import com.unihub.workshop.shared.web.ApiResponse;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +30,7 @@ public class AuthController {
 
     private final LoginUseCase loginUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
+    private final LogoutUseCase logoutUseCase;
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
@@ -62,5 +71,21 @@ public class AuthController {
                 result.expiresIn());
 
         return ApiResponse.success(response, "Token refreshed");
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestBody(required = false) LogoutRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        String refreshToken = request != null ? request.refreshToken() : null;
+
+        logoutUseCase.logout(
+                jwt.getTokenValue(),
+                jwt.getId(),
+                jwt.getExpiresAt(),
+                UUID.fromString(jwt.getSubject()),
+                refreshToken);
+
+        return ResponseEntity.noContent().build();
     }
 }

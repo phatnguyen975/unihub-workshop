@@ -4,6 +4,8 @@ import com.unihub.workshop.workers.batch_ingestion.core.models.SourceFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -75,8 +77,7 @@ class S3IngestionObjectStoreTest {
         String validHeader = "student_number,email,full_name,faculty\n231234,a@b,c,d";
 
         when(s3Client.getObject(any(GetObjectRequest.class),
-                org.mockito.ArgumentMatchers
-                        .<ResponseTransformer<GetObjectResponse, ResponseBytes<GetObjectResponse>>>any()))
+                ArgumentMatchers.<ResponseTransformer<GetObjectResponse, ResponseBytes<GetObjectResponse>>>any()))
                 .thenReturn(ResponseBytes.fromByteArray(
                         GetObjectResponse.builder().build(),
                         validHeader.getBytes(StandardCharsets.UTF_8)));
@@ -89,8 +90,7 @@ class S3IngestionObjectStoreTest {
         String invalidHeader = "student_number,email,organization_id,status\n231234,a@b,c,d";
 
         when(s3Client.getObject(any(GetObjectRequest.class),
-                org.mockito.ArgumentMatchers
-                        .<ResponseTransformer<GetObjectResponse, ResponseBytes<GetObjectResponse>>>any()))
+                ArgumentMatchers.<ResponseTransformer<GetObjectResponse, ResponseBytes<GetObjectResponse>>>any()))
                 .thenReturn(ResponseBytes.fromByteArray(
                         GetObjectResponse.builder().build(),
                         invalidHeader.getBytes(StandardCharsets.UTF_8)));

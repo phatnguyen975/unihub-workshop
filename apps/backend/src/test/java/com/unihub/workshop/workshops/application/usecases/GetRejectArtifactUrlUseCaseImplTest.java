@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.application.usecases;
 
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.workshops.application.ports.out.ArtifactPresignPort;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
@@ -80,8 +81,7 @@ class GetRejectArtifactUrlUseCaseImplImplTest {
 
         when(repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)).thenReturn(Optional.of(report));
 
-        com.unihub.workshop.shared.exception.NotFoundException ex = assertThrows(com.unihub.workshop.shared.exception.NotFoundException.class,
-                () -> useCase.execute(JOB_ID, ORG_ID));
+        NotFoundException ex = assertThrows(NotFoundException.class, () -> useCase.execute(JOB_ID, ORG_ID));
         assertTrue(ex.getMessage().contains("does not have an applicable reject artifact"));
     }
 
@@ -93,8 +93,7 @@ class GetRejectArtifactUrlUseCaseImplImplTest {
 
         when(repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)).thenReturn(Optional.of(report));
 
-        com.unihub.workshop.shared.exception.NotFoundException ex = assertThrows(com.unihub.workshop.shared.exception.NotFoundException.class,
-                () -> useCase.execute(JOB_ID, ORG_ID));
+        NotFoundException ex = assertThrows(NotFoundException.class, () -> useCase.execute(JOB_ID, ORG_ID));
         assertTrue(ex.getMessage().contains("does not have an applicable reject artifact"));
     }
 
@@ -102,8 +101,7 @@ class GetRejectArtifactUrlUseCaseImplImplTest {
     void execute_WhenNotFound_ThrowsException() {
         when(repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)).thenReturn(Optional.empty());
 
-        com.unihub.workshop.shared.exception.NotFoundException ex = assertThrows(com.unihub.workshop.shared.exception.NotFoundException.class,
-                () -> useCase.execute(JOB_ID, ORG_ID));
+        NotFoundException ex = assertThrows(NotFoundException.class, () -> useCase.execute(JOB_ID, ORG_ID));
         assertTrue(ex.getMessage().contains("IngestionJobReport not found"));
     }
 }

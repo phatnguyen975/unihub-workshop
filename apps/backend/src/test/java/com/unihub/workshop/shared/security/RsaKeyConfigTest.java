@@ -2,6 +2,7 @@ package com.unihub.workshop.shared.security;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.convert.support.ConfigurableConversionService;
 import org.springframework.boot.convert.ApplicationConversionService;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -10,8 +11,7 @@ class RsaKeyConfigTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withInitializer(context -> context.getEnvironment().setConversionService(
-                    (org.springframework.core.convert.support.ConfigurableConversionService) ApplicationConversionService
-                            .getSharedInstance()))
+                    (ConfigurableConversionService) ApplicationConversionService.getSharedInstance()))
             .withUserConfiguration(RsaKeyConfig.class);
 
     @Test
