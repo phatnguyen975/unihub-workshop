@@ -1,7 +1,9 @@
 package com.unihub.workshop.shared.web;
 
+import com.unihub.workshop.shared.exception.AppException;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.MDC;
+import jakarta.validation.ConstraintViolationException;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -13,31 +15,41 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 
 import java.net.URI;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private String getTraceId() {
-        String traceId = MDC.get("traceId");
-        return traceId != null ? traceId : java.util.UUID.randomUUID().toString();
-    }
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ProblemDetail> handleAppException(AppException ex, HttpServletRequest request) {
+        ProblemDetail problem = createProblemDetail(
+                ex.getStatus(),
+                ex.getType(),
+                ex.getStatus().getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI());
 
-    private ProblemDetail createProblemDetail(HttpStatus status, String type, String title, String detail,
-            String instance) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setType(URI.create(type));
-        problem.setTitle(title);
-        problem.setInstance(URI.create(instance));
-        problem.setProperty("traceId", getTraceId());
-        return problem;
+        if (ex.getProperties() != null) {
+            ex.getProperties().forEach(problem::setProperty);
+        }
+
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(ex.getStatus());
+
+        if (ex instanceof ServiceUnavailableException) {
+            builder.header("Retry-After", "30");
+        }
+
+        return builder.body(problem);
     }
 
     @Override
@@ -57,6 +69,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
         List<String> validationErrors = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.toList());
+        problem.setProperty("validationErrors", validationErrors);
+
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(problem);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ProblemDetail> handleConstraintViolationException(
+            ConstraintViolationException ex, HttpServletRequest request) {
+        String instance = request.getRequestURI();
+        String detail = String.format("Validation failed. %d error(s) found.", ex.getConstraintViolations().size());
+
+        ProblemDetail problem = createProblemDetail(
+                HttpStatus.UNPROCESSABLE_CONTENT,
+                "urn:unihub:error:validation",
+                "Unprocessable Entity",
+                detail,
+                instance);
+
+        List<String> validationErrors = ex.getConstraintViolations().stream()
+                .map(violation -> violation.getPropertyPath().toString() + ": " + violation.getMessage())
                 .collect(Collectors.toList());
         problem.setProperty("validationErrors", validationErrors);
 
@@ -126,19 +159,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
     }
 
-    @ExceptionHandler(com.unihub.workshop.shared.security.JtiValidationException.class)
-    public ResponseEntity<ProblemDetail> handleJtiValidationException(
-            com.unihub.workshop.shared.security.JtiValidationException ex,
-            HttpServletRequest request) {
-        ProblemDetail problem = createProblemDetail(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "urn:unihub:error:service-unavailable",
-                "Service Unavailable",
-                "Authentication service is temporarily unavailable. Please try again later.",
-                request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
-    }
-
     @Override
     protected ResponseEntity<Object> handleNoHandlerFoundException(
             NoHandlerFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -168,6 +188,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleAllExceptions(Exception ex, HttpServletRequest request) {
+        log.error("Unhandled system error", ex);
         ProblemDetail problem = createProblemDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "urn:unihub:error:internal",
@@ -175,5 +196,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "An unexpected system error occurred.",
                 request.getRequestURI());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problem);
+    }
+
+    private ProblemDetail createProblemDetail(HttpStatus status, String type, String title, String detail,
+            String instance) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setType(URI.create(type));
+        problem.setTitle(title);
+        problem.setInstance(URI.create(instance));
+        return problem;
     }
 }

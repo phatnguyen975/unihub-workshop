@@ -7,19 +7,23 @@ public class ApiResponse<T> {
     private final boolean success;
     private final String message;
     private final T data;
+    private final Object error;
     private Metadata metadata;
 
-    public ApiResponse(T data, String message) {
-        this.success = true;
+    private ApiResponse(boolean success, String message, T data, Object error) {
+        this.success = success;
         this.message = message;
         this.data = data;
+        this.error = error;
+        this.metadata = null;
     }
 
-    public ApiResponse(T data, String message, String traceId, String processedBy) {
-        this.success = true; // Envelope is only used for successful 2xx responses
-        this.message = message;
-        this.data = data;
-        this.metadata = new Metadata(traceId, processedBy);
+    public static <T> ApiResponse<T> success(T data, String message) {
+        return new ApiResponse<>(true, message, data, null);
+    }
+
+    public static ApiResponse<Void> error(Object errorObject) {
+        return new ApiResponse<>(false, null, null, errorObject);
     }
 
     public boolean isSuccess() {
@@ -32,6 +36,10 @@ public class ApiResponse<T> {
 
     public T getData() {
         return data;
+    }
+
+    public Object getError() {
+        return error;
     }
 
     public Metadata getMetadata() {

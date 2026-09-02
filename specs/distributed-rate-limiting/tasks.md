@@ -24,12 +24,12 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
   - **Depends on:** —
   - **Layers touched:** Config (Bucket4j + Redis bean, `application.yml` properties, startup validation), Web/Filter (HTTP filter, key extraction, RFC 7807 429 response, header attachment)
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/RateLimitConfig.java` — Bucket4j `ProxyManager` bean wired to the Spring-managed `RedisClient`; `@ConfigurationProperties`-bound `RateLimitProperties`; startup `@PostConstruct` validation enforcing registration-tier ≤ browsing-tier
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/RateLimitProperties.java` — typed config record (registration-tier capacity, refill tokens, refill duration; browsing-tier equivalents)
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/web/RateLimitFilter.java` — `OncePerRequestFilter`; extracts `jwt.sub` (best-effort, no signature check); resolves tier by path; atomically consumes one token; attaches `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After`; writes RFC 7807 `application/problem+json` body on 429; registers itself before the authentication filter in the security filter chain
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitConfig.java` — Bucket4j `ProxyManager` bean wired to the Spring-managed `RedisClient`; `@ConfigurationProperties`-bound `RateLimitProperties`; startup `@PostConstruct` validation enforcing registration-tier ≤ browsing-tier
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitProperties.java` — typed config record (registration-tier capacity, refill tokens, refill duration; browsing-tier equivalents)
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitFilter.java` — `OncePerRequestFilter`; extracts `jwt.sub` (best-effort, no signature check); resolves tier by path; atomically consumes one token; attaches `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After`; writes RFC 7807 `application/problem+json` body on 429; registers itself before the authentication filter in the security filter chain
     - `apps/backend/src/main/resources/application.yml` — new `rate-limit.*` config block with concrete defaults: registration-tier (capacity: 5, refill: 5 tokens per 10s) and browsing-tier (capacity: 100, refill: 100 tokens per 60s)
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/web/RateLimitFilterAuthenticatedTest.java` — unit tests with mocked `ProxyManager`; verifies token consumed, headers present (FR-06, FR-08), 429 body is RFC 7807 (FR-07, BR-08), filter short-circuits before downstream filters
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/RateLimitConfigTest.java` — startup validation test: misconfigured tiers (registration > browsing) must throw `ApplicationContext` failure
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/ratelimit/RateLimitFilterAuthenticatedTest.java` — unit tests with mocked `ProxyManager`; verifies token consumed, headers present (FR-06, FR-08), 429 body is RFC 7807 (FR-07, BR-08), filter short-circuits before downstream filters
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/ratelimit/RateLimitConfigTest.java` — startup validation test: misconfigured tiers (registration > browsing) must throw `ApplicationContext` failure
   - **Acceptance Criteria:**
     - (FR-01, Scenario 1) A request with `Authorization: Bearer <valid JWT>` passes through the filter when the bucket has tokens; the response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` (decremented by 1), and `X-RateLimit-Retry-After: 0`.
     - (FR-06, FR-07, FR-08, Scenario 2) When the same user's bucket has 0 tokens, the filter returns `429` before any downstream filter is called; `Content-Type: application/problem+json`; body contains `status: 429`, `type`, `title`, `detail`, `instance`, `traceId`; `X-RateLimit-Remaining: 0`; `X-RateLimit-Retry-After` is a positive integer.
@@ -41,9 +41,9 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
   - **Depends on:** T1
   - **Layers touched:** Web/Filter (key-resolution branch in `RateLimitFilter`; IP extraction utility), Config (no new beans; browsing-tier bucket is reused for IP-keyed buckets)
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/web/RateLimitFilter.java` — add IP-keying branch: extract leftmost entry from `X-Forwarded-For` header set by Nginx; fall back to `HttpServletRequest.getRemoteAddr()` if header absent; apply browsing-tier bucket; catch JWT parse exceptions and redirect to this branch without returning 400/401
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitFilter.java` — add IP-keying branch: extract leftmost entry from `X-Forwarded-For` header set by Nginx; fall back to `HttpServletRequest.getRemoteAddr()` if header absent; apply browsing-tier bucket; catch JWT parse exceptions and redirect to this branch without returning 400/401
     - `apps/backend/src/main/java/com/unihub/workshop/shared/web/ClientIpExtractor.java` — small utility extracting real client IP from `X-Forwarded-For` (first value only, trusted from upstream Nginx)
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/web/RateLimitFilterUnauthenticatedTest.java` — tests for: no `Authorization` header → IP key; malformed JWT → IP key, no 401/400 thrown; `X-Forwarded-For` with multiple values → leftmost used; no `X-Forwarded-For` → `getRemoteAddr()` used
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/ratelimit/RateLimitFilterUnauthenticatedTest.java` — tests for: no `Authorization` header → IP key; malformed JWT → IP key, no 401/400 thrown; `X-Forwarded-For` with multiple values → leftmost used; no `X-Forwarded-For` → `getRemoteAddr()` used
     - `apps/backend/src/test/java/com/unihub/workshop/shared/web/ClientIpExtractorTest.java` — unit tests for IP extraction edge cases
   - **Acceptance Criteria:**
     - (FR-02, Scenario 3) A request with no `Authorization` header is keyed by the IP derived from `X-Forwarded-For`; the browsing-tier bucket is used; `X-RateLimit-*` headers reflect the IP-keyed bucket state.
@@ -55,10 +55,10 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
   - **Depends on:** T1
   - **Layers touched:** Web/Filter (tier-dispatch logic in `RateLimitFilter`), Config (`RateLimitProperties` path-matcher list)
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/web/RateLimitFilter.java` — extract and encapsulate tier-resolution logic: match request path against a configurable list of registration-tier path patterns (e.g. `POST /api/v1/registrations/**`); fall through to browsing-tier if no match
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/config/RateLimitProperties.java` — add `registrationPathPatterns: List<String>` configurable from `application.yml`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitFilter.java` — extract and encapsulate tier-resolution logic: match request path against a configurable list of registration-tier path patterns (e.g. `POST /api/v1/registrations/**`); fall through to browsing-tier if no match
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitProperties.java` — add `registrationPathPatterns: List<String>` configurable from `application.yml`
     - `apps/backend/src/main/resources/application.yml` — populate `rate-limit.registration-path-patterns` with `["/api/v1/registrations/**"]`
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/web/RateLimitFilterTierRoutingTest.java` — parameterized tests: `POST /api/v1/registrations` → registration-tier bucket used; `GET /api/v1/workshops` → browsing-tier bucket used; an unknown path → browsing-tier; path patterns are loaded from config, not hardcoded
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/ratelimit/RateLimitFilterTierRoutingTest.java` — parameterized tests: `POST /api/v1/registrations` → registration-tier bucket used; `GET /api/v1/workshops` → browsing-tier bucket used; an unknown path → browsing-tier; path patterns are loaded from config, not hardcoded
   - **Acceptance Criteria:**
     - (FR-03, FR-04, Scenario 5) A request to `POST /api/v1/registrations/**` consumes from the registration-tier bucket (verified by `X-RateLimit-Limit` matching the configured registration-tier capacity).
     - (FR-04) A request to any path not matching the registration patterns consumes from the browsing-tier bucket.
@@ -70,9 +70,9 @@ This plan builds the application-layer Token Bucket rate limiter from scratch. I
   - **Depends on:** T1
   - **Layers touched:** Web/Filter (exception handling branch in `RateLimitFilter`), Observability (`rate_limiter.redis_unavailable` counter registered via `MeterRegistry`)
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/web/RateLimitFilter.java` — wrap `ProxyManager.asAsync()` / bucket evaluation call in try-catch; on any `RedisException`, `LettuceException`, or command-timeout exception: allow request to proceed; log WARN with bucket key, path, exception class and message; increment counter
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/observability/RateLimitMetrics.java` — registers `rate_limiter.redis_unavailable` Counter with tags `tier=registration` and `tier=browsing` against the shared `MeterRegistry` (BR-07)
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/web/RateLimitFilterFailOpenTest.java` — tests with `ProxyManager` mocked to throw `RedisException`: filter returns 2xx (not 429 or 500); downstream filter chain is invoked; WARN log contains bucket key and path; `rate_limiter.redis_unavailable` counter is incremented once per fail-open event
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitFilter.java` — wrap `ProxyManager.asAsync()` / bucket evaluation call in try-catch; on any `RedisException`, `LettuceException`, or command-timeout exception: allow request to proceed; log WARN with bucket key, path, exception class and message; increment counter
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitMetrics.java` — registers `rate_limiter.redis_unavailable` Counter with tags `tier=registration` and `tier=browsing` against the shared `MeterRegistry` (BR-07)
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/ratelimit/RateLimitFilterFailOpenTest.java` — tests with `ProxyManager` mocked to throw `RedisException`: filter returns 2xx (not 429 or 500); downstream filter chain is invoked; WARN log contains bucket key and path; `rate_limiter.redis_unavailable` counter is incremented once per fail-open event
   - **Acceptance Criteria:**
     - (FR-09, Scenario 4) When the mocked `ProxyManager` throws a Redis connection/timeout exception, the filter calls `filterChain.doFilter()` and the overall HTTP response is NOT `429` or `5xx`.
     - (FR-10, Scenario 4) A `WARN`-level log entry is written; it contains at minimum the bucket key, the request path, and the exception class name.

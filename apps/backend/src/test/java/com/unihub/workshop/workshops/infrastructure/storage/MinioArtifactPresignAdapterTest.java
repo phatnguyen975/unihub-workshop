@@ -7,6 +7,7 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
 
@@ -31,7 +32,7 @@ class MinioArtifactPresignAdapterTest {
     @Test
     void generateDownloadUrl_Success() throws MalformedURLException {
         PresignedGetObjectRequest mockPresigned = mock(PresignedGetObjectRequest.class);
-        URL expectedUrl = java.net.URI.create("https://minio/test-bucket/obj.csv?X-Amz-Expires=900").toURL();
+        URL expectedUrl = URI.create("https://minio/test-bucket/obj.csv?X-Amz-Expires=900").toURL();
         when(mockPresigned.url()).thenReturn(expectedUrl);
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(mockPresigned);
 

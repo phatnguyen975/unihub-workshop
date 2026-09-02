@@ -1,6 +1,7 @@
 # Spec: Ingestion Reject Report
 
 > **Status:** APPROVED  
+> **Domain:** 9 — Student Data Synchronization  
 > **Owner/area:** `workshops` module (Core Backend) — organizer-facing ingestion history and reject-artifact access  
 > **Last revised:** 2026-08-31 — first version
 

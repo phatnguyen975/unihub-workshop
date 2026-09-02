@@ -153,24 +153,30 @@ The JSON envelope is used only for successful `2xx` responses. The backend must 
 }
 ```
 
-### Error Response - RFC 7807 (4xx, 5xx)
+### Error Response (4xx, 5xx)
 
-Error responses are not wrapped in the custom envelope. They must use RFC 7807 Problem Details at the root with `Content-Type: application/problem+json`.
+Error responses are wrapped in the standard envelope. The `success` flag is set to `false`, the `data` field is absent, and the `error` field contains the RFC 7807 Problem Details. The `traceId` is present in `metadata`.
 
 **Error Response (422 Unprocessable Entity)**
 
 ```json
 {
-  "type": "urn:unihub:error:state",
-  "title": "Unprocessable Entity",
-  "status": 422,
-  "detail": "Workshop cannot be published from DRAFT when required fields are missing.",
-  "instance": "/api/v1/workshops/8e4b9b3b-9c1a-4a8d-9f6b-3c8b7f9f2c10/publish",
-  "traceId": "7f6f7c9b2d0b4d8c",
-  "validationErrors": [
-    "coverImageUrl: is required",
-    "startsAt: must be in the future"
-  ]
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:state",
+    "title": "Unprocessable Entity",
+    "status": 422,
+    "detail": "Workshop cannot be published from DRAFT when required fields are missing.",
+    "instance": "/api/v1/workshops/8e4b9b3b-9c1a-4a8d-9f6b-3c8b7f9f2c10/publish",
+    "validationErrors": [
+      "coverImageUrl: is required",
+      "startsAt: must be in the future"
+    ]
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
 }
 ```
 
@@ -178,12 +184,18 @@ Error responses are not wrapped in the custom envelope. They must use RFC 7807 P
 
 ```json
 {
-  "type": "urn:unihub:error:not-found",
-  "title": "Not Found",
-  "status": 404,
-  "detail": "Workshop not found.",
-  "instance": "/api/v1/workshops/00000000-0000-0000-0000-000000000000",
-  "traceId": "7f6f7c9b2d0b4d8c"
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:not-found",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "Workshop not found.",
+    "instance": "/api/v1/workshops/00000000-0000-0000-0000-000000000000"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-2",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
 }
 ```
 

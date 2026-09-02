@@ -20,7 +20,7 @@ This plan establishes the shared `resilience-platform-setup` infrastructure with
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Infrastructure
-  - **Files:** `apps/backend/build.gradle` (if resilience4j/micrometer dependencies need adding), `apps/backend/src/main/resources/application.yml`, `apps/backend/src/main/java/com/unihub/workshop/shared/config/ResilienceConfig.java`, `apps/backend/src/test/java/com/unihub/workshop/shared/config/ResilienceConfigTest.java`
+  - **Files:** `apps/backend/build.gradle` (if resilience4j/micrometer dependencies need adding), `apps/backend/src/main/resources/application.yml`, `apps/backend/src/main/java/com/unihub/workshop/shared/resilience/ResilienceConfig.java`, `apps/backend/src/test/java/com/unihub/workshop/shared/resilience/ResilienceConfigTest.java`
   - **Acceptance Criteria:**
     - Spring context starts and registers the Resilience4j `CircuitBreakerRegistry` with the threshold properties defined in `application.yml` (FR-01, FR-02).
     - When a named circuit breaker breaches thresholds (e.g. failure rate, slow call rate), it correctly transitions states (`CLOSED` → `OPEN` → `HALF_OPEN`) (FR-03, FR-04, FR-05, FR-06, FR-07, FR-08).
@@ -38,7 +38,7 @@ This plan establishes the shared `resilience-platform-setup` infrastructure with
   - **Size:** S
   - **Depends on:** —
   - **Layers touched:** Infrastructure
-  - **Files:** `apps/backend/src/main/java/com/unihub/workshop/shared/config/ChaosMockAdapter.java`, `apps/backend/src/main/java/com/unihub/workshop/shared/config/DevChaosMockAdapter.java`, `apps/backend/src/main/resources/application-dev.yml`, `apps/backend/src/test/java/com/unihub/workshop/shared/config/DevChaosMockAdapterTest.java`
+  - **Files:** `apps/backend/src/main/java/com/unihub/workshop/shared/resilience/ChaosMockAdapter.java`, `apps/backend/src/main/java/com/unihub/workshop/shared/resilience/DevChaosMockAdapter.java`, `apps/backend/src/main/resources/application-dev.yml`, `apps/backend/src/test/java/com/unihub/workshop/shared/resilience/DevChaosMockAdapterTest.java`
   - **Acceptance Criteria:**
     - The `DevChaosMockAdapter` bean is only active under the `dev` Spring profile; loading context under `prod` or default fails to inject it (FR-13, BR-01).
     - The adapter correctly reads `chaos.latency-ms` and `chaos.error-rate` from `application-dev.yml` and accurately injects artificial latency and simulated failures upon invocation (FR-12, FR-14).

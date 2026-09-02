@@ -783,7 +783,7 @@ sequenceDiagram
 
 The backend securely holds the private key used to sign QR codes. QR payloads are signed server-side and verified offline by the mobile app to prevent forged tickets.
 
-- **Key Distribution:** When a `STAFF` member logs in online, the API returns the latest public key. The mobile app stores this key locally (SQLite or secure storage) and uses it to verify signatures while offline.
+- **Key Distribution:** When a `STAFF` member logs in online, the mobile app fetches the latest public key via the dedicated distribution endpoint. The mobile app stores this key locally (SQLite or secure storage) and uses it to verify signatures while offline.
 - **Key Rotation**: Rotating the signing key invalidates compromised signatures globally while allowing the platform to distribute the new public key on the next authenticated session.
 
 ## 6. System Protection Mechanisms

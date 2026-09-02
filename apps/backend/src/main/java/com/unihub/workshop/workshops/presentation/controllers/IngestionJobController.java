@@ -2,8 +2,10 @@ package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.ApiResponse;
-import com.unihub.workshop.workshops.application.usecases.GetRejectArtifactUrlUseCase;
-import com.unihub.workshop.workshops.application.usecases.ListIngestionJobsUseCase;
+import com.unihub.workshop.shared.exception.AppException;
+import com.unihub.workshop.shared.exception.ForbiddenException;
+import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse;
@@ -13,7 +15,7 @@ import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,19 +23,14 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/admin/ingestion-jobs")
+@RequiredArgsConstructor
 public class IngestionJobController {
 
     private final ListIngestionJobsUseCase listUseCase;
     private final GetRejectArtifactUrlUseCase getRejectArtifactUrlUseCase;
 
-    public IngestionJobController(ListIngestionJobsUseCase listUseCase,
-            GetRejectArtifactUrlUseCase getRejectArtifactUrlUseCase) {
-        this.listUseCase = listUseCase;
-        this.getRejectArtifactUrlUseCase = getRejectArtifactUrlUseCase;
-    }
-
     @GetMapping
-    public IngestionJobListResponse getIngestionJobs(
+    public ApiResponse<IngestionJobListResponse> getIngestionJobs(
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false, defaultValue = "20") Integer size,
             Authentication authentication) {
@@ -41,16 +38,11 @@ public class IngestionJobController {
         JwtAuthenticatedPrincipal principal = (JwtAuthenticatedPrincipal) authentication.getPrincipal();
         String orgIdStr = principal.org();
         if (orgIdStr == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Missing org claim in token");
+            throw new ForbiddenException("Missing org claim in token");
         }
         UUID orgId = UUID.fromString(orgIdStr);
 
-        CursorPage<IngestionJobReport> page;
-        try {
-            page = listUseCase.execute(orgId, cursor, size);
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
+        CursorPage<IngestionJobReport> page = listUseCase.execute(orgId, cursor, size);
 
         List<IngestionJobItem> items = page.items().stream()
                 .map(report -> new IngestionJobItem(
@@ -64,7 +56,8 @@ public class IngestionJobController {
                 .collect(Collectors.toList());
 
         CursorResponse cursorResponse = new CursorResponse(page.nextCursor(), page.hasMore());
-        return new IngestionJobListResponse(items, cursorResponse);
+        return ApiResponse.success(new IngestionJobListResponse(items, cursorResponse),
+                "Ingestion job reports retrieved");
     }
 
     @GetMapping("/{jobId}/reject-artifact")
@@ -76,26 +69,22 @@ public class IngestionJobController {
         try {
             jobUuid = UUID.fromString(jobId);
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid UUID format");
+            throw new AppException(HttpStatus.BAD_REQUEST, "urn:unihub:error:validation", "Invalid UUID format");
         }
 
         JwtAuthenticatedPrincipal principal = (JwtAuthenticatedPrincipal) authentication.getPrincipal();
         String orgIdStr = principal.org();
         if (orgIdStr == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Missing org claim in token");
+            throw new ForbiddenException("Missing org claim in token");
         }
         UUID orgId = UUID.fromString(orgIdStr);
 
-        try {
-            var result = getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
-            RejectArtifactUrlResponse responseDto = new RejectArtifactUrlResponse(
-                    result.jobId(),
-                    result.artifactType(),
-                    result.downloadUrl(),
-                    result.expiresAt());
-            return new ApiResponse<>(responseDto, "Pre-signed download URL generated");
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        var result = getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
+        RejectArtifactUrlResponse responseDto = new RejectArtifactUrlResponse(
+                result.jobId(),
+                result.artifactType(),
+                result.downloadUrl(),
+                result.expiresAt());
+        return ApiResponse.success(responseDto, "Pre-signed download URL generated");
     }
 }
