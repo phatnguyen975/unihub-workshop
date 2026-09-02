@@ -85,7 +85,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 ### Phase 3: Session Continuation (Token Refresh)
 
-- [ ] **T3 — Token refresh: atomically rotate refresh token and issue a new access token**
+- [x] **T3 — Token refresh: atomically rotate refresh token and issue a new access token**
   - **Size:** M
   - **Depends on:** T2 (requires a valid refresh token issued by login to test end-to-end)
   - **Layers touched:** Application, Infrastructure/Persistence, Presentation
@@ -109,7 +109,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
 
 #### Checkpoint: Phase 3
 
-- [ ] `POST /api/v1/auth/refresh` performs correct token rotation under both normal and concurrent conditions. All unit tests pass. `ModulithArchitectureTest` passes. Build is clean.
+- [x] `POST /api/v1/auth/refresh` performs correct token rotation under both normal and concurrent conditions. All unit tests pass. `ModulithArchitectureTest` passes. Build is clean.
 
 ### Phase 4: Session Termination (Logout)
 

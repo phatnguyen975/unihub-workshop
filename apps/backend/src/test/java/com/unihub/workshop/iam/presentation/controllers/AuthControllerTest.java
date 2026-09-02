@@ -25,7 +25,7 @@ class AuthControllerTest {
     @BeforeEach
     void setUp() {
         loginUseCase = mock(LoginUseCase.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(loginUseCase))
+        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(loginUseCase, mock(com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }

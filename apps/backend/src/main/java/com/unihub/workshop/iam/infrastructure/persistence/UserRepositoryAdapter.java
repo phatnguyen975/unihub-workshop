@@ -19,6 +19,19 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<User> findById(UUID id) {
+        return repository.findById(id).map(entity -> new User(
+                entity.getId(),
+                entity.getOrganizationId(),
+                UserRole.valueOf(entity.getRole()),
+                entity.getEmail(),
+                entity.getPasswordHash(),
+                entity.isActive(),
+                entity.isTemporaryPassword(),
+                entity.getLastLoginAt()));
+    }
+
+    @Override
     public Optional<User> findByEmail(String email) {
         return repository.findByEmail(email).map(entity -> new User(
                 entity.getId(),

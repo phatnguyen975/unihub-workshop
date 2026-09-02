@@ -4,6 +4,8 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @Component
 public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
 
@@ -15,7 +17,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
 
     @Override
     public void save(RefreshToken refreshToken) {
-        RefreshTokenJpaEntity entity = new RefreshTokenJpaEntity();
+        RefreshTokenJpaEntity entity = repository.findById(refreshToken.id()).orElseGet(RefreshTokenJpaEntity::new);
         entity.setId(refreshToken.id());
         entity.setUserId(refreshToken.userId());
         entity.setTokenHash(refreshToken.tokenHash());
@@ -25,5 +27,21 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         entity.setRevokedAt(refreshToken.revokedAt());
 
         repository.save(entity);
+    }
+
+    @Override
+    public Optional<RefreshToken> findByTokenHash(String tokenHash) {
+        return repository.findByTokenHash(tokenHash).map(this::mapToDomain);
+    }
+
+    private RefreshToken mapToDomain(RefreshTokenJpaEntity entity) {
+        return new RefreshToken(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getTokenHash(),
+                entity.getDeviceInfo(),
+                entity.getIpAddress(),
+                entity.getExpiresAt(),
+                entity.getRevokedAt());
     }
 }
