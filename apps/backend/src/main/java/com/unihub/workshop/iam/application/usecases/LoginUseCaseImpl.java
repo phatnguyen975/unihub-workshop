@@ -7,7 +7,7 @@ import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.domain.model.User;
-import com.unihub.workshop.iam.domain.utils.TokenHashUtils;
+import com.unihub.workshop.iam.application.utils.TokenUtils;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -18,10 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
-import java.security.SecureRandom;
 
 @Service
 public class LoginUseCaseImpl implements LoginUseCase {
@@ -90,8 +88,8 @@ public class LoginUseCaseImpl implements LoginUseCase {
                 user.role().name(),
                 user.organizationId().toString());
 
-        String rawRefreshToken = generateSecureToken();
-        String tokenHash = TokenHashUtils.hash(rawRefreshToken);
+        String rawRefreshToken = TokenUtils.generateSecureToken();
+        String tokenHash = TokenUtils.hash(rawRefreshToken);
         Instant expiresAt = now.plus(securityProperties.refreshTokenTtlDays(), ChronoUnit.DAYS);
 
         RefreshToken refreshToken = new RefreshToken(
@@ -111,12 +109,5 @@ public class LoginUseCaseImpl implements LoginUseCase {
                 rawRefreshToken,
                 "Bearer",
                 securityProperties.accessTokenTtlMinutes() * 60L);
-    }
-
-    private String generateSecureToken() {
-        SecureRandom random = new SecureRandom();
-        byte[] bytes = new byte[32];
-        random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

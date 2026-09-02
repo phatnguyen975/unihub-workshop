@@ -3,6 +3,7 @@ package com.unihub.workshop.iam.application.usecases;
 import com.unihub.workshop.iam.application.ports.out.JtiBlacklistPort;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
+import com.unihub.workshop.iam.application.utils.TokenUtils;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -13,8 +14,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.Optional;
@@ -48,27 +47,10 @@ class LogoutUseCaseImplTest {
         useCase = new LogoutUseCaseImpl(jtiBlacklistPort, refreshTokenRepository, meterRegistry);
     }
 
-    private String hash(String raw) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedHash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder(2 * encodedHash.length);
-            for (byte b : encodedHash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1)
-                    hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     @Test
     void shouldBlacklistJtiAndRevokeSpecificToken() {
         String rawToken = "raw-token";
-        String tokenHash = hash(rawToken);
+        String tokenHash = TokenUtils.hash(rawToken);
         RefreshToken token = new RefreshToken(UUID.randomUUID(), userId, tokenHash, "dev", "ip",
                 Instant.now().plusSeconds(100), null);
 

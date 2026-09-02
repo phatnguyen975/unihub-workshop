@@ -25,19 +25,21 @@
 
 ### 1.1 `user-registration-and-identity-verification`
 
-**Description:** Allows a new `STUDENT` to self-register on the platform. Upon registration, the system validates the submitted email against the `student_directory` table (populated by the nightly CSV ingestion pipeline) to establish a verified identity link (`users.student_record_id`). Students whose email cannot be matched to a `student_directory` record are created as accounts but are blocked from registering for workshops until verified. This is the only self-service account creation flow — `ORGANIZER` and `STAFF` accounts are exclusively created by delegated provisioning (see feature `staff-and-organizer-provisioning`).
+**Description:** Allows a new `STUDENT` to self-register on the platform. Upon registration, the account is created with `is_active = false` (preventing login) and an OTP (6-digit numeric) is generated, saved in `password_reset_tokens` (repurposed for general verification tokens), and sent via email. The system also validates the submitted email against the `student_directory` table to establish a verified identity link (`users.student_record_id`). Students without a `student_record_id` match can verify their account but are blocked from registering for workshops. A dedicated verification endpoint allows users to submit the OTP to activate their account (`is_active = true`). A shared OTP resend endpoint (used by both registration and password reset flows) allows requesting a new OTP if it expires or is lost. This is the only self-service account creation flow.
 
-| Attribute           | Detail                                                                                                                                         |
-| :------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Backend Modules** | `iam` (primary — user creation, identity verification, `student_record_id` link), `shared/security` (password hashing)                         |
-| **Worker Modules**  | None                                                                                                                                           |
-| **System Flow Ref** | `docs/system-design.md §5 — Account Provisioning & Security`                                                                                   |
-| **ADR Refs**        | ADR-005 (JWT RS256), ADR-006 (RBAC), ADR-028 (Zero-Trust Provisioning)                                                                         |
-| **DB Tables**       | `users`, `student_directory`, `organizations`                                                                                                  |
-| **Clients**         | Web                                                                                                                                            |
-| **Key Constraints** | Password hashed with Argon2/Bcrypt. `student_record_id` is nullable; `NULL` = workshop registration blocked. Email unique via `CITEXT UNIQUE`. |
+| Attribute           | Detail                                                                                                                                                                                                                                                                                                  |
+| :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Backend Modules** | `iam` (primary — user creation, OTP generation/verification), `shared/security` (password hashing), `shared/events` (outbox infrastructure)                                                                                                                                                             |
+| **Worker Modules**  | `notifications` (email delivery for OTP)                                                                                                                                                                                                                                                                |
+| **System Flow Ref** | `docs/system-design.md §5 — Account Provisioning & Security`                                                                                                                                                                                                                                            |
+| **ADR Refs**        | ADR-005 (JWT RS256), ADR-006 (RBAC), ADR-028 (Zero-Trust Provisioning)                                                                                                                                                                                                                                  |
+| **DB Tables**       | `users`, `student_directory`, `organizations`, `password_reset_tokens`                                                                                                                                                                                                                                  |
+| **Clients**         | Web                                                                                                                                                                                                                                                                                                     |
+| **Key Constraints** | **OTP:** 6 numeric digits, direct DB storage (no Redis). **Email:** standard format, max 254 chars, `CITEXT UNIQUE`. **Password:** min 8 chars, max 255 chars, must contain uppercase, lowercase, digit, and special char. `is_active = false` until OTP verification. `student_record_id` is nullable. |
 
 ### 1.2 `authentication-and-session-management`
+
+> **Status:** DONE
 
 **Description:** Implements the complete authentication session lifecycle: login with email/password returning a short-lived RS256-signed JWT access token and a long-lived refresh token; access token refresh using the refresh token (with rotation on each use); and secure logout that revokes the JWT's `jti` claim in the Redis blacklist and invalidates the refresh token in the database. Also enforces the mandatory first-login password change for accounts where `is_temporary_password = true` (provisioned `STAFF`/`ORGANIZER` accounts). The JWKS endpoint (`/.well-known/jwks.json`) exposes the RSA public key for token verification by downstream services.
 
@@ -53,6 +55,8 @@
 
 ### 1.3 `public-key-distribution`
 
+> **Status:** READY
+
 **Description:** Provides a dedicated, authenticated `GET /api/v1/auth/public-key` endpoint that returns the current RSA public key in PEM format. This endpoint is the explicit mechanism for the mobile app to refresh its cached public key on demand — for example, after a key rotation event that invalidates previously cached keys. Unlike the JWKS endpoint (which is used for JWT signature verification by downstream services), this endpoint is designed specifically for the mobile `STAFF` client and returns the key in the PEM format that the mobile app can directly store in `mobile_public_keys`. Key rotation invalidates all previously issued QR signatures; staff must fetch the new key on their next online session. Without this endpoint, the mobile app has no mechanism to recover from a key rotation while the app is already authenticated.
 
 | Attribute           | Detail                                                                                                                                                                                                                                               |
@@ -67,17 +71,17 @@
 
 ### 1.4 `password-reset`
 
-**Description:** Provides a self-service password reset flow for users who have forgotten their credentials. A user submits their email; the system generates a cryptographically random, single-use reset token, stores its hash in `password_reset_tokens` with an expiry TTL, and sends the reset link via the notification worker. On link consumption, the token is validated (non-expired, non-used), the password is updated and hashed, the token is marked as `used_at`, and all active refresh tokens for the user are revoked.
+**Description:** Provides a self-service password reset flow for users who have forgotten their credentials. A user submits their email; the system generates a 6-digit numeric OTP, stores its hash in `password_reset_tokens` (used for both reset and registration OTPs) with an expiry TTL, and sends it via email. A dedicated verification endpoint (different from account registration flow) allows the user to submit the OTP. If valid, the client receives a short-lived reset token to submit along with the new password to the final reset endpoint. The flow also utilizes the shared OTP resend endpoint to request a new OTP if needed. On successful reset, the token is marked `used_at`, the password is updated and hashed, and all active refresh tokens for the user are revoked.
 
-| Attribute           | Detail                                                                                                                                                          |
-| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Backend Modules** | `iam` (primary — token generation and validation), `notifications` (event publication for reset email)                                                          |
-| **Worker Modules**  | `notifications` (email delivery)                                                                                                                                |
-| **System Flow Ref** | `docs/system-design.md §5 — Account Provisioning & Security`                                                                                                    |
-| **ADR Refs**        | ADR-027 (Pluggable Notification Architecture), ADR-028 (Zero-Trust Provisioning)                                                                                |
-| **DB Tables**       | `users`, `password_reset_tokens`, `refresh_tokens`                                                                                                              |
-| **Clients**         | Web                                                                                                                                                             |
-| **Key Constraints** | Tokens are single-use; `used_at` set on first valid consumption. Expired tokens purged by the TTL cleanup job every 6 hours (per `docs/database-schema.md §1`). |
+| Attribute           | Detail                                                                                                                                                                                                                                                         |
+| :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Backend Modules** | `iam` (primary — OTP generation, verification, password reset), `shared/events` (outbox infrastructure)                                                                                                                                                        |
+| **Worker Modules**  | `notifications` (email delivery)                                                                                                                                                                                                                               |
+| **System Flow Ref** | `docs/system-design.md §5 — Account Provisioning & Security`                                                                                                                                                                                                   |
+| **ADR Refs**        | ADR-027 (Pluggable Notification Architecture), ADR-028 (Zero-Trust Provisioning)                                                                                                                                                                               |
+| **DB Tables**       | `users`, `password_reset_tokens`, `refresh_tokens`                                                                                                                                                                                                             |
+| **Clients**         | Web                                                                                                                                                                                                                                                            |
+| **Key Constraints** | **OTP:** 6 numeric digits, directly stored in DB. **Password:** min 8 chars, max 255 chars, must contain uppercase, lowercase, digit, and special char. Tokens are single-use; `used_at` set on first valid consumption. Expired tokens purged by TTL cleanup. |
 
 ### 1.5 `staff-and-organizer-provisioning`
 
@@ -85,7 +89,7 @@
 
 | Attribute           | Detail                                                                                                                                        |
 | :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Backend Modules** | `iam` (primary — user creation, organization scoping), `notifications` (event publication for welcome email)                                  |
+| **Backend Modules** | `iam` (primary — user creation, organization scoping), `shared/events` (outbox infrastructure)                                                |
 | **Worker Modules**  | `notifications` (email delivery with temporary password)                                                                                      |
 | **System Flow Ref** | `docs/system-design.md §5 — Account Provisioning & Security`                                                                                  |
 | **ADR Refs**        | ADR-006 (RBAC + org scoping), ADR-028 (Zero-Trust Provisioning + delegated creation)                                                          |

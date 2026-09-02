@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.iam.application.utils.TokenUtils;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
@@ -18,8 +19,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,20 +53,19 @@ class RefreshTokenUseCaseImplTest {
     void setUp() {
         securityProperties = new SecurityProperties(java.util.List.of(), 15, 60, 7);
         meterRegistry = new SimpleMeterRegistry();
-        
+
         useCase = new RefreshTokenUseCaseImpl(
                 refreshTokenRepository,
                 userRepository,
                 jwtTokenIssuer,
                 securityProperties,
-                meterRegistry
-        );
+                meterRegistry);
 
         activeUser = new User(userId, orgId, UserRole.STUDENT, "student@test.com", "hash", true, false, null);
-        
+
         String rawToken = "raw-refresh-token";
-        String tokenHash = hash(rawToken);
-        
+        String tokenHash = TokenUtils.hash(rawToken);
+
         validToken = new RefreshToken(
                 tokenId,
                 userId,
@@ -75,31 +73,16 @@ class RefreshTokenUseCaseImplTest {
                 "Old Device",
                 "127.0.0.1",
                 Instant.now().plusSeconds(3600),
-                null
-        );
-    }
-
-    private String hash(String raw) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedHash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder(2 * encodedHash.length);
-            for (byte b : encodedHash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+                null);
     }
 
     @Test
     void shouldRefreshSuccessfully() {
-        when(refreshTokenRepository.findByTokenHash(hash("raw-refresh-token"))).thenReturn(Optional.of(validToken));
+        when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw-refresh-token")))
+                .thenReturn(Optional.of(validToken));
         when(userRepository.findById(userId)).thenReturn(Optional.of(activeUser));
-        when(jwtTokenIssuer.issueAccessToken(userId.toString(), "STUDENT", orgId.toString())).thenReturn("new-access-token");
+        when(jwtTokenIssuer.issueAccessToken(userId.toString(), "STUDENT", orgId.toString()))
+                .thenReturn("new-access-token");
 
         LoginResult result = useCase.refresh("raw-refresh-token", "New Device", "192.168.1.1");
 
@@ -121,65 +104,74 @@ class RefreshTokenUseCaseImplTest {
         assertThat(issued.ipAddress()).isEqualTo("192.168.1.1");
         assertThat(issued.revokedAt()).isNull();
         assertThat(issued.expiresAt()).isAfter(Instant.now());
-        assertThat(issued.tokenHash()).isEqualTo(hash(result.refreshToken()));
-        
+        assertThat(issued.tokenHash()).isEqualTo(TokenUtils.hash(result.refreshToken()));
+
         assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "success").count()).isEqualTo(1);
     }
 
     @Test
     void shouldThrowUnauthorized_WhenTokenNotFound() {
-        when(refreshTokenRepository.findByTokenHash(hash("unknown-token"))).thenReturn(Optional.empty());
+        when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("unknown-token"))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.refresh("unknown-token", "Device", "IP"))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Invalid refresh token")
                 .hasFieldOrPropertyWithValue("type", "urn:unihub:error:authentication");
-                
-        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "not_found").count()).isEqualTo(1);
+
+        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "not_found").count())
+                .isEqualTo(1);
     }
 
     @Test
     void shouldThrowUnauthorized_WhenTokenRevoked() {
-        RefreshToken revoked = new RefreshToken(tokenId, userId, validToken.tokenHash(), "Dev", "IP", Instant.now().plusSeconds(3600), Instant.now().minusSeconds(10));
-        when(refreshTokenRepository.findByTokenHash(hash("raw"))).thenReturn(Optional.of(revoked));
+        RefreshToken revoked = new RefreshToken(tokenId, userId, validToken.tokenHash(), "Dev", "IP",
+                Instant.now().plusSeconds(3600), Instant.now().minusSeconds(10));
+        when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw"))).thenReturn(Optional.of(revoked));
 
         assertThatThrownBy(() -> useCase.refresh("raw", "Device", "IP"))
                 .isInstanceOf(UnauthorizedException.class);
-                
-        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "revoked").count()).isEqualTo(1);
+
+        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "revoked").count())
+                .isEqualTo(1);
     }
 
     @Test
     void shouldThrowUnauthorized_WhenTokenExpired() {
-        RefreshToken expired = new RefreshToken(tokenId, userId, validToken.tokenHash(), "Dev", "IP", Instant.now().minusSeconds(10), null);
-        when(refreshTokenRepository.findByTokenHash(hash("raw"))).thenReturn(Optional.of(expired));
+        RefreshToken expired = new RefreshToken(tokenId, userId, validToken.tokenHash(), "Dev", "IP",
+                Instant.now().minusSeconds(10), null);
+        when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw"))).thenReturn(Optional.of(expired));
 
         assertThatThrownBy(() -> useCase.refresh("raw", "Device", "IP"))
                 .isInstanceOf(UnauthorizedException.class);
-                
-        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "expired").count()).isEqualTo(1);
+
+        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "expired").count())
+                .isEqualTo(1);
     }
 
     @Test
     void shouldThrowUnauthorized_WhenUserNotFound() {
-        when(refreshTokenRepository.findByTokenHash(hash("raw"))).thenReturn(Optional.of(validToken));
+        when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw"))).thenReturn(Optional.of(validToken));
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.refresh("raw", "Device", "IP"))
                 .isInstanceOf(UnauthorizedException.class);
-                
-        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "user_not_found").count()).isEqualTo(1);
+
+        assertThat(
+                meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "user_not_found").count())
+                .isEqualTo(1);
     }
 
     @Test
     void shouldThrowUnauthorized_WhenUserDisabled() {
         User disabledUser = new User(userId, orgId, UserRole.STUDENT, "student@test.com", "hash", false, false, null);
-        when(refreshTokenRepository.findByTokenHash(hash("raw"))).thenReturn(Optional.of(validToken));
+        when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw"))).thenReturn(Optional.of(validToken));
         when(userRepository.findById(userId)).thenReturn(Optional.of(disabledUser));
 
         assertThatThrownBy(() -> useCase.refresh("raw", "Device", "IP"))
                 .isInstanceOf(UnauthorizedException.class);
-                
-        assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "account_disabled").count()).isEqualTo(1);
+
+        assertThat(
+                meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "account_disabled").count())
+                .isEqualTo(1);
     }
 }

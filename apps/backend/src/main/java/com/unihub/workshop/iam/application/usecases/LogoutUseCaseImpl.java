@@ -4,11 +4,12 @@ import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.out.JtiBlacklistPort;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
-import com.unihub.workshop.iam.domain.utils.TokenHashUtils;
+import com.unihub.workshop.iam.application.utils.TokenUtils;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -31,7 +32,8 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NEVER)
+    // Enforce fail-closed: Redis write must succeed before any DB mutation.
     public void logout(String accessTokenString, String jti, Instant expiresAt, UUID userId,
             String refreshTokenString) {
         Instant now = Instant.now();
@@ -45,7 +47,7 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
 
         // 2. Revoke refresh token(s) in DB
         if (refreshTokenString != null && !refreshTokenString.isBlank()) {
-            String tokenHash = TokenHashUtils.hash(refreshTokenString);
+            String tokenHash = TokenUtils.hash(refreshTokenString);
             refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(token -> {
                 if (token.userId().equals(userId)) {
                     RefreshToken revoked = new RefreshToken(

@@ -1,12 +1,15 @@
-package com.unihub.workshop.iam.domain.utils;
+package com.unihub.workshop.iam.application.utils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Base64;
 
-public final class TokenHashUtils {
+public final class TokenUtils {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    private TokenHashUtils() {
+    private TokenUtils() {
     }
 
     public static String hash(String rawToken) {
@@ -25,5 +28,11 @@ public final class TokenHashUtils {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 algorithm not found", e);
         }
+    }
+
+    public static String generateSecureToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }
