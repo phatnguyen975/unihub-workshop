@@ -25,6 +25,8 @@
 
 ### 1.1 `user-registration-and-identity-verification`
 
+> **Status:** READY
+
 **Description:** Allows a new `STUDENT` to self-register on the platform. Upon registration, the account is created with `is_active = false` (preventing login) and an OTP (6-digit numeric) is generated, saved in `password_reset_tokens` (repurposed for general verification tokens), and sent via email. The system also validates the submitted email against the `student_directory` table to establish a verified identity link (`users.student_record_id`). Students without a `student_record_id` match can verify their account but are blocked from registering for workshops. A dedicated verification endpoint allows users to submit the OTP to activate their account (`is_active = true`). A shared OTP resend endpoint (used by both registration and password reset flows) allows requesting a new OTP if it expires or is lost. This is the only self-service account creation flow.
 
 | Attribute           | Detail                                                                                                                                                                                                                                                                                                  |
@@ -55,7 +57,7 @@
 
 ### 1.3 `public-key-distribution`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Provides a dedicated, authenticated `GET /api/v1/auth/public-key` endpoint that returns the current RSA public key in PEM format. This endpoint is the explicit mechanism for the mobile app to refresh its cached public key on demand — for example, after a key rotation event that invalidates previously cached keys. Unlike the JWKS endpoint (which is used for JWT signature verification by downstream services), this endpoint is designed specifically for the mobile `STAFF` client and returns the key in the PEM format that the mobile app can directly store in `mobile_public_keys`. Key rotation invalidates all previously issued QR signatures; staff must fetch the new key on their next online session. Without this endpoint, the mobile app has no mechanism to recover from a key rotation while the app is already authenticated.
 

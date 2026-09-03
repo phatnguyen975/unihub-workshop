@@ -12,29 +12,33 @@ import java.util.HexFormat;
 @Service
 public class PublicKeyService {
 
-    private final RsaKeyProperties rsaKeyProperties;
+    private final String publicKeyPem;
+    private final String keyId;
 
     public PublicKeyService(RsaKeyProperties rsaKeyProperties) {
-        this.rsaKeyProperties = rsaKeyProperties;
-    }
-
-    public String getPublicKeyPem() {
         RSAPublicKey publicKey = rsaKeyProperties.publicKey();
         byte[] encoded = publicKey.getEncoded();
-        String base64 = Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(encoded);
-        return "-----BEGIN PUBLIC KEY-----\n" + base64 + "\n-----END PUBLIC KEY-----";
-    }
 
-    public String getKeyId() {
+        // Precompute PEM
+        String base64 = Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(encoded);
+        this.publicKeyPem = "-----BEGIN PUBLIC KEY-----\n" + base64 + "\n-----END PUBLIC KEY-----";
+
+        // Precompute Key ID
         try {
-            RSAPublicKey publicKey = rsaKeyProperties.publicKey();
-            byte[] encoded = publicKey.getEncoded();
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(encoded);
-            return HexFormat.of().withLowerCase().formatHex(hash);
+            this.keyId = HexFormat.of().withLowerCase().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 algorithm not available", e);
         }
+    }
+
+    public String getPublicKeyPem() {
+        return publicKeyPem;
+    }
+
+    public String getKeyId() {
+        return keyId;
     }
 
     public Instant getIssuedAt() {
