@@ -3,6 +3,7 @@ package com.unihub.workshop.iam.presentation.controllers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
+import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.presentation.dto.LogoutRequest;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
@@ -46,7 +47,7 @@ class AuthControllerLogoutTest {
         logoutUseCase = mock(LogoutUseCase.class);
         objectMapper = new ObjectMapper();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(loginUseCase, refreshTokenUseCase, logoutUseCase))
+        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(loginUseCase, refreshTokenUseCase, logoutUseCase, mock(PublicKeyService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override

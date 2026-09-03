@@ -8,6 +8,10 @@ import com.unihub.workshop.iam.presentation.dto.LoginResponse;
 import com.unihub.workshop.iam.presentation.dto.LogoutRequest;
 import com.unihub.workshop.iam.presentation.dto.RefreshTokenRequest;
 import com.unihub.workshop.shared.web.ApiResponse;
+import com.unihub.workshop.shared.security.PublicKeyService;
+import com.unihub.workshop.iam.presentation.dto.PublicKeyResponse;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -31,6 +35,7 @@ public class AuthController {
     private final LoginUseCase loginUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
+    private final PublicKeyService publicKeyService;
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
@@ -71,6 +76,17 @@ public class AuthController {
                 result.expiresIn());
 
         return ApiResponse.success(response, "Token refreshed");
+    }
+
+    @GetMapping("/public-key")
+    @PreAuthorize("hasRole('STAFF')")
+    public ApiResponse<PublicKeyResponse> getPublicKey() {
+        PublicKeyResponse response = new PublicKeyResponse(
+                publicKeyService.getKeyId(),
+                publicKeyService.getPublicKeyPem(),
+                publicKeyService.getIssuedAt());
+
+        return ApiResponse.success(response, "Public key retrieved successfully");
     }
 
     @PostMapping("/logout")

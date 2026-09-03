@@ -2,6 +2,7 @@ package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
+import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import com.unihub.workshop.shared.exception.ForbiddenException;
@@ -32,7 +33,9 @@ class AuthControllerTest {
         loginUseCase = mock(LoginUseCase.class);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new AuthController(loginUseCase, mock(RefreshTokenUseCase.class), mock(LogoutUseCase.class)))
+                        new AuthController(loginUseCase, mock(RefreshTokenUseCase.class),
+                                mock(LogoutUseCase.class),
+                                mock(PublicKeyService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }
@@ -40,7 +43,8 @@ class AuthControllerTest {
     @Test
     void shouldReturn200OnSuccessfulLogin() throws Exception {
         when(loginUseCase.login(eq("test@example.com"), eq("password"), any(), any()))
-                .thenReturn(new LoginUseCase.LoginResult("access-token", "refresh-token", "Bearer", 900L));
+                .thenReturn(new LoginUseCase.LoginResult("access-token", "refresh-token", "Bearer",
+                        900L));
 
         String requestBody = """
                 {
@@ -105,7 +109,8 @@ class AuthControllerTest {
     void shouldReturn403OnTemporaryPassword() throws Exception {
         when(loginUseCase.login(any(), any(), any(), any()))
                 .thenThrow(new com.unihub.workshop.shared.exception.ForbiddenException(
-                        "urn:unihub:error:temporary-password", "Temporary password change required"));
+                        "urn:unihub:error:temporary-password",
+                        "Temporary password change required"));
 
         String requestBody = """
                 {
