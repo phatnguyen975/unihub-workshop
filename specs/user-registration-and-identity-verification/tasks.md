@@ -21,7 +21,7 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
 
 ### Phase 1: Student Self-Registration (Core Flow + Shared Foundation)
 
-- [ ] **T1 — A new student can self-register, receive an OTP via the outbox event, and the account is created inactive**
+- [x] **T1 — A new student can self-register, receive an OTP via the outbox event, and the account is created inactive**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -63,9 +63,9 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
 
 #### Checkpoint: Phase 1
 
-- [ ] T1 acceptance criteria pass against the running application (endpoint callable, DB rows verifiable, event_publication row present).
-- [ ] All T1 test files pass; no compilation errors.
-- [ ] `User` domain record and `UserJpaEntity` include all fields defined in `docs/database-schema.md §users`.
+- [x] T1 acceptance criteria pass against the running application (endpoint callable, DB rows verifiable, event_publication row present).
+- [x] All T1 test files pass; no compilation errors.
+- [x] `User` domain record and `UserJpaEntity` include all fields defined in `docs/database-schema.md §users`.
 
 ### Phase 2: Account Activation via OTP
 

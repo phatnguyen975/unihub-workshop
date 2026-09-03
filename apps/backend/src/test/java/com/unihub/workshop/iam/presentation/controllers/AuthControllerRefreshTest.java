@@ -3,8 +3,9 @@ package com.unihub.workshop.iam.presentation.controllers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
+import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
+import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.presentation.dto.RefreshTokenRequest;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
@@ -37,8 +38,12 @@ class AuthControllerRefreshTest {
         objectMapper = new ObjectMapper();
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(loginUseCase, refreshTokenUseCase, mock(LogoutUseCase.class),
-                        mock(PublicKeyService.class)))
+                .standaloneSetup(new AuthController(
+                        loginUseCase,
+                        refreshTokenUseCase,
+                        mock(LogoutUseCase.class),
+                        mock(PublicKeyService.class),
+                        mock(RegisterUserUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }

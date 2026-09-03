@@ -25,7 +25,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
+import com.unihub.workshop.iam.presentation.dto.RegisterRequest;
+import com.unihub.workshop.iam.presentation.dto.RegisterResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,6 +41,15 @@ public class AuthController {
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
     private final PublicKeyService publicKeyService;
+    private final RegisterUserUseCase registerUserUseCase;
+
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        UUID userId = registerUserUseCase.register(request.email(), request.password(), request.fullName());
+        return ApiResponse.success(new RegisterResponse(userId),
+                "Registration successful. Please check your email for the activation code.");
+    }
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
