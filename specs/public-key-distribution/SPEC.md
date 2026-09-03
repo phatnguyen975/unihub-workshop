@@ -22,8 +22,8 @@ The `public-key-distribution` feature exposes a dedicated, authenticated endpoin
 ### Key Retrieval
 
 - **FR-01:** The system SHALL return the current RSA public key material in PEM-encoded format when a request with a valid, non-revoked JWT is received.
-- **FR-02:** The system SHALL include a `key_id` field in the response that uniquely identifies the current public key, enabling the mobile app to detect key rotation without comparing PEM content byte-by-byte.
-- **FR-03:** The system SHALL include an `issued_at` timestamp in the response, in ISO 8601 UTC format, representing when the key became active on this server instance (i.e. request-time UTC).
+- **FR-02:** The system SHALL include a `keyId` field in the response that uniquely identifies the current public key, enabling the mobile app to detect key rotation without comparing PEM content byte-by-byte.
+- **FR-03:** The system SHALL include an `issuedAt` timestamp in the response, in ISO 8601 UTC format, representing when the key became active on this server instance (i.e. request-time UTC).
 
 ### Authentication and Authorization
 
@@ -34,13 +34,13 @@ The `public-key-distribution` feature exposes a dedicated, authenticated endpoin
 ### Key Material Source
 
 - **FR-07:** The system SHALL derive the PEM response from the same RSA public key that is currently loaded in memory and used for JWT signature verification — there is exactly one active key at any time, sourced from the configured key file at application startup.
-- **FR-08:** The system SHALL derive `key_id` deterministically from the public key material so that: (a) the same key always produces the same `key_id`, and (b) a different key (after rotation) always produces a different `key_id`, without requiring any database state.
+- **FR-08:** The system SHALL derive `keyId` deterministically from the public key material so that: (a) the same key always produces the same `keyId`, and (b) a different key (after rotation) always produces a different `keyId`, without requiring any database state.
 
 ## 4. Business Rules
 
 - **BR-01:** This endpoint is strictly limited to the `STAFF` role. Other roles (`STUDENT`, `ORGANIZER`) have no legitimate use case for offline key caching and must be blocked from accessing this endpoint.
 - **BR-02:** The RSA public key material is loaded from `classpath:security/public.pem` at application startup and held in memory for the lifetime of the process. The endpoint must not read from disk on every request; it must read from the already-loaded in-memory bean (`RsaKeyProperties`). This is a correctness and performance constraint.
-- **BR-03:** The `key_id` returned must be stable (deterministic) for the same key material and must change when the key material changes. A non-deterministic `key_id` that changes on every request would cause unnecessary cache churn on the mobile side. (Algorithm: SHA-256 fingerprint).
+- **BR-03:** The `keyId` returned must be stable (deterministic) for the same key material and must change when the key material changes. A non-deterministic `keyId` that changes on every request would cause unnecessary cache churn on the mobile side. (Algorithm: SHA-256 fingerprint).
 - **BR-04:** The JTI blacklist check is fail-closed (ADR-010): if Redis is unavailable, the authentication filter returns `503 Service Unavailable`. This is enforced by the existing `RedisJtiValidator` and is not changed by this feature.
 - **BR-05:** No database tables are read or written by this endpoint. Key material is sourced entirely from the in-memory `RsaKeyProperties` bean. Consistent with `docs/feature-catalog.md 1.3`: "DB Tables: None."
 - **BR-06:** The `public.pem` file must exist at application startup — the existing `RsaKeyConfig` constructor throws `IllegalStateException` if either key is missing. This feature inherits that startup fail-fast guarantee and adds no new startup requirement.
@@ -67,10 +67,10 @@ N/A — this feature does not introduce or modify any stateful entity. The RSA k
 Given a STAFF user is authenticated with a valid, non-revoked JWT
 When the user sends GET /api/v1/auth/public-key with the Authorization: Bearer header
 Then the response status is 200 OK
-And the response body contains a "data" object with fields: key_id, public_key_pem, issued_at
-And key_id is a non-empty string
-And public_key_pem begins with "-----BEGIN PUBLIC KEY-----" and ends with "-----END PUBLIC KEY-----"
-And issued_at is an ISO 8601 UTC timestamp string
+And the response body contains a "data" object with fields: keyId, publicKeyPem, issuedAt
+And keyId is a non-empty string
+And publicKeyPem begins with "-----BEGIN PUBLIC KEY-----" and ends with "-----END PUBLIC KEY-----"
+And issuedAt is an ISO 8601 UTC timestamp string
 ```
 
 _(Traces to: FR-01, FR-02, FR-03)_
@@ -130,25 +130,25 @@ And the response body follows the RFC 7807 error format
 
 _(Traces to: FR-06, BR-01)_
 
-### Scenario 7: `key_id` is deterministic and stable for the same key
+### Scenario 7: `keyId` is deterministic and stable for the same key
 
 ```gherkin
 Given the same RSA public key is loaded in memory
 When GET /api/v1/auth/public-key is called twice by the same authenticated user
-Then both responses return the same key_id value
-And both responses return the same public_key_pem value
+Then both responses return the same keyId value
+And both responses return the same publicKeyPem value
 ```
 
 _(Traces to: FR-07, FR-08, BR-03)_
 
-### Scenario 8: `key_id` changes after key rotation
+### Scenario 8: `keyId` changes after key rotation
 
 ```gherkin
 Given the server is restarted with a different RSA key pair (key rotation)
 And a STAFF user is authenticated with a JWT signed by the new private key
 When the user sends GET /api/v1/auth/public-key
-Then the response contains a key_id different from the key_id returned before rotation
-And public_key_pem reflects the new public key material
+Then the response contains a keyId different from the keyId returned before rotation
+And publicKeyPem reflects the new public key material
 ```
 
 _(Traces to: FR-08, BR-03)_
@@ -171,7 +171,7 @@ _(Traces to: FR-08, BR-03)_
 | `docs/feature-catalog.md`                                       | §1.3 `public-key-distribution`                                                                   |
 | `docs/system-design.md`                                         | §5 — Offline PKI & Cryptography                                                                  |
 | `docs/adrs.md`                                                  | ADR-005 (JWT RS256), ADR-010 (Redis fail-closed), ADR-029 (Offline QR Verification Cryptography) |
-| `docs/database-schema.md`                                       | Mobile SQLite — `mobile_public_keys` table (key_id, public_key_pem, issued_at)                   |
+| `docs/database-schema.md`                                       | Mobile SQLite — `mobile_public_keys` table (keyId, publicKeyPem, issuedAt)                       |
 | `docs/api-standards.md`                                         | HTTP Status Codes, Mandatory Headers, Success Response Envelope, RFC 7807 Error, ISO 8601 UTC    |
 | `docs/project-structure.md`                                     | §3 Core Backend — `shared/security`, `iam` module layout                                         |
 | `apps/backend/src/main/resources/application.yml`               | `rsa.public-key`, `app.security.public-paths`                                                    |

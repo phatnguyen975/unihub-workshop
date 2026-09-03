@@ -55,9 +55,9 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
   "success": true,
   "message": "Public key retrieved successfully",
   "data": {
-    "key_id": "a3f4c2e1b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1",
-    "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----",
-    "issued_at": "2026-09-03T05:42:00Z"
+    "keyId": "a3f4c2e1b8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END PUBLIC KEY-----",
+    "issuedAt": "2026-09-03T05:42:00Z"
   },
   "metadata": {
     "processedBy": "unihub-app-1",
@@ -68,11 +68,11 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 
 **Field Descriptions:**
 
-| Field                 | Type                  | Description                                                                                                                                                                                                      |
-| :-------------------- | :-------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data.key_id`         | string                | A deterministic fingerprint of the current RSA public key (e.g., SHA-256 of DER-encoded SubjectPublicKeyInfo, hex-encoded, lowercase). Changes when the key is rotated; stable across requests for the same key. |
-| `data.public_key_pem` | string                | The RSA public key in PEM format (X.509 SubjectPublicKeyInfo, Base64-encoded, wrapped in `-----BEGIN PUBLIC KEY-----` / `-----END PUBLIC KEY-----` delimiters, with line breaks at 64 characters).               |
-| `data.issued_at`      | string (ISO 8601 UTC) | The UTC timestamp at which the response was generated (i.e., when the mobile device fetched the key). Format: `2026-09-03T05:42:00Z`.                                                                            |
+| Field               | Type                  | Description                                                                                                                                                                                                      |
+| :------------------ | :-------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data.keyId`        | string                | A deterministic fingerprint of the current RSA public key (e.g., SHA-256 of DER-encoded SubjectPublicKeyInfo, hex-encoded, lowercase). Changes when the key is rotated; stable across requests for the same key. |
+| `data.publicKeyPem` | string                | The RSA public key in PEM format (X.509 SubjectPublicKeyInfo, Base64-encoded, wrapped in `-----BEGIN PUBLIC KEY-----` / `-----END PUBLIC KEY-----` delimiters, with line breaks at 64 characters).               |
+| `data.issuedAt`     | string (ISO 8601 UTC) | The UTC timestamp at which the response was generated (i.e., when the mobile device fetched the key). Format: `2026-09-03T05:42:00Z`.                                                                            |
 
 **Error Responses:**
 
@@ -104,6 +104,6 @@ Not applicable. This endpoint is a `GET` request. HTTP `GET` is defined as safe 
 
 - **Response envelope:** Follows the same `ApiResponse<T>` envelope as all other `GET` endpoints in the `iam` module.
 - **Error shape:** Uses the same RFC 7807 error URN namespace (`urn:unihub:error:...`) as all other endpoints in the system. The `401` error shape is identical to what the `/api/v1/auth/login` endpoint produces when a JWT check fails.
-- **`issued_at` field naming:** The field name `issued_at` is consistent with the `issued_at` column defined in the mobile SQLite `mobile_public_keys` table (`docs/database-schema.md`).
-- **`key_id` field naming:** The field name `key_id` is consistent with the `key_id` column in the mobile SQLite `mobile_public_keys` table.
+- **`issuedAt` field naming:** The field name `issuedAt` is consistent with the `issuedAt` column defined in the mobile SQLite `mobile_public_keys` table (`docs/database-schema.md`).
+- **`keyId` field naming:** The field name `keyId` is consistent with the `keyId` column in the mobile SQLite `mobile_public_keys` table.
 - **Authorization header convention:** Same `Authorization: Bearer <token>` convention used across all authenticated endpoints.
