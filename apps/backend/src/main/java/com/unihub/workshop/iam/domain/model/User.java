@@ -61,4 +61,24 @@ public record User(
                 null,
                 null);
     }
+
+    public User activate() {
+        return new User(
+                id,
+                organizationId,
+                role,
+                email,
+                phoneNumber,
+                passwordHash,
+                fullName,
+                avatarUrl,
+                true,
+                isTemporaryPassword,
+                lastLoginAt,
+                studentRecordId,
+                createdAt,
+                Instant.now(),
+                createdBy,
+                updatedBy);
+    }
 }

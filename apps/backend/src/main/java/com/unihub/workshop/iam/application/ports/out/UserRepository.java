@@ -15,4 +15,6 @@ public interface UserRepository {
     User save(User user);
 
     void updateLastLoginAt(UUID userId, Instant lastLoginAt);
+
+    void activate(UUID userId);
 }

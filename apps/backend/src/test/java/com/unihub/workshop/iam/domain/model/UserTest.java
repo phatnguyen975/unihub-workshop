@@ -42,4 +42,17 @@ class UserTest {
         assertThat(user.isActive()).isFalse();
         assertThat(user.role()).isEqualTo(UserRole.STUDENT);
     }
+
+    @Test
+    void activateShouldSetIsActiveToTrueAndRefreshUpdatedAt() {
+        User user = User.createStudent(UUID.randomUUID(), "student@test.com", "hash", "Alice", null, null);
+        assertThat(user.isActive()).isFalse();
+
+        User activatedUser = user.activate();
+
+        assertThat(activatedUser.isActive()).isTrue();
+        assertThat(activatedUser.id()).isEqualTo(user.id());
+        assertThat(activatedUser.email()).isEqualTo(user.email());
+        assertThat(activatedUser.updatedAt()).isNotNull();
+    }
 }

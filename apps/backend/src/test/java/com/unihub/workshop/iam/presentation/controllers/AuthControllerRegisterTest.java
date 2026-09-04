@@ -1,5 +1,6 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
@@ -36,8 +37,9 @@ class AuthControllerRegisterTest {
                 mock(RefreshTokenUseCase.class),
                 mock(LogoutUseCase.class),
                 mock(PublicKeyService.class),
-                registerUserUseCase);
-
+                registerUserUseCase,
+                mock(ActivateAccountUseCase.class)
+        ); 
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

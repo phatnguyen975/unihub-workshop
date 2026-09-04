@@ -1,6 +1,7 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
@@ -43,7 +44,8 @@ class AuthControllerRefreshTest {
                         refreshTokenUseCase,
                         mock(LogoutUseCase.class),
                         mock(PublicKeyService.class),
-                        mock(RegisterUserUseCase.class)))
+                        mock(RegisterUserUseCase.class),
+                        mock(ActivateAccountUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }

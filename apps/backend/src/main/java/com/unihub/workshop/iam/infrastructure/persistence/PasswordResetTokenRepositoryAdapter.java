@@ -6,6 +6,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+import java.util.Optional;
+import java.util.UUID;
+
 @Component
 public class PasswordResetTokenRepositoryAdapter implements PasswordResetTokenRepository {
 
@@ -20,6 +23,24 @@ public class PasswordResetTokenRepositoryAdapter implements PasswordResetTokenRe
         PasswordResetTokenJpaEntity entity = toEntity(token);
         PasswordResetTokenJpaEntity saved = repository.save(entity);
         return toDomain(saved);
+    }
+
+    @Override
+    public Optional<PasswordResetToken> findActiveTokenByUserEmail(String email) {
+        return repository.findActiveTokensByEmail(email, Instant.now())
+                .stream()
+                .findFirst()
+                .map(this::toDomain);
+    }
+
+    @Override
+    public Optional<PasswordResetToken> findLatestByUserId(UUID userId) {
+        return repository.findFirstByUserIdOrderByCreatedAtDesc(userId).map(this::toDomain);
+    }
+
+    @Override
+    public void markConsumed(UUID tokenId) {
+        repository.markConsumed(tokenId, Instant.now());
     }
 
     private PasswordResetToken toDomain(PasswordResetTokenJpaEntity entity) {

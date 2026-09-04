@@ -27,4 +27,26 @@ public record PasswordResetToken(
                 null,
                 null);
     }
+
+    public PasswordResetToken consume() {
+        Instant now = Instant.now();
+        return new PasswordResetToken(
+                id,
+                userId,
+                tokenHash,
+                expiresAt,
+                now,
+                createdAt,
+                now,
+                createdBy,
+                updatedBy);
+    }
+
+    public boolean isExpired() {
+        return expiresAt.isBefore(Instant.now());
+    }
+
+    public boolean isConsumed() {
+        return usedAt != null;
+    }
 }

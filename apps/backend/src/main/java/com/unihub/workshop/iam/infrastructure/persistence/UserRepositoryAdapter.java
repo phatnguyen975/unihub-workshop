@@ -45,6 +45,11 @@ public class UserRepositoryAdapter implements UserRepository {
         repository.updateLastLoginAt(userId, lastLoginAt);
     }
 
+    @Override
+    public void activate(UUID userId) {
+        repository.activateUser(userId, Instant.now());
+    }
+
     private User toDomain(UserJpaEntity entity) {
         return new User(
                 entity.getId(),

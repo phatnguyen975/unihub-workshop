@@ -69,7 +69,7 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
 
 ### Phase 2: Account Activation via OTP
 
-- [ ] **T2 — An unverified student can activate their account by submitting the correct OTP**
+- [x] **T2 — An unverified student can activate their account by submitting the correct OTP**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -97,8 +97,8 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
 
 #### Checkpoint: Phase 2
 
-- [ ] T2 acceptance criteria pass against the running application (calling the endpoint, verifying DB state).
-- [ ] All T2 test files pass; no compilation errors.
+- [x] T2 acceptance criteria pass against the running application (calling the endpoint, verifying DB state).
+- [x] All T2 test files pass; no compilation errors.
 
 ### Phase 3: OTP Resend
 
