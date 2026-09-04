@@ -13,7 +13,7 @@ class OtpServiceTest {
 
     @BeforeEach
     void setUp() {
-        otpService = new OtpService(testSecret);
+        otpService = new OtpService(testSecret, 15);
         otpService.init();
     }
 
@@ -48,9 +48,30 @@ class OtpServiceTest {
 
     @Test
     void initShouldFailWhenSecretIsBlankOrNull() {
-        OtpService invalidService = new OtpService("   ");
+        OtpService invalidService = new OtpService("   ", 15);
         assertThatThrownBy(invalidService::init)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("OTP HMAC secret");
+    }
+
+    @Test
+    void initShouldFailWhenSecretIsShorterThan32Characters() {
+        OtpService shortSecretService = new OtpService("too-short-secret-12345", 15);
+        assertThatThrownBy(shortSecretService::init)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("at least 32 characters long");
+    }
+
+    @Test
+    void calculateExpiryInstantShouldAddConfiguredTtlMinutes() {
+        OtpService customTtlService = new OtpService(testSecret, 30);
+        customTtlService.init();
+
+        java.time.Instant before = java.time.Instant.now();
+        java.time.Instant expiry = customTtlService.calculateExpiryInstant();
+        java.time.Instant after = java.time.Instant.now();
+
+        assertThat(expiry).isAfterOrEqualTo(before.plusSeconds(30 * 60 - 2));
+        assertThat(expiry).isBeforeOrEqualTo(after.plusSeconds(30 * 60 + 2));
     }
 }

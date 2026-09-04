@@ -43,6 +43,11 @@ public class PasswordResetTokenRepositoryAdapter implements PasswordResetTokenRe
         repository.markConsumed(tokenId, Instant.now());
     }
 
+    @Override
+    public void invalidateAllActiveTokensForUser(UUID userId) {
+        repository.invalidateAllActiveTokensForUser(userId, Instant.now());
+    }
+
     private PasswordResetToken toDomain(PasswordResetTokenJpaEntity entity) {
         return new PasswordResetToken(
                 entity.getId(),

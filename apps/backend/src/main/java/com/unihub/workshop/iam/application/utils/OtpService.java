@@ -9,17 +9,25 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HexFormat;
 
 @Component
 public class OtpService {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final int MIN_SECRET_LENGTH = 32;
+
     private final String hmacSecret;
+    private final int ttlMinutes;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public OtpService(@Value("${app.otp.hmac-secret:}") String hmacSecret) {
+    public OtpService(
+            @Value("${app.otp.hmac-secret:}") String hmacSecret,
+            @Value("${app.otp.ttl-minutes:15}") int ttlMinutes) {
         this.hmacSecret = hmacSecret;
+        this.ttlMinutes = ttlMinutes > 0 ? ttlMinutes : 15;
     }
 
     @PostConstruct
@@ -28,6 +36,18 @@ public class OtpService {
             throw new IllegalStateException(
                     "OTP HMAC secret must be configured via app.otp.hmac-secret and cannot be blank");
         }
+        if (hmacSecret.trim().length() < MIN_SECRET_LENGTH) {
+            throw new IllegalStateException(
+                    "OTP HMAC secret must be at least " + MIN_SECRET_LENGTH + " characters long");
+        }
+    }
+
+    public Instant calculateExpiryInstant() {
+        return Instant.now().plus(Duration.ofMinutes(ttlMinutes));
+    }
+
+    public int getTtlMinutes() {
+        return ttlMinutes;
     }
 
     public String generateOtp() {

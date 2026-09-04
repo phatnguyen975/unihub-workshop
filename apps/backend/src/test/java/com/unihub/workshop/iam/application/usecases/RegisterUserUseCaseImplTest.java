@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,8 +71,11 @@ class RegisterUserUseCaseImplTest {
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(otpService.generateOtp()).thenReturn("123456");
         when(otpService.hashOtp("123456")).thenReturn("otpHash");
+        when(otpService.calculateExpiryInstant()).thenReturn(Instant.now().plus(Duration.ofMinutes(15)));
 
         UUID userId = useCase.register(email, password, fullName);
+
+        assertThat(userId).isNotNull();
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(userCaptor.capture());
@@ -98,6 +102,7 @@ class RegisterUserUseCaseImplTest {
         assertThat(event.userId()).isEqualTo(userId);
         assertThat(event.email()).isEqualTo(email);
         assertThat(event.otp()).isEqualTo("123456");
+        assertThat(event.purpose()).isEqualTo(OtpRequestedEvent.PURPOSE_ACTIVATION);
     }
 
     @Test
@@ -109,6 +114,7 @@ class RegisterUserUseCaseImplTest {
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(otpService.generateOtp()).thenReturn("654321");
         when(otpService.hashOtp("654321")).thenReturn("otpHash2");
+        when(otpService.calculateExpiryInstant()).thenReturn(Instant.now().plus(Duration.ofMinutes(15)));
 
         UUID userId = useCase.register(email, "Str0ng!Pass", "Bob Jones");
 

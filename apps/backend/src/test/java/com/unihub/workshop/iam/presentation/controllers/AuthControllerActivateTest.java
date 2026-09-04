@@ -5,6 +5,7 @@ import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
+import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.InvalidOtpException;
 import com.unihub.workshop.shared.security.PublicKeyService;
@@ -36,8 +37,9 @@ class AuthControllerActivateTest {
                 mock(LogoutUseCase.class),
                 mock(PublicKeyService.class),
                 mock(RegisterUserUseCase.class),
-                activateAccountUseCase);
-
+                activateAccountUseCase,
+                mock(ResendOtpUseCase.class)
+        );
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

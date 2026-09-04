@@ -15,7 +15,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,7 +70,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
         String otp = otpService.generateOtp();
         String otpHash = otpService.hashOtp(otp);
-        Instant expiresAt = Instant.now().plus(Duration.ofMinutes(15));
+        Instant expiresAt = otpService.calculateExpiryInstant();
 
         PasswordResetToken token = PasswordResetToken.create(savedUser.id(), otpHash, expiresAt);
         passwordResetTokenRepository.save(token);
@@ -80,7 +79,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
                 savedUser.id(),
                 savedUser.email(),
                 otp,
-                "REGISTRATION_ACTIVATION"));
+                OtpRequestedEvent.PURPOSE_ACTIVATION));
 
         return savedUser.id();
     }

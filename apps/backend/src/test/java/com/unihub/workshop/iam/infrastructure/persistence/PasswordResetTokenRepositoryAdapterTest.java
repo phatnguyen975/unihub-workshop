@@ -66,4 +66,15 @@ class PasswordResetTokenRepositoryAdapterTest {
 
         verify(jpaRepo).markConsumed(eq(tokenId), any(Instant.class));
     }
+
+    @Test
+    void shouldInvalidateAllActiveTokensForUser() {
+        PasswordResetTokenJpaRepository jpaRepo = mock(PasswordResetTokenJpaRepository.class);
+        PasswordResetTokenRepositoryAdapter adapter = new PasswordResetTokenRepositoryAdapter(jpaRepo);
+
+        UUID userId = UUID.randomUUID();
+        adapter.invalidateAllActiveTokensForUser(userId);
+
+        verify(jpaRepo).invalidateAllActiveTokensForUser(eq(userId), any(Instant.class));
+    }
 }

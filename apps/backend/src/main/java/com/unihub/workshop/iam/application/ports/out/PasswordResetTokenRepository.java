@@ -13,4 +13,6 @@ public interface PasswordResetTokenRepository {
     Optional<PasswordResetToken> findLatestByUserId(UUID userId);
 
     void markConsumed(UUID tokenId);
+
+    void invalidateAllActiveTokensForUser(UUID userId);
 }

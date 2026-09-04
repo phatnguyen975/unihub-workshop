@@ -102,7 +102,7 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
 
 ### Phase 3: OTP Resend
 
-- [ ] **T3 — An unverified student can request a new OTP, invalidating any prior unconsumed OTPs**
+- [x] **T3 — An unverified student can request a new OTP, invalidating any prior unconsumed OTPs**
   - **Size:** S
   - **Depends on:** T1, T2
   - **Layers touched:** Application, Infrastructure, Presentation
@@ -124,11 +124,11 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks (T1, T2, T3) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end.
-- [ ] Tests for all new and modified files pass in isolation (per the agreed build-time policy).
-- [ ] No new compilation errors or warnings in the `iam` module.
-- [ ] Ready for `/review user-registration-and-identity-verification`.
+- [x] All tasks (T1, T2, T3) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end.
+- [x] Tests for all new and modified files pass in isolation (per the agreed build-time policy).
+- [x] No new compilation errors or warnings in the `iam` module.
+- [x] Ready for `/review user-registration-and-identity-verification`.
 
 ## Risks and Mitigations
 
