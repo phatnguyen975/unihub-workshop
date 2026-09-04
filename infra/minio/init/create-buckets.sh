@@ -21,8 +21,10 @@ done
 
 mc mb --ignore-existing local/unihub-brochures
 mc mb --ignore-existing local/unihub-csv-drops
+mc mb --ignore-existing local/unihub-media
 
 mc anonymous set download local/unihub-brochures
+mc anonymous set download local/unihub-media
 
 echo "MinIO buckets ready."
 touch /tmp/minio-init.done

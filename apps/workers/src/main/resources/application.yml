@@ -23,6 +23,8 @@ app:
     expected-faculties: ${INGESTION_EXPECTED_FACULTIES:Information Technology,Mathematics,Physics,Chemistry}
     reject-dir: ${INGESTION_REJECT_DIR:resources}
     max-file-size: ${INGESTION_MAX_FILE_SIZE:104857600}
+  ttl-cleanup:
+    cron: ${TTL_CLEANUP_CRON:0 0 */6 * * *}
   storage:
     buckets:
       csv: unihub-csv-drops

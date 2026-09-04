@@ -359,6 +359,7 @@ apps/workers/
 │   │   │       │   ├── messaging/            # Common AMQP configuration and message utilities
 │   │   │       │   └── observability/        # Metrics and logging context
 │   │   │       ├── batch_ingestion/          # Nightly CSV ingestion workers (follows ai_processing template)
+│   │   │       ├── maintenance/              # Recurring TTL cleanup & database maintenance workers
 │   │   │       ├── notifications/            # Notification fan-out workers (follows ai_processing template)
 │   │   │       ├── search_sync/              # Elasticsearch CQRS sync workers (follows ai_processing template)
 │   │   │       └── ai_processing/            # AI summarization pipeline (hexagonal template)

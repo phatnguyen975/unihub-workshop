@@ -9,7 +9,7 @@
 - **Audit Fields:** Every main table includes `created_at`, `updated_at`, `created_by`, and `updated_by`.
 - **Automated Timestamps:** Add a standard PostgreSQL trigger function to set `updated_at = now()` on every `UPDATE` operation for all tables to guarantee consistency independently of the application layer.
 - **UTC Standardization:** All timestamps are stored in `TIMESTAMPTZ`. The database server, connection pools, and application JVM must be strictly configured to use the **UTC** timezone to prevent scheduling and registration anomalies.
-- **TTL Cleanup Jobs:** Implement scheduled TTL cleanup jobs (every 6 hours) in the backend to automatically purge expired records from TTL-managed tables and prevent database bloat. This applies to the `expires_at` column in `idempotency_keys`, `refresh_tokens`, and `password_reset_tokens` tables.
+- **TTL Cleanup Jobs:** Implement scheduled TTL cleanup jobs (every 6 hours) in the backend to automatically purge expired records from TTL-managed tables and prevent database bloat. This applies to the `expires_at` column in `idempotency_keys`, `refresh_tokens`, and `user_verification_tokens` tables.
 - **No Hard Deletions (Soft Delete & State Machines):** Due to the financial and auditing nature of registrations and attendances, `DELETE` operations are strictly prohibited for core business entities. Use state machine transitions (for example, `status = 'CANCELED'` or `status = 'INACTIVE'`) to preserve data lineage.
 - **Strict Role Naming:** Role values across the system must strictly be `STUDENT`, `ORGANIZER`, and `STAFF`. `ROLE_` prefixes are strictly forbidden at both the database and application levels.
 
@@ -116,9 +116,10 @@ erDiagram
     VARCHAR token_hash
   }
 
-  password_reset_tokens {
+  user_verification_tokens {
     UUID id PK
     UUID user_id FK
+    VARCHAR token_type
     VARCHAR token_hash
   }
 
@@ -162,7 +163,7 @@ erDiagram
   users ||--o{ in_app_notifications : receives
   users ||--o{ notification_delivery_logs : generates
   users ||--o{ refresh_tokens : owns
-  users ||--o{ password_reset_tokens : requests
+  users ||--o{ user_verification_tokens : requests
 ```
 
 > [!NOTE]
@@ -211,7 +212,7 @@ erDiagram
 | role                  | VARCHAR(16)  | NOT NULL, CHECK (role IN ('STUDENT','ORGANIZER','STAFF')) | RBAC role used by the API and UI.                                                |
 | email                 | CITEXT       | NOT NULL, UNIQUE                                          | Login email (case-insensitive).                                                  |
 | phone_number          | VARCHAR(20)  | NULL                                                      | Optional contact number, critical for `ORGANIZER` or `STAFF` emergency contacts. |
-| password_hash         | VARCHAR(255) | NOT NULL                                                  | Argon2 or Bcrypt hash.                                                           |
+| password_hash         | VARCHAR(255) | NOT NULL                                                  | Argon2 hash (`Argon2PasswordEncoder`).                                           |
 | full_name             | VARCHAR(200) | NOT NULL                                                  | Display name in UI and email templates.                                          |
 | avatar_url            | TEXT         | NULL                                                      | Optional profile avatar.                                                         |
 | is_active             | BOOLEAN      | NOT NULL, DEFAULT true                                    | Account status.                                                                  |
@@ -264,31 +265,33 @@ erDiagram
 > [!IMPORTANT]
 > Refresh tokens must be stored only as hashes and rotated on each use to reduce replay risk.
 
-### Table: `password_reset_tokens`
+### Table: `user_verification_tokens`
 
-**Table Description & UX Context:** Stores one-time password reset tokens for self-service recovery flows.
+**Table Description & UX Context:** Stores one-time verification OTP tokens (6-digit numeric) for account activation and password reset flows.
 
 **Schema Definition Table:**
 
-| Column Name | Data Type    | Constraints                             | Description/UX Logic                             |
-| :---------- | :----------- | :-------------------------------------- | :----------------------------------------------- |
-| id          | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid() | Password reset token identifier.                 |
-| user_id     | UUID         | FK users(id), NOT NULL                  | User requesting the reset.                       |
-| token_hash  | VARCHAR(255) | NOT NULL                                | Hash of the reset token (never store raw token). |
-| expires_at  | TIMESTAMPTZ  | NOT NULL                                | Expiration time for TTL cleanup.                 |
-| used_at     | TIMESTAMPTZ  | NULL                                    | Timestamp when the token was consumed.           |
-| created_at  | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                 | Audit timestamp.                                 |
-| updated_at  | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                 | Audit timestamp.                                 |
-| created_by  | UUID         | FK users(id), NULL                      | System actor.                                    |
-| updated_by  | UUID         | FK users(id), NULL                      | System actor.                                    |
+| Column Name | Data Type    | Constraints                                                             | Description/UX Logic                                       |
+| :---------- | :----------- | :---------------------------------------------------------------------- | :--------------------------------------------------------- |
+| id          | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid()                                 | Verification token identifier.                             |
+| user_id     | UUID         | FK users(id), NOT NULL                                                  | User requesting verification.                              |
+| token_type  | VARCHAR(32)  | NOT NULL, CHECK (token_type IN ('ACTIVATION_OTP','PASSWORD_RESET_OTP')) | Token purpose discriminator.                               |
+| token_hash  | VARCHAR(255) | NOT NULL                                                                | HMAC-SHA256 hash of the 6-digit OTP (never store raw OTP). |
+| expires_at  | TIMESTAMPTZ  | NOT NULL                                                                | Expiration time for TTL cleanup (15-minute TTL).           |
+| used_at     | TIMESTAMPTZ  | NULL                                                                    | Timestamp when the OTP was consumed.                       |
+| created_at  | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                                           |
+| updated_at  | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                                           |
+| created_by  | UUID         | FK users(id), NULL                                                      | System actor.                                              |
+| updated_by  | UUID         | FK users(id), NULL                                                      | System actor.                                              |
 
 **Indexing Strategy:**
 
 - Unique B-Tree on `token_hash`.
 - B-Tree on `expires_at` for TTL cleanup sweeps.
+- Partial B-Tree on `(user_id, token_type, expires_at) WHERE used_at IS NULL` for active token lookups and scoped invalidation.
 
 > [!CAUTION]
-> Tokens are single-use and must be invalidated on first successful password reset.
+> Tokens are single-use and must be marked with `used_at = now()` upon first successful consumption. Invalidation operations must always be scoped to `token_type` to prevent cross-flow invalidation.
 
 ### Table: `student_directory`
 
@@ -758,12 +761,15 @@ Neon PostgreSQL uses a primary-replica topology. Replication lag is expected and
 - `workshops`: Optimistic locking reads (`version`) before admin mutations.
 - `attendances`: Offline sync upserts and duplicate check-in detection.
 - `workshop_assignments`: `STAFF` assignment validation during check-in authorization.
+- `user_verification_tokens`: OTP validation and single-use consumption (`used_at`) during account activation and password reset.
+- `refresh_tokens`: Session rotation, revocation, and active session verification.
 - `event_publication`: Spring Modulith's internal event registry polling and status updates.
 
 **Primary Routing Requirements:**
 
 - All idempotency reads and writes must be routed to the primary.
 - Any operation that reads a value and immediately writes based on it (check-then-act) must use the primary.
+- All OTP verification, password changes, and refresh token rotations must be routed to the primary.
 - Admin mutation flows that rely on `version` must read from the primary to avoid stale versions.
 - Offline sync reconciliation must read and write against the primary to avoid double check-ins.
 - The Spring Modulith event publication registry (`event_publication`) must be strictly routed to the Primary DB to prevent missed events or duplicate broker publishing caused by replica read delays.

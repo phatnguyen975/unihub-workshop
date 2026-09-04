@@ -21,21 +21,21 @@ Wildcard origins (`*`) are strictly prohibited in production. The backend must e
 
 ### HTTP Status Codes
 
-| Status Code | Reason Phrase         | Use Case in UniHub                                                                |
-| :---------- | :-------------------- | :-------------------------------------------------------------------------------- |
-| 200         | OK                    | Standard successful `GET` or mutation response.                                   |
-| 201         | Created               | Resource created (workshop, registration, payment intent).                        |
-| 202         | Accepted              | Async request accepted (AI summarization, CSV ingestion) returning a Job ID.      |
-| 204         | No Content            | Successful update or deletion with no response body to reduce bandwidth.          |
-| 207         | Multi-Status          | Mobile offline sync bulk upsert with per-item outcomes.                           |
-| 400         | Bad Request           | Invalid payload, missing required fields, malformed JSON.                         |
-| 401         | Unauthorized          | Missing or invalid JWT.                                                           |
-| 403         | Forbidden             | RBAC or tenant boundary violation.                                                |
-| 404         | Not Found             | Resource ID does not exist or is not visible to the requester.                    |
-| 409         | Conflict              | Optimistic locking failure or seat-capacity conflict.                             |
-| 422         | Unprocessable Entity  | State machine or business rule violation (publish/cancel/registration conflicts). |
-| 429         | Too Many Requests     | Bucket4j rate limit exceeded.                                                     |
-| 500         | Internal Server Error | Unhandled or unexpected backend failures.                                         |
+| Status Code | Reason Phrase         | Use Case in UniHub                                                                                                      |
+| :---------- | :-------------------- | :---------------------------------------------------------------------------------------------------------------------- |
+| 200         | OK                    | Standard successful `GET` or mutation response.                                                                         |
+| 201         | Created               | Resource created (workshop, registration, payment intent).                                                              |
+| 202         | Accepted              | Async request accepted (AI summarization, CSV ingestion) returning a Job ID.                                            |
+| 204         | No Content            | Successful update or deletion with no response body to reduce bandwidth.                                                |
+| 207         | Multi-Status          | Mobile offline sync bulk upsert with per-item outcomes.                                                                 |
+| 400         | Bad Request           | Malformed JSON syntax, unparseable request body, corrupted headers, protocol-level errors.                              |
+| 401         | Unauthorized          | Missing or invalid JWT.                                                                                                 |
+| 403         | Forbidden             | RBAC or tenant boundary violation.                                                                                      |
+| 404         | Not Found             | Resource ID does not exist or is not visible to the requester.                                                          |
+| 409         | Conflict              | Optimistic locking failure or seat-capacity conflict.                                                                   |
+| 422         | Unprocessable Entity  | Validation failure (`@Valid`, missing/invalid fields, constraint violations), state machine or business rule violation. |
+| 429         | Too Many Requests     | Bucket4j rate limit exceeded.                                                                                           |
+| 500         | Internal Server Error | Unhandled or unexpected backend failures.                                                                               |
 
 ### Mandatory Headers
 
