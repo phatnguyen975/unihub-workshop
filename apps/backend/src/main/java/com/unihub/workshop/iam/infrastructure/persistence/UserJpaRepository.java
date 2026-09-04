@@ -12,7 +12,13 @@ import java.util.UUID;
 public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     Optional<UserJpaEntity> findByEmail(String email);
 
+    boolean existsByEmail(String email);
+
     @Modifying
     @Query("UPDATE UserJpaEntity u SET u.lastLoginAt = :time WHERE u.id = :id")
     void updateLastLoginAt(@Param("id") UUID id, @Param("time") Instant time);
+
+    @Modifying
+    @Query("UPDATE UserJpaEntity u SET u.isActive = true, u.updatedAt = :now WHERE u.id = :id")
+    void activateUser(@Param("id") UUID id, @Param("now") Instant now);
 }

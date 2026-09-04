@@ -3,6 +3,7 @@ package com.unihub.workshop.shared.exception;
 import org.springframework.http.HttpStatus;
 
 public class InternalServerException extends AppException {
+
     public InternalServerException(String message) {
         super(HttpStatus.INTERNAL_SERVER_ERROR, "urn:unihub:error:internal", message);
     }

@@ -6,6 +6,11 @@ spring:
     redis:
       password: ${SPRING_DATA_REDIS_PASSWORD}
 
+app:
+  otp:
+    hmac-secret: test-secret-key-must-be-long-enough-for-hmac-sha256-testing
+    ttl-minutes: 15
+
 # =============================================================================
 # RSA Key Configuration
 # =============================================================================

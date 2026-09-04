@@ -4,6 +4,7 @@ import com.unihub.workshop.shared.exception.AppException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -134,6 +135,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 ex.getMessage() != null ? ex.getMessage() : "State or argument is invalid.",
                 request.getRequestURI());
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(problem);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(DataIntegrityViolationException ex,
+            HttpServletRequest request) {
+        ProblemDetail problem = createProblemDetail(
+                HttpStatus.CONFLICT,
+                "urn:unihub:error:conflict",
+                "Conflict",
+                "A data conflict or unique constraint violation occurred.",
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

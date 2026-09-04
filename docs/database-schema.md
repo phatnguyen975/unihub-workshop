@@ -207,7 +207,7 @@ erDiagram
 | Column Name           | Data Type    | Constraints                                               | Description/UX Logic                                                             |
 | :-------------------- | :----------- | :-------------------------------------------------------- | :------------------------------------------------------------------------------- |
 | id                    | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid()                   | User identifier.                                                                 |
-| organization_id       | UUID         | FK organizations(id), NOT NULL                            | Tenant boundary for user access.                                                 |
+| organization_id       | UUID         | FK organizations(id), NULL                                | Tenant boundary for user access. NULL if not matched to student directory.       |
 | role                  | VARCHAR(16)  | NOT NULL, CHECK (role IN ('STUDENT','ORGANIZER','STAFF')) | RBAC role used by the API and UI.                                                |
 | email                 | CITEXT       | NOT NULL, UNIQUE                                          | Login email (case-insensitive).                                                  |
 | phone_number          | VARCHAR(20)  | NULL                                                      | Optional contact number, critical for `ORGANIZER` or `STAFF` emergency contacts. |

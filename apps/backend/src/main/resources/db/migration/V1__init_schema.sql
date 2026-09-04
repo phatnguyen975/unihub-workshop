@@ -68,7 +68,7 @@ CREATE TRIGGER trg_organizations_updated_at
 -- NULL means the student has not been verified and cannot register for workshops.
 CREATE TABLE users (
     id                    UUID         NOT NULL DEFAULT gen_random_uuid(),
-    organization_id       UUID         NOT NULL,
+    organization_id       UUID         NULL,
     role                  VARCHAR(16)  NOT NULL CHECK (role IN ('STUDENT', 'ORGANIZER', 'STAFF')),
     email                 CITEXT       NOT NULL,
     phone_number          VARCHAR(20)  NULL,

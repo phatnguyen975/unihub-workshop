@@ -25,7 +25,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
+import com.unihub.workshop.iam.presentation.dto.RegisterRequest;
+import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
+import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
+import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
+import com.unihub.workshop.iam.presentation.dto.RegisterResponse;
+import com.unihub.workshop.iam.presentation.dto.ResendOtpRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,6 +45,29 @@ public class AuthController {
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
     private final PublicKeyService publicKeyService;
+    private final RegisterUserUseCase registerUserUseCase;
+    private final ActivateAccountUseCase activateAccountUseCase;
+    private final ResendOtpUseCase resendOtpUseCase;
+
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        UUID userId = registerUserUseCase.register(request.email(), request.password(), request.fullName());
+        return ApiResponse.success(new RegisterResponse(userId),
+                "Registration successful. Please check your email for the activation code.");
+    }
+
+    @PostMapping("/activate")
+    public ApiResponse<Void> activate(@Valid @RequestBody ActivateAccountRequest request) {
+        activateAccountUseCase.activate(request.email(), request.otp());
+        return ApiResponse.success(null, "Account activated successfully. You may now log in.");
+    }
+
+    @PostMapping("/otp/resend")
+    public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
+        resendOtpUseCase.resendOtp(request.email());
+        return ApiResponse.success(null, "A new activation code has been sent to your email.");
+    }
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
