@@ -1,6 +1,7 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
+import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
@@ -31,15 +32,17 @@ class AuthControllerResendOtpTest {
     @BeforeEach
     void setUp() {
         resendOtpUseCase = mock(ResendOtpUseCase.class);
+        ActivateAccountUseCase activateAccountUseCase = mock(ActivateAccountUseCase.class);
         AuthController authController = new AuthController(
                 mock(LoginUseCase.class),
                 mock(RefreshTokenUseCase.class),
                 mock(LogoutUseCase.class),
                 mock(PublicKeyService.class),
                 mock(RegisterUserUseCase.class),
-                mock(ActivateAccountUseCase.class),
+                activateAccountUseCase,
                 resendOtpUseCase,
-                mock(ResetPasswordUseCase.class));
+                mock(ResetPasswordUseCase.class),
+                mock(ChangeTemporaryPasswordUseCase.class));
 
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())

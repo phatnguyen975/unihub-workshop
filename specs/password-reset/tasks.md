@@ -82,7 +82,7 @@ This implementation plan delivers the complete password modification and credent
 
 ### Phase 3: First-Login Temporary Password Exchange
 
-- [ ] **T3 — Implement first-login temporary password exchange with credential update and immediate full session issuance (`POST /api/v1/auth/password/temporary`)**
+- [x] **T3 — Implement first-login temporary password exchange with credential update and immediate full session issuance (`POST /api/v1/auth/password/temporary`)**
   - **Size:** M
   - **Depends on:** T2 (reuses password policy validation & response mapping conventions)
   - **Layers touched:** Domain, Application, Infrastructure (persistence/security), Presentation
@@ -104,7 +104,7 @@ This implementation plan delivers the complete password modification and credent
 
 #### Checkpoint: Phase 3
 
-- [ ] First-login temporary password exchange verified end-to-end with immediate session generation and dashboard routing. Unit tests pass 100%.
+- [x] First-login temporary password exchange verified end-to-end with immediate session generation and dashboard routing. Unit tests pass 100%.
 
 ### Phase 4: Mutation Idempotency & Hardening
 

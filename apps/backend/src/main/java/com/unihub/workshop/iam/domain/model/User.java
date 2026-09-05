@@ -101,4 +101,24 @@ public record User(
                 createdBy,
                 updatedBy);
     }
+
+    public User changeTemporaryPassword(String newPasswordHash, Instant loginTime) {
+        return new User(
+                id,
+                organizationId,
+                role,
+                email,
+                phoneNumber,
+                newPasswordHash,
+                fullName,
+                avatarUrl,
+                isActive,
+                false,
+                loginTime,
+                studentRecordId,
+                createdAt,
+                loginTime,
+                createdBy,
+                updatedBy);
+    }
 }

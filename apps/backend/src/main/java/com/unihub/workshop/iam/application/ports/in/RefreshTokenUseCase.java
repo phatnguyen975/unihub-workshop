@@ -7,6 +7,6 @@ public interface RefreshTokenUseCase {
             String accessToken,
             String refreshToken,
             String tokenType,
-            long expiresIn) {
+            long expiresIn) implements TokenResult {
     }
 }

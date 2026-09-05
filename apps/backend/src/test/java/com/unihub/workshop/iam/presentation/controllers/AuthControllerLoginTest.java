@@ -1,6 +1,7 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
+import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
@@ -46,7 +47,8 @@ class AuthControllerLoginTest {
                                 mock(RegisterUserUseCase.class),
                                 mock(ActivateAccountUseCase.class),
                                 mock(ResendOtpUseCase.class),
-                                mock(ResetPasswordUseCase.class)))
+                                mock(ResetPasswordUseCase.class),
+                                mock(ChangeTemporaryPasswordUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }

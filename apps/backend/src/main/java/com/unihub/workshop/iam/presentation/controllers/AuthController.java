@@ -1,6 +1,7 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
+import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
@@ -8,6 +9,7 @@ import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
+import com.unihub.workshop.iam.presentation.dto.ChangeTemporaryPasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginResponse;
 import com.unihub.workshop.iam.presentation.dto.LogoutRequest;
@@ -50,6 +52,7 @@ public class AuthController {
     private final ActivateAccountUseCase activateAccountUseCase;
     private final ResendOtpUseCase resendOtpUseCase;
     private final ResetPasswordUseCase resetPasswordUseCase;
+    private final ChangeTemporaryPasswordUseCase changeTemporaryPasswordUseCase;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -75,6 +78,23 @@ public class AuthController {
     public ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         resetPasswordUseCase.resetPassword(request.email(), request.otp(), request.newPassword());
         return ApiResponse.success(null, "Password reset successfully. Please sign in with your new password.");
+    }
+
+    @PostMapping("/password/temporary")
+    public ApiResponse<LoginResponse> changeTemporaryPassword(
+            @Valid @RequestBody ChangeTemporaryPasswordRequest request,
+            HttpServletRequest httpRequest) {
+        ChangeTemporaryPasswordUseCase.ChangeTemporaryPasswordResult result = changeTemporaryPasswordUseCase
+                .changeTemporaryPassword(
+                        request.email(),
+                        request.currentPassword(),
+                        request.newPassword(),
+                        httpRequest.getHeader("User-Agent"),
+                        httpRequest.getRemoteAddr());
+
+        return ApiResponse.success(
+                LoginResponse.from(result),
+                "Password updated successfully. Welcome to UniHub!");
     }
 
     @PostMapping("/login")

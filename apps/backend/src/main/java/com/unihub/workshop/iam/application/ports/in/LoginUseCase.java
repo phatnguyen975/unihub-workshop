@@ -10,6 +10,6 @@ public interface LoginUseCase {
             String refreshToken,
             String tokenType,
             long expiresIn,
-            User user) {
+            User user) implements AuthSessionResult {
     }
 }

@@ -1,7 +1,7 @@
 package com.unihub.workshop.iam.presentation.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
+import com.unihub.workshop.iam.application.ports.in.AuthSessionResult;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LoginResponse(
@@ -11,7 +11,7 @@ public record LoginResponse(
         long expiresIn,
         UserProfileResponse user) {
 
-    public static LoginResponse from(LoginUseCase.LoginResult result) {
+    public static LoginResponse from(AuthSessionResult result) {
         if (result == null) {
             return null;
         }
