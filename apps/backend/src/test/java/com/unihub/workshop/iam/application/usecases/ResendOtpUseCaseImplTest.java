@@ -94,18 +94,38 @@ class ResendOtpUseCaseImplTest {
     }
 
     @Test
-    void shouldLeaveActiveFlowBlankForFeature14() {
+    void shouldResendPasswordResetOtpSuccessfullyWhenAccountActive() {
         String email = "active@university.edu";
         UUID userId = UUID.randomUUID();
         User activeUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", true, false, null);
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(activeUser));
+        when(otpService.generateOtp()).thenReturn("123456");
+        when(otpService.hashOtp("123456")).thenReturn("resetOtpHash");
+        when(otpService.calculateExpiryInstant())
+                .thenReturn(java.time.Instant.now().plus(java.time.Duration.ofMinutes(15)));
+        when(userVerificationTokenRepository.save(any(UserVerificationToken.class))).thenAnswer(i -> i.getArgument(0));
 
         useCase.resendOtp(email);
 
-        verify(userVerificationTokenRepository, never()).invalidateActiveTokens(any(), any());
-        verify(otpService, never()).generateOtp();
-        verify(userVerificationTokenRepository, never()).save(any());
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(userVerificationTokenRepository).invalidateActiveTokens(userId,
+                UserVerificationToken.TYPE_PASSWORD_RESET_OTP);
+
+        ArgumentCaptor<UserVerificationToken> tokenCaptor = ArgumentCaptor.forClass(UserVerificationToken.class);
+        verify(userVerificationTokenRepository).save(tokenCaptor.capture());
+        UserVerificationToken savedToken = tokenCaptor.getValue();
+        assertThat(savedToken.userId()).isEqualTo(userId);
+        assertThat(savedToken.tokenType()).isEqualTo(UserVerificationToken.TYPE_PASSWORD_RESET_OTP);
+        assertThat(savedToken.tokenHash()).isEqualTo("resetOtpHash");
+        assertThat(savedToken.usedAt()).isNull();
+        assertThat(savedToken.expiresAt()).isNotNull();
+
+        ArgumentCaptor<OtpRequestedEvent> eventCaptor = ArgumentCaptor.forClass(OtpRequestedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        OtpRequestedEvent publishedEvent = eventCaptor.getValue();
+        assertThat(publishedEvent.userId()).isEqualTo(userId);
+        assertThat(publishedEvent.email()).isEqualTo(email);
+        assertThat(publishedEvent.otp()).isEqualTo("123456");
+        assertThat(publishedEvent.purpose()).isEqualTo(OtpRequestedEvent.PURPOSE_PASSWORD_RESET);
     }
 }

@@ -13,6 +13,7 @@ public record OtpRequestedEvent(
         Instant requestedAt) {
 
     public static final String PURPOSE_ACTIVATION = "ACTIVATION";
+    public static final String PURPOSE_PASSWORD_RESET = "PASSWORD_RESET";
 
     public OtpRequestedEvent(UUID userId, String email, String otp, String purpose) {
         this(userId, email, otp, purpose, Instant.now());

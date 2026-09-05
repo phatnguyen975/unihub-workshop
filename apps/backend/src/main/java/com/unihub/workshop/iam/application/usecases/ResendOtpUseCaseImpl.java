@@ -39,8 +39,23 @@ public class ResendOtpUseCaseImpl implements ResendOtpUseCase {
                 .orElseThrow(() -> new NotFoundException("No account found for this email."));
 
         if (user.isActive()) {
-            // TODO: Send PASSWORD_RESET_OTP for active accounts.
-            // Left blank for now per Feature 1.1 scope; will be implemented in Feature 1.4.
+            userVerificationTokenRepository.invalidateActiveTokens(
+                    user.id(), UserVerificationToken.TYPE_PASSWORD_RESET_OTP);
+
+            String otp = otpService.generateOtp();
+            String tokenHash = otpService.hashOtp(otp);
+
+            UserVerificationToken token = UserVerificationToken.createPasswordResetOtp(
+                    user.id(),
+                    tokenHash,
+                    otpService.calculateExpiryInstant());
+            userVerificationTokenRepository.save(token);
+
+            eventPublisher.publishEvent(new OtpRequestedEvent(
+                    user.id(),
+                    user.email(),
+                    otp,
+                    OtpRequestedEvent.PURPOSE_PASSWORD_RESET));
             return;
         }
 

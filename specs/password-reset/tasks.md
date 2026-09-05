@@ -26,7 +26,7 @@ This implementation plan delivers the complete password modification and credent
 
 ### Phase 1: Password-Reset OTP Dispatch (Shared Resend Extension)
 
-- [ ] **T1 — Implement password-reset OTP generation and asynchronous delivery via shared resend endpoint (`POST /api/v1/auth/otp/resend`)**
+- [x] **T1 — Implement password-reset OTP generation and asynchronous delivery via shared resend endpoint (`POST /api/v1/auth/otp/resend`)**
   - **Size:** S
   - **Depends on:** — (Shared resend endpoint infrastructure already initialized in Feature 1.1)
   - **Layers touched:** Application, Domain, Infrastructure (persistence/events), Presentation
@@ -46,7 +46,7 @@ This implementation plan delivers the complete password modification and credent
 
 #### Checkpoint: Phase 1
 
-- [ ] Active accounts can request and receive 6-digit password reset OTPs via `POST /api/v1/auth/otp/resend`. Token scoping and event publishing verified by unit tests. Build is clean.
+- [x] Active accounts can request and receive 6-digit password reset OTPs via `POST /api/v1/auth/otp/resend`. Token scoping and event publishing verified by unit tests. Build is clean.
 
 ### Phase 2: Core Forgot Password Reset
 
