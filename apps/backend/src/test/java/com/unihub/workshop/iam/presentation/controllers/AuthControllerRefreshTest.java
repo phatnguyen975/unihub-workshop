@@ -8,6 +8,7 @@ import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase.RefreshResult;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
+import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.presentation.dto.RefreshTokenRequest;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
@@ -48,7 +49,8 @@ class AuthControllerRefreshTest {
                         mock(PublicKeyService.class),
                         mock(RegisterUserUseCase.class),
                         mock(ActivateAccountUseCase.class),
-                        mock(ResendOtpUseCase.class)))
+                        mock(ResendOtpUseCase.class),
+                        mock(ResetPasswordUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }

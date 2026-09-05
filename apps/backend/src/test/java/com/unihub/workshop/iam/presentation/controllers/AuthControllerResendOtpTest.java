@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
+import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
@@ -37,7 +38,8 @@ class AuthControllerResendOtpTest {
                 mock(PublicKeyService.class),
                 mock(RegisterUserUseCase.class),
                 mock(ActivateAccountUseCase.class),
-                resendOtpUseCase);
+                resendOtpUseCase,
+                mock(ResetPasswordUseCase.class));
 
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())

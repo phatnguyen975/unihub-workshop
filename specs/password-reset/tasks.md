@@ -50,7 +50,7 @@ This implementation plan delivers the complete password modification and credent
 
 ### Phase 2: Core Forgot Password Reset
 
-- [ ] **T2 — Implement atomic single-step forgot password reset with OTP verification, credential update, and global session revocation (`POST /api/v1/auth/password/reset`)**
+- [x] **T2 — Implement atomic single-step forgot password reset with OTP verification, credential update, and global session revocation (`POST /api/v1/auth/password/reset`)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure (persistence/security), Presentation
@@ -78,7 +78,7 @@ This implementation plan delivers the complete password modification and credent
 
 #### Checkpoint: Phase 2
 
-- [ ] End-to-end forgot password reset capability verified: OTP request -> atomic reset -> session invalidation. Unit tests pass 100%.
+- [x] End-to-end forgot password reset capability verified: OTP request -> atomic reset -> session invalidation. Unit tests pass 100%.
 
 ### Phase 3: First-Login Temporary Password Exchange
 

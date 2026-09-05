@@ -81,4 +81,24 @@ public record User(
                 createdBy,
                 updatedBy);
     }
+
+    public User updatePassword(String newPasswordHash) {
+        return new User(
+                id,
+                organizationId,
+                role,
+                email,
+                phoneNumber,
+                newPasswordHash,
+                fullName,
+                avatarUrl,
+                isActive,
+                false,
+                lastLoginAt,
+                studentRecordId,
+                createdAt,
+                Instant.now(),
+                createdBy,
+                updatedBy);
+    }
 }

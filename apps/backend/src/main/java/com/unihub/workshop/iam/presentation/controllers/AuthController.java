@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
+import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginResponse;
@@ -16,6 +17,7 @@ import com.unihub.workshop.iam.presentation.dto.RefreshTokenResponse;
 import com.unihub.workshop.iam.presentation.dto.RegisterRequest;
 import com.unihub.workshop.iam.presentation.dto.RegisterResponse;
 import com.unihub.workshop.iam.presentation.dto.ResendOtpRequest;
+import com.unihub.workshop.iam.presentation.dto.ResetPasswordRequest;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,6 +49,7 @@ public class AuthController {
     private final RegisterUserUseCase registerUserUseCase;
     private final ActivateAccountUseCase activateAccountUseCase;
     private final ResendOtpUseCase resendOtpUseCase;
+    private final ResetPasswordUseCase resetPasswordUseCase;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -66,6 +69,12 @@ public class AuthController {
     public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
         resendOtpUseCase.resendOtp(request.email());
         return ApiResponse.success(null, "A verification code has been sent to your email.");
+    }
+
+    @PostMapping("/password/reset")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        resetPasswordUseCase.resetPassword(request.email(), request.otp(), request.newPassword());
+        return ApiResponse.success(null, "Password reset successfully. Please sign in with your new password.");
     }
 
     @PostMapping("/login")
