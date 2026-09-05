@@ -61,8 +61,8 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
     - `POST /api/v1/auth/register` with valid payload and active student directory match → `201 Created`, returns `data.userId`, user has `role=STUDENT`, `is_active=false`, `is_temporary_password=false`, `password_hash` encoded with Argon2, `student_record_id` and `organization_id` set from directory, `user_verification_tokens` record created with `token_type='ACTIVATION_OTP'`, `used_at=NULL`, and `expires_at=now() + TTL`, `event_publication` record created for `OtpRequestedEvent`. _(FR-01, FR-02, FR-03, FR-04, FR-05, FR-09, FR-10; SPEC Scenario 1)_
     - `POST /api/v1/auth/register` with valid payload and no student directory match (or directory status `INACTIVE`) → `201 Created`, `student_record_id=NULL`, `organization_id=NULL`. _(FR-03; SPEC Scenario 2)_
     - `POST /api/v1/auth/register` with duplicate email → `409 Conflict` (`urn:unihub:error:conflict`). _(FR-06; SPEC Scenario 3)_
-    - `POST /api/v1/auth/register` with weak password (missing digit, uppercase, lowercase, or special char) → `422 Unprocessable Entity` (`urn:unihub:error:validation`). _(FR-08; SPEC Scenario 4)_
-    - `POST /api/v1/auth/register` with malformed email or missing fields → `422 Unprocessable Entity` (`urn:unihub:error:validation`). _(FR-07)_
+    - `POST /api/v1/auth/register` with weak password (missing digit, uppercase, lowercase, or special char) → `422 Unprocessable Content` (`urn:unihub:error:validation`). _(FR-08; SPEC Scenario 4)_
+    - `POST /api/v1/auth/register` with malformed email or missing fields → `422 Unprocessable Content` (`urn:unihub:error:validation`). _(FR-07)_
     - `POST /api/v1/auth/register` with invalid JSON body → `400 Bad Request`. _(FR-10)_
 
 #### Checkpoint: Phase 1
@@ -89,12 +89,12 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
     - `iam/presentation/controllers/AuthControllerActivateTest.java`
   - **Acceptance Criteria:**
     - `POST /api/v1/auth/activate` with valid OTP for inactive account → `200 OK` (`success: true`, message: `"Account activated successfully. You may now log in."`), `users.is_active = true`, token's `used_at = now()`. _(FR-11; SPEC Scenario 5)_
-    - `POST /api/v1/auth/activate` with expired OTP (`expires_at < now()`) → `422 Unprocessable Entity` (`urn:unihub:error:otp-invalid`, uniform message `"Invalid or expired activation code."`). _(FR-12; SPEC Scenario 6)_
-    - `POST /api/v1/auth/activate` with already-consumed OTP (`used_at IS NOT NULL`) → `422 Unprocessable Entity` (uniform message). _(FR-12; SPEC Scenario 6)_
-    - `POST /api/v1/auth/activate` with incorrect OTP value → `422 Unprocessable Entity` (uniform message). _(FR-12; SPEC Scenario 6)_
-    - `POST /api/v1/auth/activate` for non-existent user email → `422 Unprocessable Entity` (uniform message, anti-enumeration). _(FR-12)_
+    - `POST /api/v1/auth/activate` with expired OTP (`expires_at < now()`) → `422 Unprocessable Content` (`urn:unihub:error:validation`, uniform message `"Invalid or expired activation code."`, with `validationErrors`). _(FR-12; SPEC Scenario 6)_
+    - `POST /api/v1/auth/activate` with already-consumed OTP (`used_at IS NOT NULL`) → `422 Unprocessable Content` (uniform message, with `validationErrors`). _(FR-12; SPEC Scenario 6)_
+    - `POST /api/v1/auth/activate` with incorrect OTP value → `422 Unprocessable Content` (uniform message, with `validationErrors`). _(FR-12; SPEC Scenario 6)_
+    - `POST /api/v1/auth/activate` for non-existent user email → `422 Unprocessable Content` (uniform message, anti-enumeration, with `validationErrors`). _(FR-12)_
     - `POST /api/v1/auth/activate` for already active account (`is_active = true`) → `409 Conflict` (`urn:unihub:error:conflict`, `"Account is already active."`). _(FR-13; SPEC Scenario 7)_
-    - `POST /api/v1/auth/activate` with malformed OTP (not 6 digits) → `422 Unprocessable Entity` (`urn:unihub:error:validation`). _(FR-14)_
+    - `POST /api/v1/auth/activate` with malformed OTP (not 6 digits) → `422 Unprocessable Content` (`urn:unihub:error:validation`, with `validationErrors`). _(FR-14)_
 
 #### Checkpoint: Phase 2
 
@@ -121,7 +121,7 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
     - `POST /api/v1/auth/otp/resend` for inactive account (`is_active = false`) → `200 OK` (`"A verification code has been sent to your email."`), prior `ACTIVATION_OTP` tokens marked `used_at = now()`, new `ACTIVATION_OTP` token created with `used_at = NULL` and fresh `expires_at`, new `OtpRequestedEvent` (purpose: `ACTIVATION`) published. _(FR-15, FR-16; SPEC Scenario 8)_
     - `POST /api/v1/auth/otp/resend` for active account (`is_active = true`) → Flow left blank with comment for Feature 1.4. _(FR-15, FR-17; SPEC Scenario 9)_
     - `POST /api/v1/auth/otp/resend` for non-existent email → `404 Not Found` (`urn:unihub:error:not-found`, detail: `"No account found for this email."`). _(FR-18; SPEC Scenario 10)_
-    - `POST /api/v1/auth/otp/resend` with invalid email format → `422 Unprocessable Entity` (`urn:unihub:error:validation`). _(FR-19)_
+    - `POST /api/v1/auth/otp/resend` with invalid email format → `422 Unprocessable Content` (`urn:unihub:error:validation`). _(FR-19)_
 
 #### Checkpoint: Feature Complete
 

@@ -1,6 +1,5 @@
 package com.unihub.workshop.iam.application.usecases;
 
-import com.unihub.workshop.iam.application.ports.in.LoginUseCase.LoginResult;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
@@ -42,38 +41,38 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
     @Override
     @Transactional
-    public LoginResult refresh(String refreshTokenString, String userAgent, String ipAddress) {
+    public RefreshResult refresh(String refreshTokenString, String userAgent, String ipAddress) {
         String tokenHash = TokenUtils.hash(refreshTokenString);
 
         RefreshToken oldToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> {
                     meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "not_found")
                             .increment();
-                    return new UnauthorizedException("urn:unihub:error:authentication", "Invalid refresh token");
+                    return new UnauthorizedException("Invalid refresh token");
                 });
 
         Instant now = Instant.now();
 
         if (oldToken.revokedAt() != null) {
             meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "revoked").increment();
-            throw new UnauthorizedException("urn:unihub:error:authentication", "Invalid refresh token");
+            throw new UnauthorizedException("Invalid refresh token");
         }
 
         if (oldToken.expiresAt().isBefore(now)) {
             meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "expired").increment();
-            throw new UnauthorizedException("urn:unihub:error:authentication", "Invalid refresh token");
+            throw new UnauthorizedException("Invalid refresh token");
         }
 
         User user = userRepository.findById(oldToken.userId())
                 .orElseThrow(() -> {
                     meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "user_not_found")
                             .increment();
-                    return new UnauthorizedException("urn:unihub:error:authentication", "Invalid refresh token");
+                    return new UnauthorizedException("Invalid refresh token");
                 });
 
         if (!user.isActive()) {
             meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "account_disabled").increment();
-            throw new UnauthorizedException("urn:unihub:error:authentication", "Invalid refresh token");
+            throw new UnauthorizedException("Invalid refresh token");
         }
 
         RefreshToken revokedToken = new RefreshToken(
@@ -86,10 +85,11 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
                 now);
         refreshTokenRepository.save(revokedToken);
 
+        String orgId = user.organizationId() != null ? user.organizationId().toString() : null;
         String accessToken = jwtTokenIssuer.issueAccessToken(
                 user.id().toString(),
                 user.role().name(),
-                user.organizationId().toString());
+                orgId);
 
         String rawNewRefreshToken = TokenUtils.generateSecureToken();
         String newTokenHash = TokenUtils.hash(rawNewRefreshToken);
@@ -107,7 +107,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
         meterRegistry.counter("auth.token.refresh", "outcome", "success").increment();
 
-        return new LoginResult(
+        return new RefreshResult(
                 accessToken,
                 rawNewRefreshToken,
                 "Bearer",

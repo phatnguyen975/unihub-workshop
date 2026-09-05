@@ -77,20 +77,20 @@ This contract defines the three REST endpoints introduced by Feature 1.1 (`user-
 
 | Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                  |
 | :----: | :------------------------------ | :-------------------- | :--------------------------------------------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:validation`   | Bad Request           | Malformed JSON syntax or unparseable HTTP payload.                                                         |
+| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON syntax or unparseable HTTP payload.                                                         |
 | `409`  | `urn:unihub:error:conflict`     | Conflict              | A user account with the submitted email already exists (active or inactive).                               |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Entity  | Payload fails `@Valid` constraints (missing fields, invalid email format, weak password, length exceeded). |
+| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Payload fails `@Valid` constraints (missing fields, invalid email format, weak password, length exceeded). |
 | `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Bucket4j Token Bucket rate limit exceeded for client IP.                                                   |
 | `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error (e.g. database unreachable, outbox event persistence failure).                     |
 
-**Error Response Example (422 Unprocessable Entity):**
+**Error Response Example (422 Unprocessable Content):**
 
 ```json
 {
   "success": false,
   "error": {
     "type": "urn:unihub:error:validation",
-    "title": "Unprocessable Entity",
+    "title": "Unprocessable Content",
     "status": 422,
     "detail": "Validation failed for 'registerRequest'. 1 error(s) found.",
     "instance": "/api/v1/auth/register",
@@ -180,14 +180,13 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                      |
-| :----: | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:validation`   | Bad Request           | Malformed JSON syntax or unparseable HTTP payload.                                                             |
-| `409`  | `urn:unihub:error:conflict`     | Conflict              | The account for the submitted email is already active (`is_active = true`).                                    |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Entity  | Payload fails `@Valid` constraints (e.g. invalid email format or OTP not 6 digits).                            |
-| `422`  | `urn:unihub:error:otp-invalid`  | Unprocessable Entity  | **Uniform error:** The OTP is incorrect, expired, already consumed, or no user exists for the submitted email. |
-| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (protects against brute-forcing OTPs).                                                     |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server failure.                                                                                     |
+| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                 |
+| :----: | :------------------------------ | :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON syntax or unparseable HTTP payload.                                                                                                        |
+| `409`  | `urn:unihub:error:conflict`     | Conflict              | The account for the submitted email is already active (`is_active = true`).                                                                               |
+| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Payload fails `@Valid` constraints, OR **uniform error** when the OTP is incorrect, expired, already consumed, or no user exists for the submitted email. |
+| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (protects against brute-forcing OTPs).                                                                                                |
+| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server failure.                                                                                                                                |
 
 **Error Response Example (422 Invalid OTP — Uniform Response):**
 
@@ -195,11 +194,12 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 {
   "success": false,
   "error": {
-    "type": "urn:unihub:error:otp-invalid",
-    "title": "Unprocessable Entity",
+    "type": "urn:unihub:error:validation",
+    "title": "Unprocessable Content",
     "status": 422,
     "detail": "Invalid or expired activation code.",
-    "instance": "/api/v1/auth/activate"
+    "instance": "/api/v1/auth/activate",
+    "validationErrors": ["otp: Invalid or expired activation code."]
   },
   "metadata": {
     "processedBy": "unihub-app-1",
@@ -285,9 +285,9 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 
 | Status | Error Type (`error.type`)       | Title                 | Condition                                          |
 | :----: | :------------------------------ | :-------------------- | :------------------------------------------------- |
-| `400`  | `urn:unihub:error:validation`   | Bad Request           | Malformed JSON syntax or unparseable HTTP payload. |
+| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON syntax or unparseable HTTP payload. |
 | `404`  | `urn:unihub:error:not-found`    | Not Found             | No user account exists for the submitted email.    |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Entity  | Missing or malformed email address.                |
+| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Missing or malformed email address.                |
 | `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (preventing email spam/abuse). |
 | `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                           |
 

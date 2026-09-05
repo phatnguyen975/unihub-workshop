@@ -1,5 +1,6 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.security.RedisJtiValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -95,7 +97,8 @@ class AuthControllerPublicKeyTest {
         mockMvc.perform(get("/api/v1/auth/public-key")
                 .header("Authorization", "Bearer token"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false));
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:forbidden"));
     }
 
     @Test
@@ -105,14 +108,16 @@ class AuthControllerPublicKeyTest {
         mockMvc.perform(get("/api/v1/auth/public-key")
                 .header("Authorization", "Bearer token"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false));
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:forbidden"));
     }
 
     @Test
     void getPublicKey_withoutAuth_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/auth/public-key"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false));
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:unauthorized"));
     }
 
     @Test
@@ -121,6 +126,22 @@ class AuthControllerPublicKeyTest {
 
         mockMvc.perform(get("/api/v1/auth/public-key")
                 .header("Authorization", "Bearer token"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:unauthorized"));
+    }
+
+    @Test
+    void getPublicKey_whenRedisIsDown_returns503WithRetryAfter() throws Exception {
+        when(jwtDecoder.decode(anyString())).thenReturn(createMockJwt("STAFF"));
+        when(redisJtiValidator.isTokenValid(anyString()))
+                .thenThrow(new ServiceUnavailableException("Failed to check token revocation status. Failing closed."));
+
+        mockMvc.perform(get("/api/v1/auth/public-key")
+                .header("Authorization", "Bearer token"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("Retry-After", "30"))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:service-unavailable"));
     }
 }

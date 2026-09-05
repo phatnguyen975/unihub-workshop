@@ -1,40 +1,39 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
+import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
+import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
+import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginResponse;
 import com.unihub.workshop.iam.presentation.dto.LogoutRequest;
-import com.unihub.workshop.iam.presentation.dto.RefreshTokenRequest;
-import com.unihub.workshop.shared.web.ApiResponse;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.presentation.dto.PublicKeyResponse;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-
+import com.unihub.workshop.iam.presentation.dto.RefreshTokenRequest;
+import com.unihub.workshop.iam.presentation.dto.RefreshTokenResponse;
+import com.unihub.workshop.iam.presentation.dto.RegisterRequest;
+import com.unihub.workshop.iam.presentation.dto.RegisterResponse;
+import com.unihub.workshop.iam.presentation.dto.ResendOtpRequest;
+import com.unihub.workshop.shared.security.PublicKeyService;
+import com.unihub.workshop.shared.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-
-import java.util.UUID;
-
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
-import com.unihub.workshop.iam.presentation.dto.RegisterRequest;
-import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
-import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
-import com.unihub.workshop.iam.presentation.dto.RegisterResponse;
-import com.unihub.workshop.iam.presentation.dto.ResendOtpRequest;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -72,53 +71,30 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
-        String userAgent = httpRequest.getHeader("User-Agent");
-        String ipAddress = httpRequest.getRemoteAddr();
-
         LoginUseCase.LoginResult result = loginUseCase.login(
                 request.email(),
                 request.password(),
-                userAgent,
-                ipAddress);
+                httpRequest.getHeader("User-Agent"),
+                httpRequest.getRemoteAddr());
 
-        LoginResponse response = new LoginResponse(
-                result.accessToken(),
-                result.refreshToken(),
-                result.tokenType(),
-                result.expiresIn());
-
-        return ApiResponse.success(response, "Login successful");
+        return ApiResponse.success(LoginResponse.from(result), "Login successful");
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<LoginResponse> refresh(@Valid @RequestBody RefreshTokenRequest request,
+    public ApiResponse<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request,
             HttpServletRequest httpRequest) {
-        String userAgent = httpRequest.getHeader("User-Agent");
-        String ipAddress = httpRequest.getRemoteAddr();
-
-        LoginUseCase.LoginResult result = refreshTokenUseCase.refresh(
+        RefreshTokenUseCase.RefreshResult result = refreshTokenUseCase.refresh(
                 request.refreshToken(),
-                userAgent,
-                ipAddress);
+                httpRequest.getHeader("User-Agent"),
+                httpRequest.getRemoteAddr());
 
-        LoginResponse response = new LoginResponse(
-                result.accessToken(),
-                result.refreshToken(),
-                result.tokenType(),
-                result.expiresIn());
-
-        return ApiResponse.success(response, "Token refreshed");
+        return ApiResponse.success(RefreshTokenResponse.from(result), "Token refreshed");
     }
 
     @GetMapping("/public-key")
     @PreAuthorize("hasRole('STAFF')")
     public ApiResponse<PublicKeyResponse> getPublicKey() {
-        PublicKeyResponse response = new PublicKeyResponse(
-                publicKeyService.getKeyId(),
-                publicKeyService.getPublicKeyPem(),
-                publicKeyService.getIssuedAt());
-
-        return ApiResponse.success(response, "Public key retrieved successfully");
+        return ApiResponse.success(PublicKeyResponse.from(publicKeyService), "Public key retrieved successfully");
     }
 
     @PostMapping("/logout")

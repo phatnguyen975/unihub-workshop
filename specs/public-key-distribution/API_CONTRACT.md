@@ -2,7 +2,7 @@
 
 > **Status:** APPROVED  
 > **Spec:** `specs/public-key-distribution/SPEC.md`  
-> **Last revised:** 2026-09-03
+> **Last revised:** 2026-09-05
 
 ## 1. Overview
 
@@ -76,12 +76,69 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 
 **Error Responses:**
 
-| Status                      | Error `type` (URN)                     | Condition                                                                                                                                                                                                                                                  |
-| :-------------------------- | :------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `401 Unauthorized`          | `urn:unihub:error:authentication`      | `Authorization` header is missing, the token format is invalid (not `Bearer <token>`), the JWT signature verification fails, the JWT is expired (`exp` claim in the past), the JWT is malformed, or the JWT's `jti` is present in the Redis JTI blacklist. |
-| `403 Forbidden`             | `urn:unihub:error:forbidden`           | The authenticated user does not have the `STAFF` role.                                                                                                                                                                                                     |
-| `503 Service Unavailable`   | `urn:unihub:error:service-unavailable` | Redis is unavailable; the JTI blacklist check cannot be performed (fail-closed per ADR-010, BR-04). This is produced by the authentication filter before the endpoint handler is reached.                                                                  |
-| `500 Internal Server Error` | `urn:unihub:error:internal`            | An unexpected server-side error occurs (e.g., PEM serialization fails for an unknown reason). This should not occur in normal operation as key material is validated at startup.                                                                           |
+| Status | Error `type` (URN)                     | Title                 | Condition                                                                                                                                                                                                                                                  |
+| :----- | :------------------------------------- | :-------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`  | `urn:unihub:error:unauthorized`        | Unauthorized          | `Authorization` header is missing, the token format is invalid (not `Bearer <token>`), the JWT signature verification fails, the JWT is expired (`exp` claim in the past), the JWT is malformed, or the JWT's `jti` is present in the Redis JTI blacklist. |
+| `403`  | `urn:unihub:error:forbidden`           | Forbidden             | The authenticated user does not have the `STAFF` role.                                                                                                                                                                                                     |
+| `500`  | `urn:unihub:error:internal`            | Internal Server Error | An unexpected server-side error occurs (e.g., PEM serialization fails for an unknown reason). This should not occur in normal operation as key material is validated at startup.                                                                           |
+| `503`  | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis is unavailable; the JTI blacklist check cannot be performed (fail-closed per ADR-010, BR-04). This is produced by the authentication filter before the endpoint handler is reached. Includes `Retry-After: 30` header.                               |
+
+**RFC 7807 Error body shape (401 Unauthorized):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:unauthorized",
+    "title": "Unauthorized",
+    "status": 401,
+    "detail": "Full authentication is required to access this resource",
+    "instance": "/api/v1/auth/public-key"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**RFC 7807 Error body shape (403 Forbidden):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:forbidden",
+    "title": "Forbidden",
+    "status": 403,
+    "detail": "Access Denied",
+    "instance": "/api/v1/auth/public-key"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**RFC 7807 Error body shape (503 Service Unavailable):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:service-unavailable",
+    "title": "Service Unavailable",
+    "status": 503,
+    "detail": "Redis service is unavailable",
+    "instance": "/api/v1/auth/public-key"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 #### Side Effects
 
@@ -90,7 +147,7 @@ None. This is a read-only endpoint. No database records are created or modified.
 #### Spec Traceability
 
 - **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07, FR-08
-- **Satisfies Scenarios:** Scenario 1, Scenario 2, Scenario 3, Scenario 4, Scenario 5, Scenario 6, Scenario 7, Scenario 8
+- **Satisfies Scenarios:** Scenario 1, Scenario 2, Scenario 3, Scenario 4, Scenario 5, Scenario 6, Scenario 7, Scenario 8, Scenario 9
 
 ## 4. Rate Limiting Behavior
 

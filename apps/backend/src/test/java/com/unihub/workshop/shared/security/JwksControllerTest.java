@@ -1,5 +1,7 @@
 package com.unihub.workshop.shared.security;
 
+import com.unihub.workshop.shared.web.GlobalExceptionHandler;
+import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +41,9 @@ class JwksControllerTest {
         when(rsaKeyProperties.publicKey()).thenReturn(testPublicKey);
 
         JwksController jwksController = new JwksController(rsaKeyProperties);
-        mockMvc = MockMvcBuilders.standaloneSetup(jwksController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(jwksController)
+                .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
+                .build();
     }
 
     @Test
@@ -57,5 +61,17 @@ class JwksControllerTest {
                 .andExpect(jsonPath("$.keys[0].d").doesNotExist())
                 .andExpect(jsonPath("$.keys[0].p").doesNotExist())
                 .andExpect(jsonPath("$.keys[0].q").doesNotExist());
+    }
+
+    @Test
+    void shouldReturn500WhenPublicKeyNotLoaded() throws Exception {
+        when(rsaKeyProperties.publicKey()).thenReturn(null);
+
+        mockMvc.perform(get("/.well-known/jwks.json"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.type").value("urn:unihub:error:internal"))
+                .andExpect(jsonPath("$.title").value("Internal Server Error"))
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.detail").value("RSA public key is not loaded."));
     }
 }

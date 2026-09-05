@@ -828,7 +828,24 @@ External payment gateways are inherently unreliable due to network latency, time
 
 To prevent this, the payment integration uses a **Circuit Breaker** implemented with **Resilience4j**. The breaker continuously tracks failure rate and slow-call rate; when thresholds are exceeded, it opens and blocks further payment calls.
 
-When the circuit is open, the system fails fast instead of hanging. It returns an immediate error or places the registration in a "Payment Pending" state so users can retry later, while free workshop registration and browsing remain fully operational.
+When the circuit is open, the system fails fast instead of hanging. Calls intercepted by Resilience4j throw `CallNotPermittedException`, which `GlobalExceptionHandler` maps to `503 Service Unavailable` (`urn:unihub:error:service-unavailable`) accompanied by a `Retry-After` HTTP header matching the configured open-state wait duration. This prevents thread pool exhaustion and informs clients exactly when downstream recovery attempts will begin.
+
+#### Circuit Breaker Configuration
+
+All Circuit Breaker thresholds and state parameters are configurable via environment variables in `application.yml`:
+
+| Configuration Property                                | Default Value | Purpose                                                                         |
+| :---------------------------------------------------- | :------------ | :------------------------------------------------------------------------------ |
+| `sliding-window-type`                                 | `COUNT_BASED` | Sliding window evaluation type (`COUNT_BASED` or `TIME_BASED`)                  |
+| `sliding-window-size`                                 | `10`          | Number of calls recorded in closed state                                        |
+| `minimum-number-of-calls`                             | `5`           | Minimum calls required before calculating error rates                           |
+| `failure-rate-threshold`                              | `50`          | Percentage of failures to trip breaker to `OPEN` (50%)                          |
+| `slow-call-rate-threshold`                            | `50`          | Percentage of slow calls to trip breaker to `OPEN` (50%)                        |
+| `slow-call-duration-threshold`                        | `2s`          | Latency beyond which a call is marked slow                                      |
+| `wait-duration-in-open-state`                         | `10s`         | Time breaker remains in `OPEN` before entering `HALF_OPEN`                      |
+| `permitted-number-of-calls-in-half-open-state`        | `3`           | Trial calls permitted in `HALF_OPEN` to test recovery                           |
+| `register-health-indicator`                           | `true`        | Exposes breaker health in Spring Boot Actuator                                  |
+| `automatic-transition-from-open-to-half-open-enabled` | `true`        | Automatically transitions from `OPEN` to `HALF_OPEN` when wait duration expires |
 
 ```mermaid
 stateDiagram-v2

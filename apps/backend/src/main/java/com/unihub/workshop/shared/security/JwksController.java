@@ -3,6 +3,7 @@ package com.unihub.workshop.shared.security;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
+import com.unihub.workshop.shared.exception.InternalServerException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,10 @@ public class JwksController {
 
     @GetMapping("/.well-known/jwks.json")
     public JwksResponse getJwks() {
+        if (rsaKeyProperties == null || rsaKeyProperties.publicKey() == null) {
+            throw new InternalServerException("RSA public key is not loaded.");
+        }
+
         RSAKey rsaKey = new RSAKey.Builder(rsaKeyProperties.publicKey())
                 .keyUse(KeyUse.SIGNATURE)
                 .algorithm(JWSAlgorithm.RS256)

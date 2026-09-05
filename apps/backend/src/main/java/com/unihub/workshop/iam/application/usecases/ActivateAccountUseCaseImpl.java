@@ -7,7 +7,7 @@ import com.unihub.workshop.iam.application.utils.OtpService;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ConflictException;
-import com.unihub.workshop.shared.exception.InvalidOtpException;
+import com.unihub.workshop.shared.exception.ValidationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +32,7 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
     public void activate(String email, String otp) {
         String normalizedEmail = email != null ? email.toLowerCase().trim() : "";
         User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(InvalidOtpException::new);
+                .orElseThrow(this::invalidOtp);
 
         if (user.isActive()) {
             throw new ConflictException("Account is already active.");
@@ -40,17 +40,21 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
 
         UserVerificationToken token = userVerificationTokenRepository.findLatestByUserIdAndType(
                 user.id(), UserVerificationToken.TYPE_ACTIVATION_OTP)
-                .orElseThrow(InvalidOtpException::new);
+                .orElseThrow(this::invalidOtp);
 
         if (token.isConsumed() || token.isExpired()) {
-            throw new InvalidOtpException();
+            throw invalidOtp();
         }
 
         if (!otpService.verifyOtp(otp, token.tokenHash())) {
-            throw new InvalidOtpException();
+            throw invalidOtp();
         }
 
         userVerificationTokenRepository.markConsumed(token.id());
         userRepository.activate(user.id());
+    }
+
+    private ValidationException invalidOtp() {
+        return new ValidationException("otp", "Invalid or expired activation code.");
     }
 }

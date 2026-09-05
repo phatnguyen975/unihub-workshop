@@ -1,5 +1,6 @@
 package com.unihub.workshop.shared.security;
 
+import com.unihub.workshop.shared.exception.InternalServerException;
 import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
@@ -16,6 +17,9 @@ public class PublicKeyService {
     private final String keyId;
 
     public PublicKeyService(RsaKeyProperties rsaKeyProperties) {
+        if (rsaKeyProperties == null || rsaKeyProperties.publicKey() == null) {
+            throw new InternalServerException("RSA public key is not loaded.");
+        }
         RSAPublicKey publicKey = rsaKeyProperties.publicKey();
         byte[] encoded = publicKey.getEncoded();
 

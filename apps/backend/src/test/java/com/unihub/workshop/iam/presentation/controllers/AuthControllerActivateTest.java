@@ -7,7 +7,7 @@ import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
 import com.unihub.workshop.shared.exception.ConflictException;
-import com.unihub.workshop.shared.exception.InvalidOtpException;
+import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -38,8 +38,7 @@ class AuthControllerActivateTest {
                 mock(PublicKeyService.class),
                 mock(RegisterUserUseCase.class),
                 activateAccountUseCase,
-                mock(ResendOtpUseCase.class)
-        );
+                mock(ResendOtpUseCase.class));
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
@@ -66,7 +65,7 @@ class AuthControllerActivateTest {
 
     @Test
     void shouldReturn422OnInvalidOtp() throws Exception {
-        doThrow(new InvalidOtpException())
+        doThrow(new ValidationException("otp", "Invalid or expired activation code."))
                 .when(activateAccountUseCase).activate(any(), any());
 
         String requestBody = """
@@ -81,8 +80,9 @@ class AuthControllerActivateTest {
                 .content(requestBody))
                 .andExpect(status().is(422))
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:otp-invalid"))
-                .andExpect(jsonPath("$.error.detail").value("Invalid or expired activation code."));
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"))
+                .andExpect(jsonPath("$.error.detail").value("Invalid or expired activation code."))
+                .andExpect(jsonPath("$.error.validationErrors[0]").value("otp: Invalid or expired activation code."));
     }
 
     @Test

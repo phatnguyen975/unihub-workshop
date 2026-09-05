@@ -9,8 +9,6 @@ public interface UserVerificationTokenRepository {
 
     UserVerificationToken save(UserVerificationToken token);
 
-    Optional<UserVerificationToken> findActiveTokenByUserEmailAndType(String email, String tokenType);
-
     Optional<UserVerificationToken> findLatestByUserIdAndType(UUID userId, String tokenType);
 
     void markConsumed(UUID tokenId);

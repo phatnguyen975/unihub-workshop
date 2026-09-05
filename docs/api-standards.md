@@ -157,14 +157,34 @@ The JSON envelope is used only for successful `2xx` responses. The backend must 
 
 Error responses are wrapped in the standard envelope. The `success` flag is set to `false`, the `data` field is absent, and the `error` field contains the RFC 7807 Problem Details. The `traceId` is present in `metadata`.
 
-**Error Response (422 Unprocessable Entity)**
+**Standard Error Types (`urn:unihub:error:*`):**
+
+All RFC 7807 error responses use a unified URI identifier in the `error.type` field. Standard common error types are defined as follows:
+
+| HTTP Status                 | Standard `type`                        | Default Title         | Description                                                                                                       | RFC 7807 Payload Details                        |
+| :-------------------------- | :------------------------------------- | :-------------------- | :---------------------------------------------------------------------------------------------------------------- | :---------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`         | Bad Request           | Malformed JSON syntax, unparseable request body, or invalid raw query/path parameter formats.                     | Standard ProblemDetail                          |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing Bearer token, invalid signature, expired token, revoked token (JTI blacklist), or invalid credentials.    | Standard ProblemDetail                          |
+| `403 Forbidden`             | `urn:unihub:error:forbidden`           | Forbidden             | Insufficient permissions (RBAC) or organization boundary violation (`organization_id`).                           | Standard ProblemDetail                          |
+| `404 Not Found`             | `urn:unihub:error:not-found`           | Not Found             | Target resource or endpoint does not exist.                                                                       | Standard ProblemDetail                          |
+| `405 Method Not Allowed`    | `urn:unihub:error:method-not-allowed`  | Method Not Allowed    | HTTP method not supported for the requested resource.                                                             | Standard ProblemDetail                          |
+| `409 Conflict`              | `urn:unihub:error:conflict`            | Conflict              | Resource conflict (unique constraint violation, already active account, assignment overlap, capacity exhaustion). | Standard ProblemDetail                          |
+| `422 Unprocessable Content` | `urn:unihub:error:validation`          | Unprocessable Content | Business logic / input validation failure (`@Valid`, business rules).                                             | Includes `validationErrors: ["field: message"]` |
+| `429 Too Many Requests`     | `urn:unihub:error:rate-limited`        | Too Many Requests     | Token bucket rate limit exceeded.                                                                                 | Includes `Retry-After` header                   |
+| `500 Internal Server Error` | `urn:unihub:error:internal`            | Internal Server Error | Unexpected server error.                                                                                          | Technical stack trace suppressed                |
+| `503 Service Unavailable`   | `urn:unihub:error:service-unavailable` | Service Unavailable   | Downstream or mandatory infrastructure (Redis, RabbitMQ, Gateway) unavailable, or Circuit Breaker is OPEN.        | Includes `Retry-After` header                   |
+
+> [!NOTE]
+> Domain-specific business exceptions (e.g. `urn:unihub:error:temporary-password`, `urn:unihub:error:account-disabled`) inherit this identical envelope structure and RFC 7807 schema, allowing client applications to branch UI logic predictably based on `error.type`.
+
+**Error Response (422 Unprocessable Content)**
 
 ```json
 {
   "success": false,
   "error": {
-    "type": "urn:unihub:error:state",
-    "title": "Unprocessable Entity",
+    "type": "urn:unihub:error:validation",
+    "title": "Unprocessable Content",
     "status": 422,
     "detail": "Workshop cannot be published from DRAFT when required fields are missing.",
     "instance": "/api/v1/workshops/8e4b9b3b-9c1a-4a8d-9f6b-3c8b7f9f2c10/publish",

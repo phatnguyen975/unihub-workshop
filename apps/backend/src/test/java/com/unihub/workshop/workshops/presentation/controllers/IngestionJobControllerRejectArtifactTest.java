@@ -91,7 +91,7 @@ class IngestionJobControllerRejectArtifactTest {
                 .with(authentication(auth))
                 .with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"));
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:bad-request"));
     }
 
     @Test

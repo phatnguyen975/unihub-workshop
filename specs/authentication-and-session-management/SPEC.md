@@ -3,7 +3,7 @@
 > **Status:** APPROVED  
 > **Domain:** 1 — Identity & Access Management  
 > **Owner/area:** `docs/feature-catalog.md §1.2`  
-> **Last revised:** 2026-09-02 — first version
+> **Last revised:** 2026-09-05 — first version
 
 ## 1. Overview
 
@@ -20,7 +20,7 @@ This feature lives in the `iam` module of the Core Backend, with the JWT filter 
 | :----------------- | :-------------------------------------------------------------------------------------------- |
 | STUDENT            | Self-registered user performing login, refresh, and logout.                                   |
 | ORGANIZER          | Platform-provisioned or seeded user performing login (may be forced to reset password first). |
-| STAFF              | Platform-provisioned user performing login; receives RSA public key in response.              |
+| STAFF              | Platform-provisioned user performing login, refresh, and logout.                              |
 | Anonymous / Public | Calls the JWKS endpoint (`/.well-known/jwks.json`) without authentication.                    |
 | System / Sweeper   | The TTL cleanup scheduler that purges expired `refresh_tokens` rows (already spec'd in 10.4). |
 
@@ -61,7 +61,7 @@ The system **SHALL** issue a short-lived RS256-signed JWT access token upon succ
 | :----- | :------------------------------------------------------------ |
 | `sub`  | The user's `UUID` (`users.id`)                                |
 | `role` | The user's `role` string (`STUDENT`, `ORGANIZER`, or `STAFF`) |
-| `org`  | The user's `organization_id` UUID                             |
+| `org`  | The user's `organization_id` UUID (nullable, omitted if null) |
 | `jti`  | A freshly generated UUIDv4 unique to this token               |
 | `iat`  | Current UTC timestamp (Unix epoch seconds)                    |
 | `exp`  | `iat` + configured access token TTL (e.g., 1 hour)            |
@@ -88,6 +88,24 @@ The refresh token TTL **SHALL** be configurable via `application.yml` (e.g., `ap
 ### FR-06 — Login: update `last_login_at`
 
 The system **SHALL** update `users.last_login_at` to the current UTC timestamp on every successful login (after tokens are generated).
+
+### FR-07 — Login: user profile response
+
+The system **SHALL** return the authenticated user's profile in the `user` field of the login response body (`POST /api/v1/auth/login`). This enables the client (Web/Mobile) to immediately populate application state and render identity-dependent UI (e.g. Navbar, role-based navigation) without making an additional round-trip request to `/users/me`.
+
+The user profile object **SHALL** include:
+
+- `id`: the user's UUID
+- `email`: user's email address
+- `fullName`: user's full name
+- `role`: user's role (`STUDENT`, `ORGANIZER`, `STAFF`)
+- `phoneNumber`: user's phone number (nullable, omitted if null)
+- `avatarUrl`: URL of user's avatar image (nullable, omitted if null)
+- `lastLoginAt`: previous login UTC timestamp (nullable, omitted if null)
+- `organizationId`: user's associated organization UUID (nullable, omitted if null)
+- `studentRecordId`: associated student directory record UUID (nullable, omitted if null)
+
+All nullable fields **SHALL** be omitted when null, conforming to `@JsonInclude(NON_NULL)`.
 
 ### FR-08 — Token refresh: locate and validate
 
@@ -227,11 +245,23 @@ When the user submits a POST /api/v1/auth/login with correct email and password
 Then the response is 200 OK
 And the response body contains a non-empty accessToken (JWT)
 And the response body contains a non-empty refreshToken (opaque string)
+And the response body contains a "user" object with id, email, fullName, role, and organizationId
 And a new refresh_tokens row is created in the database with revoked_at = NULL
 And users.last_login_at is updated to approximately NOW()
 ```
 
-_(Traces to: FR-01, FR-04, FR-05, FR-06)_
+_(Traces to: FR-01, FR-04, FR-05, FR-06, FR-07)_
+
+### Scenario 2: Login validation failure
+
+```gherkin
+Given a caller submits POST /api/v1/auth/login with an invalid email format or empty password
+Then the response is 422 Unprocessable Content
+And the error type is "urn:unihub:error:validation"
+And the response contains a "validationErrors" list
+```
+
+_(Traces to: `API_CONTRACT` validation)_
 
 ### Scenario 3: Login with wrong password
 
@@ -239,7 +269,7 @@ _(Traces to: FR-01, FR-04, FR-05, FR-06)_
 Given a STUDENT account with email "student@student.hcmus.edu.vn"
 When the student submits POST /api/v1/auth/login with an incorrect password
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no refresh_tokens row is created
 And no accessToken is returned
 ```
@@ -252,7 +282,7 @@ _(Traces to: FR-01)_
 Given no user with email "unknown@example.com" exists in the system
 When a caller submits POST /api/v1/auth/login with email "unknown@example.com"
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no refresh_tokens row is created
 ```
 
@@ -304,7 +334,7 @@ _(Traces to: FR-08, FR-09)_
 Given a refresh token that was previously consumed (revoked_at IS NOT NULL)
 When the user submits POST /api/v1/auth/refresh with that token
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no new tokens are issued
 ```
 
@@ -316,7 +346,7 @@ _(Traces to: FR-08, BR-05)_
 Given a refresh token whose refresh_tokens row has expires_at < NOW() and revoked_at IS NULL
 When the user submits POST /api/v1/auth/refresh with that token
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no new tokens are issued
 ```
 
@@ -342,7 +372,7 @@ _(Traces to: FR-10, BR-07)_
 Given a user has logged out and their jti is in the Redis blacklist
 When the user attempts a GET request to a protected endpoint with the old Bearer token
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 ```
 
 _(Traces to: FR-13)_
@@ -400,7 +430,7 @@ _(Traces to: FR-09, NFR-06)_
 | User self-registration                                 | Handled by `user-registration-and-identity-verification` (1.1).                                                   |
 | Password reset flow                                    | Handled by `password-reset` (1.4). This feature's FR-03 only _gates_ the login response; reset logic is separate. |
 | ORGANIZER/STAFF account creation                       | Handled by `staff-and-organizer-provisioning` (1.5).                                                              |
-| `GET /api/v1/auth/public-key` endpoint (PEM on demand) | Handled by `public-key-distribution` (1.3). This feature only provides PEM in the login response for STAFF.       |
+| `GET /api/v1/auth/public-key` endpoint (PEM on demand) | Handled by `public-key-distribution` (1.3). Key retrieval is decoupled to the dedicated endpoint.                 |
 | Active session listing and multi-session revocation    | Handled by `active-session-management` (1.7). This feature only handles logout for the caller's current session.  |
 | OAuth2 / SSO / federated identity providers            | Not in scope per `docs/overview.md`.                                                                              |
 | MFA / two-factor authentication                        | Not in scope for this version.                                                                                    |

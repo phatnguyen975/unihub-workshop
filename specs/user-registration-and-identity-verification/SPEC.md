@@ -38,21 +38,21 @@ This is the **only** self-service account-creation path; all other account types
 - **FR-04:** The system SHALL generate a cryptographically secure 6-digit numeric OTP (`[0-9]{6}`), hash it using HMAC-SHA256 with a server-side secret key, and persist the hash in `user_verification_tokens` with `token_type = 'ACTIVATION_OTP'`, a configurable TTL (default: 15 minutes), and a foreign key reference to the new user.
 - **FR-05:** The system SHALL publish an `OtpRequestedEvent` (carrying `userId`, `email`, plain-text `otp`, and `purpose = 'ACTIVATION'`) to Spring Modulith's transactional outbox table (`event_publication`) externalized to RabbitMQ exchange `unihub.events::notifications`.
 - **FR-06:** The system SHALL reject registration with a `409 Conflict` error when the submitted email already exists in the `users` table, regardless of the existing account's `is_active` status.
-- **FR-07:** The system SHALL reject registration with a `422 Unprocessable Entity` validation error when the submitted payload fails field constraints (e.g. missing fields, blank name, invalid email format per RFC 5321, or email length > 254 chars).
-- **FR-08:** The system SHALL reject registration with a `422 Unprocessable Entity` validation error when the password does not satisfy complexity requirements (min 8 chars, max 255 chars, at least one uppercase letter, one lowercase letter, one digit, and one special character).
+- **FR-07:** The system SHALL reject registration with a `422 Unprocessable Content` validation error when the submitted payload fails field constraints (e.g. missing fields, blank name, invalid email format per RFC 5321, or email length > 254 chars).
+- **FR-08:** The system SHALL reject registration with a `422 Unprocessable Content` validation error when the password does not satisfy complexity requirements (min 8 chars, max 255 chars, at least one uppercase letter, one lowercase letter, one digit, and one special character).
 - **FR-09:** The system SHALL hash user passwords using **Argon2** (`Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()`). Plain-text passwords must never be logged, persisted, or leaked.
 - **FR-10:** Registration requests with malformed JSON syntax or unreadable body SHALL be rejected with `400 Bad Request`.
 
 ### 3.2 Account Activation via OTP
 
 - **FR-11:** The system SHALL set `is_active = true` and mark the OTP token consumed (`used_at = now()`, `updated_at = now()`) in `user_verification_tokens` when a valid, unexpired, unconsumed OTP of `token_type = 'ACTIVATION_OTP'` is submitted for an inactive account.
-- **FR-12:** The system SHALL reject OTP verification with a `422 Unprocessable Entity` error (`urn:unihub:error:otp-invalid`) using a **uniform error detail message** (`"Invalid or expired activation code."`) whenever:
+- **FR-12:** The system SHALL reject OTP verification with a `422 Unprocessable Content` error (`urn:unihub:error:validation`, including `validationErrors: ["otp: Invalid or expired activation code."]`) using a **uniform error detail message** (`"Invalid or expired activation code."`) whenever:
   - The submitted OTP does not match the stored HMAC-SHA256 hash.
   - The active OTP has expired (`expires_at < now()`).
   - The OTP has already been consumed (`used_at IS NOT NULL`).
   - No user record exists for the submitted email.
 - **FR-13:** The system SHALL reject OTP verification with `409 Conflict` (`urn:unihub:error:conflict`) when the user account is already active (`is_active = true`).
-- **FR-14:** The system SHALL reject OTP verification with `422 Unprocessable Entity` (`urn:unihub:error:validation`) when the request payload fails validation (e.g. invalid email format or OTP string not conforming to `^[0-9]{6}$`).
+- **FR-14:** The system SHALL reject OTP verification with `422 Unprocessable Content` (`urn:unihub:error:validation`, with `validationErrors`) when the request payload fails validation (e.g. invalid email format or OTP string not conforming to `^[0-9]{6}$`).
 
 ### 3.3 Shared OTP Resend
 
@@ -66,7 +66,7 @@ This is the **only** self-service account-creation path; all other account types
   - The system SHALL generate a fresh 6-digit numeric OTP, persist its HMAC-SHA256 hash in `user_verification_tokens` with `token_type = 'PASSWORD_RESET_OTP'` and the configured TTL.
   - The system SHALL publish an `OtpRequestedEvent` with `purpose = 'PASSWORD_RESET'` to the transactional outbox.
 - **FR-18:** The system SHALL reject the resend request with `404 Not Found` (`urn:unihub:error:not-found`) when no user account exists with the submitted email.
-- **FR-19:** The system SHALL reject the resend request with `422 Unprocessable Entity` (`urn:unihub:error:validation`) when the email is missing or malformed.
+- **FR-19:** The system SHALL reject the resend request with `422 Unprocessable Content` (`urn:unihub:error:validation`) when the email is missing or malformed.
 
 ## 4. Business Rules
 
@@ -91,7 +91,7 @@ This is the **only** self-service account-creation path; all other account types
 | _(None)_            | Valid registration submitted         | `is_active = false` |   ✅   | `201 Created`                                               |
 | _(None)_            | Registration with duplicate email    | _(Unchanged)_       |   ❌   | `409 Conflict` (`urn:unihub:error:conflict`)                |
 | `is_active = false` | Valid `ACTIVATION_OTP` submitted     | `is_active = true`  |   ✅   | `200 OK`                                                    |
-| `is_active = false` | Invalid / expired / consumed OTP     | `is_active = false` |   ❌   | `422 Unprocessable Entity` (`urn:unihub:error:otp-invalid`) |
+| `is_active = false` | Invalid / expired / consumed OTP     | `is_active = false` |   ❌   | `422 Unprocessable Content` (`urn:unihub:error:validation`) |
 | `is_active = false` | Resend OTP request                   | `is_active = false` |   ✅   | `200 OK` (New `ACTIVATION_OTP` issued)                      |
 | `is_active = true`  | Activation attempt on active account | `is_active = true`  |   ❌   | `409 Conflict` (`urn:unihub:error:conflict`)                |
 | `is_active = true`  | Resend OTP request                   | `is_active = true`  |   ✅   | `200 OK` (New `PASSWORD_RESET_OTP` issued)                  |
@@ -102,8 +102,8 @@ This is the **only** self-service account-creation path; all other account types
 | :-------------------- | :------------------------------- | :------------------------------ | :----: | :---------------------------------------------------------- |
 | _(None)_              | Registration / Resend request    | `used_at = NULL` (ACTIVE)       |   ✅   | —                                                           |
 | `used_at = NULL`      | Valid OTP submission             | `used_at = now()` (CONSUMED)    |   ✅   | —                                                           |
-| `used_at IS NOT NULL` | Any OTP verification attempt     | _(Unchanged)_                   |   ❌   | `422 Unprocessable Entity` (`urn:unihub:error:otp-invalid`) |
-| `expires_at < now()`  | Expired OTP verification attempt | _(Unchanged)_                   |   ❌   | `422 Unprocessable Entity` (`urn:unihub:error:otp-invalid`) |
+| `used_at IS NOT NULL` | Any OTP verification attempt     | _(Unchanged)_                   |   ❌   | `422 Unprocessable Content` (`urn:unihub:error:validation`) |
+| `expires_at < now()`  | Expired OTP verification attempt | _(Unchanged)_                   |   ❌   | `422 Unprocessable Content` (`urn:unihub:error:validation`) |
 | `used_at = NULL`      | OTP resend for same `token_type` | `used_at = now()` (INVALIDATED) |   ✅   | —                                                           |
 
 ## 6. Non-Functional Requirements
@@ -161,7 +161,7 @@ And the HTTP response is 409 Conflict with error.type = "urn:unihub:error:confli
 ```gherkin
 Given no user account exists for "student.carol@student.hcmus.edu.vn"
 When an unauthenticated client submits registration with password "weakpass"
-Then the HTTP response is 422 Unprocessable Entity with error.type = "urn:unihub:error:validation" and validationErrors mentioning password
+Then the HTTP response is 422 Unprocessable Content with error.type = "urn:unihub:error:validation" and validationErrors mentioning password
 ```
 
 ### Scenario 5: Successful account activation via OTP
@@ -181,7 +181,7 @@ And the HTTP response is 200 OK with message "Account activated successfully. Yo
 Given a user "student.alice@student.hcmus.edu.vn" exists with is_active = false
 When the user submits an incorrect, expired, or previously consumed OTP to /api/v1/auth/activate
 Then is_active remains false
-And the HTTP response is 422 Unprocessable Entity with error.type = "urn:unihub:error:otp-invalid" and uniform detail "Invalid or expired activation code."
+And the HTTP response is 422 Unprocessable Content with error.type = "urn:unihub:error:validation", uniform detail "Invalid or expired activation code.", and validationErrors containing "otp: Invalid or expired activation code."
 ```
 
 ### Scenario 7: Activation rejected — account already active

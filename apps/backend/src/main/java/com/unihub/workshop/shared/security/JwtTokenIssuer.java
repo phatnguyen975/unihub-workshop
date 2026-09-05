@@ -30,16 +30,18 @@ public class JwtTokenIssuer {
         Instant now = Instant.now();
         long ttlMinutes = properties.accessTokenTtlMinutes();
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
                 .issuer("unihub")
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(ttlMinutes * 60))
                 .subject(subject)
                 .claim("role", role)
-                .claim("org", organizationId)
-                .id(UUID.randomUUID().toString()) // jti
-                .build();
+                .id(UUID.randomUUID().toString()); // jti
 
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        if (organizationId != null && !organizationId.isBlank()) {
+            claimsBuilder.claim("org", organizationId);
+        }
+
+        return jwtEncoder.encode(JwtEncoderParameters.from(claimsBuilder.build())).getTokenValue();
     }
 }

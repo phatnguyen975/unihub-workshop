@@ -51,7 +51,7 @@ class LoginUseCaseImplTest {
     }
 
     @Test
-    void shouldReturnTokensOnSuccessfulLogin() {
+    void shouldReturnTokensAndUserProfileOnSuccessfulLogin() {
         String email = "test@example.com";
         String password = "password123";
         String encodedPassword = passwordEncoder.encode(password);
@@ -68,10 +68,31 @@ class LoginUseCaseImplTest {
         assertThat(result.refreshToken()).isNotBlank();
         assertThat(result.tokenType()).isEqualTo("Bearer");
         assertThat(result.expiresIn()).isEqualTo(15 * 60);
+        assertThat(result.user()).isEqualTo(user);
 
         verify(userRepository).updateLastLoginAt(eq(user.id()), any());
         verify(refreshTokenRepository).save(any());
         assertThat(meterRegistry.counter("auth.login.attempts", "outcome", "success").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void shouldHandleNullOrganizationIdGracefully() {
+        String email = "student@example.com";
+        String password = "password123";
+        String encodedPassword = passwordEncoder.encode(password);
+
+        // Student with organizationId = null
+        User user = new User(UUID.randomUUID(), null, UserRole.STUDENT, email, encodedPassword, true,
+                false, null);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(jwtTokenIssuer.issueAccessToken(user.id().toString(), "STUDENT", null))
+                .thenReturn("mock-access-token");
+
+        LoginUseCase.LoginResult result = loginUseCase.login(email, password, "device-1", "127.0.0.1");
+
+        assertThat(result.accessToken()).isEqualTo("mock-access-token");
+        assertThat(result.user()).isEqualTo(user);
+        verify(jwtTokenIssuer).issueAccessToken(user.id().toString(), "STUDENT", null);
     }
 
     @Test

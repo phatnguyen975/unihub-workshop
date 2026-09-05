@@ -25,12 +25,6 @@ public class UserVerificationTokenRepositoryAdapter implements UserVerificationT
     }
 
     @Override
-    public Optional<UserVerificationToken> findActiveTokenByUserEmailAndType(String email, String tokenType) {
-        return repository.findActiveTokenByEmailAndType(email, tokenType, Instant.now())
-                .map(this::toDomain);
-    }
-
-    @Override
     public Optional<UserVerificationToken> findLatestByUserIdAndType(UUID userId, String tokenType) {
         return repository.findFirstByUserIdAndTokenTypeOrderByCreatedAtDesc(userId, tokenType)
                 .map(this::toDomain);
