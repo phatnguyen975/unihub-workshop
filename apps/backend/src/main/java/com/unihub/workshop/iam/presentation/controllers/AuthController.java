@@ -66,7 +66,7 @@ public class AuthController {
     @PostMapping("/otp/resend")
     public ApiResponse<Void> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
         resendOtpUseCase.resendOtp(request.email());
-        return ApiResponse.success(null, "A new activation code has been sent to your email.");
+        return ApiResponse.success(null, "A verification code has been sent to your email.");
     }
 
     @PostMapping("/login")

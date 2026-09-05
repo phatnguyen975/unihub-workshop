@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -56,14 +57,14 @@ class AuthControllerResendOtpTest {
                 .content(requestBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("A new activation code has been sent to your email."));
+                .andExpect(jsonPath("$.message").value("A verification code has been sent to your email."));
 
         verify(resendOtpUseCase).resendOtp("student@university.edu");
     }
 
     @Test
-    void shouldReturn422WhenAccountNotFoundOrAlreadyActive() throws Exception {
-        doThrow(new IllegalStateException("No inactive account found for this email."))
+    void shouldReturn404WhenUserNotFound() throws Exception {
+        doThrow(new NotFoundException("No account found for this email."))
                 .when(resendOtpUseCase).resendOtp(any());
 
         String requestBody = """
@@ -75,10 +76,10 @@ class AuthControllerResendOtpTest {
         mockMvc.perform(post("/api/v1/auth/otp/resend")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().is(422))
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:state"))
-                .andExpect(jsonPath("$.error.detail").value("No inactive account found for this email."));
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:not-found"))
+                .andExpect(jsonPath("$.error.detail").value("No account found for this email."));
     }
 
     @Test

@@ -44,7 +44,7 @@ app:
       - "/api/v1/auth/otp/resend"
   otp:
     hmac-secret: ${APP_OTP_HMAC_SECRET:super-secret-hmac-key-for-otp-generation-and-verification-unihub}
-    ttl-minutes: 15
+    ttl-minutes: ${APP_OTP_TTL_MINUTES:15}
   cors:
     allowed-origin-patterns:
       - "http://localhost:[*]"
