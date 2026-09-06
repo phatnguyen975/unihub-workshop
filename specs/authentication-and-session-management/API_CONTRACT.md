@@ -27,8 +27,7 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 **Purpose:** Authenticate a user with email/password. Issues an RS256-signed JWT access token, an opaque refresh token, and user profile data for immediate UI rendering. Enforces inactive-account and temporary-password gates before issuing tokens.  
 **FR Traces:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07  
-**Authentication:** Not required (this endpoint IS the authentication mechanism).  
-**Idempotency:** Not applicable — each login creates a new session. No `Idempotency-Key` header required.
+**Authentication:** Not required (this endpoint IS the authentication mechanism).
 
 ### Request
 
@@ -183,8 +182,7 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 **Purpose:** Exchange a valid refresh token for a new access token. The refresh token is rotated atomically: the old token is revoked and a new one is issued in a single transaction.  
 **FR Traces:** FR-08, FR-09  
-**Authentication:** Not required (the refresh token itself is the credential).  
-**Idempotency:** Not applicable — refresh is inherently stateful. A second request with the same (now revoked) refresh token returns `401`.
+**Authentication:** Not required (the refresh token itself is the credential).
 
 ### Request
 
@@ -241,22 +239,21 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ### Error Responses
 
-| Scenario                                 | HTTP Status | `type`                                 | `title`               | Notes                                                                     |
-| :--------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :------------------------------------------------------------------------ |
-| Token not found (unknown hash)           |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | No matching `token_hash` in `refresh_tokens`                              |
-| Token revoked (`revoked_at IS NOT NULL`) |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Token was already rotated or explicitly revoked                           |
-| Token expired (`expires_at < NOW()`)     |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Refresh token TTL has lapsed                                              |
-| Request body validation failure          |    `422`    | `urn:unihub:error:validation`          | Unprocessable Content | Missing or blank `refreshToken` field; returns `validationErrors` list    |
-| Malformed JSON body                      |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                                   |
-| Redis unavailable                        |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included                                         |
-| Unexpected server error                  |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)                 |
+| Scenario                                 | HTTP Status | `type`                                 | `title`               | Notes                                                                  |
+| :--------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :--------------------------------------------------------------------- |
+| Token not found (unknown hash)           |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | No matching `token_hash` in `refresh_tokens`                           |
+| Token revoked (`revoked_at IS NOT NULL`) |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Token was already rotated or explicitly revoked                        |
+| Token expired (`expires_at < NOW()`)     |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Refresh token TTL has lapsed                                           |
+| Request body validation failure          |    `422`    | `urn:unihub:error:validation`          | Unprocessable Content | Missing or blank `refreshToken` field; returns `validationErrors` list |
+| Malformed JSON body                      |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                                |
+| Redis unavailable                        |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included                                      |
+| Unexpected server error                  |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)              |
 
 ## Endpoint 3 — Logout: `POST /api/v1/auth/logout`
 
 **Purpose:** Revoke the caller's current access token by writing its `jti` to the Redis JTI blacklist with a TTL matching the token's remaining validity, and invalidate the corresponding refresh token row in the database.  
 **FR Traces:** FR-10, FR-11  
-**Authentication:** Required — caller must present a valid Bearer JWT access token.  
-**Idempotency:** Not applicable. Calling logout twice with the same (now blacklisted) access token results in `401` on the second call because the token has been revoked.
+**Authentication:** Required — caller must present a valid Bearer JWT access token.
 
 ### Request
 
@@ -301,8 +298,7 @@ No response body.
 
 **Purpose:** Return the RSA public key in JWK Set format (RFC 7517) for token signature verification by downstream services and API gateways.  
 **FR Traces:** FR-12  
-**Authentication:** Not required. This is a public endpoint.  
-**Idempotency:** Inherently idempotent (read-only).
+**Authentication:** Not required. This is a public endpoint.
 
 ### Request
 

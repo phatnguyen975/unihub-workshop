@@ -13,6 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -31,6 +34,7 @@ class ResetPasswordUseCaseImplTest {
     private RefreshTokenRepository refreshTokenRepository;
     private OtpService otpService;
     private PasswordEncoder passwordEncoder;
+    private MeterRegistry meterRegistry;
     private ResetPasswordUseCaseImpl useCase;
 
     @BeforeEach
@@ -40,13 +44,17 @@ class ResetPasswordUseCaseImplTest {
         refreshTokenRepository = mock(RefreshTokenRepository.class);
         otpService = mock(OtpService.class);
         passwordEncoder = mock(PasswordEncoder.class);
+        meterRegistry = new SimpleMeterRegistry();
+
+        when(otpService.hashOtp("000000")).thenReturn("dummyHash");
 
         useCase = new ResetPasswordUseCaseImpl(
                 userRepository,
                 userVerificationTokenRepository,
                 refreshTokenRepository,
                 otpService,
-                passwordEncoder);
+                passwordEncoder,
+                meterRegistry);
     }
 
     @Test
@@ -67,6 +75,7 @@ class ResetPasswordUseCaseImplTest {
                 UserVerificationToken.TYPE_PASSWORD_RESET_OTP))
                 .thenReturn(Optional.of(token));
         when(otpService.verifyOtp(otp, "tokenHash123")).thenReturn(true);
+        when(userVerificationTokenRepository.markConsumed(token.id())).thenReturn(true);
         when(passwordEncoder.encode(newPassword)).thenReturn("argon2NewHash");
 
         useCase.resetPassword(email, otp, newPassword);
@@ -80,6 +89,40 @@ class ResetPasswordUseCaseImplTest {
         assertThat(savedUser.isTemporaryPassword()).isFalse();
 
         verify(refreshTokenRepository).revokeAllActiveTokensForUser(eq(userId), any(Instant.class));
+        assertThat(meterRegistry.counter("auth.password.reset.attempts", "outcome", "success").count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenMarkConsumedFailsDueToRaceCondition() {
+        String email = "student@university.edu";
+        String otp = "849201";
+        String newPassword = "BrandNewSecurePassword2026!";
+        UUID userId = UUID.randomUUID();
+        User activeUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "oldHash", true, true, null);
+
+        Instant expiresAt = Instant.now().plus(Duration.ofMinutes(15));
+        UserVerificationToken token = new UserVerificationToken(
+                UUID.randomUUID(), userId, UserVerificationToken.TYPE_PASSWORD_RESET_OTP,
+                "tokenHash123", expiresAt, null, Instant.now(), Instant.now(), null, null);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(activeUser));
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_PASSWORD_RESET_OTP))
+                .thenReturn(Optional.of(token));
+        when(otpService.verifyOtp(otp, "tokenHash123")).thenReturn(true);
+        when(userVerificationTokenRepository.markConsumed(token.id())).thenReturn(false);
+
+        assertThatThrownBy(() -> useCase.resetPassword(email, otp, newPassword))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired verification code.");
+
+        verify(userRepository, never()).save(any());
+        verify(refreshTokenRepository, never()).revokeAllActiveTokensForUser(any(), any());
+        assertThat(meterRegistry
+                .counter("auth.password.reset.attempts", "outcome", "failure", "reason", "already_consumed")
+                .count())
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -91,9 +134,14 @@ class ResetPasswordUseCaseImplTest {
                 .isInstanceOf(ValidationException.class)
                 .hasMessage("Invalid or expired verification code.");
 
+        verify(otpService).verifyOtp("123456", "dummyHash");
         verify(userVerificationTokenRepository, never()).markConsumed(any());
         verify(userRepository, never()).save(any());
         verify(refreshTokenRepository, never()).revokeAllActiveTokensForUser(any(), any());
+        assertThat(meterRegistry
+                .counter("auth.password.reset.attempts", "outcome", "failure", "reason", "user_not_found")
+                .count())
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -107,8 +155,13 @@ class ResetPasswordUseCaseImplTest {
                 .isInstanceOf(ValidationException.class)
                 .hasMessage("Invalid or expired verification code.");
 
+        verify(otpService).verifyOtp("123456", "dummyHash");
         verify(userVerificationTokenRepository, never()).markConsumed(any());
         verify(userRepository, never()).save(any());
+        assertThat(meterRegistry
+                .counter("auth.password.reset.attempts", "outcome", "failure", "reason", "inactive_user")
+                .count())
+                .isEqualTo(1.0);
     }
 
     @Test

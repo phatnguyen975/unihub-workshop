@@ -49,11 +49,35 @@ class ActivateAccountUseCaseImplTest {
                 UserVerificationToken.TYPE_ACTIVATION_OTP))
                 .thenReturn(Optional.of(token));
         when(otpService.verifyOtp(otp, "tokenHash")).thenReturn(true);
+        when(userVerificationTokenRepository.markConsumed(token.id())).thenReturn(true);
 
         useCase.activate(email, otp);
 
         verify(userVerificationTokenRepository).markConsumed(token.id());
         verify(userRepository).activate(userId);
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenMarkConsumedFailsDueToRaceCondition() {
+        String email = "student@university.edu";
+        String otp = "123456";
+        UUID userId = UUID.randomUUID();
+        User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
+        UserVerificationToken token = UserVerificationToken.createActivationOtp(userId, "tokenHash",
+                Instant.now().plus(15, ChronoUnit.MINUTES));
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP))
+                .thenReturn(Optional.of(token));
+        when(otpService.verifyOtp(otp, "tokenHash")).thenReturn(true);
+        when(userVerificationTokenRepository.markConsumed(token.id())).thenReturn(false);
+
+        assertThatThrownBy(() -> useCase.activate(email, otp))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired activation code.");
+
+        verify(userRepository, never()).activate(any());
     }
 
     @Test
@@ -129,8 +153,17 @@ class ActivateAccountUseCaseImplTest {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
         User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
-        UserVerificationToken token = UserVerificationToken
-                .createActivationOtp(userId, "tokenHash", Instant.now().plusSeconds(600)).consume();
+        UserVerificationToken token = new UserVerificationToken(
+                UUID.randomUUID(),
+                userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP,
+                "tokenHash",
+                Instant.now().plusSeconds(600),
+                Instant.now(),
+                Instant.now(),
+                Instant.now(),
+                null,
+                null);
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
         when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,

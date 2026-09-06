@@ -48,21 +48,6 @@ public record UserVerificationToken(
                 null);
     }
 
-    public UserVerificationToken consume() {
-        Instant now = Instant.now();
-        return new UserVerificationToken(
-                id,
-                userId,
-                tokenType,
-                tokenHash,
-                expiresAt,
-                now,
-                createdAt,
-                now,
-                createdBy,
-                updatedBy);
-    }
-
     public boolean isExpired() {
         return expiresAt.isBefore(Instant.now());
     }

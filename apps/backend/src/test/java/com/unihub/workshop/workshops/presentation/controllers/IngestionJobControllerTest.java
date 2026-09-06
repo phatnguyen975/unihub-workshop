@@ -110,4 +110,43 @@ class IngestionJobControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:bad-request"));
     }
+
+    @Test
+    void getIngestionJobs_whenNoMorePages_omitsNextCursor() throws Exception {
+        UUID orgId = UUID.randomUUID();
+        when(jwtDecoder.decode(anyString())).thenReturn(createMockJwt("ORGANIZER", orgId));
+
+        IngestionJobReport report = new IngestionJobReport(
+                UUID.randomUUID(), 1L, orgId, "file.csv", IngestionJobOutcome.COMPLETED,
+                100, 0, null, null, Instant.now(), Instant.now(), Instant.now());
+        CursorPage<IngestionJobReport> page = new CursorPage<>(List.of(report), null, false);
+
+        when(listUseCase.execute(eq(orgId), isNull(), eq(20))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/admin/ingestion-jobs")
+                .header("Authorization", "Bearer token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.cursor.hasMore").value(false))
+                .andExpect(jsonPath("$.data.cursor.nextCursor").doesNotExist());
+    }
+
+    @Test
+    void getIngestionJobs_withInvalidOrgClaim_returns403() throws Exception {
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "none")
+                .claim("sub", "user-123")
+                .claim("org", "not-a-uuid")
+                .claim("jti", "jti-123")
+                .claim("role", "ORGANIZER")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(get("/api/v1/admin/ingestion-jobs")
+                .header("Authorization", "Bearer token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:forbidden"));
+    }
 }

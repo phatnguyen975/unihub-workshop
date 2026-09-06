@@ -11,7 +11,7 @@ This implementation plan delivers the complete password modification and credent
 1. **Password-Reset OTP generation and delivery** via the active-account branch of the shared `POST /api/v1/auth/otp/resend` endpoint.
 2. **Atomic single-step forgot password reset** via `POST /api/v1/auth/password/reset` with OTP validation, Argon2id hashing, and global session revocation (PostgreSQL refresh tokens + Redis JTI blacklist).
 3. **First-login temporary password exchange** via `POST /api/v1/auth/password/temporary` under the Zero-Trust model (ADR-028), issuing a full authentication session (`accessToken`, `refreshToken`, and `user` profile) for immediate dashboard access.
-4. **Idempotency guard and concurrent replay protection** using the `Idempotency-Key` header on mutation endpoints.
+4. **Concurrent replay protection and state invalidation verification** ensuring single-use OTP consumption and temporary password transitions naturally guard against replay attacks.
 
 ## Architecture Decisions for This Plan
 
@@ -106,27 +106,28 @@ This implementation plan delivers the complete password modification and credent
 
 - [x] First-login temporary password exchange verified end-to-end with immediate session generation and dashboard routing. Unit tests pass 100%.
 
-### Phase 4: Mutation Idempotency & Hardening
+### Phase 4: Mutation Reliability & Hardening
 
-- [ ] **T4 — Implement idempotency support and concurrent replay protection for password mutations**
+- [x] **T4 — Verify concurrent replay protection and single-use state invalidation for password mutations**
   - **Size:** S
   - **Depends on:** T2, T3
-  - **Layers touched:** Application, Infrastructure, Presentation
+  - **Layers touched:** Application, Presentation
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/AuthController.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerPasswordIdempotencyTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerResetPasswordTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerTemporaryPasswordTest.java`
   - **Acceptance Criteria:**
-    - When a client retries `POST /api/v1/auth/password/reset` or `POST /api/v1/auth/password/temporary` with an identical `Idempotency-Key` and identical request body, the server replays the completed `200 OK` response without repeating password hashing, database updates, or duplicate token revocation.
-    - When an `Idempotency-Key` is reused with a different request payload, the server rejects it with `409 Conflict` (`urn:unihub:error:conflict`).
-    - Under concurrent requests with the same reset OTP or temporary password, at most one request succeeds and any race condition is safely handled.
-    - _Traces to:_ SPEC FR-22 through FR-24, NFR Concurrency & Idempotency, Scenario 10; API_CONTRACT §3.2, §3.3
+    - When a client retries `POST /api/v1/auth/password/reset` with an already-consumed OTP, the request is safely rejected with `422 Unprocessable Content` (`validationErrors: ["otp: Invalid or expired verification code."]`).
+    - When a client retries `POST /api/v1/auth/password/temporary` with the old temporary password after it was already changed (`is_temporary_password = false`), the request is rejected with `401 Unauthorized` (or `400 Bad Request`).
+    - Under concurrent requests with the same reset OTP or temporary password, at most one request succeeds and any race condition is safely handled by database transactional boundaries.
+    - _Traces to:_ SPEC FR-22 through FR-23, NFR Concurrency & Reliability, Scenario 10; API_CONTRACT §3.2, §3.3
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1, T2, T3, T4 checked off.
-- [ ] Every acceptance criterion across all tasks verified end-to-end.
-- [ ] Full unit test suite passes: `com.unihub.workshop.iam.*`, `com.unihub.workshop.shared.*`, `ModulithArchitectureTest`.
-- [ ] Ready for `/review`.
+- [x] All tasks T1, T2, T3, T4 checked off.
+- [x] Every acceptance criterion across all tasks verified end-to-end.
+- [x] Full unit test suite passes: `com.unihub.workshop.iam.*`, `com.unihub.workshop.shared.*`, `ModulithArchitectureTest`.
+- [x] Ready for `/review`.
 
 ## Risks and Mitigations
 

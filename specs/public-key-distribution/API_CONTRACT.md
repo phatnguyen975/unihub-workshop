@@ -14,7 +14,6 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 - **Pagination convention:** Not applicable — this endpoint returns a single resource object, not a collection.
 - **Success response shape:** Standard `ApiResponse<T>` envelope: `{ "success": true, "message": "...", "data": { ... }, "metadata": { "processedBy": "...", "traceId": "..." } }`. Null fields are omitted (`@JsonInclude(NON_NULL)`).
 - **Error response format:** RFC 7807 Problem Details wrapped in the `ApiResponse` error envelope: `{ "success": false, "error": { "type": "urn:unihub:error:...", "title": "...", "status": <code>, "detail": "...", "instance": "..." }, "metadata": { "processedBy": "...", "traceId": "..." } }`.
-- **Idempotency-key convention:** Not applicable — this is a `GET` endpoint (read-only, inherently idempotent by HTTP method semantics).
 - **Auth header convention:** `Authorization: Bearer <access_token>` (RS256-signed JWT). Required on this endpoint.
 - **Date/time formatting convention:** ISO 8601 in UTC with trailing `Z` (e.g., `2026-09-03T05:42:00Z`).
 
@@ -23,8 +22,7 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 ### GET /api/v1/auth/public-key
 
 **Description:** Returns the currently active RSA public key in PEM format, along with a deterministic key identifier and the timestamp at which the key was fetched.  
-**Required Role / Auth:** `AUTHENTICATED | STAFF`. Users must be authenticated with a valid, non-revoked RS256 JWT, and must possess the `STAFF` role. Unauthenticated requests are rejected with `401`. Requests from other roles are rejected with `403`.  
-**Idempotency Requirement:** Not Required — this is a `GET` request; the HTTP method guarantees safe, repeatable semantics with no side effects.
+**Required Role / Auth:** `AUTHENTICATED | STAFF`. Users must be authenticated with a valid, non-revoked RS256 JWT, and must possess the `STAFF` role. Unauthenticated requests are rejected with `401`. Requests from other roles are rejected with `403`.
 
 #### Request
 
@@ -153,11 +151,7 @@ None. This is a read-only endpoint. No database records are created or modified.
 
 This endpoint is **not** subject to the Bucket4j registration rate-limit tier (which is restricted to `/api/v1/registrations/**` paths, per `application.yml`). Standard server-side TCP connection limits at the Nginx gateway layer apply. No custom per-user rate limit is applied to this endpoint.
 
-## 5. Idempotency Behavior
-
-Not applicable. This endpoint is a `GET` request. HTTP `GET` is defined as safe and idempotent by RFC 9110 — calling it multiple times with the same input produces the same output and has no side effects. No `Idempotency-Key` header is accepted or required.
-
-## 6. Cross-Endpoint Consistency Notes
+## 5. Cross-Endpoint Consistency Notes
 
 - **Response envelope:** Follows the same `ApiResponse<T>` envelope as all other `GET` endpoints in the `iam` module.
 - **Error shape:** Uses the same RFC 7807 error URN namespace (`urn:unihub:error:...`) as all other endpoints in the system. The `401` error shape is identical to what the `/api/v1/auth/login` endpoint produces when a JWT check fails.

@@ -30,15 +30,24 @@ class UserVerificationTokenTest {
     }
 
     @Test
-    @DisplayName("consume marks usedAt with timestamp and isConsumed returns true")
-    void consumeMarksUsedAt() {
-        UserVerificationToken token = UserVerificationToken.createActivationOtp(
+    @DisplayName("isConsumed returns true when usedAt is present and false when null")
+    void isConsumedReturnsTrueWhenUsedAtPresent() {
+        UserVerificationToken unconsumed = UserVerificationToken.createActivationOtp(
                 UUID.randomUUID(), "hash", Instant.now().plusSeconds(60));
+        assertThat(unconsumed.isConsumed()).isFalse();
 
-        UserVerificationToken consumed = token.consume();
-
+        UserVerificationToken consumed = new UserVerificationToken(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UserVerificationToken.TYPE_ACTIVATION_OTP,
+                "hash",
+                Instant.now().plusSeconds(60),
+                Instant.now(),
+                Instant.now(),
+                Instant.now(),
+                null,
+                null);
         assertThat(consumed.isConsumed()).isTrue();
-        assertThat(consumed.usedAt()).isNotNull();
     }
 
     @Test

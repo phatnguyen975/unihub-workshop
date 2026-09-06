@@ -50,7 +50,9 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
             throw invalidOtp();
         }
 
-        userVerificationTokenRepository.markConsumed(token.id());
+        if (!userVerificationTokenRepository.markConsumed(token.id())) {
+            throw invalidOtp();
+        }
         userRepository.activate(user.id());
     }
 

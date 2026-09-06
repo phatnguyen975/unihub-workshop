@@ -78,6 +78,8 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         when(jwtTokenIssuer.issueAccessToken(user.id().toString(), "STAFF", user.organizationId().toString()))
                 .thenReturn("mock-access-token");
 
+        when(userRepository.updateTemporaryPassword(eq(user.id()), any(), any())).thenReturn(true);
+
         ChangeTemporaryPasswordUseCase.ChangeTemporaryPasswordResult result = changeTemporaryPasswordUseCase
                 .changeTemporaryPassword(
                         email,
@@ -94,12 +96,47 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         assertThat(result.user().isTemporaryPassword()).isFalse();
         assertThat(result.user().lastLoginAt()).isNotNull();
 
-        verify(userRepository).save(argThat(savedUser -> savedUser.id().equals(user.id()) &&
-                !savedUser.isTemporaryPassword() &&
-                savedUser.lastLoginAt() != null &&
-                passwordEncoder.matches(newPassword, savedUser.passwordHash())));
+        verify(userRepository).updateTemporaryPassword(eq(user.id()),
+                argThat(hash -> passwordEncoder.matches(newPassword, hash)), any());
         verify(refreshTokenRepository).save(any());
         assertThat(meterRegistry.counter("auth.password.temporary.attempts", "outcome", "success").count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void shouldThrowBadRequestWhenConcurrentRequestAlreadyChangedTemporaryPassword() {
+        String email = "staff.bob@unihub.edu";
+        String currentPassword = "TempPassword123!";
+        String newPassword = "MyOfficialSecurePassword2026!";
+        String encodedTempPassword = passwordEncoder.encode(currentPassword);
+
+        User user = new User(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UserRole.STAFF,
+                email,
+                encodedTempPassword,
+                true,
+                true,
+                null);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(userRepository.updateTemporaryPassword(eq(user.id()), any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> changeTemporaryPasswordUseCase.changeTemporaryPassword(
+                email,
+                currentPassword,
+                newPassword,
+                "Mozilla/5.0",
+                "127.0.0.1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Account does not have a temporary password.");
+
+        verify(refreshTokenRepository, never()).save(any());
+        verify(jwtTokenIssuer, never()).issueAccessToken(any(), any(), any());
+        assertThat(meterRegistry
+                .counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "not_temporary_password")
+                .count())
                 .isEqualTo(1.0);
     }
 

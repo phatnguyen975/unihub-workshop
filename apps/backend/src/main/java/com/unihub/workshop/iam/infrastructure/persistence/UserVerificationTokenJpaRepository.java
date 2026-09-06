@@ -15,8 +15,8 @@ public interface UserVerificationTokenJpaRepository extends JpaRepository<UserVe
             String tokenType);
 
     @Modifying
-    @Query("UPDATE UserVerificationTokenJpaEntity t SET t.usedAt = :now, t.updatedAt = :now WHERE t.id = :id")
-    void markConsumed(@Param("id") UUID id, @Param("now") Instant now);
+    @Query("UPDATE UserVerificationTokenJpaEntity t SET t.usedAt = :now, t.updatedAt = :now WHERE t.id = :id AND t.usedAt IS NULL")
+    int markConsumed(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying
     @Query("UPDATE UserVerificationTokenJpaEntity t SET t.usedAt = :now, t.updatedAt = :now " +

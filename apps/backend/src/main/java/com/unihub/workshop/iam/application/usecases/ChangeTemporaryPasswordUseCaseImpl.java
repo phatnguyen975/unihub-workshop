@@ -61,7 +61,8 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
 
         if (optionalUser.isEmpty()) {
             passwordEncoder.matches(currentPassword, dummyPasswordHash);
-            meterRegistry.counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "invalid_credentials")
+            meterRegistry
+                    .counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "invalid_credentials")
                     .increment();
             throw new UnauthorizedException("Invalid email or current password");
         }
@@ -69,19 +70,23 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
         User user = optionalUser.get();
 
         if (!user.isActive()) {
-            meterRegistry.counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "invalid_credentials")
+            meterRegistry
+                    .counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "invalid_credentials")
                     .increment();
             throw new UnauthorizedException("Invalid email or current password");
         }
 
         if (!passwordEncoder.matches(currentPassword, user.passwordHash())) {
-            meterRegistry.counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "invalid_credentials")
+            meterRegistry
+                    .counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "invalid_credentials")
                     .increment();
             throw new UnauthorizedException("Invalid email or current password");
         }
 
         if (!user.isTemporaryPassword()) {
-            meterRegistry.counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "not_temporary_password")
+            meterRegistry
+                    .counter("auth.password.temporary.attempts", "outcome", "failure", "reason",
+                            "not_temporary_password")
                     .increment();
             throw new BadRequestException("Account does not have a temporary password.");
         }
@@ -92,16 +97,22 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
 
         Instant now = Instant.now();
         String newPasswordHash = passwordEncoder.encode(newPassword);
-        User updatedUser = user.changeTemporaryPassword(newPasswordHash, now);
-        User savedUser = userRepository.save(updatedUser);
-        if (savedUser == null) {
-            savedUser = updatedUser;
+
+        boolean updated = userRepository.updateTemporaryPassword(user.id(), newPasswordHash, now);
+        if (!updated) {
+            meterRegistry
+                    .counter("auth.password.temporary.attempts", "outcome", "failure", "reason",
+                            "not_temporary_password")
+                    .increment();
+            throw new BadRequestException("Account does not have a temporary password.");
         }
 
-        String orgId = savedUser.organizationId() != null ? savedUser.organizationId().toString() : null;
+        User updatedUser = user.changeTemporaryPassword(newPasswordHash, now);
+
+        String orgId = updatedUser.organizationId() != null ? updatedUser.organizationId().toString() : null;
         String accessToken = jwtTokenIssuer.issueAccessToken(
-                savedUser.id().toString(),
-                savedUser.role().name(),
+                updatedUser.id().toString(),
+                updatedUser.role().name(),
                 orgId);
 
         String rawRefreshToken = TokenUtils.generateSecureToken();
@@ -110,7 +121,7 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
 
         RefreshToken refreshToken = new RefreshToken(
                 UUID.randomUUID(),
-                savedUser.id(),
+                updatedUser.id(),
                 tokenHash,
                 deviceInfo,
                 ipAddress,
@@ -125,6 +136,6 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
                 rawRefreshToken,
                 "Bearer",
                 securityProperties.accessTokenTtlMinutes() * 60L,
-                savedUser);
+                updatedUser);
     }
 }

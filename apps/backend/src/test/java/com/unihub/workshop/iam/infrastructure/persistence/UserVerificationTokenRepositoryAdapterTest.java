@@ -74,8 +74,11 @@ class UserVerificationTokenRepositoryAdapterTest {
         UserVerificationTokenRepositoryAdapter adapter = new UserVerificationTokenRepositoryAdapter(jpaRepo);
 
         UUID tokenId = UUID.randomUUID();
-        adapter.markConsumed(tokenId);
+        when(jpaRepo.markConsumed(eq(tokenId), any(Instant.class))).thenReturn(1);
 
+        boolean result = adapter.markConsumed(tokenId);
+
+        assertThat(result).isTrue();
         verify(jpaRepo).markConsumed(eq(tokenId), any(Instant.class));
     }
 

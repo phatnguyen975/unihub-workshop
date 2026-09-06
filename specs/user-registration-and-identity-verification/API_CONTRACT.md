@@ -26,8 +26,7 @@ This contract defines the three REST endpoints introduced by Feature 1.1 (`user-
 ### 3.1. POST /api/v1/auth/register
 
 **Description:** Creates a new `STUDENT` account in inactive state (`is_active = false`), links the identity to `student_directory` if an active matching record exists, hashes the password using **Argon2**, generates a 6-digit numeric OTP, persists it in `user_verification_tokens` (`token_type = 'ACTIVATION_OTP'`), and publishes `OtpRequestedEvent` (purpose: `ACTIVATION`) to the transactional outbox for RabbitMQ externalization.  
-**Required Role / Auth:** PUBLIC  
-**Idempotency Requirement:** Not required — duplicate registration attempts with the same email are rejected with `409 Conflict` by the database unique constraint on `users.email` (`CITEXT`).
+**Required Role / Auth:** PUBLIC
 
 #### Request
 
@@ -134,8 +133,7 @@ This contract defines the three REST endpoints introduced by Feature 1.1 (`user-
 ### 3.2. POST /api/v1/auth/activate
 
 **Description:** Activates a `STUDENT` account by verifying the submitted 6-digit OTP against active records in `user_verification_tokens` with `token_type = 'ACTIVATION_OTP'`. On success, consumes the token (`used_at = now()`) and activates the user account (`is_active = true`).  
-**Required Role / Auth:** PUBLIC  
-**Idempotency Requirement:** Safe to repeat — once active, subsequent calls return `409 Conflict`.
+**Required Role / Auth:** PUBLIC
 
 #### Request
 
@@ -241,8 +239,7 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 - If `user.is_active == true` (Forgot Password flow - Feature 1.4): Invalidates prior unconsumed `PASSWORD_RESET_OTP` tokens, creates a fresh `PASSWORD_RESET_OTP`, and publishes `OtpRequestedEvent` (purpose: `PASSWORD_RESET`).
 - Invalidation is strictly scoped to the corresponding `token_type` to prevent cross-flow token collisions.
 
-**Required Role / Auth:** PUBLIC  
-**Idempotency Requirement:** Safe to repeat — each call deterministically invalidates prior tokens of that type and generates a new one.
+**Required Role / Auth:** PUBLIC
 
 #### Request
 

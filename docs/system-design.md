@@ -858,35 +858,103 @@ stateDiagram-v2
 
 ### Transaction Idempotency
 
-Client retries caused by network drops or impatient clicks can create duplicate `POST /registrations` requests, risking double-booking or double-charging. The system enforces exactly-once processing with an **idempotency key strategy** backed by PostgreSQL.
+Client retries caused by network drops or impatient clicks can create duplicate mutating requests (such as workshop registrations or payment charges), risking double-booking or duplicate charges. The platform implements a **2-Tier Cache-Aside Idempotency Architecture** combining Redis (L1 distributed in-memory cache) for sub-millisecond deduplication and replay with PostgreSQL (`idempotency_keys` table, L2 durable source-of-truth) for atomic exactly-once execution guarantees across horizontally-scaled backend nodes.
 
-- **Key generation and transmission:** The React / React Native client generates a UUIDv4 and sends it in the `Idempotency-Key` header.
-- **Storage and duplicate detection:** The backend stores keys in `idempotency_keys` with a `UNIQUE` constraint, creating a database-level barrier against race conditions.
-- **Workflow:** On the first attempt, the key is inserted, the payment is processed, and the final response payload is serialized and stored with the key. On a retry, the API finds the existing key and immediately returns the cached response, bypassing the payment gateway and write logic.
-- **TTL configuration:** Each key includes an `expires_at` timestamp (for example, 24 hours), and a scheduled cleanup job deletes expired records to prevent table bloat.
-- **Primary database routing:** All idempotency reads and writes are routed to the primary database to avoid replica lag and eliminate check-then-act races.
+#### Architecture & Scoping
+
+- **Key Generation & Header Format:** The authenticated client (React / React Native) generates a UUIDv4 (max 64 chars) and sends it in the `Idempotency-Key` header.
+- **Mandatory Endpoints:** Required for business-critical mutating operations with severe financial or capacity risk:
+  - Workshop registrations
+  - Payment authorizations and charges
+  - Offline check-in batch synchronization
+  - _Missing header behavior:_ The server immediately rejects the request with `400 Bad Request`.
+- **User Scoping & Multi-Tenant Isolation:** The backend stores and caches keys strictly scoped by `(user_id, idempotency_key)`:
+  - **Redis L1 Key:** `idempotency:<user_id>:<idempotency_key>`
+  - **PostgreSQL L2 Constraint:** `UNIQUE (user_id, idempotency_key)`
+  - This prevents key collisions across different users even if two clients generate identical UUIDs coincidentally.
+- **Primary DB Routing (ADR-015):** All L2 idempotency reads, claims, and updates route strictly to the **Primary PostgreSQL DB**, never read replicas, eliminating replication-lag anomalies on immediate retries.
+- **Horizontal Scaling Consistency:** Node 1 and Node 2 behind Nginx share the centralized Redis cluster and Primary PostgreSQL database. No sticky sessions are required; retries can hit any backend node interchangeably.
+
+#### Cache Hit, Cache Miss, and Cache Invalidation Semantics
+
+1. **L1 Cache Hit (Redis):**
+   - **Payload Hash Validation:** The cached entry contains `{status, request_hash, response_code, response_headers, response_body}`. The incoming request computes `SHA-256(method + path + body)`. If the hash does not match the cached `request_hash`, the request is rejected with `409 Conflict` (key reused with different payload).
+   - **Status `PENDING`:** Another request with this key is actively processing in flight. Return `409 Conflict` immediately with header `Retry-After: 2` without touching PostgreSQL.
+   - **Status `COMPLETED`:** The request was already processed successfully. Return the cached `response_code`, `response_headers`, and `response_body` immediately (instant replay, bypassing all business logic and database queries).
+2. **L1 Cache Miss (Fallback to L2 & Cache Backfill):**
+   - On an L1 miss (e.g., Redis restart, key eviction under memory pressure, or genuinely new request), the application falls back to Primary PostgreSQL and attempts an atomic claim: `INSERT INTO idempotency_keys (user_id, idempotency_key, request_method, request_path, request_hash, status, expires_at) VALUES (...) ON CONFLICT (user_id, idempotency_key) DO NOTHING RETURNING *;`
+   - **Conflict Detected (L2 Hit — Key exists in DB):** The application fetches the existing row from `idempotency_keys`:
+     - If `request_hash` does not match: return `409 Conflict`.
+     - If `status == 'PENDING'`: return `409 Conflict` (request in progress).
+     - If `status == 'COMPLETED'`: **Backfill L1 Cache** by writing `{status: COMPLETED, request_hash, response_code, response_body}` into Redis with the remaining TTL (up to 24h), then replay the stored response to the client (`200/201 OK`).
+     - If `status == 'FAILED'`: replay the terminal failure or allow a fresh retry based on the failure category.
+   - **Genuinely New Request (Claim Succeeded):** The new row is created in DB with `status = 'PENDING'`. The application sets a short-lived transient claim in Redis: `SET idempotency:<user_id>:<key> {status: PENDING, hash: H} EX 60s` to protect against microsecond concurrent races across nodes, then proceeds to execute the business transaction.
+3. **Transaction Completion & Cache Population:**
+   - When the business mutation commits successfully, the application updates PostgreSQL within the same transaction: `status = 'COMPLETED'`, `response_code`, `response_body`, `response_headers`, `updated_at = now()`.
+   - Redis L1 is populated: `SET idempotency:<user_id>:<key> {status: COMPLETED, ...} EX 86400` (24-hour TTL).
+   - The success response is returned to the client.
+4. **Cache Invalidation on Failure / Rollback:**
+   - **Transient / Retryable Failure (Downstream timeout, circuit breaker open, connection failure):**
+     - The application immediately executes **Cache Invalidation** on Redis: `DEL idempotency:<user_id>:<key>`.
+     - In PostgreSQL, the `PENDING` row is deleted (or rolled back) so that the client is not locked out and can retry immediately.
+   - **Deterministic Business Failure (Validation error, permanent condition):**
+     - In PostgreSQL, the record transitions to `status = 'FAILED'`.
+     - In Redis, the key is invalidated (`DEL`) or updated to `FAILED` depending on whether fresh attempts with the same key are permitted.
+5. **TTL & Cleanup Strategy:**
+   - Keys in `idempotency_keys` carry `expires_at = now() + interval '24 hours'`.
+   - A scheduled TTL Cleanup Job in the Workers app purges expired rows every 6 hours.
+   - The Dual-Case Reconciliation Sweeper (ADR-014 / ADR-022) acts as a fallback for orphaned `PENDING` payment keys after 30 minutes.
 
 ```mermaid
 sequenceDiagram
+  autonumber
   actor Client
-  participant GW as API Gateway
-  participant API as Core Backend Monolith
-  participant DB as Neon PostgreSQL
-  participant Pay as Payment Gateway
+  participant GW as API Gateway (Nginx)
+  participant App as Backend (Node 1/2)
+  participant Redis as Redis (L1)
+  participant DB as Primary PostgreSQL (L2)
 
-  Client->>GW: POST /registrations (Idempotency-Key: A)
-  GW->>API: Forward request
-  API->>DB: Atomic INSERT idempotency key (Primary DB)
-  alt Success (New Request)
-    API->>Pay: Charge payment
-    Pay-->>API: Approved
-    API->>DB: Store final response for key A
-    API-->>GW: 200 OK (success)
-    GW-->>Client: 200 OK (success)
-  else Unique Constraint Violation (Concurrent Retry)
-    API->>DB: Load cached response (Primary DB)
-    API-->>GW: 200 OK (cached)
-    GW-->>Client: 200 OK (cached)
+  Client->>GW: POST /registrations (Idempotency-Key: K, Body: {...})
+  GW->>App: Forward request to available node
+
+  Note over App: Step 1: L1 Redis Check (Cache-Aside Read)
+  App->>Redis: GET idempotency:<user_id>:K
+  alt L1 Hit
+    alt Payload Hash Mismatch
+      App-->>Client: 409 Conflict (Key reused with different payload)
+    else Status = PENDING
+      App-->>Client: 409 Conflict (Request in progress, Retry-After: 2s)
+    else Status = COMPLETED
+      App-->>Client: 200/201 OK (Instant cached replay from L1)
+    end
+  else L1 Miss
+    Note over App: Step 2: L2 DB Atomic Claim
+    App->>DB: INSERT INTO idempotency_keys (Status: PENDING) ON CONFLICT DO NOTHING
+    alt Conflict Detected (L2 Hit - Key already exists in DB)
+      App->>DB: SELECT * FROM idempotency_keys WHERE user_id AND idempotency_key
+      alt Payload Hash Mismatch
+        App-->>Client: 409 Conflict (Payload mismatch)
+      else Status = PENDING
+        App-->>Client: 409 Conflict (Concurrent in-flight)
+      else Status = COMPLETED
+        App->>Redis: SET idempotency:<user_id>:K {COMPLETED, ...} EX <remaining_ttl>
+        Note over App,Redis: L1 Cache Backfill on Miss
+        App-->>Client: 200/201 OK (Replayed response from L2)
+      end
+    else Genuinely New Request (Claim Succeeded)
+      App->>Redis: SET idempotency:<user_id>:K {Status: PENDING} EX 60s
+      Note over App: Step 3: Execute Business Transaction
+      alt Transaction Success
+        App->>DB: UPDATE idempotency_keys SET status='COMPLETED', response_body=...
+        App->>Redis: SET idempotency:<user_id>:K {Status: COMPLETED, ...} EX 24h
+        App-->>Client: 200/201 Success Response
+      else Transaction Failure (Transient / Rollback)
+        Note over App,Redis: Step 4: Cache Invalidation & Rollback
+        App->>Redis: DEL idempotency:<user_id>:K
+        App->>DB: DELETE FROM idempotency_keys (or status='FAILED')
+        App-->>Client: 4xx/5xx Error Response (Safe to retry)
+      end
+    end
   end
 ```
 

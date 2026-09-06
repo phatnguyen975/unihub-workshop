@@ -34,12 +34,7 @@ public class IngestionJobController {
             @RequestParam(required = false, defaultValue = "20") Integer size,
             Authentication authentication) {
 
-        JwtAuthenticatedPrincipal principal = (JwtAuthenticatedPrincipal) authentication.getPrincipal();
-        String orgIdStr = principal.org();
-        if (orgIdStr == null) {
-            throw new ForbiddenException("Missing org claim in token");
-        }
-        UUID orgId = UUID.fromString(orgIdStr);
+        UUID orgId = extractOrganizationId(authentication);
 
         CursorPage<IngestionJobReport> page = listUseCase.execute(orgId, cursor, size);
 
@@ -71,12 +66,7 @@ public class IngestionJobController {
             throw new BadRequestException("Invalid UUID format");
         }
 
-        JwtAuthenticatedPrincipal principal = (JwtAuthenticatedPrincipal) authentication.getPrincipal();
-        String orgIdStr = principal.org();
-        if (orgIdStr == null) {
-            throw new ForbiddenException("Missing org claim in token");
-        }
-        UUID orgId = UUID.fromString(orgIdStr);
+        UUID orgId = extractOrganizationId(authentication);
 
         var result = getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
         RejectArtifactUrlResponse responseDto = new RejectArtifactUrlResponse(
@@ -85,5 +75,20 @@ public class IngestionJobController {
                 result.downloadUrl(),
                 result.expiresAt());
         return ApiResponse.success(responseDto, "Pre-signed download URL generated");
+    }
+
+    private UUID extractOrganizationId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof JwtAuthenticatedPrincipal principal)) {
+            throw new ForbiddenException("Missing or invalid authentication principal");
+        }
+        String orgIdStr = principal.org();
+        if (orgIdStr == null || orgIdStr.isBlank()) {
+            throw new ForbiddenException("Missing org claim in token");
+        }
+        try {
+            return UUID.fromString(orgIdStr);
+        } catch (IllegalArgumentException e) {
+            throw new ForbiddenException("Invalid org claim in token");
+        }
     }
 }

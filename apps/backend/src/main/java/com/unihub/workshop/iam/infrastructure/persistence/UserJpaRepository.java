@@ -21,4 +21,16 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     @Modifying
     @Query("UPDATE UserJpaEntity u SET u.isActive = true, u.updatedAt = :now WHERE u.id = :id")
     void activateUser(@Param("id") UUID id, @Param("now") Instant now);
+
+    @Modifying
+    @Query("""
+            UPDATE UserJpaEntity u
+            SET u.passwordHash = :newPasswordHash,
+                u.isTemporaryPassword = false,
+                u.lastLoginAt = :now,
+                u.updatedAt = :now
+            WHERE u.id = :id AND u.isTemporaryPassword = true
+            """)
+    int updateTemporaryPassword(@Param("id") UUID id, @Param("newPasswordHash") String newPasswordHash,
+            @Param("now") Instant now);
 }

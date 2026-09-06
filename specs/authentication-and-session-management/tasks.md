@@ -64,7 +64,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
     - `POST /api/v1/auth/login` with correct credentials for an account with `is_temporary_password = TRUE` returns `403 Forbidden` with `type = "urn:unihub:error:temporary-password"`, and no `refresh_tokens` row is created.
     - `POST /api/v1/auth/login` with invalid email format or blank password returns `422 Unprocessable Content` with `type = "urn:unihub:error:validation"` and `validationErrors`.
     - Micrometer counter `auth.login.attempts` is emitted on success and failure paths.
-    - _(Traces to: FR-01 through FR-07, BR-01 through BR-11, Scenarios 1, 2, 3, 4, 5, 6)_
+    - _(Traces to: FR-01 through FR-07, BR-01 through BR-10, Scenarios 1, 2, 3, 4, 5, 6)_
 
 #### Checkpoint: Phase 2
 

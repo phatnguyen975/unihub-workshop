@@ -57,11 +57,10 @@ This feature provides two dedicated password modification flows for unauthentica
 - **FR-20:** The system SHALL update `users.password_hash` with the Argon2id hash of `newPassword`, set `users.is_temporary_password = false`, update `users.last_login_at = now()`, and update `users.updated_at = now()`.
 - **FR-21:** The system SHALL immediately generate and issue an RS256-signed JWT access token (3600s TTL), persist a newly issued refresh token in `refresh_tokens`, and return a `200 OK` response containing `accessToken`, `refreshToken`, `tokenType: "Bearer"`, `expiresIn: 3600`, and full `user` profile data.
 
-### 3.4 Idempotency & Reliability
+### 3.4 Reliability & Natural State Invalidation
 
-- **FR-22:** The system SHALL support the `Idempotency-Key` header (UUIDv4) on `POST /api/v1/auth/password/reset` and `POST /api/v1/auth/password/temporary` to ensure exactly-once execution during network retries.
-- **FR-23:** Replaying a request with an identical `Idempotency-Key` SHALL return the cached response without repeating password hashing, token revocation, or session generation.
-- **FR-24:** Reusing an existing `Idempotency-Key` with a different request payload SHALL be rejected with `409 Conflict` (`urn:unihub:error:conflict`).
+- **FR-22:** The password reset flow SHALL enforce strict single-use OTP consumption: once verified and consumed (`used_at = now()`), subsequent submissions with the same OTP SHALL be rejected with `422 Unprocessable Content` (`urn:unihub:error:validation`).
+- **FR-23:** The temporary password exchange flow SHALL enforce single-use state transition: once exchanged, `is_temporary_password` is set to `false`, and subsequent requests with the old temporary password SHALL be rejected with `400 Bad Request` (`urn:unihub:error:bad-request`).
 
 ## 4. Business Rules
 
@@ -215,13 +214,14 @@ Then the request is rejected with 422 Unprocessable Content
 And "validationErrors" contains "newPassword: New password must be different from the temporary password."
 ```
 
-### Scenario 10: Idempotent replay of password reset
+### Scenario 10: Retried submission with already-consumed reset OTP
 
 ```gherkin
-Given a POST request to "/api/v1/auth/password/reset" succeeded with Idempotency-Key "e4b5c6d7-1234-5678-9abc-def012345678"
-When the client retries the exact same request with the same Idempotency-Key
-Then the system returns the cached 200 OK response
-And no duplicate hashing, revocation, or database updates occur
+Given a password reset request has succeeded and consumed the OTP
+When the client retries the request with the same OTP
+Then the system rejects the request with 422 Unprocessable Content
+And error.type is "urn:unihub:error:validation"
+And "validationErrors" contains "otp: Invalid or expired verification code."
 ```
 
 ## 8. Out of Scope
@@ -238,6 +238,6 @@ And no duplicate hashing, revocation, or database updates occur
 | `docs/feature-catalog.md` | Section 1.4 `password-reset`                                                                                                      |
 | `auth-flows.md`           | Feature 1.4 (§8 `POST /api/v1/auth/password/reset`, §9 `POST /api/v1/auth/password/temporary`, §3 `POST /api/v1/auth/otp/resend`) |
 | `docs/system-design.md`   | Section 5 Account Provisioning & Security, Self-Service Password Reset, Delegated Creation & Zero-Trust                           |
-| `docs/database-schema.md` | `users`, `user_verification_tokens`, `refresh_tokens`, `idempotency_keys`                                                         |
+| `docs/database-schema.md` | `users`, `user_verification_tokens`, `refresh_tokens`                                                                             |
 | `docs/api-standards.md`   | HTTP status codes, standard envelope `ApiResponse`, ProblemDetail RFC 7807, validation format                                     |
-| `docs/adrs.md`            | ADR-005 (JWT RS256 + Redis JTI), ADR-014 (Idempotency), ADR-015 (Replication Lag Routing), ADR-028 (Zero-Trust Provisioning)      |
+| `docs/adrs.md`            | ADR-005 (JWT RS256 + Redis JTI), ADR-015 (Replication Lag Routing), ADR-028 (Zero-Trust Provisioning)                             |

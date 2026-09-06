@@ -17,4 +17,6 @@ public interface UserRepository {
     void updateLastLoginAt(UUID userId, Instant lastLoginAt);
 
     void activate(UUID userId);
+
+    boolean updateTemporaryPassword(UUID userId, String newPasswordHash, Instant loginTime);
 }

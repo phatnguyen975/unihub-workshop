@@ -45,15 +45,13 @@ This contract defines the network interfaces for password recovery and initial c
   }
   ```
 - **Public Endpoints:** All three endpoints are public (unauthenticated, no `Authorization` header required).
-- **Idempotency:** `Idempotency-Key` (UUIDv4) header supported for mutating actions with retry risk.
 
 ## 3. Endpoints
 
 ### 3.1. POST /api/v1/auth/otp/resend
 
 **Description:** Shared OTP resend endpoint. When called for an active account (`is_active = true`), it invalidates previous unconsumed `PASSWORD_RESET_OTP` records, generates a new 6-digit numeric OTP with a 15-minute TTL, and triggers asynchronous email delivery.  
-**Required Role / Auth:** PUBLIC  
-**Idempotency Requirement:** Safe to repeat — each invocation invalidates previous unconsumed tokens of the same type and issues a fresh one.
+**Required Role / Auth:** PUBLIC
 
 #### Request
 
@@ -113,19 +111,17 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`)._
 ### 3.2. POST /api/v1/auth/password/reset
 
 **Description:** Performs an atomic single-step forgot password reset. Validates the submitted 6-digit OTP, updates the user's password hash with Argon2id, revokes all active refresh tokens in PostgreSQL, and blacklists active JWT access token JTIs in Redis.  
-**Required Role / Auth:** PUBLIC  
-**Idempotency Requirement:** Supported via `Idempotency-Key` header to safely handle network retries without repeating credential updates or revocation effects.
+**Required Role / Auth:** PUBLIC
 
 #### Request
 
 **Headers:**
 
-| Header             |     Required     | Description                                                             |
-| :----------------- | :--------------: | :---------------------------------------------------------------------- |
-| `Content-Type`     |       Yes        | Must be `application/json`                                              |
-| `Idempotency-Key`  | No (Recommended) | UUIDv4 (max 64 chars) to prevent duplicate execution upon network retry |
-| `X-Correlation-ID` |        No        | Client-generated UUID for distributed tracing                           |
-| `Accept-Language`  |        No        | Preferred locale for error messages (default: `en`)                     |
+| Header             | Required | Description                                         |
+| :----------------- | :------: | :-------------------------------------------------- |
+| `Content-Type`     |   Yes    | Must be `application/json`                          |
+| `X-Correlation-ID` |    No    | Client-generated UUID for distributed tracing       |
+| `Accept-Language`  |    No    | Preferred locale for error messages (default: `en`) |
 
 **Request Body:**
 
@@ -165,7 +161,6 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 | Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                                                                           |
 | :----: | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON payload syntax.                                                                                                                                                                                      |
-| `409`  | `urn:unihub:error:conflict`     | Conflict              | The provided `Idempotency-Key` was previously used for a different payload.                                                                                                                                         |
 | `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Payload format validation failure (`@Valid`), OR uniform error when the OTP is invalid, expired, consumed, or no account exists for the email (`validationErrors: ["otp: Invalid or expired verification code."]`). |
 | `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (header `Retry-After` present).                                                                                                                                                                 |
 | `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                                                                                                                                                                                            |
@@ -203,18 +198,17 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 
 **Description:** Dedicated first-login endpoint for provisioned Staff, Organizers, or seeded accounts where `is_temporary_password = true`. Exchanging the temporary password for a permanent password clears the temporary flag, updates credentials, and directly issues a full authentication session (JWT RS256 access token, refresh token, and user profile data) so the user enters their dashboard immediately.  
 **Required Role / Auth:** PUBLIC  
-**Idempotency Requirement:** Supported via `Idempotency-Key` header to safely replay responses during network retries.
+**Reliability & State Transition:** Enforces single-use activation via `is_temporary_password`. Once transitioned to `false`, subsequent retries with the old temporary password fail with `401 Unauthorized` (or `400 Bad Request` if user is already authenticated and permanent password has taken effect).
 
 #### Request
 
 **Headers:**
 
-| Header             |     Required     | Description                                                             |
-| :----------------- | :--------------: | :---------------------------------------------------------------------- |
-| `Content-Type`     |       Yes        | Must be `application/json`                                              |
-| `Idempotency-Key`  | No (Recommended) | UUIDv4 (max 64 chars) to prevent duplicate execution upon network retry |
-| `X-Correlation-ID` |        No        | Client-generated UUID for distributed tracing                           |
-| `Accept-Language`  |        No        | Preferred locale for error messages (default: `en`)                     |
+| Header             | Required | Description                                         |
+| :----------------- | :------: | :-------------------------------------------------- |
+| `Content-Type`     |   Yes    | Must be `application/json`                          |
+| `X-Correlation-ID` |    No    | Client-generated UUID for distributed tracing       |
+| `Accept-Language`  |    No    | Preferred locale for error messages (default: `en`) |
 
 **Request Body:**
 
@@ -270,7 +264,6 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 | :----: | :------------------------------ | :-------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `400`  | `urn:unihub:error:bad-request`  | Bad Request           | The account does not have a temporary password (`is_temporary_password = false`), or malformed JSON syntax.                                                              |
 | `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | User not found, inactive, or `currentPassword` does not match current password hash.                                                                                     |
-| `409`  | `urn:unihub:error:conflict`     | Conflict              | The provided `Idempotency-Key` was previously used for a different payload.                                                                                              |
 | `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Password policy violation, or `newPassword` equals `currentPassword` (`validationErrors: ["newPassword: New password must be different from the temporary password."]`). |
 | `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (header `Retry-After` present).                                                                                                                      |
 | `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                                                                                                                                                 |

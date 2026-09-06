@@ -11,7 +11,7 @@ public interface UserVerificationTokenRepository {
 
     Optional<UserVerificationToken> findLatestByUserIdAndType(UUID userId, String tokenType);
 
-    void markConsumed(UUID tokenId);
+    boolean markConsumed(UUID tokenId);
 
     void invalidateActiveTokens(UUID userId, String tokenType);
 }

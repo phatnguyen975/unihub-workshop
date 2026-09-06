@@ -31,8 +31,8 @@ public class UserVerificationTokenRepositoryAdapter implements UserVerificationT
     }
 
     @Override
-    public void markConsumed(UUID tokenId) {
-        repository.markConsumed(tokenId, Instant.now());
+    public boolean markConsumed(UUID tokenId) {
+        return repository.markConsumed(tokenId, Instant.now()) > 0;
     }
 
     @Override
