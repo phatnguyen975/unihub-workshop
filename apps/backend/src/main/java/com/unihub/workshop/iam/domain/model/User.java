@@ -62,22 +62,42 @@ public record User(
                 null);
     }
 
-    public User activate() {
+    public User updatePassword(String newPasswordHash) {
         return new User(
                 id,
                 organizationId,
                 role,
                 email,
                 phoneNumber,
-                passwordHash,
+                newPasswordHash,
                 fullName,
                 avatarUrl,
-                true,
-                isTemporaryPassword,
+                isActive,
+                false,
                 lastLoginAt,
                 studentRecordId,
                 createdAt,
                 Instant.now(),
+                createdBy,
+                updatedBy);
+    }
+
+    public User changeTemporaryPassword(String newPasswordHash, Instant loginTime) {
+        return new User(
+                id,
+                organizationId,
+                role,
+                email,
+                phoneNumber,
+                newPasswordHash,
+                fullName,
+                avatarUrl,
+                isActive,
+                false,
+                loginTime,
+                studentRecordId,
+                createdAt,
+                loginTime,
                 createdBy,
                 updatedBy);
     }

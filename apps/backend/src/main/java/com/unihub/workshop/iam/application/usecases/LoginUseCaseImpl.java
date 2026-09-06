@@ -57,7 +57,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
             passwordEncoder.matches(password, dummyPasswordHash);
             meterRegistry.counter("auth.login.attempts", "outcome", "failure", "reason", "invalid_credentials")
                     .increment();
-            throw new UnauthorizedException("urn:unihub:error:authentication", "Invalid email or password");
+            throw new UnauthorizedException("Invalid email or password");
         }
 
         User user = optionalUser.get();
@@ -65,7 +65,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
         if (!passwordEncoder.matches(password, user.passwordHash())) {
             meterRegistry.counter("auth.login.attempts", "outcome", "failure", "reason", "invalid_credentials")
                     .increment();
-            throw new UnauthorizedException("urn:unihub:error:authentication", "Invalid email or password");
+            throw new UnauthorizedException("Invalid email or password");
         }
 
         if (!user.isActive()) {
@@ -83,10 +83,11 @@ public class LoginUseCaseImpl implements LoginUseCase {
         Instant now = Instant.now();
         userRepository.updateLastLoginAt(user.id(), now);
 
+        String orgId = user.organizationId() != null ? user.organizationId().toString() : null;
         String accessToken = jwtTokenIssuer.issueAccessToken(
                 user.id().toString(),
                 user.role().name(),
-                user.organizationId().toString());
+                orgId);
 
         String rawRefreshToken = TokenUtils.generateSecureToken();
         String tokenHash = TokenUtils.hash(rawRefreshToken);
@@ -108,6 +109,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
                 accessToken,
                 rawRefreshToken,
                 "Bearer",
-                securityProperties.accessTokenTtlMinutes() * 60L);
+                securityProperties.accessTokenTtlMinutes() * 60L,
+                user);
     }
 }

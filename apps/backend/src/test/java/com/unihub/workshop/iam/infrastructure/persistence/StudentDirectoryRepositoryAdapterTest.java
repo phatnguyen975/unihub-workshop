@@ -32,9 +32,9 @@ class StudentDirectoryRepositoryAdapterTest {
         entity.setImportedAt(now);
         entity.setCreatedAt(now);
 
-        when(jpaRepo.findByEmail(email)).thenReturn(Optional.of(entity));
+        when(jpaRepo.findByEmailAndStatus(email, "ACTIVE")).thenReturn(Optional.of(entity));
 
-        Optional<StudentDirectory> result = adapter.findByEmail(email);
+        Optional<StudentDirectory> result = adapter.findActiveByEmail(email);
 
         assertThat(result.isPresent()).isTrue();
         StudentDirectory domain = result.get();
@@ -49,9 +49,9 @@ class StudentDirectoryRepositoryAdapterTest {
         StudentDirectoryJpaRepository jpaRepo = mock(StudentDirectoryJpaRepository.class);
         StudentDirectoryRepositoryAdapter adapter = new StudentDirectoryRepositoryAdapter(jpaRepo);
 
-        when(jpaRepo.findByEmail("unknown@test.com")).thenReturn(Optional.empty());
+        when(jpaRepo.findByEmailAndStatus("unknown@test.com", "ACTIVE")).thenReturn(Optional.empty());
 
-        Optional<StudentDirectory> result = adapter.findByEmail("unknown@test.com");
+        Optional<StudentDirectory> result = adapter.findActiveByEmail("unknown@test.com");
         assertThat(result.isEmpty()).isTrue();
     }
 }

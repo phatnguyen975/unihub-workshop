@@ -2,7 +2,7 @@ package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.ApiResponse;
-import com.unihub.workshop.shared.exception.AppException;
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
@@ -12,7 +12,6 @@ import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.CursorResponse;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.IngestionJobItem;
 import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
@@ -35,12 +34,7 @@ public class IngestionJobController {
             @RequestParam(required = false, defaultValue = "20") Integer size,
             Authentication authentication) {
 
-        JwtAuthenticatedPrincipal principal = (JwtAuthenticatedPrincipal) authentication.getPrincipal();
-        String orgIdStr = principal.org();
-        if (orgIdStr == null) {
-            throw new ForbiddenException("Missing org claim in token");
-        }
-        UUID orgId = UUID.fromString(orgIdStr);
+        UUID orgId = extractOrganizationId(authentication);
 
         CursorPage<IngestionJobReport> page = listUseCase.execute(orgId, cursor, size);
 
@@ -69,15 +63,10 @@ public class IngestionJobController {
         try {
             jobUuid = UUID.fromString(jobId);
         } catch (IllegalArgumentException e) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "urn:unihub:error:validation", "Invalid UUID format");
+            throw new BadRequestException("Invalid UUID format");
         }
 
-        JwtAuthenticatedPrincipal principal = (JwtAuthenticatedPrincipal) authentication.getPrincipal();
-        String orgIdStr = principal.org();
-        if (orgIdStr == null) {
-            throw new ForbiddenException("Missing org claim in token");
-        }
-        UUID orgId = UUID.fromString(orgIdStr);
+        UUID orgId = extractOrganizationId(authentication);
 
         var result = getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
         RejectArtifactUrlResponse responseDto = new RejectArtifactUrlResponse(
@@ -86,5 +75,20 @@ public class IngestionJobController {
                 result.downloadUrl(),
                 result.expiresAt());
         return ApiResponse.success(responseDto, "Pre-signed download URL generated");
+    }
+
+    private UUID extractOrganizationId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof JwtAuthenticatedPrincipal principal)) {
+            throw new ForbiddenException("Missing or invalid authentication principal");
+        }
+        String orgIdStr = principal.org();
+        if (orgIdStr == null || orgIdStr.isBlank()) {
+            throw new ForbiddenException("Missing org claim in token");
+        }
+        try {
+            return UUID.fromString(orgIdStr);
+        } catch (IllegalArgumentException e) {
+            throw new ForbiddenException("Invalid org claim in token");
+        }
     }
 }

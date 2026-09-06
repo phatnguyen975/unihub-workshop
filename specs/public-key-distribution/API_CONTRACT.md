@@ -2,7 +2,7 @@
 
 > **Status:** APPROVED  
 > **Spec:** `specs/public-key-distribution/SPEC.md`  
-> **Last revised:** 2026-09-03
+> **Last revised:** 2026-09-05
 
 ## 1. Overview
 
@@ -14,7 +14,6 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 - **Pagination convention:** Not applicable — this endpoint returns a single resource object, not a collection.
 - **Success response shape:** Standard `ApiResponse<T>` envelope: `{ "success": true, "message": "...", "data": { ... }, "metadata": { "processedBy": "...", "traceId": "..." } }`. Null fields are omitted (`@JsonInclude(NON_NULL)`).
 - **Error response format:** RFC 7807 Problem Details wrapped in the `ApiResponse` error envelope: `{ "success": false, "error": { "type": "urn:unihub:error:...", "title": "...", "status": <code>, "detail": "...", "instance": "..." }, "metadata": { "processedBy": "...", "traceId": "..." } }`.
-- **Idempotency-key convention:** Not applicable — this is a `GET` endpoint (read-only, inherently idempotent by HTTP method semantics).
 - **Auth header convention:** `Authorization: Bearer <access_token>` (RS256-signed JWT). Required on this endpoint.
 - **Date/time formatting convention:** ISO 8601 in UTC with trailing `Z` (e.g., `2026-09-03T05:42:00Z`).
 
@@ -23,8 +22,7 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 ### GET /api/v1/auth/public-key
 
 **Description:** Returns the currently active RSA public key in PEM format, along with a deterministic key identifier and the timestamp at which the key was fetched.  
-**Required Role / Auth:** `AUTHENTICATED | STAFF`. Users must be authenticated with a valid, non-revoked RS256 JWT, and must possess the `STAFF` role. Unauthenticated requests are rejected with `401`. Requests from other roles are rejected with `403`.  
-**Idempotency Requirement:** Not Required — this is a `GET` request; the HTTP method guarantees safe, repeatable semantics with no side effects.
+**Required Role / Auth:** `AUTHENTICATED | STAFF`. Users must be authenticated with a valid, non-revoked RS256 JWT, and must possess the `STAFF` role. Unauthenticated requests are rejected with `401`. Requests from other roles are rejected with `403`.
 
 #### Request
 
@@ -76,12 +74,69 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 
 **Error Responses:**
 
-| Status                      | Error `type` (URN)                     | Condition                                                                                                                                                                                                                                                  |
-| :-------------------------- | :------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `401 Unauthorized`          | `urn:unihub:error:authentication`      | `Authorization` header is missing, the token format is invalid (not `Bearer <token>`), the JWT signature verification fails, the JWT is expired (`exp` claim in the past), the JWT is malformed, or the JWT's `jti` is present in the Redis JTI blacklist. |
-| `403 Forbidden`             | `urn:unihub:error:forbidden`           | The authenticated user does not have the `STAFF` role.                                                                                                                                                                                                     |
-| `503 Service Unavailable`   | `urn:unihub:error:service-unavailable` | Redis is unavailable; the JTI blacklist check cannot be performed (fail-closed per ADR-010, BR-04). This is produced by the authentication filter before the endpoint handler is reached.                                                                  |
-| `500 Internal Server Error` | `urn:unihub:error:internal`            | An unexpected server-side error occurs (e.g., PEM serialization fails for an unknown reason). This should not occur in normal operation as key material is validated at startup.                                                                           |
+| Status | Error `type` (URN)                     | Title                 | Condition                                                                                                                                                                                                                                                  |
+| :----- | :------------------------------------- | :-------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401`  | `urn:unihub:error:unauthorized`        | Unauthorized          | `Authorization` header is missing, the token format is invalid (not `Bearer <token>`), the JWT signature verification fails, the JWT is expired (`exp` claim in the past), the JWT is malformed, or the JWT's `jti` is present in the Redis JTI blacklist. |
+| `403`  | `urn:unihub:error:forbidden`           | Forbidden             | The authenticated user does not have the `STAFF` role.                                                                                                                                                                                                     |
+| `500`  | `urn:unihub:error:internal`            | Internal Server Error | An unexpected server-side error occurs (e.g., PEM serialization fails for an unknown reason). This should not occur in normal operation as key material is validated at startup.                                                                           |
+| `503`  | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis is unavailable; the JTI blacklist check cannot be performed (fail-closed per ADR-010, BR-04). This is produced by the authentication filter before the endpoint handler is reached. Includes `Retry-After: 30` header.                               |
+
+**RFC 7807 Error body shape (401 Unauthorized):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:unauthorized",
+    "title": "Unauthorized",
+    "status": 401,
+    "detail": "Full authentication is required to access this resource",
+    "instance": "/api/v1/auth/public-key"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**RFC 7807 Error body shape (403 Forbidden):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:forbidden",
+    "title": "Forbidden",
+    "status": 403,
+    "detail": "Access Denied",
+    "instance": "/api/v1/auth/public-key"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**RFC 7807 Error body shape (503 Service Unavailable):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:service-unavailable",
+    "title": "Service Unavailable",
+    "status": 503,
+    "detail": "Redis service is unavailable",
+    "instance": "/api/v1/auth/public-key"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 #### Side Effects
 
@@ -90,17 +145,13 @@ None. This is a read-only endpoint. No database records are created or modified.
 #### Spec Traceability
 
 - **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07, FR-08
-- **Satisfies Scenarios:** Scenario 1, Scenario 2, Scenario 3, Scenario 4, Scenario 5, Scenario 6, Scenario 7, Scenario 8
+- **Satisfies Scenarios:** Scenario 1, Scenario 2, Scenario 3, Scenario 4, Scenario 5, Scenario 6, Scenario 7, Scenario 8, Scenario 9
 
 ## 4. Rate Limiting Behavior
 
 This endpoint is **not** subject to the Bucket4j registration rate-limit tier (which is restricted to `/api/v1/registrations/**` paths, per `application.yml`). Standard server-side TCP connection limits at the Nginx gateway layer apply. No custom per-user rate limit is applied to this endpoint.
 
-## 5. Idempotency Behavior
-
-Not applicable. This endpoint is a `GET` request. HTTP `GET` is defined as safe and idempotent by RFC 9110 — calling it multiple times with the same input produces the same output and has no side effects. No `Idempotency-Key` header is accepted or required.
-
-## 6. Cross-Endpoint Consistency Notes
+## 5. Cross-Endpoint Consistency Notes
 
 - **Response envelope:** Follows the same `ApiResponse<T>` envelope as all other `GET` endpoints in the `iam` module.
 - **Error shape:** Uses the same RFC 7807 error URN namespace (`urn:unihub:error:...`) as all other endpoints in the system. The `401` error shape is identical to what the `/api/v1/auth/login` endpoint produces when a JWT check fails.

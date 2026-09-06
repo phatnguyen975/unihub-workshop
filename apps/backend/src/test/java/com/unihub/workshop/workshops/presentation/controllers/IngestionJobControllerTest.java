@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.security.RedisJtiValidator;
 import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
@@ -14,6 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 
 import java.time.Instant;
 import java.util.List;
@@ -100,11 +102,51 @@ class IngestionJobControllerTest {
         when(jwtDecoder.decode(anyString())).thenReturn(createMockJwt("ORGANIZER", orgId));
 
         when(listUseCase.execute(eq(orgId), isNull(), eq(0)))
-                .thenThrow(new com.unihub.workshop.shared.exception.AppException(org.springframework.http.HttpStatus.BAD_REQUEST, "urn:unihub:error:validation", "Invalid cursor"));
+                .thenThrow(new BadRequestException("Invalid cursor"));
 
         mockMvc.perform(get("/api/v1/admin/ingestion-jobs?size=0")
                 .header("Authorization", "Bearer token"))
-                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
-                .andExpect(status().isBadRequest());
+                .andDo(MockMvcResultHandlers.print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:bad-request"));
+    }
+
+    @Test
+    void getIngestionJobs_whenNoMorePages_omitsNextCursor() throws Exception {
+        UUID orgId = UUID.randomUUID();
+        when(jwtDecoder.decode(anyString())).thenReturn(createMockJwt("ORGANIZER", orgId));
+
+        IngestionJobReport report = new IngestionJobReport(
+                UUID.randomUUID(), 1L, orgId, "file.csv", IngestionJobOutcome.COMPLETED,
+                100, 0, null, null, Instant.now(), Instant.now(), Instant.now());
+        CursorPage<IngestionJobReport> page = new CursorPage<>(List.of(report), null, false);
+
+        when(listUseCase.execute(eq(orgId), isNull(), eq(20))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/admin/ingestion-jobs")
+                .header("Authorization", "Bearer token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.cursor.hasMore").value(false))
+                .andExpect(jsonPath("$.data.cursor.nextCursor").doesNotExist());
+    }
+
+    @Test
+    void getIngestionJobs_withInvalidOrgClaim_returns403() throws Exception {
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "none")
+                .claim("sub", "user-123")
+                .claim("org", "not-a-uuid")
+                .claim("jti", "jti-123")
+                .claim("role", "ORGANIZER")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+        when(jwtDecoder.decode(anyString())).thenReturn(jwt);
+
+        mockMvc.perform(get("/api/v1/admin/ingestion-jobs")
+                .header("Authorization", "Bearer token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:forbidden"));
     }
 }

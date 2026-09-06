@@ -46,10 +46,6 @@ public class OtpService {
         return Instant.now().plus(Duration.ofMinutes(ttlMinutes));
     }
 
-    public int getTtlMinutes() {
-        return ttlMinutes;
-    }
-
     public String generateOtp() {
         int code = secureRandom.nextInt(1_000_000);
         return String.format("%06d", code);

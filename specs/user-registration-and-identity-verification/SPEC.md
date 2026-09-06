@@ -2,274 +2,242 @@
 
 > **Status:** APPROVED  
 > **Domain:** 1 — Identity & Access Management  
-> **Owner/area:** `iam` module (Spring Modulith), `notifications` worker  
-> **Last revised:** 2026-09-03 — first version
+> **Owner/area:** `iam` module (Spring Modulith Core Monolith)  
+> **Last revised:** 2026-09-05 — first version
 
 ## 1. Overview
 
-This feature enables a new user with the `STUDENT` role to self-register on the UniHub platform. Upon submitting their registration details, the system creates the account in an **inactive** state (`is_active = false`) and immediately attempts to cross-reference the submitted email against the `student_directory` table to establish a verified identity link (`student_record_id`). A 6-digit numeric One-Time Password (OTP) is generated, its hash stored in the `password_reset_tokens` table with a defined expiry TTL, and a domain event is published so the `notifications` worker delivers the OTP to the user's email. A dedicated endpoint lets the user submit that OTP to activate their account (`is_active = true`). A shared OTP resend endpoint (also used by the password-reset flow in Feature 1.4) allows requesting a fresh OTP when the original has expired or been lost. This is the **only** self-service account-creation path; all other account types (`ORGANIZER`, `STAFF`) are provisioned by an `ORGANIZER` and are out of scope here.
+This feature enables a new user with the `STUDENT` role to self-register on the UniHub platform. Upon submitting their registration details, the system creates the account in an **inactive** state (`is_active = false`) and cross-references the submitted email against the `student_directory` table (requiring `status = 'ACTIVE'`) to establish a verified identity link (`users.student_record_id`).
+
+A 6-digit numeric One-Time Password (OTP) is generated, its HMAC-SHA256 hash is persisted in the `user_verification_tokens` table with a configurable expiry TTL (default: 15 minutes, configurable via `app.auth.otp.ttl-minutes` or `.env`), and `token_type = 'ACTIVATION_OTP'`. The system publishes an `OtpRequestedEvent` to Spring Modulith's transactional outbox (`event_publication` table) externalized to RabbitMQ (`unihub.events::notifications`) so the `notifications` worker can deliver the code via email (actual worker-side email delivery is decoupled and owned by a separate worker feature).
+
+A dedicated verification endpoint (`POST /api/v1/auth/activate`) allows the user to submit the 6-digit OTP to activate their account (`is_active = true`). A shared OTP resend endpoint (`POST /api/v1/auth/otp/resend`) handles requesting fresh verification codes:
+
+- For inactive accounts (`is_active = false`), it invalidates previous active `ACTIVATION_OTP` tokens and issues a fresh `ACTIVATION_OTP`.
+- For active accounts (`is_active = true`), it delegates to the forgot-password flow (Feature 1.4) by invalidating previous active `PASSWORD_RESET_OTP` tokens and issuing a fresh `PASSWORD_RESET_OTP`.
+
+This is the **only** self-service account-creation path; all other account types (`ORGANIZER`, `STAFF`) are provisioned by an `ORGANIZER` (Feature 1.5) and are out of scope here.
 
 ## 2. Actors & Preconditions
 
-| Actor                | Precondition                                                                                                                                   |
-| :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unauthenticated user | No prior account exists for the submitted email address in the `users` table. The platform must be reachable.                                  |
-| Unverified user      | A `users` record exists for the email with `is_active = false` and an unexpired, unconsumed OTP exists in `password_reset_tokens`.             |
-| Unverified user      | For the OTP resend path: a `users` record with `is_active = false` exists for the submitted email, regardless of whether an OTP is still live. |
+| Actor                                    | Precondition                                                                                                                                                       |
+| :--------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Unauthenticated user (Guest)**         | No prior account exists for the submitted email address in the `users` table. The platform is reachable.                                                           |
+| **Unverified student**                   | A `users` record exists with `is_active = false`, and an unexpired, unconsumed OTP exists in `user_verification_tokens` with `token_type = 'ACTIVATION_OTP'`.      |
+| **Unverified student / Registered user** | For the OTP resend endpoint: A `users` record exists for the submitted email (either `is_active = false` for activation or `is_active = true` for password reset). |
 
 ## 3. Functional Requirements
 
 ### 3.1 Registration
 
-- **FR-01:** The system SHALL create a new `STUDENT` user record when a valid registration payload (email, password, full name) is submitted and no existing user shares the same email.
-- **FR-02:** The system SHALL set `is_active = false` and `role = STUDENT` on the newly created user record.
-- **FR-03:** The system SHALL check the `student_directory` table for a record whose email (case-insensitive) matches the submitted email. If a match is found, the system SHALL populate `users.student_record_id` with that directory record's `id`. If no match is found, the system SHALL leave `student_record_id` as `NULL`.
-- **FR-04:** The system SHALL generate a cryptographically random 6-digit numeric OTP, hash it using HMAC-SHA256 with a server-side secret, and persist the hash in `password_reset_tokens` with an expiry TTL of 15 minutes and a reference to the new user.
-- **FR-05:** The system SHALL publish a domain event carrying the user's email address and the plain-text OTP so the `notifications` worker can deliver it via email.
-- **FR-06:** The system SHALL reject the registration with an appropriate conflict error when the submitted email already exists in the `users` table, regardless of the existing account's `is_active` status.
-- **FR-07:** The system SHALL reject the registration when the submitted email fails standard format validation (RFC 5321, max 254 chars).
-- **FR-08:** The system SHALL reject the registration when the submitted password does not meet complexity requirements (min 8 chars, max 255 chars, at least one uppercase letter, one lowercase letter, one digit, one special character).
-- **FR-09:** The system SHALL store the user's password as a hash; the plain-text password must never be persisted or included in any response or event payload.
-- **FR-10:** The system SHALL set the new user's `organization_id` to match the `student_directory` record if one is found. If no directory match is found, `organization_id` SHALL be `NULL`.
+- **FR-01:** The system SHALL create a new `STUDENT` user record when a valid registration payload (email, password, full name) is submitted and no existing user shares the same email (case-insensitive `CITEXT`).
+- **FR-02:** The system SHALL set `is_active = false`, `is_temporary_password = false`, and `role = STUDENT` on the newly created user record.
+- **FR-03:** The system SHALL check the `student_directory` table for an active record (`status = 'ACTIVE'`) whose email matches the normalized submitted email (case-insensitive).
+  - If an active match is found: The system SHALL populate `users.student_record_id` with that directory record's `id`, and `users.organization_id` with `student_directory.organization_id`.
+  - If no match is found or the directory record is `INACTIVE`: The system SHALL set `users.student_record_id = NULL` and `users.organization_id = NULL`.
+- **FR-04:** The system SHALL generate a cryptographically secure 6-digit numeric OTP (`[0-9]{6}`), hash it using HMAC-SHA256 with a server-side secret key, and persist the hash in `user_verification_tokens` with `token_type = 'ACTIVATION_OTP'`, a configurable TTL (default: 15 minutes), and a foreign key reference to the new user.
+- **FR-05:** The system SHALL publish an `OtpRequestedEvent` (carrying `userId`, `email`, plain-text `otp`, and `purpose = 'ACTIVATION'`) to Spring Modulith's transactional outbox table (`event_publication`) externalized to RabbitMQ exchange `unihub.events::notifications`.
+- **FR-06:** The system SHALL reject registration with a `409 Conflict` error when the submitted email already exists in the `users` table, regardless of the existing account's `is_active` status.
+- **FR-07:** The system SHALL reject registration with a `422 Unprocessable Content` validation error when the submitted payload fails field constraints (e.g. missing fields, blank name, invalid email format per RFC 5321, or email length > 254 chars).
+- **FR-08:** The system SHALL reject registration with a `422 Unprocessable Content` validation error when the password does not satisfy complexity requirements (min 8 chars, max 255 chars, at least one uppercase letter, one lowercase letter, one digit, and one special character).
+- **FR-09:** The system SHALL hash user passwords using **Argon2** (`Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()`). Plain-text passwords must never be logged, persisted, or leaked.
+- **FR-10:** Registration requests with malformed JSON syntax or unreadable body SHALL be rejected with `400 Bad Request`.
 
 ### 3.2 Account Activation via OTP
 
-- **FR-11:** The system SHALL set `is_active = true` on a user record and mark the OTP as consumed (`used_at = now()`) when a valid, unexpired, unconsumed OTP is submitted for that user's email.
-- **FR-12:** The system SHALL reject OTP verification when the submitted OTP does not match the active (unexpired, unconsumed) token for the given email.
-- **FR-13:** The system SHALL reject OTP verification when the OTP has expired (i.e., `expires_at < now()`).
-- **FR-14:** The system SHALL reject OTP verification when the OTP has already been consumed (i.e., `used_at IS NOT NULL`).
-- **FR-15:** The system SHALL reject OTP verification when no `users` record exists for the submitted email.
-- **FR-16:** The system SHALL reject OTP verification when the user account is already active (`is_active = true`).
+- **FR-11:** The system SHALL set `is_active = true` and mark the OTP token consumed (`used_at = now()`, `updated_at = now()`) in `user_verification_tokens` when a valid, unexpired, unconsumed OTP of `token_type = 'ACTIVATION_OTP'` is submitted for an inactive account.
+- **FR-12:** The system SHALL reject OTP verification with a `422 Unprocessable Content` error (`urn:unihub:error:validation`, including `validationErrors: ["otp: Invalid or expired activation code."]`) using a **uniform error detail message** (`"Invalid or expired activation code."`) whenever:
+  - The submitted OTP does not match the stored HMAC-SHA256 hash.
+  - The active OTP has expired (`expires_at < now()`).
+  - The OTP has already been consumed (`used_at IS NOT NULL`).
+  - No user record exists for the submitted email.
+- **FR-13:** The system SHALL reject OTP verification with `409 Conflict` (`urn:unihub:error:conflict`) when the user account is already active (`is_active = true`).
+- **FR-14:** The system SHALL reject OTP verification with `422 Unprocessable Content` (`urn:unihub:error:validation`, with `validationErrors`) when the request payload fails validation (e.g. invalid email format or OTP string not conforming to `^[0-9]{6}$`).
 
-### 3.3 OTP Resend
+### 3.3 Shared OTP Resend
 
-- **FR-17:** The system SHALL invalidate all existing unconsumed OTP tokens for the user (by setting `used_at = now()` on each) before generating a new OTP, when a valid resend request is received.
-- **FR-18:** The system SHALL generate, persist, and publish a fresh OTP (same mechanism as FR-04/FR-05) when a resend request is received for an email address that has an inactive account.
-- **FR-19:** The system SHALL reject the OTP resend when no inactive user account exists for the submitted email (account not found, or already active).
+- **FR-15:** The system SHALL provide a shared resend endpoint (`POST /api/v1/auth/otp/resend`) accepting `{ "email": "..." }`.
+- **FR-16:** When the submitted email belongs to an inactive account (`users.is_active = false`):
+  - The system SHALL invalidate all existing unconsumed OTP tokens for that user **scoped to `token_type = 'ACTIVATION_OTP'`** (by setting `used_at = now()`).
+  - The system SHALL generate a fresh 6-digit numeric OTP, persist its HMAC-SHA256 hash in `user_verification_tokens` with `token_type = 'ACTIVATION_OTP'` and the configured TTL.
+  - The system SHALL publish an `OtpRequestedEvent` with `purpose = 'ACTIVATION'` to the transactional outbox.
+- **FR-17:** When the submitted email belongs to an active account (`users.is_active = true`):
+  - The system SHALL invalidate all existing unconsumed OTP tokens for that user **scoped to `token_type = 'PASSWORD_RESET_OTP'`** (by setting `used_at = now()`).
+  - The system SHALL generate a fresh 6-digit numeric OTP, persist its HMAC-SHA256 hash in `user_verification_tokens` with `token_type = 'PASSWORD_RESET_OTP'` and the configured TTL.
+  - The system SHALL publish an `OtpRequestedEvent` with `purpose = 'PASSWORD_RESET'` to the transactional outbox.
+- **FR-18:** The system SHALL reject the resend request with `404 Not Found` (`urn:unihub:error:not-found`) when no user account exists with the submitted email.
+- **FR-19:** The system SHALL reject the resend request with `422 Unprocessable Content` (`urn:unihub:error:validation`) when the email is missing or malformed.
 
 ## 4. Business Rules
 
-- **BR-01:** Email must conform to standard format (RFC 5321) and must not exceed 254 characters. The `users.email` column is `CITEXT` (case-insensitive); uniqueness is enforced at the database level. Source: `docs/database-schema.md §users`.
-- **BR-02:** Password must be at minimum 8 characters and at most 255 characters, and must contain at least one uppercase letter, one lowercase letter, one digit, and one special character. Source: `docs/feature-catalog.md §1.1 Key Constraints`.
-- **BR-03:** The OTP is a 6-digit numeric string. It is stored only as an HMAC-SHA256 hash in `password_reset_tokens.token_hash`; the plain-text OTP is never persisted. Source: `docs/feature-catalog.md §1.1 Key Constraints`.
-- **BR-04:** OTP storage is direct database only — Redis is **not** used for OTP storage in this flow. Source: `docs/feature-catalog.md §1.1 Key Constraints`.
-- **BR-05:** The `student_record_id` link is established at registration time by an exact email match (case-insensitive) against `student_directory.email`. A user with `student_record_id = NULL` may log in and update their profile but is **blocked** from registering for any workshop. Source: `docs/database-schema.md §users note`.
-- **BR-06:** OTP tokens are single-use. Once consumed (verified), `used_at` is set and the token must never be accepted again. Source: `docs/database-schema.md §password_reset_tokens CAUTION`.
-- **BR-07:** The `role` for self-registered users is always `STUDENT`. No other role may be self-assigned. Source: `docs/feature-catalog.md §1.1`.
-- **BR-08:** A user account with `is_active = false` must not be able to authenticate (login). The login flow (Feature 1.2) enforces this gate. Source: `docs/feature-catalog.md §1.2`.
-- **BR-09:** The password hash algorithm must be Argon2. Source: `docs/database-schema.md §users`.
-- **BR-10:** All audit fields (`created_at`, `updated_at`) must be populated on the new `users` and `password_reset_tokens` records. The `created_by` and `updated_by` fields are `NULL` for self-registered accounts (no authenticated actor). Source: `docs/database-schema.md §Overview`.
-- **BR-11:** The OTP resend endpoint is shared with the password-reset flow (Feature 1.4). This spec governs only the behaviour when the target account has `is_active = false` (registration context). Feature 1.4 governs the active-account context.
+- **BR-01:** Email must conform to RFC 5321 and must not exceed 254 characters. Stored in PostgreSQL as `CITEXT` (case-insensitive); uniqueness is strictly enforced by `uq_users_email`.
+- **BR-02:** Passwords must be at least 8 and at most 255 characters, containing at least one uppercase letter, one lowercase letter, one digit, and one special character.
+- **BR-03:** Passwords must be hashed using **Argon2** (`Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()`). BCrypt is strictly prohibited.
+- **BR-04:** The OTP is a 6-digit numeric string (`^[0-9]{6}$`). The plain-text OTP is never stored in the database; only its HMAC-SHA256 hash is persisted in `user_verification_tokens.token_hash`.
+- **BR-05:** OTP storage is direct PostgreSQL database only — Redis is **not** used for OTP storage in this flow.
+- **BR-06:** The OTP TTL defaults to 15 minutes, but MUST be configurable via environment variables / application configuration (`app.auth.otp.ttl-minutes`).
+- **BR-07:** The `student_record_id` link is established at registration by an exact email match against `student_directory.email` where `status = 'ACTIVE'`. Users with `student_record_id = NULL` can log in and update their profile, but are blocked from registering for workshops.
+- **BR-08:** OTP tokens are single-use. Once verified, `used_at` is set to `now()`. Invalidation and lookups MUST always be scoped by `token_type` (`ACTIVATION_OTP` vs `PASSWORD_RESET_OTP`) to prevent cross-flow token conflicts.
+- **BR-09:** The role for self-registered users is always `STUDENT`. No other role can be self-assigned.
+- **BR-10:** A user account with `is_active = false` cannot authenticate (login). The login flow (Feature 1.2) enforces this gate.
+- **BR-11:** All audit fields (`created_at`, `updated_at`) must be populated. The `created_by` and `updated_by` fields are `NULL` for self-registered users.
 
 ## 5. State Transitions
 
-This feature governs the `is_active` lifecycle of the `users` entity for `STUDENT` accounts.
+### User Account State Transitions (`users.is_active`):
 
-| From State                     | Event / Trigger                      | To State                       | Valid? | Rejection Behavior (if invalid)                            |
-| :----------------------------- | :----------------------------------- | :----------------------------- | :----: | :--------------------------------------------------------- |
-| _(not exists)_                 | Successful registration submission   | `is_active = false` (INACTIVE) |   ✅   | —                                                          |
-| _(not exists)_                 | Registration with duplicate email    | _(unchanged)_                  |   ❌   | `409 Conflict` — email already registered                  |
-| `is_active = false` (INACTIVE) | Valid OTP submission                 | `is_active = true` (ACTIVE)    |   ✅   | —                                                          |
-| `is_active = false` (INACTIVE) | Invalid / expired / already-used OTP | `is_active = false` (INACTIVE) |   ❌   | `422 Unprocessable Entity` — OTP invalid or expired        |
-| `is_active = false` (INACTIVE) | OTP resend request                   | `is_active = false` (INACTIVE) |   ✅   | — (previous OTPs invalidated, new OTP issued)              |
-| `is_active = true` (ACTIVE)    | OTP verification attempt             | _(unchanged)_                  |   ❌   | `409 Conflict` — account already active                    |
-| `is_active = true` (ACTIVE)    | OTP resend attempt                   | _(unchanged)_                  |   ❌   | `422 Unprocessable Entity` — no inactive account for email |
+| From State          | Event / Trigger                      | To State            | Valid? | HTTP Status & Error Code                                    |
+| :------------------ | :----------------------------------- | :------------------ | :----: | :---------------------------------------------------------- |
+| _(None)_            | Valid registration submitted         | `is_active = false` |   ✅   | `201 Created`                                               |
+| _(None)_            | Registration with duplicate email    | _(Unchanged)_       |   ❌   | `409 Conflict` (`urn:unihub:error:conflict`)                |
+| `is_active = false` | Valid `ACTIVATION_OTP` submitted     | `is_active = true`  |   ✅   | `200 OK`                                                    |
+| `is_active = false` | Invalid / expired / consumed OTP     | `is_active = false` |   ❌   | `422 Unprocessable Content` (`urn:unihub:error:validation`) |
+| `is_active = false` | Resend OTP request                   | `is_active = false` |   ✅   | `200 OK` (New `ACTIVATION_OTP` issued)                      |
+| `is_active = true`  | Activation attempt on active account | `is_active = true`  |   ❌   | `409 Conflict` (`urn:unihub:error:conflict`)                |
+| `is_active = true`  | Resend OTP request                   | `is_active = true`  |   ✅   | `200 OK` (New `PASSWORD_RESET_OTP` issued)                  |
 
-OTP token state transitions in `password_reset_tokens`:
+### Verification Token State Transitions (`user_verification_tokens`):
 
-| From State            | Event / Trigger              | To State                        | Valid? | Rejection Behavior (if invalid)               |
-| :-------------------- | :--------------------------- | :------------------------------ | :----: | :-------------------------------------------- |
-| _(not exists)_        | Registration / OTP resend    | `used_at = NULL` (ACTIVE)       |   ✅   | —                                             |
-| `used_at = NULL`      | Valid OTP submission         | `used_at = now()` (CONSUMED)    |   ✅   | —                                             |
-| `used_at IS NOT NULL` | Any OTP verification attempt | _(unchanged)_                   |   ❌   | `422 Unprocessable Entity` — OTP already used |
-| `expires_at < now()`  | OTP verification attempt     | _(unchanged)_                   |   ❌   | `422 Unprocessable Entity` — OTP expired      |
-| `used_at = NULL`      | OTP resend                   | `used_at = now()` (INVALIDATED) |   ✅   | —                                             |
+| From State            | Event / Trigger                  | To State                        | Valid? | Rejection Behavior                                          |
+| :-------------------- | :------------------------------- | :------------------------------ | :----: | :---------------------------------------------------------- |
+| _(None)_              | Registration / Resend request    | `used_at = NULL` (ACTIVE)       |   ✅   | —                                                           |
+| `used_at = NULL`      | Valid OTP submission             | `used_at = now()` (CONSUMED)    |   ✅   | —                                                           |
+| `used_at IS NOT NULL` | Any OTP verification attempt     | _(Unchanged)_                   |   ❌   | `422 Unprocessable Content` (`urn:unihub:error:validation`) |
+| `expires_at < now()`  | Expired OTP verification attempt | _(Unchanged)_                   |   ❌   | `422 Unprocessable Content` (`urn:unihub:error:validation`) |
+| `used_at = NULL`      | OTP resend for same `token_type` | `used_at = now()` (INVALIDATED) |   ✅   | —                                                           |
 
 ## 6. Non-Functional Requirements
 
-- **Performance:** Registration and OTP verification endpoints must complete primary database operations within the system's standard request latency envelope. Email delivery is decoupled via the outbox/event pattern and must not block the HTTP response.
-- **Concurrency:** Concurrent registration attempts with the same email must result in exactly one account creation; the database `UNIQUE` constraint on `users.email` (CITEXT) is the ultimate enforcement gate.
-- **Idempotency:** Registration is **not** idempotent — a second call with the same email must return `409 Conflict`. OTP resend is safe to repeat — each call invalidates prior tokens and issues a new one. OTP verification is effectively idempotent on the first successful call; subsequent calls on an already-active account return `409 Conflict`.
-- **Rate-limiting:** These endpoints are public (unauthenticated) and must be covered by the global Bucket4j rate limiter on the application filter layer to prevent brute-force OTP guessing and registration spam.
-- **Security:**
-  - Passwords must never appear in logs, events, or responses.
-  - OTP plain-text must never be persisted; only the hash is stored in the database.
-  - OTP verification error responses must use a uniform message for all failed-validation cases (incorrect OTP, expired OTP, already used OTP) to prevent distinguishing between these states, reducing enumeration risk.
-  - The hash algorithm for OTPs in `password_reset_tokens.token_hash` must be HMAC-SHA256 with a server-side secret to prevent offline brute-force attacks.
-- **Reliability / Failure modes:** If the domain event publication to the outbox fails, the entire registration transaction must roll back atomically — the user record and OTP token must not be persisted without a corresponding event in the outbox. Spring Modulith's transactional outbox provides this guarantee.
-- **Observability:** Each registration attempt, OTP verification attempt, and resend attempt must produce a structured log entry (per `docs/api-standards.md §API Logging`) that includes the correlation ID but **never** includes the email address or any credential.
+- **Performance:** Registration, OTP activation, and resend operations must complete primary database writes within standard latency (< 100ms). Asynchronous email notification is offloaded to RabbitMQ via the outbox pattern and does not block HTTP responses.
+- **Concurrency & Atomicity:** Database unique constraint on `users.email` (`CITEXT`) protects against race conditions during concurrent registrations. If outbox event publication fails, the entire transaction rolls back atomically.
+- **Rate Limiting:** All three endpoints are public (unauthenticated) and must be protected by the global Bucket4j Token Bucket rate limiter (returning `429 Too Many Requests` with `X-RateLimit-*` headers when exceeded) to prevent brute-forcing OTPs and spam registrations.
+- **Security & Anti-Enumeration:**
+  - Passwords and plain-text OTPs must never appear in application logs or HTTP responses.
+  - OTP verification error responses use a uniform message (`"Invalid or expired activation code."`) across all failure causes (wrong code, expired, already consumed, user not found) to prevent timing and enumeration attacks.
+  - OTP hashing uses HMAC-SHA256 with a server-side secret key.
+- **Observability:** Structured JSON logging compatible with ELK/Prometheus emitting `traceId`, `http.method`, `http.uri`, `http.status`, and `duration_ms` without logging sensitive credentials or emails.
 
 ## 7. Acceptance Criteria
 
-### Scenario 1: Successful registration with matched student directory entry
+### Scenario 1: Successful registration with matched active student directory entry
 
 ```gherkin
-Given no user account exists for "alice@university.edu"
-And a student directory record exists with email "alice@university.edu"
+Given no user account exists for "student.alice@student.hcmus.edu.vn"
+And an active student directory record exists with email "student.alice@student.hcmus.edu.vn"
 When an unauthenticated client submits a valid registration payload
-  (email: "alice@university.edu", password: "Str0ng!Pass", fullName: "Alice Smith")
-Then the system creates a new user with role STUDENT and is_active = false
-And student_record_id is populated with the matched directory record's id
-And a password_reset_tokens record is created with used_at = NULL and a future expires_at
-And a domain event carrying the OTP is published to the notifications worker
-And the HTTP response is 201 Created containing the new user's id
+  (email: "student.alice@student.hcmus.edu.vn", password: "StrongPassword123!", fullName: "Alice Nguyen")
+Then the system creates a new user with role STUDENT, is_active = false, is_temporary_password = false
+And password_hash is an Argon2 encoded string
+And student_record_id is linked to the matched directory record's id
+And organization_id is set to the student directory record's organization_id
+And a user_verification_tokens record is created with token_type = 'ACTIVATION_OTP', used_at = NULL, and expires_at = now() + configured TTL
+And an OtpRequestedEvent (purpose: 'ACTIVATION') is persisted to event_publication for RabbitMQ externalization
+And the HTTP response is 201 Created with JSON envelope containing data.userId
 ```
-
-_(Traces to: FR-01, FR-02, FR-03, FR-04, FR-05)_
 
 ### Scenario 2: Successful registration without student directory match
 
 ```gherkin
-Given no user account exists for "bob@external.com"
-And no student directory record exists with email "bob@external.com"
+Given no user account exists for "guest.bob@gmail.com"
+And no student directory record exists for "guest.bob@gmail.com"
 When an unauthenticated client submits a valid registration payload
-  (email: "bob@external.com", password: "Str0ng!Pass", fullName: "Bob Jones")
-Then the system creates a new user with role STUDENT, is_active = false, and student_record_id = NULL
-And a domain event carrying the OTP is published
-And the HTTP response is 201 Created containing the new user's id
+  (email: "guest.bob@gmail.com", password: "StrongPassword123!", fullName: "Bob Jones")
+Then the system creates a new user with role STUDENT, is_active = false, student_record_id = NULL, and organization_id = NULL
+And a user_verification_tokens record is created with token_type = 'ACTIVATION_OTP'
+And the HTTP response is 201 Created containing data.userId
 ```
-
-_(Traces to: FR-01, FR-02, FR-03, FR-04, FR-05)_
 
 ### Scenario 3: Registration rejected — duplicate email
 
 ```gherkin
-Given a user account already exists for "alice@university.edu"
-When an unauthenticated client submits a registration payload with email "alice@university.edu"
-Then the system does not create any new user record or OTP token
-And the HTTP response is 409 Conflict
+Given a user account already exists for "student.alice@student.hcmus.edu.vn"
+When an unauthenticated client submits registration with email "student.alice@student.hcmus.edu.vn"
+Then no new user or verification token is created
+And the HTTP response is 409 Conflict with error.type = "urn:unihub:error:conflict"
 ```
 
-_(Traces to: FR-06)_
-
-### Scenario 4: Registration rejected — invalid email format
+### Scenario 4: Registration rejected — weak password
 
 ```gherkin
-Given no user account exists for "not-an-email"
-When an unauthenticated client submits email "not-an-email"
-Then the HTTP response is 400 Bad Request with a validation error on the email field
+Given no user account exists for "student.carol@student.hcmus.edu.vn"
+When an unauthenticated client submits registration with password "weakpass"
+Then the HTTP response is 422 Unprocessable Content with error.type = "urn:unihub:error:validation" and validationErrors mentioning password
 ```
 
-_(Traces to: FR-07)_
-
-### Scenario 5: Registration rejected — weak password
+### Scenario 5: Successful account activation via OTP
 
 ```gherkin
-Given no user account exists for "carol@university.edu"
-When an unauthenticated client submits password "password"
-Then the HTTP response is 400 Bad Request with a validation error on the password field
+Given a user "student.alice@student.hcmus.edu.vn" exists with is_active = false
+And an unconsumed, unexpired user_verification_tokens record exists with token_type = 'ACTIVATION_OTP' and OTP "849201"
+When the user submits email "student.alice@student.hcmus.edu.vn" and otp "849201" to /api/v1/auth/activate
+Then the user record has is_active set to true
+And the token's used_at is set to current timestamp
+And the HTTP response is 200 OK with message "Account activated successfully. You may now log in."
 ```
 
-_(Traces to: FR-08)_
-
-### Scenario 6: Successful OTP verification (account activation)
+### Scenario 6: Activation rejected — invalid, expired, or already consumed OTP
 
 ```gherkin
-Given a user "alice@university.edu" exists with is_active = false
-And an unconsumed, unexpired OTP "123456" exists for that user
-When the user submits the correct OTP "123456" and email "alice@university.edu" to the account activation endpoint
-Then is_active is set to true on the user record
-And the OTP token's used_at is set to the current timestamp
-And the HTTP response is 200 OK
-```
-
-_(Traces to: FR-11)_
-
-### Scenario 7: OTP verification rejected — expired OTP
-
-```gherkin
-Given a user "alice@university.edu" exists with is_active = false
-And an OTP exists for that user with expires_at in the past and used_at = NULL
-When the user submits any OTP value to the account activation endpoint
-Then is_active remains false and used_at remains NULL
-And the HTTP response is 422 Unprocessable Entity
-```
-
-_(Traces to: FR-13)_
-
-### Scenario 8: OTP verification rejected — already consumed OTP
-
-```gherkin
-Given a user "alice@university.edu" exists with is_active = false
-And an OTP token exists for that user with used_at IS NOT NULL
-When the user submits that OTP to the account activation endpoint
+Given a user "student.alice@student.hcmus.edu.vn" exists with is_active = false
+When the user submits an incorrect, expired, or previously consumed OTP to /api/v1/auth/activate
 Then is_active remains false
-And the HTTP response is 422 Unprocessable Entity
+And the HTTP response is 422 Unprocessable Content with error.type = "urn:unihub:error:validation", uniform detail "Invalid or expired activation code.", and validationErrors containing "otp: Invalid or expired activation code."
 ```
 
-_(Traces to: FR-14)_
-
-### Scenario 9: OTP verification rejected — incorrect OTP value
+### Scenario 7: Activation rejected — account already active
 
 ```gherkin
-Given a user "alice@university.edu" exists with is_active = false
-And an unconsumed, unexpired OTP exists for that user
-When the user submits an incorrect OTP value "000000"
-Then is_active remains false
-And the HTTP response is 422 Unprocessable Entity
+Given a user "student.alice@student.hcmus.edu.vn" exists with is_active = true
+When the user submits any OTP to /api/v1/auth/activate
+Then the HTTP response is 409 Conflict with error.type = "urn:unihub:error:conflict" and detail "Account is already active."
 ```
 
-_(Traces to: FR-12)_
-
-### Scenario 10: OTP verification rejected — account already active
+### Scenario 8: Successful OTP resend for inactive account
 
 ```gherkin
-Given a user "alice@university.edu" exists with is_active = true
-When the user submits any OTP to the account activation endpoint
-Then is_active remains true and the HTTP response is 409 Conflict
+Given a user "student.alice@student.hcmus.edu.vn" exists with is_active = false
+And an unconsumed user_verification_tokens record exists with token_type = 'ACTIVATION_OTP'
+When the user requests OTP resend to /api/v1/auth/otp/resend with email "student.alice@student.hcmus.edu.vn"
+Then the previous unconsumed ACTIVATION_OTP token has used_at set to now()
+And a new user_verification_tokens record is created with token_type = 'ACTIVATION_OTP' and used_at = NULL
+And a new OtpRequestedEvent (purpose: 'ACTIVATION') is published to event_publication
+And the HTTP response is 200 OK with message "A verification code has been sent to your email."
 ```
 
-_(Traces to: FR-16)_
-
-### Scenario 11: Successful OTP resend
+### Scenario 9: Successful OTP resend for active account (Delegated to Password Reset)
 
 ```gherkin
-Given a user "alice@university.edu" exists with is_active = false
-And an unconsumed OTP token exists for that user
-When the user requests an OTP resend for email "alice@university.edu"
-Then the existing unconsumed OTP token's used_at is set to now()
-And a new OTP token is created with a fresh expires_at and used_at = NULL
-And a new domain event carrying the new OTP is published to the notifications worker
-And the HTTP response is 200 OK
+Given a user "student.alice@student.hcmus.edu.vn" exists with is_active = true
+When the user requests OTP resend to /api/v1/auth/otp/resend with email "student.alice@student.hcmus.edu.vn"
+Then any previous unconsumed PASSWORD_RESET_OTP token has used_at set to now()
+And a new user_verification_tokens record is created with token_type = 'PASSWORD_RESET_OTP' and used_at = NULL
+And a new OtpRequestedEvent (purpose: 'PASSWORD_RESET') is published to event_publication
+And the HTTP response is 200 OK with message "A verification code has been sent to your email."
 ```
 
-_(Traces to: FR-17, FR-18)_
-
-### Scenario 12: OTP resend rejected — no account or already active
+### Scenario 10: OTP resend rejected — user not found
 
 ```gherkin
-Given no inactive user account exists for "unknown@university.edu"
+Given no user account exists for "unknown@university.edu"
 When a resend request is submitted for "unknown@university.edu"
 Then no OTP is generated or published
-And the HTTP response is 422 Unprocessable Entity
+And the HTTP response is 404 Not Found with error.type = "urn:unihub:error:not-found"
 ```
-
-_(Traces to: FR-19)_
 
 ## 8. Out of Scope
 
-- **Login / session issuance after activation** — Activating an account does not issue a JWT or session. The user must separately call the login endpoint (Feature 1.2).
-- **Password reset for already-active accounts** — Governed entirely by Feature 1.4. The resend endpoint is shared, but its active-account branch is Feature 1.4's responsibility.
-- **`ORGANIZER` and `STAFF` account creation** — Both roles are provisioned by an existing `ORGANIZER` (Feature 1.5). No self-registration path exists for these roles.
-- **Email uniqueness validation against the student directory** — The `student_directory` lookup is for identity linking only. A registration is not rejected just because the email is absent from the directory.
-- **Workshop registration eligibility enforcement** — The system stores `student_record_id = NULL` for unmatched users, but enforcing the resulting block at the workshop registration endpoint is Feature 3.x's responsibility.
-- **Social / SSO login** — No OAuth 2.0 or institutional SSO in scope; all authentication is email/password.
-- **Account deactivation** — Disabling active accounts is an organizer-level action (Feature 1.8) and is not part of the self-registration flow.
-- **OTP delivery channel other than email** — SMS or push OTP delivery is not in scope.
-- **Phone number or avatar during registration** — Only `email`, `password`, and `fullName` are submitted at registration time. Profile enrichment belongs to Feature 1.8.
+- **Worker-Side Notification Handling** — Email rendering and SMTP delivery in the `notifications` worker is owned by a separate notifications feature. Feature 1.1 only publishes `OtpRequestedEvent` to the outbox for RabbitMQ externalization.
+- **Login / session issuance after activation** — Activating an account does not issue a JWT or session. The user separately logs in via `POST /api/v1/auth/login` (Feature 1.2).
+- **Password Reset Execution** — Actually verifying the reset OTP and updating the password is in Feature 1.4 (`POST /api/v1/auth/password/reset`).
+- **`ORGANIZER` and `STAFF` account creation** — Provisioned by an `ORGANIZER` in Feature 1.5.
+- **Workshop registration eligibility enforcement** — Blocking users with `student_record_id = NULL` from registering for workshops is enforced by Feature 3.x.
 
 ## 9. Linked References
 
-| Document                  | Section                                                                                     |
-| :------------------------ | :------------------------------------------------------------------------------------------ |
-| `docs/feature-catalog.md` | §1.1 — feature description, key constraints, ADR refs                                       |
-| `docs/system-design.md`   | §5 Account Provisioning & Security — provisioning model, multi-layer enforcement            |
-| `docs/database-schema.md` | §`users` — column specs, `student_record_id` note, `is_active` default                      |
-| `docs/database-schema.md` | §`password_reset_tokens` — column specs, single-use caution, TTL indexing                   |
-| `docs/database-schema.md` | §`student_directory` — column specs, email uniqueness per `organization_id`                 |
-| `docs/database-schema.md` | §Overview — audit fields, TTL cleanup policy, no hard-delete                                |
-| `docs/adrs.md`            | ADR-005 — JWT RS256 (informs `is_active` gate at login)                                     |
-| `docs/adrs.md`            | ADR-006 — RBAC model (role assignment at registration)                                      |
-| `docs/adrs.md`            | ADR-027 — Pluggable Notification Architecture (OTP email delivery via event)                |
-| `docs/adrs.md`            | ADR-028 — Zero-Trust Provisioning (separates self-registration from delegated provisioning) |
-| `docs/api-standards.md`   | §HTTP Status Codes, §Mandatory Headers, §Standard JSON Payloads, §API Logging               |
+| Document                  | Section                                                                                                               |
+| :------------------------ | :-------------------------------------------------------------------------------------------------------------------- |
+| `docs/feature-catalog.md` | §1.1 — feature description, key constraints, DB tables, ADR refs                                                      |
+| `docs/system-design.md`   | §5 Account Provisioning & Security (Self-Service Student Registration & OTP Activation)                               |
+| `docs/database-schema.md` | §`users`, §`user_verification_tokens`, §`student_directory`                                                           |
+| `docs/api-standards.md`   | §HTTP Status Codes, §Mandatory Headers, §Standard JSON Payloads, §API Logging                                         |
+| `docs/adrs.md`            | ADR-005 (JWT RS256), ADR-006 (RBAC), ADR-027 (Pluggable Notification Architecture), ADR-028 (Zero-Trust Provisioning) |

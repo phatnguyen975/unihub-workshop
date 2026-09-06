@@ -1,5 +1,6 @@
 package com.unihub.workshop.shared.security;
 
+import com.unihub.workshop.shared.exception.InternalServerException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,7 @@ import java.time.Instant;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PublicKeyServiceTest {
 
@@ -79,5 +81,20 @@ class PublicKeyServiceTest {
 
         assertThat(issuedAt).isNotNull();
         assertThat(issuedAt).isBeforeOrEqualTo(Instant.now());
+    }
+
+    @Test
+    void shouldThrowInternalServerExceptionWhenRsaKeyPropertiesIsNull() {
+        assertThatThrownBy(() -> new PublicKeyService(null))
+                .isInstanceOf(InternalServerException.class)
+                .hasMessage("RSA public key is not loaded.");
+    }
+
+    @Test
+    void shouldThrowInternalServerExceptionWhenPublicKeyIsNull() {
+        RsaKeyProperties invalidProperties = new RsaKeyProperties(null, null);
+        assertThatThrownBy(() -> new PublicKeyService(invalidProperties))
+                .isInstanceOf(InternalServerException.class)
+                .hasMessage("RSA public key is not loaded.");
     }
 }

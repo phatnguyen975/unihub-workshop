@@ -6,6 +6,7 @@ import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRep
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
+import com.unihub.workshop.shared.exception.BadRequestException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,7 +42,7 @@ public class IngestionJobReportRepositoryAdapter implements IngestionJobReportRe
                 cursorTime = cursorData.completedAt();
                 cursorId = cursorData.id();
             } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid cursor format");
+                throw new BadRequestException("Invalid cursor format");
             }
         }
 

@@ -148,13 +148,14 @@ CREATE TRIGGER trg_refresh_tokens_updated_at
 
 
 -- =============================================================================
--- TABLE: password_reset_tokens
+-- TABLE: user_verification_tokens
 -- =============================================================================
--- One-time tokens for self-service password recovery flows.
--- Token is stored as a hash only. used_at must be set on first successful reset.
-CREATE TABLE password_reset_tokens (
+-- One-time OTP tokens for account activation and password reset flows.
+-- Token is stored as a hash only. used_at must be set on first successful consumption.
+CREATE TABLE user_verification_tokens (
     id          UUID         NOT NULL DEFAULT gen_random_uuid(),
     user_id     UUID         NOT NULL,
+    token_type  VARCHAR(32)  NOT NULL CHECK (token_type IN ('ACTIVATION_OTP', 'PASSWORD_RESET_OTP')),
     token_hash  VARCHAR(255) NOT NULL,
     expires_at  TIMESTAMPTZ  NOT NULL,
     used_at     TIMESTAMPTZ  NULL,
@@ -163,18 +164,23 @@ CREATE TABLE password_reset_tokens (
     created_by  UUID         NULL,
     updated_by  UUID         NULL,
 
-    CONSTRAINT pk_password_reset_tokens PRIMARY KEY (id),
-    CONSTRAINT uq_password_reset_tokens_token_hash UNIQUE (token_hash),
-    CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users (id),
-    CONSTRAINT fk_password_reset_tokens_created_by FOREIGN KEY (created_by) REFERENCES users (id),
-    CONSTRAINT fk_password_reset_tokens_updated_by FOREIGN KEY (updated_by) REFERENCES users (id)
+    CONSTRAINT pk_user_verification_tokens PRIMARY KEY (id),
+    CONSTRAINT uq_user_verification_tokens_token_hash UNIQUE (token_hash),
+    CONSTRAINT fk_user_verification_tokens_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_user_verification_tokens_created_by FOREIGN KEY (created_by) REFERENCES users (id),
+    CONSTRAINT fk_user_verification_tokens_updated_by FOREIGN KEY (updated_by) REFERENCES users (id)
 );
 
 -- Index: TTL cleanup sweeper queries
-CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens (expires_at);
+CREATE INDEX idx_user_verification_tokens_expires_at ON user_verification_tokens (expires_at);
 
-CREATE TRIGGER trg_password_reset_tokens_updated_at
-    BEFORE UPDATE ON password_reset_tokens
+-- Index: Active token lookup by user and type
+CREATE INDEX idx_user_verification_tokens_lookup 
+    ON user_verification_tokens (user_id, token_type, expires_at) 
+    WHERE used_at IS NULL;
+
+CREATE TRIGGER trg_user_verification_tokens_updated_at
+    BEFORE UPDATE ON user_verification_tokens
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 

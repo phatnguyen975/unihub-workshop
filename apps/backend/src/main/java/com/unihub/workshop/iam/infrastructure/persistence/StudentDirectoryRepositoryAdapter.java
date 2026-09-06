@@ -16,8 +16,8 @@ public class StudentDirectoryRepositoryAdapter implements StudentDirectoryReposi
     }
 
     @Override
-    public Optional<StudentDirectory> findByEmail(String email) {
-        return repository.findByEmail(email).map(this::toDomain);
+    public Optional<StudentDirectory> findActiveByEmail(String email) {
+        return repository.findByEmailAndStatus(email, "ACTIVE").map(this::toDomain);
     }
 
     private StudentDirectory toDomain(StudentDirectoryJpaEntity entity) {

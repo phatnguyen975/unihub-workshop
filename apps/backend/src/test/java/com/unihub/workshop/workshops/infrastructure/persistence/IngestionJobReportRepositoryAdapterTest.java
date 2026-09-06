@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.infrastructure.persistence;
 
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,7 +91,7 @@ class IngestionJobReportRepositoryAdapterTest {
     @Test
     void findByOrganizationId_invalidCursor_throwsException() {
         UUID orgId = UUID.randomUUID();
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BadRequestException.class,
                 () -> adapter.findByOrganizationId(orgId, "invalid-base64-cursor", 10));
     }
 

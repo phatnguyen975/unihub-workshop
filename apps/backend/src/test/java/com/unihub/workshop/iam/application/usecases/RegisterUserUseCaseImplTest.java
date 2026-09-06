@@ -1,14 +1,14 @@
 package com.unihub.workshop.iam.application.usecases;
 
-import com.unihub.workshop.iam.application.ports.out.PasswordResetTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.StudentDirectoryRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
+import com.unihub.workshop.iam.application.ports.out.UserVerificationTokenRepository;
 import com.unihub.workshop.iam.application.utils.OtpService;
 import com.unihub.workshop.iam.domain.events.OtpRequestedEvent;
-import com.unihub.workshop.iam.domain.model.PasswordResetToken;
 import com.unihub.workshop.iam.domain.model.StudentDirectory;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ConflictException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ class RegisterUserUseCaseImplTest {
 
     private UserRepository userRepository;
     private StudentDirectoryRepository studentDirectoryRepository;
-    private PasswordResetTokenRepository passwordResetTokenRepository;
+    private UserVerificationTokenRepository userVerificationTokenRepository;
     private OtpService otpService;
     private PasswordEncoder passwordEncoder;
     private ApplicationEventPublisher eventPublisher;
@@ -40,7 +40,7 @@ class RegisterUserUseCaseImplTest {
     void setUp() {
         userRepository = mock(UserRepository.class);
         studentDirectoryRepository = mock(StudentDirectoryRepository.class);
-        passwordResetTokenRepository = mock(PasswordResetTokenRepository.class);
+        userVerificationTokenRepository = mock(UserVerificationTokenRepository.class);
         otpService = mock(OtpService.class);
         passwordEncoder = mock(PasswordEncoder.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
@@ -48,7 +48,7 @@ class RegisterUserUseCaseImplTest {
         useCase = new RegisterUserUseCaseImpl(
                 userRepository,
                 studentDirectoryRepository,
-                passwordResetTokenRepository,
+                userVerificationTokenRepository,
                 otpService,
                 passwordEncoder,
                 eventPublisher);
@@ -66,7 +66,7 @@ class RegisterUserUseCaseImplTest {
         StudentDirectory directory = new StudentDirectory(
                 dirId, orgId, "23123456", email, fullName, "Computer Science", "ACTIVE", null, Instant.now(),
                 Instant.now());
-        when(studentDirectoryRepository.findByEmail(email)).thenReturn(Optional.of(directory));
+        when(studentDirectoryRepository.findActiveByEmail(email)).thenReturn(Optional.of(directory));
         when(passwordEncoder.encode(password)).thenReturn("hashedPassword");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(otpService.generateOtp()).thenReturn("123456");
@@ -88,10 +88,11 @@ class RegisterUserUseCaseImplTest {
         assertThat(savedUser.organizationId()).isEqualTo(orgId);
         assertThat(savedUser.passwordHash()).isEqualTo("hashedPassword");
 
-        ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
-        verify(passwordResetTokenRepository).save(tokenCaptor.capture());
-        PasswordResetToken savedToken = tokenCaptor.getValue();
+        ArgumentCaptor<UserVerificationToken> tokenCaptor = ArgumentCaptor.forClass(UserVerificationToken.class);
+        verify(userVerificationTokenRepository).save(tokenCaptor.capture());
+        UserVerificationToken savedToken = tokenCaptor.getValue();
         assertThat(savedToken.userId()).isEqualTo(userId);
+        assertThat(savedToken.tokenType()).isEqualTo(UserVerificationToken.TYPE_ACTIVATION_OTP);
         assertThat(savedToken.tokenHash()).isEqualTo("otpHash");
         assertThat(savedToken.usedAt()).isNull();
         assertThat(savedToken.expiresAt()).isAfter(Instant.now());
@@ -109,7 +110,7 @@ class RegisterUserUseCaseImplTest {
     void shouldRegisterStudentWithoutStudentDirectoryMatch() {
         String email = "bob@external.com";
         when(userRepository.existsByEmail(email)).thenReturn(false);
-        when(studentDirectoryRepository.findByEmail(email)).thenReturn(Optional.empty());
+        when(studentDirectoryRepository.findActiveByEmail(email)).thenReturn(Optional.empty());
         when(passwordEncoder.encode(any())).thenReturn("hashedPassword");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(otpService.generateOtp()).thenReturn("654321");
@@ -125,6 +126,11 @@ class RegisterUserUseCaseImplTest {
         assertThat(savedUser.studentRecordId()).isNull();
         assertThat(savedUser.organizationId()).isNull();
         assertThat(savedUser.isActive()).isFalse();
+
+        ArgumentCaptor<UserVerificationToken> tokenCaptor = ArgumentCaptor.forClass(UserVerificationToken.class);
+        verify(userVerificationTokenRepository).save(tokenCaptor.capture());
+        UserVerificationToken savedToken = tokenCaptor.getValue();
+        assertThat(savedToken.tokenType()).isEqualTo(UserVerificationToken.TYPE_ACTIVATION_OTP);
     }
 
     @Test
@@ -137,7 +143,7 @@ class RegisterUserUseCaseImplTest {
                 .hasMessageContaining("An account with this email already exists");
 
         verify(userRepository, never()).save(any());
-        verify(passwordResetTokenRepository, never()).save(any());
+        verify(userVerificationTokenRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
 }

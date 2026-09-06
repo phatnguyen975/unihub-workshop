@@ -3,7 +3,7 @@
 > **Status:** APPROVED  
 > **Domain:** 1 — Identity & Access Management  
 > **Owner/area:** `docs/feature-catalog.md §1.2`  
-> **Last revised:** 2026-09-02 — first version
+> **Last revised:** 2026-09-05 — first version
 
 ## 1. Overview
 
@@ -20,7 +20,7 @@ This feature lives in the `iam` module of the Core Backend, with the JWT filter 
 | :----------------- | :-------------------------------------------------------------------------------------------- |
 | STUDENT            | Self-registered user performing login, refresh, and logout.                                   |
 | ORGANIZER          | Platform-provisioned or seeded user performing login (may be forced to reset password first). |
-| STAFF              | Platform-provisioned user performing login; receives RSA public key in response.              |
+| STAFF              | Platform-provisioned user performing login, refresh, and logout.                              |
 | Anonymous / Public | Calls the JWKS endpoint (`/.well-known/jwks.json`) without authentication.                    |
 | System / Sweeper   | The TTL cleanup scheduler that purges expired `refresh_tokens` rows (already spec'd in 10.4). |
 
@@ -61,7 +61,7 @@ The system **SHALL** issue a short-lived RS256-signed JWT access token upon succ
 | :----- | :------------------------------------------------------------ |
 | `sub`  | The user's `UUID` (`users.id`)                                |
 | `role` | The user's `role` string (`STUDENT`, `ORGANIZER`, or `STAFF`) |
-| `org`  | The user's `organization_id` UUID                             |
+| `org`  | The user's `organization_id` UUID (nullable, omitted if null) |
 | `jti`  | A freshly generated UUIDv4 unique to this token               |
 | `iat`  | Current UTC timestamp (Unix epoch seconds)                    |
 | `exp`  | `iat` + configured access token TTL (e.g., 1 hour)            |
@@ -88,6 +88,24 @@ The refresh token TTL **SHALL** be configurable via `application.yml` (e.g., `ap
 ### FR-06 — Login: update `last_login_at`
 
 The system **SHALL** update `users.last_login_at` to the current UTC timestamp on every successful login (after tokens are generated).
+
+### FR-07 — Login: user profile response
+
+The system **SHALL** return the authenticated user's profile in the `user` field of the login response body (`POST /api/v1/auth/login`). This enables the client (Web/Mobile) to immediately populate application state and render identity-dependent UI (e.g. Navbar, role-based navigation) without making an additional round-trip request to `/users/me`.
+
+The user profile object **SHALL** include:
+
+- `id`: the user's UUID
+- `email`: user's email address
+- `fullName`: user's full name
+- `role`: user's role (`STUDENT`, `ORGANIZER`, `STAFF`)
+- `phoneNumber`: user's phone number (nullable, omitted if null)
+- `avatarUrl`: URL of user's avatar image (nullable, omitted if null)
+- `lastLoginAt`: previous login UTC timestamp (nullable, omitted if null)
+- `organizationId`: user's associated organization UUID (nullable, omitted if null)
+- `studentRecordId`: associated student directory record UUID (nullable, omitted if null)
+
+All nullable fields **SHALL** be omitted when null, conforming to `@JsonInclude(NON_NULL)`.
 
 ### FR-08 — Token refresh: locate and validate
 
@@ -160,10 +178,9 @@ All reads from and writes to `refresh_tokens` **SHALL** be routed to the primary
 - **BR-05:** Refresh token rotation is mandatory on every use (FR-09). Reuse of a previously consumed refresh token (one with `revoked_at IS NOT NULL`) **SHALL** be rejected with `401` — no new token is issued.
 - **BR-06:** A user may have multiple active `refresh_tokens` rows simultaneously (one per device/session). Single-device logout (`DELETE /api/v1/auth/sessions/{id}`) is handled by the `active-session-management` feature (1.7). The logout endpoint in this feature (FR-10) revokes the session associated with the current request.
 - **BR-07:** The Redis JTI blacklist TTL **SHALL** match the remaining validity of the access token at the time of logout (i.e., `exp - NOW()`). This prevents unbounded Redis growth while guaranteeing the key stays present until the token naturally expires.
-- **BR-08:** Login, refresh, and logout endpoints are **not** subject to the idempotency key mechanism used for payments and registrations. They are inherently stateful by design (a second call to login creates a second session, a second call to refresh fails because the token is already rotated).
-- **BR-09:** The `is_temporary_password` gate (FR-03) takes precedence over normal token issuance. An account with `is_temporary_password = TRUE` can never receive a standard session token until the password is changed via the `password-reset` or equivalent flow.
-- **BR-10:** `users.last_login_at` is updated on the primary DB on every successful login, consistent with the primary-routing requirements in `docs/database-schema.md §4`.
-- **BR-11:** Login attempts for non-existent emails **SHALL** take constant time (timing-safe comparison) to prevent user enumeration via timing side-channel. Argon2 verification is only called when the user row is found; when no row is found, a dummy Argon2 verification **SHALL** still be executed to preserve constant-time behaviour.
+- **BR-08:** The `is_temporary_password` gate (FR-03) takes precedence over normal token issuance. An account with `is_temporary_password = TRUE` can never receive a standard session token until the password is changed via the `password-reset` or equivalent flow.
+- **BR-09:** `users.last_login_at` is updated on the primary DB on every successful login, consistent with the primary-routing requirements in `docs/database-schema.md §4`.
+- **BR-10:** Login attempts for non-existent emails **SHALL** take constant time (timing-safe comparison) to prevent user enumeration via timing side-channel. Argon2 verification is only called when the user row is found; when no row is found, a dummy Argon2 verification **SHALL** still be executed to preserve constant-time behaviour.
 
 ## 5. State Transitions
 
@@ -227,11 +244,23 @@ When the user submits a POST /api/v1/auth/login with correct email and password
 Then the response is 200 OK
 And the response body contains a non-empty accessToken (JWT)
 And the response body contains a non-empty refreshToken (opaque string)
+And the response body contains a "user" object with id, email, fullName, role, and organizationId
 And a new refresh_tokens row is created in the database with revoked_at = NULL
 And users.last_login_at is updated to approximately NOW()
 ```
 
-_(Traces to: FR-01, FR-04, FR-05, FR-06)_
+_(Traces to: FR-01, FR-04, FR-05, FR-06, FR-07)_
+
+### Scenario 2: Login validation failure
+
+```gherkin
+Given a caller submits POST /api/v1/auth/login with an invalid email format or empty password
+Then the response is 422 Unprocessable Content
+And the error type is "urn:unihub:error:validation"
+And the response contains a "validationErrors" list
+```
+
+_(Traces to: `API_CONTRACT` validation)_
 
 ### Scenario 3: Login with wrong password
 
@@ -239,7 +268,7 @@ _(Traces to: FR-01, FR-04, FR-05, FR-06)_
 Given a STUDENT account with email "student@student.hcmus.edu.vn"
 When the student submits POST /api/v1/auth/login with an incorrect password
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no refresh_tokens row is created
 And no accessToken is returned
 ```
@@ -252,7 +281,7 @@ _(Traces to: FR-01)_
 Given no user with email "unknown@example.com" exists in the system
 When a caller submits POST /api/v1/auth/login with email "unknown@example.com"
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no refresh_tokens row is created
 ```
 
@@ -304,7 +333,7 @@ _(Traces to: FR-08, FR-09)_
 Given a refresh token that was previously consumed (revoked_at IS NOT NULL)
 When the user submits POST /api/v1/auth/refresh with that token
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no new tokens are issued
 ```
 
@@ -316,7 +345,7 @@ _(Traces to: FR-08, BR-05)_
 Given a refresh token whose refresh_tokens row has expires_at < NOW() and revoked_at IS NULL
 When the user submits POST /api/v1/auth/refresh with that token
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 And no new tokens are issued
 ```
 
@@ -342,7 +371,7 @@ _(Traces to: FR-10, BR-07)_
 Given a user has logged out and their jti is in the Redis blacklist
 When the user attempts a GET request to a protected endpoint with the old Bearer token
 Then the response is 401 Unauthorized
-And the error type is "urn:unihub:error:authentication"
+And the error type is "urn:unihub:error:unauthorized"
 ```
 
 _(Traces to: FR-13)_
@@ -400,7 +429,7 @@ _(Traces to: FR-09, NFR-06)_
 | User self-registration                                 | Handled by `user-registration-and-identity-verification` (1.1).                                                   |
 | Password reset flow                                    | Handled by `password-reset` (1.4). This feature's FR-03 only _gates_ the login response; reset logic is separate. |
 | ORGANIZER/STAFF account creation                       | Handled by `staff-and-organizer-provisioning` (1.5).                                                              |
-| `GET /api/v1/auth/public-key` endpoint (PEM on demand) | Handled by `public-key-distribution` (1.3). This feature only provides PEM in the login response for STAFF.       |
+| `GET /api/v1/auth/public-key` endpoint (PEM on demand) | Handled by `public-key-distribution` (1.3). Key retrieval is decoupled to the dedicated endpoint.                 |
 | Active session listing and multi-session revocation    | Handled by `active-session-management` (1.7). This feature only handles logout for the caller's current session.  |
 | OAuth2 / SSO / federated identity providers            | Not in scope per `docs/overview.md`.                                                                              |
 | MFA / two-factor authentication                        | Not in scope for this version.                                                                                    |
@@ -410,21 +439,17 @@ _(Traces to: FR-09, NFR-06)_
 
 ## 9. Linked References
 
-| Source                                                 | Section                                                           | Relevance                                                                                         |
-| :----------------------------------------------------- | :---------------------------------------------------------------- | :------------------------------------------------------------------------------------------------ |
-| `docs/feature-catalog.md`                              | §1.2 `authentication-and-session-management`                      | Authoritative feature definition, module ownership, DB tables, ADR refs, key constraints          |
-| `docs/feature-catalog.md`                              | §1.7 `active-session-management`                                  | Out-of-scope boundary for multi-session revocation                                                |
-| `docs/system-design.md`                                | §5 — RBAC Model & Multi-Layer Enforcement                         | JWT structure, three-role model, multi-layer enforcement points                                   |
-| `docs/system-design.md`                                | §5 — Offline PKI & Cryptography                                   | STAFF login returns public key; mobile caches for offline verification                            |
-| `docs/system-design.md`                                | §5 — Account Provisioning & Security                              | `is_temporary_password` provisioning model                                                        |
-| `docs/adrs.md`                                         | ADR-005 (Authentication Mechanism)                                | RS256 asymmetric JWT, Redis JTI revocation, JWKS endpoint requirement                             |
-| `docs/adrs.md`                                         | ADR-006 (Authorization Model)                                     | RBAC three-role model, `org` claim in JWT                                                         |
-| `docs/adrs.md`                                         | ADR-010 — JTI Blacklist Failure Mode                              | Fail-closed: Redis unavailability → `503 Service Unavailable` for auth-critical checks            |
-| `docs/adrs.md`                                         | ADR-028 (Delegated Creation & Zero-Trust Provisioning)            | `is_temporary_password = TRUE` gate enforced at login                                             |
-| `docs/database-schema.md`                              | §users                                                            | `is_active`, `is_temporary_password`, `last_login_at`, `password_hash` (Argon2), role constraints |
-| `docs/database-schema.md`                              | §refresh_tokens                                                   | `token_hash`, `device_info`, `ip_address`, `expires_at`, `revoked_at` columns; rotation note      |
-| `docs/database-schema.md`                              | §4 — Replication Lag & Read-After-Write Consistency               | All `refresh_tokens` and `users.last_login_at` writes must target primary DB                      |
-| `docs/api-standards.md`                                | §HTTP Status Codes, Error Response RFC 7807, Mandatory Headers    | Governs response shapes and error formats for all endpoints in this feature                       |
-| `docs/project-structure.md`                            | §Core Backend — `iam/` and `shared/security/` layout              | Package placement for use cases, ports, and security components                                   |
-| `specs/ingestion-reject-report/SPEC.md`                | FR-04, FR-05 (shared/security setup)                              | Existing `JwtAuthenticationFilter`, `RedisJtiValidator`, `SecurityConfig` already in place        |
-| `specs/infrastructure-bootstrap-and-seed-data/SPEC.md` | FR-02 (RSA key loading), FR-08 (TTL cleanup for `refresh_tokens`) | Dependency: key pair and table schema already established                                         |
+| Source                                                 | Section                                                                                                                                    | Relevance                                                                                  |
+| :----------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------- |
+| `docs/feature-catalog.md`                              | §1.2 `authentication-and-session-management`                                                                                               | Authoritative feature definition, module ownership, DB tables, ADR refs, key constraints   |
+| `docs/feature-catalog.md`                              | §1.7 `active-session-management`                                                                                                           | Out-of-scope boundary for multi-session revocation                                         |
+| `docs/system-design.md`                                | §5 — RBAC Model & Multi-Layer Enforcement                                                                                                  | JWT structure, three-role model, multi-layer enforcement points                            |
+| `docs/system-design.md`                                | §5 — Offline PKI & Cryptography                                                                                                            | STAFF login returns public key; mobile caches for offline verification                     |
+| `docs/system-design.md`                                | §5 — Account Provisioning & Security                                                                                                       | `is_temporary_password` provisioning model                                                 |
+| `docs/adrs.md`                                         | ADR-005 (Authentication Mechanism), ADR-006 (Authorization Model), ADR-010 (JTI Blacklist Failure Mode), ADR-028 (Zero-Trust Provisioning) |
+| `docs/database-schema.md`                              | §users, §refresh_tokens                                                                                                                    | `users` and `refresh_tokens` table specs; primary-routing rules                            |
+| `docs/database-schema.md`                              | §4 — Replication Lag & Read-After-Write Consistency                                                                                        | All `refresh_tokens` and `users.last_login_at` writes must target primary DB               |
+| `docs/api-standards.md`                                | §HTTP Status Codes, Error Response RFC 7807, Mandatory Headers                                                                             | Governs response shapes and error formats for all endpoints in this feature                |
+| `docs/project-structure.md`                            | §Core Backend — `iam/` and `shared/security/` layout                                                                                       | Package placement for use cases, ports, and security components                            |
+| `specs/ingestion-reject-report/SPEC.md`                | FR-04, FR-05 (shared/security setup)                                                                                                       | Existing `JwtAuthenticationFilter`, `RedisJtiValidator`, `SecurityConfig` already in place |
+| `specs/infrastructure-bootstrap-and-seed-data/SPEC.md` | FR-02 (RSA key loading), FR-08 (TTL cleanup for `refresh_tokens`)                                                                          | Dependency: key pair and table schema already established                                  |

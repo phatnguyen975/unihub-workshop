@@ -1,6 +1,6 @@
 package com.unihub.workshop.iam.application.usecases;
 
-import com.unihub.workshop.iam.application.ports.in.LoginUseCase.LoginResult;
+import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase.RefreshResult;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
@@ -84,7 +84,7 @@ class RefreshTokenUseCaseImplTest {
         when(jwtTokenIssuer.issueAccessToken(userId.toString(), "STUDENT", orgId.toString()))
                 .thenReturn("new-access-token");
 
-        LoginResult result = useCase.refresh("raw-refresh-token", "New Device", "192.168.1.1");
+        RefreshResult result = useCase.refresh("raw-refresh-token", "New Device", "192.168.1.1");
 
         assertThat(result.accessToken()).isEqualTo("new-access-token");
         assertThat(result.refreshToken()).isNotBlank().isNotEqualTo("raw-refresh-token");
@@ -110,13 +110,29 @@ class RefreshTokenUseCaseImplTest {
     }
 
     @Test
+    void shouldRefreshSuccessfullyWithNullOrganizationId() {
+        User studentUserWithoutOrg = new User(userId, null, UserRole.STUDENT, "student@test.com", "hash", true, false,
+                null);
+        when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw-refresh-token")))
+                .thenReturn(Optional.of(validToken));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(studentUserWithoutOrg));
+        when(jwtTokenIssuer.issueAccessToken(userId.toString(), "STUDENT", null))
+                .thenReturn("new-access-token");
+
+        RefreshResult result = useCase.refresh("raw-refresh-token", "New Device", "192.168.1.1");
+
+        assertThat(result.accessToken()).isEqualTo("new-access-token");
+        verify(jwtTokenIssuer).issueAccessToken(userId.toString(), "STUDENT", null);
+    }
+
+    @Test
     void shouldThrowUnauthorized_WhenTokenNotFound() {
         when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("unknown-token"))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.refresh("unknown-token", "Device", "IP"))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Invalid refresh token")
-                .hasFieldOrPropertyWithValue("type", "urn:unihub:error:authentication");
+                .hasFieldOrPropertyWithValue("type", "urn:unihub:error:unauthorized");
 
         assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "failure", "reason", "not_found").count())
                 .isEqualTo(1);

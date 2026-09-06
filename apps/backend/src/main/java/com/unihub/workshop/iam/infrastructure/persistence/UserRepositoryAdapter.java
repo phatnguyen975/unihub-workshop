@@ -50,6 +50,11 @@ public class UserRepositoryAdapter implements UserRepository {
         repository.activateUser(userId, Instant.now());
     }
 
+    @Override
+    public boolean updateTemporaryPassword(UUID userId, String newPasswordHash, Instant loginTime) {
+        return repository.updateTemporaryPassword(userId, newPasswordHash, loginTime) > 0;
+    }
+
     private User toDomain(UserJpaEntity entity) {
         return new User(
                 entity.getId(),

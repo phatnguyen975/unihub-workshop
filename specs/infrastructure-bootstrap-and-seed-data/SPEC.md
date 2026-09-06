@@ -12,7 +12,7 @@ This feature implements the five infrastructure concerns that must be resolved b
 1. **Flyway schema migration:** `V1__init_schema.sql` (and subsequent migrations) run on the Core Backend first, before any application beans, establishing the full relational schema. The Workers app does not declare Flyway as a compile dependency and therefore never runs migrations.
 2. **RSA key pair loading:** `private.pem` and `public.pem` are loaded from `resources/security/` at startup to power JWT RS256 signing and JWKS endpoint exposure.
 3. **Organization & root Organizer seeding:** an `ApplicationRunner` reads root organization definitions and initial `ORGANIZER` accounts from JSON arrays in environment variables, then inserts only the records that do not already exist using `INSERT … ON CONFLICT DO NOTHING` semantics, making the operation safe for simultaneous multi-node startup.
-4. **TTL cleanup scheduler:** a `@Scheduled` job runs every 6 hours to purge expired rows from `idempotency_keys`, `refresh_tokens`, and `password_reset_tokens` in bounded batches, preventing table bloat.
+4. **TTL cleanup scheduler:** a `@Scheduled` job runs every 6 hours to purge expired rows from `idempotency_keys`, `refresh_tokens`, and `user_verification_tokens` in bounded batches, preventing table bloat.
 5. **Primary/Replica DataSource routing:** an `AbstractRoutingDataSource` is configured in **both** the Core Backend and the Workers app; it routes DB connections to the Neon primary or read replica based solely on the active transaction's `readOnly` flag. This is the foundational mechanism that every downstream ADR-015 routing requirement depends on.
 
 No REST endpoints are introduced by this feature. No client (web, mobile) is directly affected. Every concern is a startup process, shared infrastructure bean, or scheduled background task running within the Core Backend or the Workers app.
@@ -66,6 +66,7 @@ The system **SHALL** read the `SEED_ROOT_ORGANIZERS` environment variable, parse
 1. Resolve the target `organization_id` by looking up the organization `slug` specified in the entry (which must already exist in the database — either pre-existing or just seeded by FR-03).
 2. Attempt to insert a row into the `users` table using `INSERT … ON CONFLICT DO NOTHING` (conflict target: `email`).
 3. Set `role = 'ORGANIZER'`, `is_temporary_password = TRUE`, and a securely hashed system-generated password on the inserted row.
+4. When a new root organizer row is inserted, publish a `UserProvisionedEvent` via `ApplicationEventPublisher` (externalized to RabbitMQ `unihub.events::notifications`) with `userId`, `organizationId`, `orgSlug`, `email`, `fullName`, `role` ('ORGANIZER'), and `temporaryPassword` for downstream notification delivery.
 
 The system **SHALL NOT** update or overwrite organizer accounts that already exist in the database.
 
@@ -87,21 +88,21 @@ The system **SHALL** generate a cryptographically secure random temporary passwo
 
 The system **SHALL** set `is_temporary_password = TRUE` on every newly inserted root `ORGANIZER` row, consistent with the zero-trust provisioning model (ADR-028). This flag forces the account holder to change the password on first login.
 
-### FR-08 — TTL cleanup scheduler (Core Backend only)
+### FR-08 — TTL cleanup scheduler (Workers only)
 
-The system **SHALL** register a `@Scheduled` job that executes every 6 hours (cron expression: `0 0 */6 * * *`) and purges expired rows from the three TTL-managed tables:
+The system **SHALL** register a `@Scheduled` job in the Workers app that executes periodically (configurable via `app.ttl-cleanup.cron` / `TTL_CLEANUP_CRON`, defaulting to every 6 hours: `0 0 */6 * * *`) and purges expired rows from the three TTL-managed tables:
 
-| Table                   | Delete predicate     |
-| :---------------------- | :------------------- |
-| `idempotency_keys`      | `expires_at < NOW()` |
-| `refresh_tokens`        | `expires_at < NOW()` |
-| `password_reset_tokens` | `expires_at < NOW()` |
+| Table                      | Delete predicate     |
+| :------------------------- | :------------------- |
+| `idempotency_keys`         | `expires_at < NOW()` |
+| `refresh_tokens`           | `expires_at < NOW()` |
+| `user_verification_tokens` | `expires_at < NOW()` |
 
 The system **SHALL** execute each table's purge as a bounded `DELETE` (`DELETE FROM <table> WHERE id IN (SELECT id FROM <table> WHERE expires_at < NOW() LIMIT 500)`) to avoid long-running transactions and table locks. The system **SHALL** repeat the bounded delete in a loop until zero rows are affected.
 
 The system **SHALL** log at `INFO` level the number of rows deleted per table per execution.
 
-All TTL cleanup deletes **SHALL** be routed to the **primary** database (per `docs/database-schema.md §4`), as they are write operations. The `RoutingDataSource` established by FR-10 routes them correctly when the scheduler method is annotated `@Transactional` (default, not `readOnly`).
+All TTL cleanup deletes **SHALL** be routed to the **primary** database (per `docs/database-schema.md §4`), as they are write operations. The `RoutingDataSource` established by FR-10 routes them correctly when the usecase method is annotated `@Transactional` (default, not `readOnly`).
 
 ### FR-09 — Startup health validation (Core Backend only)
 
@@ -225,7 +226,7 @@ This feature does not define a user-visible domain entity with a state machine. 
 [Bounded loop: DELETE FROM refresh_tokens WHERE id IN (SELECT id FROM refresh_tokens WHERE expires_at < NOW() LIMIT 500)]
       │  (repeat until 0 rows affected)
       ▼
-[Bounded loop: DELETE FROM password_reset_tokens WHERE id IN (SELECT id FROM password_reset_tokens WHERE expires_at < NOW() LIMIT 500)]
+[Bounded loop: DELETE FROM user_verification_tokens WHERE id IN (SELECT id FROM user_verification_tokens WHERE expires_at < NOW() LIMIT 500)]
       │  (repeat until 0 rows affected)
       ▼
 [Log total rows deleted per table at INFO]
@@ -438,7 +439,7 @@ And no write is attempted against the replica DataSource
 | `docs/database-schema.md §users`                                             | Table columns, `is_temporary_password`, role constraint (`ORGANIZER`), Argon2 hash      |
 | `docs/database-schema.md §idempotency_keys`                                  | TTL target — `expires_at` index and primary-routing requirement                         |
 | `docs/database-schema.md §refresh_tokens`                                    | TTL target — `expires_at` index                                                         |
-| `docs/database-schema.md §password_reset_tokens`                             | TTL target — `expires_at` index                                                         |
+| `docs/database-schema.md §user_verification_tokens`                          | TTL target — `expires_at` index                                                         |
 | `docs/database-schema.md §1 — Overview & Database Principles`                | TTL cleanup job mandate (every 6 hours), strict role naming, no `ROLE_` prefix          |
 | `docs/database-schema.md §4 — Replication Lag & Read-After-Write`            | Seeding and TTL cleanup writes must target primary; replica for non-critical reads      |
 | `docs/project-structure.md §Core Backend`                                    | Package locations: `shared/config`, `shared/security`, `iam` module                     |

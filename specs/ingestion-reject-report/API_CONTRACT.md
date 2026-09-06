@@ -13,7 +13,7 @@ This contract defines the two REST endpoints exposed by the `workshops` module i
 - **URI structure / versioning:** `/api/v1/` prefix per `docs/api-standards.md §Versioning Strategy`.
 - **Pagination convention:** Cursor-based (keyset) pagination with `?cursor=` and `?size=` parameters. Default size: 20. Hard cap: 100. Response shape uses `data.cursor.{ nextCursor, hasMore }` per `docs/api-standards.md §Pagination`.
 - **Success response shape:** Standard success envelope `{ success, message, data, metadata }` per `docs/api-standards.md §Standard JSON Payloads`. Null fields omitted (`@JsonInclude(NON_NULL)`).
-- **Error response format:** RFC 7807 Problem Details at root with `Content-Type: application/problem+json` per `docs/api-standards.md §Error Response`.
+- **Error response format:** RFC 7807 Problem Details wrapped in the standard error envelope (`{ "success": false, "error": { ... }, "metadata": { ... } }`) with `Content-Type: application/problem+json` per `docs/api-standards.md §Error Response`.
 - **Idempotency-key convention:** Not applicable — both endpoints are `GET` (naturally idempotent). No `Idempotency-Key` header required.
 - **Auth header convention:** `Authorization: Bearer <JWT>` (RS256-signed). `ORGANIZER` role required on both endpoints.
 - **Date/time formatting convention:** ISO 8601 UTC with trailing `Z` (e.g., `2026-05-03T12:00:00Z`) per `docs/api-standards.md §Date/Time`.
@@ -118,14 +118,14 @@ This contract defines the two REST endpoints exposed by the `workshops` module i
 
 **Error Responses:**
 
-| Status | Error Identifier                | Condition                                                     |
-| :----- | :------------------------------ | :------------------------------------------------------------ |
-| 400    | `urn:unihub:error:validation`   | `size` is out of `[1, 100]` range, or `cursor` is malformed.  |
-| 401    | `urn:unihub:error:unauthorized` | Missing or invalid JWT Bearer token.                          |
-| 403    | `urn:unihub:error:forbidden`    | Authenticated, but `jwt.role` is not `ORGANIZER`.             |
-| 429    | `urn:unihub:error:rate-limited` | Per-user Token Bucket exhausted (existing `RateLimitFilter`). |
-| 500    | `urn:unihub:error:internal`     | Unhandled backend error (e.g., database unreachable).         |
-| 503    | `urn:unihub:error:unavailable`  | Redis JTI blacklist unavailable (fail-closed per ADR-010).    |
+| Status | Error Identifier                       | Title                 | Condition                                                                                     |
+| :----- | :------------------------------------- | :-------------------- | :-------------------------------------------------------------------------------------------- |
+| 400    | `urn:unihub:error:bad-request`         | Bad Request           | `size` is out of `[1, 100]` range, or `cursor` is malformed.                                  |
+| 401    | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing or invalid JWT Bearer token.                                                          |
+| 403    | `urn:unihub:error:forbidden`           | Forbidden             | Authenticated, but `jwt.role` is not `ORGANIZER`.                                             |
+| 429    | `urn:unihub:error:rate-limited`        | Too Many Requests     | Per-user Token Bucket exhausted (existing `RateLimitFilter`). Includes `Retry-After` header.  |
+| 500    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled backend error (e.g., database unreachable).                                         |
+| 503    | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis JTI blacklist unavailable (fail-closed per ADR-010). Includes `Retry-After: 30` header. |
 
 #### Side Effects
 
@@ -197,15 +197,15 @@ None. This endpoint is read-only.
 
 **Error Responses:**
 
-| Status | Error Identifier                | Condition                                                                                                                              |
-| :----- | :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------- |
-| 400    | `urn:unihub:error:validation`   | `jobId` is not a valid UUID format.                                                                                                    |
-| 401    | `urn:unihub:error:unauthorized` | Missing or invalid JWT Bearer token.                                                                                                   |
-| 403    | `urn:unihub:error:forbidden`    | Authenticated, but `jwt.role` is not `ORGANIZER`.                                                                                      |
-| 404    | `urn:unihub:error:not-found`    | The `jobId` does not exist, belongs to a different organization, or the job has no applicable artifact (clean run or no artifact key). |
-| 429    | `urn:unihub:error:rate-limited` | Per-user Token Bucket exhausted (existing `RateLimitFilter`).                                                                          |
-| 500    | `urn:unihub:error:internal`     | Unhandled backend error, including MinIO SDK failure during pre-signed URL generation.                                                 |
-| 503    | `urn:unihub:error:unavailable`  | Redis JTI blacklist unavailable (fail-closed per ADR-010).                                                                             |
+| Status | Error Identifier                       | Title                 | Condition                                                                                                                              |
+| :----- | :------------------------------------- | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
+| 400    | `urn:unihub:error:bad-request`         | Bad Request           | `jobId` is not a valid UUID format.                                                                                                    |
+| 401    | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing or invalid JWT Bearer token.                                                                                                   |
+| 403    | `urn:unihub:error:forbidden`           | Forbidden             | Authenticated, but `jwt.role` is not `ORGANIZER`.                                                                                      |
+| 404    | `urn:unihub:error:not-found`           | Not Found             | The `jobId` does not exist, belongs to a different organization, or the job has no applicable artifact (clean run or no artifact key). |
+| 429    | `urn:unihub:error:rate-limited`        | Too Many Requests     | Per-user Token Bucket exhausted (existing `RateLimitFilter`). Includes `Retry-After` header.                                           |
+| 500    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled backend error, including MinIO SDK failure during pre-signed URL generation.                                                 |
+| 503    | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis JTI blacklist unavailable (fail-closed per ADR-010). Includes `Retry-After: 30` header.                                          |
 
 > **Important:** `404` is returned for both "report not found" and "report belongs to a different organization" cases. This prevents org-membership enumeration attacks — an organizer from org-A MUST NOT be able to distinguish between a non-existent `jobId` and a `jobId` belonging to org-B.
 

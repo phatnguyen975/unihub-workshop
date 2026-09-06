@@ -1,13 +1,13 @@
 package com.unihub.workshop.iam.application.usecases;
 
-import com.unihub.workshop.iam.application.ports.out.PasswordResetTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
+import com.unihub.workshop.iam.application.ports.out.UserVerificationTokenRepository;
 import com.unihub.workshop.iam.application.utils.OtpService;
-import com.unihub.workshop.iam.domain.model.PasswordResetToken;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ConflictException;
-import com.unihub.workshop.shared.exception.InvalidOtpException;
+import com.unihub.workshop.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,16 +23,16 @@ import static org.mockito.Mockito.*;
 class ActivateAccountUseCaseImplTest {
 
     private UserRepository userRepository;
-    private PasswordResetTokenRepository passwordResetTokenRepository;
+    private UserVerificationTokenRepository userVerificationTokenRepository;
     private OtpService otpService;
     private ActivateAccountUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
-        passwordResetTokenRepository = mock(PasswordResetTokenRepository.class);
+        userVerificationTokenRepository = mock(UserVerificationTokenRepository.class);
         otpService = mock(OtpService.class);
-        useCase = new ActivateAccountUseCaseImpl(userRepository, passwordResetTokenRepository, otpService);
+        useCase = new ActivateAccountUseCaseImpl(userRepository, userVerificationTokenRepository, otpService);
     }
 
     @Test
@@ -41,29 +41,56 @@ class ActivateAccountUseCaseImplTest {
         String otp = "123456";
         UUID userId = UUID.randomUUID();
         User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
-        PasswordResetToken token = PasswordResetToken.create(userId, "tokenHash", Instant.now().plus(15, ChronoUnit.MINUTES));
+        UserVerificationToken token = UserVerificationToken.createActivationOtp(userId, "tokenHash",
+                Instant.now().plus(15, ChronoUnit.MINUTES));
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
-        when(passwordResetTokenRepository.findLatestByUserId(userId)).thenReturn(Optional.of(token));
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP))
+                .thenReturn(Optional.of(token));
         when(otpService.verifyOtp(otp, "tokenHash")).thenReturn(true);
+        when(userVerificationTokenRepository.markConsumed(token.id())).thenReturn(true);
 
         useCase.activate(email, otp);
 
-        verify(passwordResetTokenRepository).markConsumed(token.id());
+        verify(userVerificationTokenRepository).markConsumed(token.id());
         verify(userRepository).activate(userId);
     }
 
     @Test
-    void shouldThrowInvalidOtpExceptionWhenUserNotFound() {
+    void shouldThrowValidationExceptionWhenMarkConsumedFailsDueToRaceCondition() {
+        String email = "student@university.edu";
+        String otp = "123456";
+        UUID userId = UUID.randomUUID();
+        User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
+        UserVerificationToken token = UserVerificationToken.createActivationOtp(userId, "tokenHash",
+                Instant.now().plus(15, ChronoUnit.MINUTES));
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP))
+                .thenReturn(Optional.of(token));
+        when(otpService.verifyOtp(otp, "tokenHash")).thenReturn(true);
+        when(userVerificationTokenRepository.markConsumed(token.id())).thenReturn(false);
+
+        assertThatThrownBy(() -> useCase.activate(email, otp))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired activation code.");
+
+        verify(userRepository, never()).activate(any());
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenUserNotFound() {
         String email = "nonexistent@university.edu";
         when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.activate(email, "123456"))
-                .isInstanceOf(InvalidOtpException.class)
-                .hasMessage(InvalidOtpException.DEFAULT_MESSAGE);
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired activation code.");
 
         verify(userRepository, never()).activate(any());
-        verify(passwordResetTokenRepository, never()).markConsumed(any());
+        verify(userVerificationTokenRepository, never()).markConsumed(any());
     }
 
     @Test
@@ -79,77 +106,97 @@ class ActivateAccountUseCaseImplTest {
                 .hasMessageContaining("Account is already active");
 
         verify(userRepository, never()).activate(any());
-        verify(passwordResetTokenRepository, never()).markConsumed(any());
+        verify(userVerificationTokenRepository, never()).markConsumed(any());
     }
 
     @Test
-    void shouldThrowInvalidOtpExceptionWhenNoActiveTokenFound() {
+    void shouldThrowValidationExceptionWhenNoActiveTokenFound() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
         User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
-        when(passwordResetTokenRepository.findLatestByUserId(userId)).thenReturn(Optional.empty());
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.activate(email, "123456"))
-                .isInstanceOf(InvalidOtpException.class)
-                .hasMessage(InvalidOtpException.DEFAULT_MESSAGE);
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired activation code.");
 
         verify(userRepository, never()).activate(any());
     }
 
     @Test
-    void shouldThrowInvalidOtpExceptionWhenTokenExpired() {
+    void shouldThrowValidationExceptionWhenTokenExpired() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
         User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
-        PasswordResetToken expiredToken = PasswordResetToken.create(userId, "tokenHash", Instant.now().minusSeconds(10));
+        UserVerificationToken expiredToken = UserVerificationToken.createActivationOtp(userId, "tokenHash",
+                Instant.now().minusSeconds(10));
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
-        when(passwordResetTokenRepository.findLatestByUserId(userId)).thenReturn(Optional.of(expiredToken));
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP))
+                .thenReturn(Optional.of(expiredToken));
 
         assertThatThrownBy(() -> useCase.activate(email, "123456"))
-                .isInstanceOf(InvalidOtpException.class)
-                .hasMessage(InvalidOtpException.DEFAULT_MESSAGE);
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired activation code.");
 
         verify(userRepository, never()).activate(any());
-        verify(passwordResetTokenRepository, never()).markConsumed(any());
+        verify(userVerificationTokenRepository, never()).markConsumed(any());
     }
 
     @Test
-    void shouldThrowInvalidOtpExceptionWhenTokenAlreadyConsumed() {
+    void shouldThrowValidationExceptionWhenTokenAlreadyConsumed() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
         User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
-        PasswordResetToken token = PasswordResetToken.create(userId, "tokenHash", Instant.now().plusSeconds(600)).consume();
+        UserVerificationToken token = new UserVerificationToken(
+                UUID.randomUUID(),
+                userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP,
+                "tokenHash",
+                Instant.now().plusSeconds(600),
+                Instant.now(),
+                Instant.now(),
+                Instant.now(),
+                null,
+                null);
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
-        when(passwordResetTokenRepository.findLatestByUserId(userId)).thenReturn(Optional.of(token));
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP))
+                .thenReturn(Optional.of(token));
 
         assertThatThrownBy(() -> useCase.activate(email, "123456"))
-                .isInstanceOf(InvalidOtpException.class)
-                .hasMessage(InvalidOtpException.DEFAULT_MESSAGE);
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired activation code.");
 
         verify(userRepository, never()).activate(any());
-        verify(passwordResetTokenRepository, never()).markConsumed(any());
+        verify(userVerificationTokenRepository, never()).markConsumed(any());
     }
 
     @Test
-    void shouldThrowInvalidOtpExceptionWhenOtpMismatch() {
+    void shouldThrowValidationExceptionWhenOtpMismatch() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
         User inactiveUser = new User(userId, UUID.randomUUID(), UserRole.STUDENT, email, "hash", false, false, null);
-        PasswordResetToken token = PasswordResetToken.create(userId, "tokenHash", Instant.now().plusSeconds(600));
+        UserVerificationToken token = UserVerificationToken.createActivationOtp(userId, "tokenHash",
+                Instant.now().plusSeconds(600));
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(inactiveUser));
-        when(passwordResetTokenRepository.findLatestByUserId(userId)).thenReturn(Optional.of(token));
+        when(userVerificationTokenRepository.findLatestByUserIdAndType(userId,
+                UserVerificationToken.TYPE_ACTIVATION_OTP))
+                .thenReturn(Optional.of(token));
         when(otpService.verifyOtp("000000", "tokenHash")).thenReturn(false);
 
         assertThatThrownBy(() -> useCase.activate(email, "000000"))
-                .isInstanceOf(InvalidOtpException.class)
-                .hasMessage(InvalidOtpException.DEFAULT_MESSAGE);
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Invalid or expired activation code.");
 
         verify(userRepository, never()).activate(any());
-        verify(passwordResetTokenRepository, never()).markConsumed(any());
+        verify(userVerificationTokenRepository, never()).markConsumed(any());
     }
 }

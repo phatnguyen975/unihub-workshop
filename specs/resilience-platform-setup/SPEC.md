@@ -22,13 +22,13 @@ This feature establishes the foundational Resilience4j infrastructure for the en
 ### 3.1 Circuit-Breaker Foundation
 
 - **FR-01:** The system SHALL register a default circuit-breaker configuration bean in the Spring application context when the application starts, using the threshold values declared in `application.yml`.
-- **FR-02:** The system SHALL read failure-rate threshold, slow-call duration threshold, slow-call rate threshold, permitted calls in `HALF_OPEN` state, and minimum number of calls from `application.yml` — never hard-code these values in Java source.
+- **FR-02:** The system SHALL read failure-rate threshold, slow-call duration threshold, slow-call rate threshold, wait duration in open state, permitted calls in `HALF_OPEN` state, and minimum number of calls from `application.yml` (configurable via environment variables) — never hard-code these values in Java source.
 - **FR-03:** The system SHALL transition a circuit breaker from `CLOSED` to `OPEN` when the recorded failure rate equals or exceeds the configured failure-rate threshold within the configured sliding window.
 - **FR-04:** The system SHALL transition a circuit breaker from `CLOSED` to `OPEN` when the recorded slow-call rate equals or exceeds the configured slow-call rate threshold and the slow-call duration threshold within the configured sliding window.
 - **FR-05:** The system SHALL transition a circuit breaker from `OPEN` to `HALF_OPEN` automatically after the configured wait duration has elapsed.
 - **FR-06:** The system SHALL transition a circuit breaker from `HALF_OPEN` to `CLOSED` when the configured number of test calls in `HALF_OPEN` all succeed.
 - **FR-07:** The system SHALL transition a circuit breaker from `HALF_OPEN` back to `OPEN` when any test call in `HALF_OPEN` fails or is slow.
-- **FR-08:** The system SHALL return a fast-fail result (without calling the protected dependency) when a circuit breaker is in `OPEN` state, so that the calling thread is never blocked waiting on an unavailable external service.
+- **FR-08:** The system SHALL return a fast-fail result (throwing `CallNotPermittedException` mapped by `GlobalExceptionHandler` to `503 Service Unavailable` with `urn:unihub:error:service-unavailable` and a `Retry-After` header matching the wait duration) when a circuit breaker is in `OPEN` state, so that the calling thread is never blocked waiting on an unavailable external service.
 
 ### 3.2 Micrometer Metric Emission
 
@@ -120,7 +120,8 @@ _(Traces to: FR-03, FR-09)_
 ```gherkin
 Given a circuit breaker is in OPEN state and the wait duration has not yet elapsed
 When a new call attempts to use the protected dependency through the circuit breaker
-Then the circuit breaker returns a fast-fail result immediately
+Then the circuit breaker returns a fast-fail result immediately by throwing CallNotPermittedException
+And the response status is 503 Service Unavailable with type "urn:unihub:error:service-unavailable" and a Retry-After header matching the wait duration
 And the protected dependency is never invoked
 And no additional failure is recorded against the sliding window
 ```

@@ -12,17 +12,20 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "password_reset_tokens")
+@Table(name = "user_verification_tokens")
 @Getter
 @Setter
 @DynamicUpdate
-public class PasswordResetTokenJpaEntity {
+public class UserVerificationTokenJpaEntity {
 
     @Id
     private UUID id;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
+
+    @Column(name = "token_type", nullable = false, length = 32)
+    private String tokenType;
 
     @Column(name = "token_hash", nullable = false, unique = true)
     private String tokenHash;

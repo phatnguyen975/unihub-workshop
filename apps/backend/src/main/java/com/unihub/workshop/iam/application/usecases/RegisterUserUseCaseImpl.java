@@ -1,14 +1,14 @@
 package com.unihub.workshop.iam.application.usecases;
 
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
-import com.unihub.workshop.iam.application.ports.out.PasswordResetTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.StudentDirectoryRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
+import com.unihub.workshop.iam.application.ports.out.UserVerificationTokenRepository;
 import com.unihub.workshop.iam.application.utils.OtpService;
 import com.unihub.workshop.iam.domain.events.OtpRequestedEvent;
-import com.unihub.workshop.iam.domain.model.PasswordResetToken;
 import com.unihub.workshop.iam.domain.model.StudentDirectory;
 import com.unihub.workshop.iam.domain.model.User;
+import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ConflictException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,7 +25,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
     private final UserRepository userRepository;
     private final StudentDirectoryRepository studentDirectoryRepository;
-    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final UserVerificationTokenRepository userVerificationTokenRepository;
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
@@ -33,13 +33,13 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
     public RegisterUserUseCaseImpl(
             UserRepository userRepository,
             StudentDirectoryRepository studentDirectoryRepository,
-            PasswordResetTokenRepository passwordResetTokenRepository,
+            UserVerificationTokenRepository userVerificationTokenRepository,
             OtpService otpService,
             PasswordEncoder passwordEncoder,
             ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.studentDirectoryRepository = studentDirectoryRepository;
-        this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.userVerificationTokenRepository = userVerificationTokenRepository;
         this.otpService = otpService;
         this.passwordEncoder = passwordEncoder;
         this.eventPublisher = eventPublisher;
@@ -53,7 +53,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
             throw new ConflictException("An account with this email already exists.");
         }
 
-        Optional<StudentDirectory> directoryOpt = studentDirectoryRepository.findByEmail(normalizedEmail);
+        Optional<StudentDirectory> directoryOpt = studentDirectoryRepository.findActiveByEmail(normalizedEmail);
         UUID studentRecordId = directoryOpt.map(StudentDirectory::id).orElse(null);
         UUID organizationId = directoryOpt.map(StudentDirectory::organizationId).orElse(null);
 
@@ -72,8 +72,8 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
         String otpHash = otpService.hashOtp(otp);
         Instant expiresAt = otpService.calculateExpiryInstant();
 
-        PasswordResetToken token = PasswordResetToken.create(savedUser.id(), otpHash, expiresAt);
-        passwordResetTokenRepository.save(token);
+        UserVerificationToken token = UserVerificationToken.createActivationOtp(savedUser.id(), otpHash, expiresAt);
+        userVerificationTokenRepository.save(token);
 
         eventPublisher.publishEvent(new OtpRequestedEvent(
                 savedUser.id(),

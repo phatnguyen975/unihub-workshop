@@ -71,7 +71,7 @@ Nginx acts as a pure reverse proxy and load balancer; it performs **no rate limi
   > **Notes:** The filter reads the JWT to extract `jwt.sub` for keying (FR-01), but does so in a best-effort, read-only manner without validating the JWT signature. Signature validation is the responsibility of the authentication filter. If JWT parsing fails, the filter falls back to IP keying (FR-02) and continues — it must not throw a 401 or 400 at this stage.
 
 - **BR-07:** The `rate_limiter.redis_unavailable` Micrometer counter must be registered in the same `MeterRegistry` configured by `observability-platform-setup`, not in a separate or local registry.
-- **BR-08:** The 429 error response body must conform to RFC 7807 (`application/problem+json`) with `type`, `title`, `status`, `detail`, `instance`, and `traceId` fields — consistent with `docs/api-standards.md` error response standards.
+- **BR-08:** The 429 error response body must conform to RFC 7807 (`application/problem+json`) with `type`, `title`, `status`, `detail`, and `instance` fields, wrapped in the standard `ApiResponse` envelope with `metadata: { traceId, processedBy }` — consistent with `docs/api-standards.md` error response standards.
 
 ## 5. State Transitions
 

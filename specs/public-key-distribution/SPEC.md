@@ -3,7 +3,7 @@
 > **Status:** APPROVED  
 > **Domain:** 1 — Identity & Access Management  
 > **Owner/area:** `iam` module (presentation layer) + `shared/security` (key material)  
-> **Last revised:** 2026-09-03 — first version
+> **Last revised:** 2026-09-05 — first version
 
 ## 1. Overview
 
@@ -82,6 +82,7 @@ Given a request with no Authorization header
 When the request is sent to GET /api/v1/auth/public-key
 Then the response status is 401 Unauthorized
 And the response body has "success": false with RFC 7807 error format
+And the error "type" is "urn:unihub:error:unauthorized"
 ```
 
 _(Traces to: FR-04)_
@@ -93,6 +94,7 @@ Given a JWT whose exp claim is in the past
 When the user sends GET /api/v1/auth/public-key with that JWT
 Then the response status is 401 Unauthorized
 And the response body follows the RFC 7807 error format
+And the error "type" is "urn:unihub:error:unauthorized"
 ```
 
 _(Traces to: FR-05)_
@@ -104,6 +106,7 @@ Given a JWT whose jti is present in the Redis JTI blacklist
 When the user sends GET /api/v1/auth/public-key with that JWT
 Then the response status is 401 Unauthorized
 And the response body follows the RFC 7807 error format
+And the error "type" is "urn:unihub:error:unauthorized"
 ```
 
 _(Traces to: FR-05)_
@@ -115,6 +118,7 @@ Given an ORGANIZER user is authenticated with a valid, non-revoked JWT
 When the user sends GET /api/v1/auth/public-key with the Authorization header
 Then the response status is 403 Forbidden
 And the response body follows the RFC 7807 error format
+And the error "type" is "urn:unihub:error:forbidden"
 ```
 
 _(Traces to: FR-06, BR-01)_
@@ -126,6 +130,7 @@ Given a STUDENT user is authenticated with a valid, non-revoked JWT
 When the user sends GET /api/v1/auth/public-key with the Authorization header
 Then the response status is 403 Forbidden
 And the response body follows the RFC 7807 error format
+And the error "type" is "urn:unihub:error:forbidden"
 ```
 
 _(Traces to: FR-06, BR-01)_
@@ -152,6 +157,19 @@ And publicKeyPem reflects the new public key material
 ```
 
 _(Traces to: FR-08, BR-03)_
+
+### Scenario 9: Redis unavailable during JTI validation (fail-closed)
+
+```gherkin
+Given Redis is unreachable or returns a connection error
+When an authenticated STAFF user sends GET /api/v1/auth/public-key with a valid JWT
+Then the response status is 503 Service Unavailable
+And the response header "Retry-After" is "30"
+And the response body has "success": false with RFC 7807 error format
+And the error "type" is "urn:unihub:error:service-unavailable"
+```
+
+_(Traces to: BR-04, ADR-010)_
 
 ## 8. Out of Scope
 

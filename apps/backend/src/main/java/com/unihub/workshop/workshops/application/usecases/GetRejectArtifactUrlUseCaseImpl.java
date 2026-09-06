@@ -5,6 +5,7 @@ import com.unihub.workshop.workshops.application.ports.out.ArtifactPresignPort;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,7 +13,6 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
-import com.unihub.workshop.shared.exception.NotFoundException;
 
 @Service
 public class GetRejectArtifactUrlUseCaseImpl implements GetRejectArtifactUrlUseCase {
@@ -33,8 +33,7 @@ public class GetRejectArtifactUrlUseCaseImpl implements GetRejectArtifactUrlUseC
     public RejectArtifactUrlResult execute(UUID jobId, UUID organizationId) {
         // Must use primary data source to prevent replication lag
         IngestionJobReport report = repository.findByIdAndOrganizationIdFromPrimary(jobId, organizationId)
-                .orElseThrow(() -> new com.unihub.workshop.shared.exception.NotFoundException(
-                        "IngestionJobReport not found"));
+                .orElseThrow(() -> new NotFoundException("IngestionJobReport not found"));
 
         String artifactType;
         String objectKey;

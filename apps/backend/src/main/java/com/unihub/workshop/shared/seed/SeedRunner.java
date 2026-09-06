@@ -4,12 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import com.unihub.workshop.shared.events.UserProvisionedEvent;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -30,12 +33,18 @@ public class SeedRunner implements ApplicationRunner {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final PasswordGenerator passwordGenerator;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public SeedRunner(SeedProperties seedProperties, JdbcTemplate jdbcTemplate, PasswordGenerator passwordGenerator) {
+    public SeedRunner(
+            SeedProperties seedProperties,
+            JdbcTemplate jdbcTemplate,
+            PasswordGenerator passwordGenerator,
+            ApplicationEventPublisher eventPublisher) {
         this.seedProperties = seedProperties;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = new ObjectMapper();
         this.passwordGenerator = passwordGenerator;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -82,8 +91,19 @@ public class SeedRunner implements ApplicationRunner {
                     organizer.displayName());
 
             if (rowsAffected > 0) {
-                // TODO: remove plaintext password from logs in production
-                // TODO: publish domain event or send notification email to organizer.email()
+                UUID userId = jdbcTemplate.queryForObject(
+                        "SELECT id FROM users WHERE email = ?", UUID.class, organizer.email());
+
+                eventPublisher.publishEvent(new UserProvisionedEvent(
+                        userId,
+                        orgId,
+                        organizer.orgSlug(),
+                        organizer.email(),
+                        organizer.displayName(),
+                        "ORGANIZER",
+                        generatedPassword.plaintext()));
+
+                // NOTE: Log kept temporarily for local inspection until notifications worker is implemented
                 log.info("Seeded root organizer: {} with temporary password: {}", organizer.email(),
                         generatedPassword.plaintext());
             } else {

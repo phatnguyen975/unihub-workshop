@@ -1,5 +1,6 @@
 package com.unihub.workshop.shared.ratelimit;
 
+import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ClientIpExtractor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.BucketConfiguration;
@@ -25,7 +26,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -90,7 +90,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
                 String traceId = MDC.get("traceId");
                 if (traceId == null) {
-                    traceId = UUID.randomUUID().toString();
+                    traceId = "unknown";
+                }
+
+                String processedBy = MDC.get("processedBy");
+                if (processedBy == null) {
+                    processedBy = "unknown";
                 }
 
                 String detail = String.format("Rate limit exceeded. Try again in %d seconds.",
@@ -100,9 +105,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 problem.setType(URI.create("urn:unihub:error:rate-limited"));
                 problem.setTitle("Too Many Requests");
                 problem.setInstance(URI.create(request.getRequestURI()));
-                problem.setProperty("traceId", traceId);
 
-                response.getWriter().write(objectMapper.writeValueAsString(problem));
+                ApiResponse<Void> apiResponse = ApiResponse.error(problem);
+                apiResponse.setMetadata(new ApiResponse.Metadata(traceId, processedBy));
+
+                response.getWriter().write(objectMapper.writeValueAsString(apiResponse));
             }
         } catch (Exception ex) {
             log.warn("Redis unavailable for rate limiting. Failing open. Key: {}, Path: {}, Error: {}",

@@ -2,7 +2,7 @@
 
 > **Status:** APPROVED  
 > **Spec:** `specs/authentication-and-session-management/SPEC.md`  
-> **Last revised:** 2026-09-02
+> **Last revised:** 2026-09-05
 
 ## Overview
 
@@ -25,10 +25,9 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ## Endpoint 1 — Login: `POST /api/v1/auth/login`
 
-**Purpose:** Authenticate a user with email/password. Issues an RS256-signed JWT access token and an opaque refresh token. Enforces inactive-account and temporary-password gates before issuing tokens.  
-**FR Traces:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06  
-**Authentication:** Not required (this endpoint IS the authentication mechanism).  
-**Idempotency:** Not applicable — each login creates a new session. No `Idempotency-Key` header required.
+**Purpose:** Authenticate a user with email/password. Issues an RS256-signed JWT access token, an opaque refresh token, and user profile data for immediate UI rendering. Enforces inactive-account and temporary-password gates before issuing tokens.  
+**FR Traces:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07  
+**Authentication:** Not required (this endpoint IS the authentication mechanism).
 
 ### Request
 
@@ -43,8 +42,8 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ```json
 {
-  "email": "user@example.com",
-  "password": "P@ssw0rd123"
+  "email": "student.alice@university.edu",
+  "password": "StrongPassword123!"
 }
 ```
 
@@ -64,24 +63,45 @@ All API endpoints comply with the following invariants from `docs/api-standards.
   "success": true,
   "message": "Login successful",
   "data": {
-    "accessToken": "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxYjhmOGM3Yi0...",
-    "refreshToken": "a8f3c2e1b9d74f5e9a2c8b7d6e1f4g3h",
+    "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InVuaWh1Yi0yMDI2In0...",
+    "refreshToken": "7f9a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
     "tokenType": "Bearer",
-    "expiresIn": 3600
+    "expiresIn": 3600,
+    "user": {
+      "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+      "email": "student.alice@university.edu",
+      "fullName": "Alice Nguyen",
+      "role": "STUDENT",
+      "phoneNumber": "+84912345678",
+      "avatarUrl": "https://storage.unihub.edu/avatars/alice.jpg",
+      "lastLoginAt": "2026-09-05T01:40:00Z",
+      "organizationId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "studentRecordId": "f01e2d3c-4b5a-6789-0123-456789abcdef"
+    }
   },
   "metadata": {
-    "processedBy": "unihub-backend-1",
-    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
   }
 }
 ```
 
-| Field          | Type    | Description                                                                        |
-| :------------- | :------ | :--------------------------------------------------------------------------------- |
-| `accessToken`  | string  | Signed RS256 JWT. Claims: `sub`, `role`, `org`, `jti`, `iat`, `exp`.               |
-| `refreshToken` | string  | Opaque cryptographically random string. Must be treated as a secret by the client. |
-| `tokenType`    | string  | Always `"Bearer"`.                                                                 |
-| `expiresIn`    | integer | Access token TTL in seconds (e.g., `3600`).                                        |
+| Field                  | Type    | Description                                                                             |
+| :--------------------- | :------ | :-------------------------------------------------------------------------------------- |
+| `accessToken`          | string  | Signed RS256 JWT. Claims: `sub`, `role`, `org`, `jti`, `iat`, `exp`.                    |
+| `refreshToken`         | string  | Opaque cryptographically random string. Must be treated as a secret by the client.      |
+| `tokenType`            | string  | Always `"Bearer"`.                                                                      |
+| `expiresIn`            | integer | Access token TTL in seconds (e.g., `3600`).                                             |
+| `user`                 | object  | User profile object for immediate UI rendering and frontend state initialization.       |
+| `user.id`              | string  | UUID of the authenticated user.                                                         |
+| `user.email`           | string  | Email address of the user.                                                              |
+| `user.fullName`        | string  | Full display name of the user.                                                          |
+| `user.role`            | string  | Role of the user: `"STUDENT"`, `"ORGANIZER"`, or `"STAFF"`.                             |
+| `user.phoneNumber`     | string  | Phone number (optional, omitted if null).                                               |
+| `user.avatarUrl`       | string  | URL of user's avatar image (optional, omitted if null).                                 |
+| `user.lastLoginAt`     | string  | ISO 8601 UTC timestamp of previous login (optional, omitted if null).                   |
+| `user.organizationId`  | string  | UUID of the associated organization (optional, omitted if null).                        |
+| `user.studentRecordId` | string  | UUID of the student directory record for verified students (optional, omitted if null). |
 
 **Side effects:**
 
@@ -90,13 +110,15 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ### Error Responses
 
-| Scenario                                      | HTTP Status | `type`                                 | `title`             | Notes                                                                                                                                             |
-| :-------------------------------------------- | :---------: | :------------------------------------- | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Wrong password or unknown email               |    `401`    | `urn:unihub:error:authentication`      | Unauthorized        | Generic; does not distinguish email-not-found from wrong-password (anti-enumeration)                                                              |
-| Account is inactive                           |    `403`    | `urn:unihub:error:account-disabled`    | Forbidden           | `is_active = FALSE`                                                                                                                               |
-| Temporary password must be reset              |    `403`    | `urn:unihub:error:temporary-password`  | Forbidden           | `is_temporary_password = TRUE`; client must route to password-change screen                                                                       |
-| Request body validation failure               |    `400`    | `urn:unihub:error:validation`          | Bad Request         | Missing or invalid `email`/`password` fields                                                                                                      |
-| Redis unavailable (JTI write on future calls) |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable | `Retry-After: 30` header included. Login itself does not write to Redis; this only applies if Redis is checked during subsequent protected calls. |
+| Scenario                                      | HTTP Status | `type`                                 | `title`               | Notes                                                                                                                                             |
+| :-------------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Wrong password or unknown email               |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Generic; does not distinguish email-not-found from wrong-password (anti-enumeration)                                                              |
+| Account is inactive                           |    `403`    | `urn:unihub:error:account-disabled`    | Forbidden             | `is_active = FALSE`                                                                                                                               |
+| Temporary password must be reset              |    `403`    | `urn:unihub:error:temporary-password`  | Forbidden             | `is_temporary_password = TRUE`; client must route to password-change screen (`POST /api/v1/auth/password/temporary`)                              |
+| Request body validation failure               |    `422`    | `urn:unihub:error:validation`          | Unprocessable Content | Missing or invalid `email`/`password` fields; returns `validationErrors` list                                                                     |
+| Malformed JSON body                           |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                                                                                                           |
+| Redis unavailable (JTI write on future calls) |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included. Login itself does not write to Redis; this only applies if Redis is checked during subsequent protected calls. |
+| Unexpected server error                       |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)                                                                                         |
 
 **RFC 7807 Error body shape (Authentication Failed):**
 
@@ -104,15 +126,15 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 {
   "success": false,
   "error": {
-    "type": "urn:unihub:error:authentication",
+    "type": "urn:unihub:error:unauthorized",
     "title": "Unauthorized",
     "status": 401,
     "detail": "Invalid email or password.",
     "instance": "/api/v1/auth/login"
   },
   "metadata": {
-    "processedBy": "unihub-backend-1",
-    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
   }
 }
 ```
@@ -130,8 +152,28 @@ All API endpoints comply with the following invariants from `docs/api-standards.
     "instance": "/api/v1/auth/login"
   },
   "metadata": {
-    "processedBy": "unihub-backend-1",
-    "traceId": "4bf92f3577b34da6a3ce929d0e0e4737"
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**RFC 7807 Error body shape (Validation Failure):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:validation",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "detail": "Validation failed for 'loginRequest'. 1 error(s) found.",
+    "instance": "/api/v1/auth/login",
+    "validationErrors": ["email: must be a well-formed email address"]
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
   }
 }
 ```
@@ -140,8 +182,7 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 **Purpose:** Exchange a valid refresh token for a new access token. The refresh token is rotated atomically: the old token is revoked and a new one is issued in a single transaction.  
 **FR Traces:** FR-08, FR-09  
-**Authentication:** Not required (the refresh token itself is the credential).  
-**Idempotency:** Not applicable — refresh is inherently stateful. A second request with the same (now revoked) refresh token returns `401`.
+**Authentication:** Not required (the refresh token itself is the credential).
 
 ### Request
 
@@ -172,14 +213,14 @@ All API endpoints comply with the following invariants from `docs/api-standards.
   "success": true,
   "message": "Token refreshed",
   "data": {
-    "accessToken": "eyJhbGciOiJSUzI1NiJ9.newToken...",
-    "refreshToken": "z9k2p4x1m8n3q7w5v6u0t",
+    "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InVuaWh1Yi0yMDI2In0...",
+    "refreshToken": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890",
     "tokenType": "Bearer",
     "expiresIn": 3600
   },
   "metadata": {
-    "processedBy": "unihub-backend-1",
-    "traceId": "4bf92f3577b34da6a3ce929d0e0e4737"
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
   }
 }
 ```
@@ -198,19 +239,21 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ### Error Responses
 
-| Scenario                                 | HTTP Status | `type`                            | Notes                                           |
-| :--------------------------------------- | :---------: | :-------------------------------- | :---------------------------------------------- |
-| Token not found (unknown hash)           |    `401`    | `urn:unihub:error:authentication` | No matching `token_hash` in `refresh_tokens`    |
-| Token revoked (`revoked_at IS NOT NULL`) |    `401`    | `urn:unihub:error:authentication` | Token was already rotated or explicitly revoked |
-| Token expired (`expires_at < NOW()`)     |    `401`    | `urn:unihub:error:authentication` | Refresh token TTL has lapsed                    |
-| Request body validation failure          |    `400`    | `urn:unihub:error:validation`     | Missing or blank `refreshToken` field           |
+| Scenario                                 | HTTP Status | `type`                                 | `title`               | Notes                                                                  |
+| :--------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :--------------------------------------------------------------------- |
+| Token not found (unknown hash)           |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | No matching `token_hash` in `refresh_tokens`                           |
+| Token revoked (`revoked_at IS NOT NULL`) |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Token was already rotated or explicitly revoked                        |
+| Token expired (`expires_at < NOW()`)     |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Refresh token TTL has lapsed                                           |
+| Request body validation failure          |    `422`    | `urn:unihub:error:validation`          | Unprocessable Content | Missing or blank `refreshToken` field; returns `validationErrors` list |
+| Malformed JSON body                      |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                                |
+| Redis unavailable                        |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included                                      |
+| Unexpected server error                  |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)              |
 
 ## Endpoint 3 — Logout: `POST /api/v1/auth/logout`
 
 **Purpose:** Revoke the caller's current access token by writing its `jti` to the Redis JTI blacklist with a TTL matching the token's remaining validity, and invalidate the corresponding refresh token row in the database.  
 **FR Traces:** FR-10, FR-11  
-**Authentication:** Required — caller must present a valid Bearer JWT access token.  
-**Idempotency:** Not applicable. Calling logout twice with the same (now blacklisted) access token results in `401` on the second call because the token has been revoked.
+**Authentication:** Required — caller must present a valid Bearer JWT access token.
 
 ### Request
 
@@ -244,17 +287,18 @@ No response body.
 
 ### Error Responses
 
-| Scenario                                      | HTTP Status | `type`                                 | Notes                                                      |
-| :-------------------------------------------- | :---------: | :------------------------------------- | :--------------------------------------------------------- |
-| Missing or invalid Bearer token               |    `401`    | `urn:unihub:error:authentication`      | Standard filter rejection before the endpoint is reached   |
-| Redis unavailable (JTI blacklist write fails) |    `503`    | `urn:unihub:error:service-unavailable` | `Retry-After: 30` header included. No DB changes are made. |
+| Scenario                                      | HTTP Status | `type`                                 | `title`               | Notes                                                      |
+| :-------------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :--------------------------------------------------------- |
+| Malformed JSON body                           |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                    |
+| Missing or invalid Bearer token               |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Standard filter rejection before the endpoint is reached   |
+| Unexpected server error                       |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)  |
+| Redis unavailable (JTI blacklist write fails) |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included. No DB changes are made. |
 
 ## Endpoint 4 — JWKS (Public Key): `GET /.well-known/jwks.json`
 
 **Purpose:** Return the RSA public key in JWK Set format (RFC 7517) for token signature verification by downstream services and API gateways.  
 **FR Traces:** FR-12  
-**Authentication:** Not required. This is a public endpoint.  
-**Idempotency:** Inherently idempotent (read-only).
+**Authentication:** Not required. This is a public endpoint.
 
 ### Request
 
@@ -296,9 +340,9 @@ No request body or query parameters.
 
 ### Error Responses
 
-| Scenario                                      | HTTP Status | Notes                                                                     |
-| :-------------------------------------------- | :---------: | :------------------------------------------------------------------------ |
-| RSA key not loaded (startup misconfiguration) |    `500`    | Should not occur in normal operation; monitored via Actuator health check |
+| Scenario                                      | HTTP Status | `type`                      | `title`               | Notes                                                                     |
+| :-------------------------------------------- | :---------: | :-------------------------- | :-------------------- | :------------------------------------------------------------------------ |
+| RSA key not loaded (startup misconfiguration) |    `500`    | `urn:unihub:error:internal` | Internal Server Error | Should not occur in normal operation; monitored via Actuator health check |
 
 ## Global Security Notes
 
@@ -319,7 +363,7 @@ All access tokens issued by `POST /api/v1/auth/login` and `POST /api/v1/auth/ref
 
 - `sub` — UUID of the authenticated user (`users.id`)
 - `role` — One of `STUDENT`, `ORGANIZER`, `STAFF` (no `ROLE_` prefix in the token)
-- `org` — UUID of `users.organization_id`
+- `org` — UUID of `users.organization_id` (optional, omitted if user has no associated organization)
 - `jti` — UUIDv4, unique per issued token; used for revocation
 - `iat` — Issued-at time (Unix epoch seconds, UTC)
 - `exp` — Expiry time (Unix epoch seconds, UTC)
@@ -348,9 +392,9 @@ Per NFR-09, the `/api/v1/auth/login` and `/api/v1/auth/refresh` endpoints are su
 
 The table below summarises which paths are public and which are protected, as configured in `app.security.public-paths` and enforced by `SecurityConfig`:
 
-| Path                         | Auth | Rate Limit Tier | Notes                                      |
-| :--------------------------- | :--: | :-------------- | :----------------------------------------- |
-| `POST /api/v1/auth/login`    |  No  | Browsing        | Must be added to `public-paths`            |
-| `POST /api/v1/auth/refresh`  |  No  | Browsing        | Must be added to `public-paths`            |
-| `POST /api/v1/auth/logout`   | Yes  | Browsing        | Bearer token required                      |
-| `GET /.well-known/jwks.json` |  No  | None            | Already in `public-paths` from feature 9.2 |
+| Path                         | Auth | Rate Limit Tier | Notes                        |
+| :--------------------------- | :--: | :-------------- | :--------------------------- |
+| `POST /api/v1/auth/login`    |  No  | Browsing        | Configured in `public-paths` |
+| `POST /api/v1/auth/refresh`  |  No  | Browsing        | Configured in `public-paths` |
+| `POST /api/v1/auth/logout`   | Yes  | Browsing        | Bearer token required        |
+| `GET /.well-known/jwks.json` |  No  | None            | Configured in `public-paths` |

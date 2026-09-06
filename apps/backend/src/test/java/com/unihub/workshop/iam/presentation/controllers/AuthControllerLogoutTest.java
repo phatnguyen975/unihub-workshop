@@ -2,12 +2,14 @@ package com.unihub.workshop.iam.presentation.controllers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
+import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
+import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.iam.presentation.dto.LogoutRequest;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
@@ -57,7 +59,9 @@ class AuthControllerLogoutTest {
                 mock(PublicKeyService.class),
                 mock(RegisterUserUseCase.class),
                 mock(ActivateAccountUseCase.class),
-                mock(ResendOtpUseCase.class)))
+                mock(ResendOtpUseCase.class),
+                mock(ResetPasswordUseCase.class),
+                mock(ChangeTemporaryPasswordUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override

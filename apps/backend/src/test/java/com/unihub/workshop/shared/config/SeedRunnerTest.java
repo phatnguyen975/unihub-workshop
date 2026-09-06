@@ -1,19 +1,23 @@
 package com.unihub.workshop.shared.config;
 
-import com.unihub.workshop.shared.seed.SeedRunner;
-import com.unihub.workshop.shared.seed.SeedProperties;
+import com.unihub.workshop.shared.events.UserProvisionedEvent;
 import com.unihub.workshop.shared.seed.PasswordGenerator;
+import com.unihub.workshop.shared.seed.SeedProperties;
+import com.unihub.workshop.shared.seed.SeedRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -30,6 +34,9 @@ class SeedRunnerTest {
     private PasswordGenerator passwordGenerator;
 
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
     private ApplicationArguments args;
 
     @Test
@@ -37,7 +44,7 @@ class SeedRunnerTest {
         SeedProperties props = new SeedProperties(
                 "[{\"name\":\"Engineering\",\"slug\":\"engineering\"}]",
                 "[{\"email\":\"admin@engineering.com\",\"orgSlug\":\"engineering\",\"displayName\":\"Admin\"}]");
-        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator, eventPublisher);
 
         when(jdbcTemplate.update(anyString(), eq("Engineering"), eq("engineering"))).thenReturn(1);
 
@@ -55,6 +62,10 @@ class SeedRunnerTest {
         when(jdbcTemplate.update(anyString(), eq(orgId), eq("admin@engineering.com"), eq("hashed123"),
                 eq("Admin"))).thenReturn(1);
 
+        UUID userId = UUID.randomUUID();
+        when(jdbcTemplate.queryForObject(anyString(), eq(UUID.class), eq("admin@engineering.com")))
+                .thenReturn(userId);
+
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(1);
 
         runner.run(args);
@@ -65,6 +76,17 @@ class SeedRunnerTest {
         verify(jdbcTemplate).update(
                 "INSERT INTO users (organization_id, role, email, password_hash, full_name, is_temporary_password) VALUES (?, 'ORGANIZER', ?, ?, ?, true) ON CONFLICT (email) DO NOTHING",
                 orgId, "admin@engineering.com", "hashed123", "Admin");
+
+        ArgumentCaptor<UserProvisionedEvent> eventCaptor = ArgumentCaptor.forClass(UserProvisionedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        UserProvisionedEvent publishedEvent = eventCaptor.getValue();
+        assertThat(publishedEvent.userId()).isEqualTo(userId);
+        assertThat(publishedEvent.organizationId()).isEqualTo(orgId);
+        assertThat(publishedEvent.orgSlug()).isEqualTo("engineering");
+        assertThat(publishedEvent.email()).isEqualTo("admin@engineering.com");
+        assertThat(publishedEvent.fullName()).isEqualTo("Admin");
+        assertThat(publishedEvent.role()).isEqualTo("ORGANIZER");
+        assertThat(publishedEvent.temporaryPassword()).isEqualTo("plaintext123");
     }
 
     @Test
@@ -72,7 +94,7 @@ class SeedRunnerTest {
         SeedProperties props = new SeedProperties(
                 "[{\"name\":\"Engineering\",\"slug\":\"engineering\"}]",
                 "[{\"email\":\"admin@engineering.com\",\"orgSlug\":\"engineering\",\"displayName\":\"Admin\"}]");
-        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator, eventPublisher);
 
         when(jdbcTemplate.update(anyString(), eq("Engineering"), eq("engineering"))).thenReturn(0);
 
@@ -89,6 +111,8 @@ class SeedRunnerTest {
         verify(passwordGenerator, never()).generate();
         // No user INSERT attempted for existing organizer
         verify(jdbcTemplate, never()).update(anyString(), eq("admin@engineering.com"));
+        // No event published for existing organizer
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -96,7 +120,7 @@ class SeedRunnerTest {
         SeedProperties props = new SeedProperties(
                 "[]",
                 "[{\"email\":\"admin@engineering.com\",\"orgSlug\":\"unknown\",\"displayName\":\"Admin\"}]");
-        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator, eventPublisher);
 
         // User does not exist — proceed to resolveOrganizationId
         when(jdbcTemplate.queryForObject(anyString(), eq(Boolean.class), eq("admin@engineering.com")))
@@ -114,13 +138,14 @@ class SeedRunnerTest {
     @Test
     void run_withEmptyArrays_logsWarnAndDoesNoInserts() {
         SeedProperties props = new SeedProperties("[]", "[]");
-        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator, eventPublisher);
 
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
 
         runner.run(args);
 
         verify(jdbcTemplate, never()).update(anyString(), (Object[]) any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -128,7 +153,7 @@ class SeedRunnerTest {
         SeedProperties props = new SeedProperties(
                 "[{\"name\":\"Engineering\",\"slug\":\"engineering\"}]",
                 "[]");
-        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator, eventPublisher);
 
         when(jdbcTemplate.update(anyString(), eq("Engineering"), eq("engineering"))).thenReturn(1);
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class))).thenReturn(1);
@@ -136,12 +161,13 @@ class SeedRunnerTest {
         runner.run(args);
 
         verify(jdbcTemplate).update(anyString(), eq("Engineering"), eq("engineering"));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
     void run_withMalformedOrganizationsJson_throwsIllegalStateException() {
         SeedProperties props = new SeedProperties("not-valid-json", "[]");
-        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator);
+        SeedRunner runner = new SeedRunner(props, jdbcTemplate, passwordGenerator, eventPublisher);
 
         assertThatThrownBy(() -> runner.run(args))
                 .isInstanceOf(IllegalStateException.class)
