@@ -115,7 +115,7 @@ This plan delivers the complete active session management capability (Domain 1: 
 
 ### Phase 4: Bulk Remote Session Revocation
 
-- [ ] **T4 — Bulk session revocation: terminate all other active sessions while preserving caller's current session (`DELETE /api/v1/auth/sessions`)**
+- [x] **T4 — Bulk session revocation: terminate all other active sessions while preserving caller's current session (`DELETE /api/v1/auth/sessions`)**
   - **Size:** M
   - **Depends on:** T1, T2, T3
   - **Layers touched:** Application (Ports/Use Cases), Infrastructure (Persistence/Redis), Presentation (Controller)
@@ -140,11 +140,11 @@ This plan delivers the complete active session management capability (Domain 1: 
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1–T4 are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified by mock-based unit tests.
-- [ ] Full unit test suite passes: `./gradlew :apps:backend:test`.
-- [ ] `ModulithArchitectureTest` passes with zero architectural violations.
-- [ ] Ready for `/review active-session-management`.
+- [x] All tasks T1–T4 are checked off.
+- [x] Every acceptance criterion across all tasks has been verified by mock-based unit tests.
+- [x] Full unit test suite passes: `./gradlew :apps:backend:test`.
+- [x] `ModulithArchitectureTest` passes with zero architectural violations.
+- [x] Ready for `/review active-session-management`.
 
 ## Risks and Mitigations
 

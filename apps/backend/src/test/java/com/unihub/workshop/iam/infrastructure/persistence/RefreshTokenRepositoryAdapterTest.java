@@ -135,6 +135,39 @@ class RefreshTokenRepositoryAdapterTest {
         assertThat(success).isTrue();
     }
 
+    @Test
+    void shouldFindActiveRemoteSessions() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        UUID remoteSessionId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        RefreshTokenJpaEntity remoteEntity = createEntity(remoteSessionId, userId, "Firefox", "192.168.1.1", now);
+
+        when(repository.findActiveRemoteSessions(eq(userId), eq(currentSessionId), any(Instant.class)))
+                .thenReturn(List.of(remoteEntity));
+
+        List<RefreshToken> results = adapter.findActiveRemoteSessions(userId, currentSessionId, now);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).id()).isEqualTo(remoteSessionId);
+        assertThat(results.get(0).userId()).isEqualTo(userId);
+    }
+
+    @Test
+    void shouldRevokeAllOtherActiveSessions() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        Instant revokedAt = Instant.now();
+
+        when(repository.revokeAllOtherActiveSessions(eq(userId), eq(currentSessionId), eq(revokedAt), eq(revokedAt)))
+                .thenReturn(3);
+
+        int count = adapter.revokeAllOtherActiveSessions(userId, currentSessionId, revokedAt);
+
+        assertThat(count).isEqualTo(3);
+    }
+
     private RefreshTokenJpaEntity createEntity(UUID id, UUID userId, String deviceInfo, String ipAddress,
             Instant createdAt) {
         RefreshTokenJpaEntity entity = new RefreshTokenJpaEntity();

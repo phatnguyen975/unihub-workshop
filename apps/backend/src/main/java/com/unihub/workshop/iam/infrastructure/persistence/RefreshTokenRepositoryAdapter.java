@@ -132,6 +132,20 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         return repository.revokeActiveSession(id, userId, revokedAt, revokedAt) > 0;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<RefreshToken> findActiveRemoteSessions(UUID userId, UUID currentSessionId, Instant now) {
+        return repository.findActiveRemoteSessions(userId, currentSessionId, now).stream()
+                .map(this::mapToDomain)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public int revokeAllOtherActiveSessions(UUID userId, UUID currentSessionId, Instant revokedAt) {
+        return repository.revokeAllOtherActiveSessions(userId, currentSessionId, revokedAt, revokedAt);
+    }
+
     private ActiveSession mapToActiveSession(RefreshTokenJpaEntity entity) {
         return new ActiveSession(
                 entity.getId(),
@@ -141,5 +155,6 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 false);
     }
 
-    private record CursorData(Instant createdAt, UUID id) {}
+    private record CursorData(Instant createdAt, UUID id) {
+    }
 }

@@ -1,6 +1,7 @@
 package com.unihub.workshop.iam.application.ports.out;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,4 +21,8 @@ public interface RefreshTokenRepository {
     Optional<RefreshToken> findActiveSessionByIdAndUserId(UUID id, UUID userId, Instant now);
 
     boolean revokeActiveSession(UUID id, UUID userId, Instant revokedAt);
+
+    List<RefreshToken> findActiveRemoteSessions(UUID userId, UUID currentSessionId, Instant now);
+
+    int revokeAllOtherActiveSessions(UUID userId, UUID currentSessionId, Instant revokedAt);
 }

@@ -121,7 +121,7 @@
 
 ### 1.7 `active-session-management`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Provides authenticated users across all roles (`STUDENT`, `STAFF`, `ORGANIZER`) with the ability to view and revoke their active login sessions. Each row in `refresh_tokens` represents one active session and carries `device_info` (User-Agent / device name) and `ip_address` for identification. The JWT access token carries a `sid` (Session ID) claim linking to `refresh_tokens.id`. `GET /api/v1/auth/sessions` returns a cursor-paginated list of non-expired, non-revoked sessions with an `isCurrentSession` indicator computed via `sid`. `DELETE /api/v1/auth/sessions/{id}` revokes a specific session by setting `revoked_at` on the `refresh_tokens` row and blacklisting the corresponding access token's `jti` in Redis. `DELETE /api/v1/auth/sessions` (revoke-all) revokes all sessions belonging to the user except the caller's current session (preserved via `sid`). This feature enables users to detect and terminate unauthorized sessions — a standard security control made possible by the `device_info` and `ip_address` columns in `refresh_tokens`.
 

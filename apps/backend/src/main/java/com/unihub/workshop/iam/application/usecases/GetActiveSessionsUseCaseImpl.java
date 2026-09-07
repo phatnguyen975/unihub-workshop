@@ -5,6 +5,7 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,9 +17,13 @@ import java.util.stream.Collectors;
 public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MeterRegistry meterRegistry;
 
-    public GetActiveSessionsUseCaseImpl(RefreshTokenRepository refreshTokenRepository) {
+    public GetActiveSessionsUseCaseImpl(
+            RefreshTokenRepository refreshTokenRepository,
+            MeterRegistry meterRegistry) {
         this.refreshTokenRepository = refreshTokenRepository;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -40,6 +45,8 @@ public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
                 .map(session -> session
                         .withCurrentSession(currentSessionId != null && session.id().equals(currentSessionId)))
                 .collect(Collectors.toList());
+
+        meterRegistry.counter("auth.sessions.listed", "outcome", "success").increment();
 
         return new CursorPage<>(items, page.nextCursor(), page.hasMore());
     }

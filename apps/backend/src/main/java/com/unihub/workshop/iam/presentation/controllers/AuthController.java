@@ -9,11 +9,13 @@ import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
+import com.unihub.workshop.iam.application.ports.in.RevokeAllOtherSessionsUseCase;
 import com.unihub.workshop.iam.application.ports.in.RevokeSessionUseCase;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
 import com.unihub.workshop.iam.presentation.dto.ChangeTemporaryPasswordRequest;
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.iam.presentation.dto.LoginRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginResponse;
 import com.unihub.workshop.iam.presentation.dto.LogoutRequest;
@@ -69,6 +71,7 @@ public class AuthController {
     private final ChangeTemporaryPasswordUseCase changeTemporaryPasswordUseCase;
     private final GetActiveSessionsUseCase getActiveSessionsUseCase;
     private final RevokeSessionUseCase revokeSessionUseCase;
+    private final RevokeAllOtherSessionsUseCase revokeAllOtherSessionsUseCase;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -235,6 +238,47 @@ public class AuthController {
         }
 
         revokeSessionUseCase.revokeSession(userId, id, currentSessionId, currentJti, exp);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/sessions")
+    public ResponseEntity<Void> revokeAllOtherSessions(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Full authentication is required to access this resource");
+        }
+
+        UUID userId;
+        UUID currentSessionId = null;
+
+        if (authentication.getPrincipal() instanceof JwtAuthenticatedPrincipal jwtPrincipal) {
+            userId = UUID.fromString(jwtPrincipal.sub());
+            if (jwtPrincipal.sid() != null && !jwtPrincipal.sid().isBlank()) {
+                try {
+                    currentSessionId = UUID.fromString(jwtPrincipal.sid());
+                } catch (IllegalArgumentException e) {
+                    throw new BadRequestException("Invalid session ID in token");
+                }
+            }
+        } else if (authentication.getPrincipal() instanceof Jwt jwt) {
+            userId = UUID.fromString(jwt.getSubject());
+            String sid = jwt.getClaimAsString("sid");
+            if (sid != null && !sid.isBlank()) {
+                try {
+                    currentSessionId = UUID.fromString(sid);
+                } catch (IllegalArgumentException e) {
+                    throw new BadRequestException("Invalid session ID in token");
+                }
+            }
+        } else {
+            throw new UnauthorizedException("Unauthorized: invalid token principal");
+        }
+
+        if (currentSessionId == null) {
+            throw new BadRequestException("Current session ID (sid) is required for bulk revocation");
+        }
+
+        revokeAllOtherSessionsUseCase.revokeAllOtherSessions(userId, currentSessionId);
 
         return ResponseEntity.noContent().build();
     }

@@ -2,6 +2,7 @@ package com.unihub.workshop.iam.infrastructure.security;
 
 import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -17,12 +18,14 @@ public class RedisSessionTrackerAdapter implements SessionTrackerPort {
     private static final String KEY_PREFIX = "session:jti:";
 
     private final StringRedisTemplate redisTemplate;
+    private final MeterRegistry meterRegistry;
 
     @Override
     public void trackSession(UUID sessionId, String jti, Duration ttl) {
         try {
             redisTemplate.opsForValue().set(KEY_PREFIX + sessionId, jti, ttl);
         } catch (Exception e) {
+            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
             throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
         }
     }
@@ -33,6 +36,7 @@ public class RedisSessionTrackerAdapter implements SessionTrackerPort {
             String jti = redisTemplate.opsForValue().get(KEY_PREFIX + sessionId);
             return Optional.ofNullable(jti);
         } catch (Exception e) {
+            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
             throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
         }
     }
@@ -46,6 +50,7 @@ public class RedisSessionTrackerAdapter implements SessionTrackerPort {
             }
             return Duration.ofMinutes(60);
         } catch (Exception e) {
+            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
             throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
         }
     }
@@ -55,6 +60,7 @@ public class RedisSessionTrackerAdapter implements SessionTrackerPort {
         try {
             redisTemplate.delete(KEY_PREFIX + sessionId);
         } catch (Exception e) {
+            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
             throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
         }
     }

@@ -18,6 +18,7 @@ public class AuthControllerTestBuilder {
     private ChangeTemporaryPasswordUseCase changeTemporaryPasswordUseCase = mock(ChangeTemporaryPasswordUseCase.class);
     private GetActiveSessionsUseCase getActiveSessionsUseCase = mock(GetActiveSessionsUseCase.class);
     private RevokeSessionUseCase revokeSessionUseCase = mock(RevokeSessionUseCase.class);
+    private RevokeAllOtherSessionsUseCase revokeAllOtherSessionsUseCase = mock(RevokeAllOtherSessionsUseCase.class);
 
     public static AuthControllerTestBuilder builder() {
         return new AuthControllerTestBuilder();
@@ -79,6 +80,12 @@ public class AuthControllerTestBuilder {
         return this;
     }
 
+    public AuthControllerTestBuilder withRevokeAllOtherSessionsUseCase(
+            RevokeAllOtherSessionsUseCase revokeAllOtherSessionsUseCase) {
+        this.revokeAllOtherSessionsUseCase = revokeAllOtherSessionsUseCase;
+        return this;
+    }
+
     public AuthController build() {
         return new AuthController(
                 loginUseCase,
@@ -91,6 +98,7 @@ public class AuthControllerTestBuilder {
                 resetPasswordUseCase,
                 changeTemporaryPasswordUseCase,
                 getActiveSessionsUseCase,
-                revokeSessionUseCase);
+                revokeSessionUseCase,
+                revokeAllOtherSessionsUseCase);
     }
 }
