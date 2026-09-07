@@ -26,22 +26,34 @@ public class JwtTokenIssuer {
         this.jwtEncoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(rsaKey)));
     }
 
-    public String issueAccessToken(String subject, String role, String organizationId) {
-        Instant now = Instant.now();
+    public IssuedToken issueToken(String subject, String role, String organizationId, String sessionId) {
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
         long ttlMinutes = properties.accessTokenTtlMinutes();
+        String jti = UUID.randomUUID().toString();
+        Instant expiresAt = now.plusSeconds(ttlMinutes * 60);
 
         JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
                 .issuer("unihub")
                 .issuedAt(now)
-                .expiresAt(now.plusSeconds(ttlMinutes * 60))
+                .expiresAt(expiresAt)
                 .subject(subject)
                 .claim("role", role)
-                .id(UUID.randomUUID().toString()); // jti
+                .id(jti);
 
         if (organizationId != null && !organizationId.isBlank()) {
             claimsBuilder.claim("org", organizationId);
         }
 
-        return jwtEncoder.encode(JwtEncoderParameters.from(claimsBuilder.build())).getTokenValue();
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("Session ID (sid) is required to issue access token");
+        }
+        claimsBuilder.claim("sid", sessionId);
+
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claimsBuilder.build())).getTokenValue();
+        return new IssuedToken(token, jti, expiresAt);
+    }
+
+    public String issueAccessToken(String subject, String role, String organizationId, String sessionId) {
+        return issueToken(subject, role, organizationId, sessionId).token();
     }
 }

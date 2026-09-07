@@ -88,7 +88,7 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 | Field                  | Type    | Description                                                                             |
 | :--------------------- | :------ | :-------------------------------------------------------------------------------------- |
-| `accessToken`          | string  | Signed RS256 JWT. Claims: `sub`, `role`, `org`, `jti`, `iat`, `exp`.                    |
+| `accessToken`          | string  | Signed RS256 JWT. Claims: `sub`, `role`, `org`, `jti`, `sid`, `iat`, `exp`.             |
 | `refreshToken`         | string  | Opaque cryptographically random string. Must be treated as a secret by the client.      |
 | `tokenType`            | string  | Always `"Bearer"`.                                                                      |
 | `expiresIn`            | integer | Access token TTL in seconds (e.g., `3600`).                                             |
@@ -227,7 +227,7 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 | Field          | Type    | Description                                                         |
 | :------------- | :------ | :------------------------------------------------------------------ |
-| `accessToken`  | string  | New RS256-signed JWT with a fresh `jti`.                            |
+| `accessToken`  | string  | New RS256-signed JWT with a fresh `jti` and `sid`.                  |
 | `refreshToken` | string  | New opaque refresh token. The old token is now permanently revoked. |
 | `tokenType`    | string  | Always `"Bearer"`.                                                  |
 | `expiresIn`    | integer | Access token TTL in seconds.                                        |
@@ -356,6 +356,7 @@ All access tokens issued by `POST /api/v1/auth/login` and `POST /api/v1/auth/ref
   "role": "STUDENT",
   "org": "b4d3f9b7-1c2a-4b8d-9e61-2e5f6a7b8c90",
   "jti": "9c1f6c23-0f5d-4f8b-9f51-2d5f3a2f1d9e",
+  "sid": "f3b97b0a-3c2d-4e5f-8a1b-0c2d3e4f5a6b",
   "iat": 1767225600,
   "exp": 1767229200
 }
@@ -365,6 +366,7 @@ All access tokens issued by `POST /api/v1/auth/login` and `POST /api/v1/auth/ref
 - `role` — One of `STUDENT`, `ORGANIZER`, `STAFF` (no `ROLE_` prefix in the token)
 - `org` — UUID of `users.organization_id` (optional, omitted if user has no associated organization)
 - `jti` — UUIDv4, unique per issued token; used for revocation
+- `sid` — UUID of the active session (`refresh_tokens.id`) bound to this access token
 - `iat` — Issued-at time (Unix epoch seconds, UTC)
 - `exp` — Expiry time (Unix epoch seconds, UTC)
 
@@ -374,15 +376,16 @@ All endpoints under `/api/v1/**` (excluding those in the `app.security.public-pa
 
 1. JWT signature verification against the RSA public key.
 2. Token expiry check (`exp > NOW()`).
-3. JTI blacklist check in Redis (fail-closed: Redis unavailability → `503`).
+3. Mandatory claims check (`sub`, `org`, `jti`, `role`, `sid`, `iat`, `exp`).
+4. JTI blacklist check in Redis (fail-closed: Redis unavailability → `503`).
 
 ### Redis Fail-Closed Semantics
 
 Per ADR-010, JTI blacklist checks on protected requests are fail-closed. If Redis is unavailable:
 
 - **Protected endpoint requests** that require JTI validation: → `503 Service Unavailable`, `Retry-After: 30`
-- **Logout** (which writes to Redis): → `503 Service Unavailable`, `Retry-After: 30`; no DB changes
-- **Login** (which does NOT write to Redis): → succeeds normally; Redis is not involved in credential validation
+- **Logout** (which writes to Redis blacklist): → `503 Service Unavailable`, `Retry-After: 30`; no DB changes
+- **Login / Refresh** (which track active session JTI in Redis `session:jti:{sessionId}`): fail-closed if Redis is down → `503 Service Unavailable`, `Retry-After: 30`
 
 ### Rate Limiting
 

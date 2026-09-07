@@ -273,8 +273,8 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 - Updates `users.password_hash` with Argon2id hash of `newPassword`.
 - Sets `users.is_temporary_password = false`.
 - Sets `users.last_login_at = now()`, `users.updated_at = now()`.
-- Generates a new RS256 JWT access token (valid 3600 seconds) containing standard claims (`sub`, `role`, `org`, `jti`, `iat`, `exp`).
-- Persists a new refresh token record in `refresh_tokens` table.
+- Generates a new RS256 JWT access token (valid 3600 seconds) containing standard claims (`sub`, `role`, `org`, `jti`, `sid`, `iat`, `exp`).
+- Persists a new refresh token record in `refresh_tokens` table and tracks the active session in Redis (`session:jti:{sessionId}`).
 - Emits audit log for successful first-time credential activation.
 
 ## 4. UI/UX Workflow Mapping

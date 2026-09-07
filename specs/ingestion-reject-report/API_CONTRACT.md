@@ -15,7 +15,7 @@ This contract defines the two REST endpoints exposed by the `workshops` module i
 - **Success response shape:** Standard success envelope `{ success, message, data, metadata }` per `docs/api-standards.md §Standard JSON Payloads`. Null fields omitted (`@JsonInclude(NON_NULL)`).
 - **Error response format:** RFC 7807 Problem Details wrapped in the standard error envelope (`{ "success": false, "error": { ... }, "metadata": { ... } }`) with `Content-Type: application/problem+json` per `docs/api-standards.md §Error Response`.
 - **Idempotency-key convention:** Not applicable — both endpoints are `GET` (naturally idempotent). No `Idempotency-Key` header required.
-- **Auth header convention:** `Authorization: Bearer <JWT>` (RS256-signed). `ORGANIZER` role required on both endpoints.
+- **Auth header convention:** `Authorization: Bearer <JWT>` (RS256-signed with standard claims `sub`, `org`, `jti`, `role`, `sid`, `iat`, `exp`). `ORGANIZER` role required on both endpoints.
 - **Date/time formatting convention:** ISO 8601 UTC with trailing `Z` (e.g., `2026-05-03T12:00:00Z`) per `docs/api-standards.md §Date/Time`.
 - **Mandatory request headers:** `Authorization`, `X-Correlation-ID` (client-generated for tracing). `Accept-Language` is optional on GET endpoints.
 
@@ -31,10 +31,10 @@ This contract defines the two REST endpoints exposed by the `workshops` module i
 
 **Headers:**
 
-| Header             | Required | Description                                               |
-| :----------------- | :------- | :-------------------------------------------------------- |
-| `Authorization`    | Yes      | `Bearer <JWT>` — RS256-signed access token.               |
-| `X-Correlation-ID` | Yes      | Client-generated UUID for cross-boundary request tracing. |
+| Header             | Required | Description                                                                               |
+| :----------------- | :------- | :---------------------------------------------------------------------------------------- |
+| `Authorization`    | Yes      | `Bearer <JWT>` — RS256-signed access token containing `sub`, `org`, `jti`, `role`, `sid`. |
+| `X-Correlation-ID` | Yes      | Client-generated UUID for cross-boundary request tracing.                                 |
 
 **Path Parameters:** None.
 
@@ -146,10 +146,10 @@ None. This endpoint is read-only.
 
 **Headers:**
 
-| Header             | Required | Description                                               |
-| :----------------- | :------- | :-------------------------------------------------------- |
-| `Authorization`    | Yes      | `Bearer <JWT>` — RS256-signed access token.               |
-| `X-Correlation-ID` | Yes      | Client-generated UUID for cross-boundary request tracing. |
+| Header             | Required | Description                                                                               |
+| :----------------- | :------- | :---------------------------------------------------------------------------------------- |
+| `Authorization`    | Yes      | `Bearer <JWT>` — RS256-signed access token containing `sub`, `org`, `jti`, `role`, `sid`. |
+| `X-Correlation-ID` | Yes      | Client-generated UUID for cross-boundary request tracing.                                 |
 
 **Path Parameters:**
 

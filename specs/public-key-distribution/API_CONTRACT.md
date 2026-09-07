@@ -42,7 +42,7 @@ This contract defines the single REST endpoint introduced by the `public-key-dis
 
 **Validation Rules:**
 
-- `Authorization` header — must be present; must be in the format `Bearer <token>`; the token must be a valid, non-expired RS256 JWT signed by the server's private key; the JWT's `jti` claim must not be present in the Redis JTI blacklist; the JWT's `role` claim must be `STAFF`.
+- `Authorization` header — must be present; must be in the format `Bearer <token>`; the token must be a valid, non-expired RS256 JWT signed by the server's private key containing standard claims (`sub`, `org`, `jti`, `role`, `sid`, `iat`, `exp`); the JWT's `jti` claim must not be present in the Redis JTI blacklist; the JWT's `role` claim must be `STAFF`.
 
 #### Response
 

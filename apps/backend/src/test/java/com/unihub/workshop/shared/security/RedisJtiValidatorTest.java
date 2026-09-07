@@ -1,5 +1,7 @@
 package com.unihub.workshop.shared.security;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -15,6 +17,8 @@ class RedisJtiValidatorTest {
 
     private RedisTemplate<String, String> redisTemplate;
     private ValueOperations<String, String> valueOperations;
+    private MeterRegistry meterRegistry;
+    private Counter counter;
     private RedisJtiValidator validator;
 
     @BeforeEach
@@ -22,8 +26,12 @@ class RedisJtiValidatorTest {
     void setUp() {
         redisTemplate = mock(RedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
+        meterRegistry = mock(MeterRegistry.class);
+        counter = mock(Counter.class);
+
+        when(meterRegistry.counter(anyString())).thenReturn(counter);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        validator = new RedisJtiValidator(redisTemplate);
+        validator = new RedisJtiValidator(redisTemplate, meterRegistry);
     }
 
     @Test
@@ -47,5 +55,8 @@ class RedisJtiValidatorTest {
         AppException exception = assertThrows(AppException.class, () -> validator.isTokenValid("jti-123"));
         assertEquals("Failed to check token revocation status. Failing closed.", exception.getMessage());
         assertTrue(exception.getCause() instanceof RedisConnectionFailureException);
+
+        verify(meterRegistry).counter("auth.blacklist.redis_unavailable");
+        verify(counter).increment();
     }
 }

@@ -20,6 +20,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
+import com.unihub.workshop.shared.security.IssuedToken;
+import java.time.Duration;
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,6 +34,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
 
     private UserRepository userRepository;
     private RefreshTokenRepository refreshTokenRepository;
+    private SessionTrackerPort sessionTrackerPort;
     private JwtTokenIssuer jwtTokenIssuer;
     private SecurityProperties securityProperties;
     private PasswordEncoder passwordEncoder;
@@ -39,6 +45,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
     void setUp() {
         userRepository = mock(UserRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
+        sessionTrackerPort = mock(SessionTrackerPort.class);
         jwtTokenIssuer = mock(JwtTokenIssuer.class);
         securityProperties = mock(SecurityProperties.class);
         passwordEncoder = new Argon2PasswordEncoder(16, 32, 1, 4096, 1);
@@ -51,6 +58,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         changeTemporaryPasswordUseCase = new ChangeTemporaryPasswordUseCaseImpl(
                 userRepository,
                 refreshTokenRepository,
+                sessionTrackerPort,
                 jwtTokenIssuer,
                 passwordEncoder,
                 securityProperties,
@@ -75,8 +83,8 @@ class ChangeTemporaryPasswordUseCaseImplTest {
                 null);
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
-        when(jwtTokenIssuer.issueAccessToken(user.id().toString(), "STAFF", user.organizationId().toString()))
-                .thenReturn("mock-access-token");
+        when(jwtTokenIssuer.issueToken(eq(user.id().toString()), eq("STAFF"), eq(user.organizationId().toString()), any()))
+                .thenReturn(new IssuedToken("mock-access-token", "mock-jti", Instant.now().plusSeconds(3600)));
 
         when(userRepository.updateTemporaryPassword(eq(user.id()), any(), any())).thenReturn(true);
 
@@ -99,6 +107,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         verify(userRepository).updateTemporaryPassword(eq(user.id()),
                 argThat(hash -> passwordEncoder.matches(newPassword, hash)), any());
         verify(refreshTokenRepository).save(any());
+        verify(sessionTrackerPort).trackSession(any(UUID.class), eq("mock-jti"), eq(Duration.ofMinutes(60)));
         assertThat(meterRegistry.counter("auth.password.temporary.attempts", "outcome", "success").count())
                 .isEqualTo(1.0);
     }
@@ -133,7 +142,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
                 .hasMessage("Account does not have a temporary password.");
 
         verify(refreshTokenRepository, never()).save(any());
-        verify(jwtTokenIssuer, never()).issueAccessToken(any(), any(), any());
+        verify(jwtTokenIssuer, never()).issueToken(any(), any(), any(), any());
         assertThat(meterRegistry
                 .counter("auth.password.temporary.attempts", "outcome", "failure", "reason", "not_temporary_password")
                 .count())

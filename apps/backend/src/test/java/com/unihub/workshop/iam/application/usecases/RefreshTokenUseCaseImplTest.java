@@ -23,6 +23,10 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
+import com.unihub.workshop.shared.security.IssuedToken;
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
@@ -34,6 +38,8 @@ class RefreshTokenUseCaseImplTest {
     private RefreshTokenRepository refreshTokenRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private SessionTrackerPort sessionTrackerPort;
     @Mock
     private JwtTokenIssuer jwtTokenIssuer;
 
@@ -57,6 +63,7 @@ class RefreshTokenUseCaseImplTest {
         useCase = new RefreshTokenUseCaseImpl(
                 refreshTokenRepository,
                 userRepository,
+                sessionTrackerPort,
                 jwtTokenIssuer,
                 securityProperties,
                 meterRegistry);
@@ -81,8 +88,8 @@ class RefreshTokenUseCaseImplTest {
         when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw-refresh-token")))
                 .thenReturn(Optional.of(validToken));
         when(userRepository.findById(userId)).thenReturn(Optional.of(activeUser));
-        when(jwtTokenIssuer.issueAccessToken(userId.toString(), "STUDENT", orgId.toString()))
-                .thenReturn("new-access-token");
+        when(jwtTokenIssuer.issueToken(eq(userId.toString()), eq("STUDENT"), eq(orgId.toString()), anyString()))
+                .thenReturn(new IssuedToken("new-access-token", "new-jti", Instant.now().plusSeconds(900)));
 
         RefreshResult result = useCase.refresh("raw-refresh-token", "New Device", "192.168.1.1");
 
@@ -97,6 +104,7 @@ class RefreshTokenUseCaseImplTest {
         RefreshToken revoked = captor.getAllValues().get(0);
         assertThat(revoked.id()).isEqualTo(tokenId);
         assertThat(revoked.revokedAt()).isNotNull();
+        verify(sessionTrackerPort).removeSession(eq(tokenId));
 
         RefreshToken issued = captor.getAllValues().get(1);
         assertThat(issued.id()).isNotEqualTo(tokenId);
@@ -105,6 +113,9 @@ class RefreshTokenUseCaseImplTest {
         assertThat(issued.revokedAt()).isNull();
         assertThat(issued.expiresAt()).isAfter(Instant.now());
         assertThat(issued.tokenHash()).isEqualTo(TokenUtils.hash(result.refreshToken()));
+
+        verify(jwtTokenIssuer).issueToken(eq(userId.toString()), eq("STUDENT"), eq(orgId.toString()), eq(issued.id().toString()));
+        verify(sessionTrackerPort).trackSession(eq(issued.id()), eq("new-jti"), eq(Duration.ofMinutes(60)));
 
         assertThat(meterRegistry.counter("auth.token.refresh", "outcome", "success").count()).isEqualTo(1);
     }
@@ -116,13 +127,13 @@ class RefreshTokenUseCaseImplTest {
         when(refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw-refresh-token")))
                 .thenReturn(Optional.of(validToken));
         when(userRepository.findById(userId)).thenReturn(Optional.of(studentUserWithoutOrg));
-        when(jwtTokenIssuer.issueAccessToken(userId.toString(), "STUDENT", null))
-                .thenReturn("new-access-token");
+        when(jwtTokenIssuer.issueToken(eq(userId.toString()), eq("STUDENT"), isNull(), anyString()))
+                .thenReturn(new IssuedToken("new-access-token", "new-jti", Instant.now().plusSeconds(900)));
 
         RefreshResult result = useCase.refresh("raw-refresh-token", "New Device", "192.168.1.1");
 
         assertThat(result.accessToken()).isEqualTo("new-access-token");
-        verify(jwtTokenIssuer).issueAccessToken(userId.toString(), "STUDENT", null);
+        verify(jwtTokenIssuer).issueToken(eq(userId.toString()), eq("STUDENT"), isNull(), anyString());
     }
 
     @Test

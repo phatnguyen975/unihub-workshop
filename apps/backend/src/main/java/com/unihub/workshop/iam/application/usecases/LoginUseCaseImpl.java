@@ -12,10 +12,13 @@ import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
+import com.unihub.workshop.shared.security.IssuedToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -26,6 +29,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final SessionTrackerPort sessionTrackerPort;
     private final JwtTokenIssuer jwtTokenIssuer;
     private final PasswordEncoder passwordEncoder;
     private final SecurityProperties securityProperties;
@@ -34,12 +38,14 @@ public class LoginUseCaseImpl implements LoginUseCase {
 
     public LoginUseCaseImpl(UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
+            SessionTrackerPort sessionTrackerPort,
             JwtTokenIssuer jwtTokenIssuer,
             PasswordEncoder passwordEncoder,
             SecurityProperties securityProperties,
             MeterRegistry meterRegistry) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.sessionTrackerPort = sessionTrackerPort;
         this.jwtTokenIssuer = jwtTokenIssuer;
         this.passwordEncoder = passwordEncoder;
         this.securityProperties = securityProperties;
@@ -83,18 +89,13 @@ public class LoginUseCaseImpl implements LoginUseCase {
         Instant now = Instant.now();
         userRepository.updateLastLoginAt(user.id(), now);
 
-        String orgId = user.organizationId() != null ? user.organizationId().toString() : null;
-        String accessToken = jwtTokenIssuer.issueAccessToken(
-                user.id().toString(),
-                user.role().name(),
-                orgId);
-
         String rawRefreshToken = TokenUtils.generateSecureToken();
         String tokenHash = TokenUtils.hash(rawRefreshToken);
         Instant expiresAt = now.plus(securityProperties.refreshTokenTtlDays(), ChronoUnit.DAYS);
 
+        UUID sessionId = UUID.randomUUID();
         RefreshToken refreshToken = new RefreshToken(
-                UUID.randomUUID(),
+                sessionId,
                 user.id(),
                 tokenHash,
                 deviceInfo,
@@ -103,10 +104,22 @@ public class LoginUseCaseImpl implements LoginUseCase {
                 null);
         refreshTokenRepository.save(refreshToken);
 
+        String orgId = user.organizationId() != null ? user.organizationId().toString() : null;
+        IssuedToken issuedToken = jwtTokenIssuer.issueToken(
+                user.id().toString(),
+                user.role().name(),
+                orgId,
+                sessionId.toString());
+
+        sessionTrackerPort.trackSession(
+                sessionId,
+                issuedToken.jti(),
+                Duration.ofMinutes(securityProperties.accessTokenTtlMinutes()));
+
         meterRegistry.counter("auth.login.attempts", "outcome", "success").increment();
 
         return new LoginResult(
-                accessToken,
+                issuedToken.token(),
                 rawRefreshToken,
                 "Bearer",
                 securityProperties.accessTokenTtlMinutes() * 60L,

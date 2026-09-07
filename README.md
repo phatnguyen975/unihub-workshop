@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>UniHub</h1>
+  <h1>UniHub Workshop</h1>
   <small>
     <strong>Author:</strong> Nguyễn Tấn Phát
   </small> <br />

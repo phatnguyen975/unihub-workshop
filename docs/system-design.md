@@ -725,12 +725,14 @@ JWTs are strictly signed using **Asymmetric Cryptography (for example, RS256)**.
   "role": "ORGANIZER",
   "org": "b4d3f9b7-1c2a-4b8d-9e61-2e5f6a7b8c90",
   "jti": "9c1f6c23-0f5d-4f8b-9f51-2d5f3a2f1d9e",
+  "sid": "7b123456-1234-1234-1234-1234567890ab",
   "iat": 1767225600,
   "exp": 1767229200
 }
 ```
 
-The `jti` claim is mandatory to support secure logout and token revocation. Revoked tokens are blocked by storing their `jti` in a Redis blacklist and checking it on every request.
+- The `jti` claim is mandatory to support secure logout and token revocation. Revoked tokens are blocked by storing their `jti` in a Redis blacklist and checking it on every request.
+- The `sid` (Session ID) claim binds the access token to its corresponding `refresh_tokens.id` row in PostgreSQL. This allows the active session management flow (`GET /api/v1/auth/sessions`) to identify the caller's current session (`isCurrentSession = true`) and enables selective revocation (`DELETE /api/v1/auth/sessions`) across distributed backend nodes without sticky sessions.
 
 ### Account Provisioning & Security
 
@@ -740,7 +742,7 @@ The `jti` claim is mandatory to support secure logout and token revocation. Revo
 - **Delegated Creation & Zero-Trust:** When an `ORGANIZER` creates `STAFFs` or invites other `ORGANIZERs` (`POST /api/v1/organizations/users`), they cannot set passwords. The system generates a temporary password, emails it directly to the new user, and sets `is_temporary_password = true`. On first login, the user exchanges the temporary password for a new permanent one via `POST /api/v1/auth/password/temporary`, which clears `is_temporary_password` and immediately issues a full authentication session (tokens + profile).
 - **Organization Member Management & Status Gating:** Organizers manage organization users via `GET /api/v1/organizations/users` (keyset cursor pagination, excluding the active organizer) and can deactivate/ban accounts via `PATCH /api/v1/organizations/users/{userId}/status`. Deactivation immediately revokes all refresh tokens and blacklists active JTIs in Redis across all devices.
 - **Explicit Staff Assignment & Conflict Prevention:** `STAFF` access is scoped by explicit assignment. A bridging table (`workshop_assignments`) maps `STAFF` to specific workshops. Organizers query available staff without schedule conflicts (`GET /api/v1/workshops/{id}/staff/available`, ignoring canceled workshops) and perform batch assignments (`POST /api/v1/workshops/{id}/staff`). Unassigned `STAFF` cannot scan or sync attendance for other workshops, even within the same organization.
-- **Active Session Tracking & Revocation:** Users of any role can inspect their active login sessions (`GET /api/v1/auth/sessions`) with device info and IP addresses, and revoke individual sessions (`DELETE /api/v1/auth/sessions/{id}`) or all other remote sessions (`DELETE /api/v1/auth/sessions`), immediately invalidating tokens via Redis blacklist.
+- **Active Session Tracking & Revocation:** Users of any role can inspect their active login sessions (`GET /api/v1/auth/sessions`) with device info and IP addresses, and revoke individual sessions (`DELETE /api/v1/auth/sessions/{id}`) or all other remote sessions (`DELETE /api/v1/auth/sessions`), immediately invalidating tokens via Redis blacklist. The caller's current session is identified across stateless backend nodes using the `sid` claim in the access token. Remote session revocation pairs PostgreSQL `revoked_at` updates with centralized Redis `jti` blacklisting via temporary `session:jti:{sessionId}` tracking, guaranteeing immediate revocation across all horizontally scaled backend instances.
 
 ### Multi-Layer Enforcement Points
 

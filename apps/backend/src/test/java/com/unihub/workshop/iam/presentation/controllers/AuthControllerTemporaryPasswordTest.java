@@ -1,19 +1,11 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
-import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
 import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
-import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
-import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
-import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
-import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.exception.ValidationException;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,17 +31,9 @@ class AuthControllerTemporaryPasswordTest {
     @BeforeEach
     void setUp() {
         changeTemporaryPasswordUseCase = mock(ChangeTemporaryPasswordUseCase.class);
-        AuthController authController = new AuthController(
-                mock(LoginUseCase.class),
-                mock(RefreshTokenUseCase.class),
-                mock(LogoutUseCase.class),
-                mock(PublicKeyService.class),
-                mock(RegisterUserUseCase.class),
-                mock(ActivateAccountUseCase.class),
-                mock(ResendOtpUseCase.class),
-                mock(ResetPasswordUseCase.class),
-                changeTemporaryPasswordUseCase);
-
+        AuthController authController = AuthControllerTestBuilder.builder()
+                .withChangeTemporaryPasswordUseCase(changeTemporaryPasswordUseCase)
+                .build();
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

@@ -63,6 +63,7 @@ The system **SHALL** issue a short-lived RS256-signed JWT access token upon succ
 | `role` | The user's `role` string (`STUDENT`, `ORGANIZER`, or `STAFF`) |
 | `org`  | The user's `organization_id` UUID (nullable, omitted if null) |
 | `jti`  | A freshly generated UUIDv4 unique to this token               |
+| `sid`  | The session UUID (`refresh_tokens.id`) bound to this token    |
 | `iat`  | Current UTC timestamp (Unix epoch seconds)                    |
 | `exp`  | `iat` + configured access token TTL (e.g., 1 hour)            |
 
@@ -124,11 +125,11 @@ The system **SHALL** execute the following atomically in a single database trans
 1. Set `revoked_at = NOW()` on the consumed `refresh_tokens` row (invalidate the old token).
 2. Generate a new cryptographically random refresh token string.
 3. Insert a new `refresh_tokens` row with the new `token_hash`, inheriting the same `user_id`, `device_info`, `ip_address`, and a fresh `expires_at = NOW() + refreshTokenTtl`. `revoked_at` is `NULL`.
-4. Issue a new RS256-signed access token (with a fresh `jti`) for the user.
+4. Issue a new RS256-signed access token (with a fresh `jti` and `sid` matching the newly inserted `refresh_tokens.id`) for the user, and track the active session in Redis (`session:jti:{sessionId}`).
 
 The raw new refresh token string and the new access token **SHALL** be returned in the response body.
 
-**No `jti` blacklist entry is needed for the consumed access token on a pure refresh call** — the old access token will expire naturally by its own TTL. Blacklisting on refresh is reserved for the explicit logout endpoint (FR-10).
+**No `jti` blacklist entry is needed for the consumed access token on a pure refresh call** — the old access token will expire naturally by its own TTL. Blacklisting on refresh is reserved for the explicit logout endpoint (FR-10). The Redis session mapping `session:jti:{sessionId}` is rotated to point to the new session's JTI.
 
 ### FR-10 — Logout: JTI blacklisting and refresh token revocation
 

@@ -11,6 +11,7 @@ public class JwtClaimsExtractor {
         String org = extractOrThrow(jwt, "org");
         String jti = extractOrThrow(jwt, "jti");
         String role = extractOrThrow(jwt, "role");
+        String sid = extractOrThrow(jwt, "sid");
 
         Instant iat = jwt.getIssuedAt();
         if (iat == null) {
@@ -22,7 +23,7 @@ public class JwtClaimsExtractor {
             throw new IllegalArgumentException("JWT is missing required claim: exp");
         }
 
-        return new JwtAuthenticatedPrincipal(sub, org, jti, role, iat, exp);
+        return new JwtAuthenticatedPrincipal(sub, org, jti, role, sid, iat, exp);
     }
 
     private String extractOrThrow(Jwt jwt, String claimName) {

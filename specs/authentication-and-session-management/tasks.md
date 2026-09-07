@@ -56,7 +56,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerLoginTest.java`
   - **Acceptance Criteria:**
     - `POST /api/v1/auth/login` with valid email + correct password for an active, non-temporary-password account returns `200 OK` with `accessToken`, `refreshToken`, `tokenType = "Bearer"`, `expiresIn`, and `user` object (`id`, `email`, `fullName`, `role`, `phoneNumber`, `avatarUrl`, `lastLoginAt`, `organizationId`, `studentRecordId`).
-    - The issued `accessToken` is a valid RS256-signed JWT with claims `sub`, `role`, `org` (omitted if null), `jti`, `iat`, `exp` — with no `ROLE_` prefix.
+    - The issued `accessToken` is a valid RS256-signed JWT with claims `sub`, `role`, `org` (omitted if null), `jti`, `sid`, `iat`, `exp` — with no `ROLE_` prefix.
     - A new `refresh_tokens` row is created with `revoked_at = NULL`, `token_hash = SHA-256(refreshToken)`, and the raw token is never stored in DB or logs.
     - `users.last_login_at` is updated to approximately `NOW()` on the primary DB.
     - `POST /api/v1/auth/login` with unknown email or wrong password returns `401 Unauthorized` with `type = "urn:unihub:error:unauthorized"` (dummy Argon2 verification executed for timing safety).
@@ -82,7 +82,7 @@ This plan delivers the four caller-observable capabilities of feature 1.2: (1) t
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/RefreshTokenUseCaseImpl.java` _(null-safe organizationId in JWT issue)_
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerRefreshTest.java`
   - **Acceptance Criteria:**
-    - `POST /api/v1/auth/refresh` with a valid, non-expired, non-revoked refresh token returns `200 OK` with a new `accessToken` and a new `refreshToken` in `RefreshTokenResponse`.
+    - `POST /api/v1/auth/refresh` with a valid, non-expired, non-revoked refresh token returns `200 OK` with a new `accessToken` (containing new session `sid`) and a new `refreshToken` in `RefreshTokenResponse`.
     - The old `refresh_tokens` row has `revoked_at IS NOT NULL`, and a new row is inserted with `revoked_at = NULL`.
     - `POST /api/v1/auth/refresh` with a revoked, expired, or unknown token returns `401 Unauthorized` with `type = "urn:unihub:error:unauthorized"`.
     - `POST /api/v1/auth/refresh` with a blank `refreshToken` returns `422 Unprocessable Content` with `type = "urn:unihub:error:validation"` and `validationErrors`.
