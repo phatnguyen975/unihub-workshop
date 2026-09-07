@@ -20,7 +20,7 @@ This plan delivers the complete active session management capability (Domain 1: 
 
 ### Phase 1: Session Identification & Distributed State Tracking
 
-- [ ] **T1 — Session token binding: embed `sid` claim in access tokens and track active token JTI in Redis upon login and token refresh**
+- [x] **T1 — Session token binding: embed mandatory `sid` claim in all access tokens and track active token JTI in Redis upon login, token refresh, and temporary password change**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Shared Security, Application (Ports/Use Cases), Infrastructure (Redis)
@@ -32,24 +32,29 @@ This plan delivers the complete active session management capability (Domain 1: 
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/security/RedisSessionTrackerAdapter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/LoginUseCaseImpl.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/RefreshTokenUseCaseImpl.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/ChangeTemporaryPasswordUseCaseImpl.java`
     - `apps/backend/src/test/java/com/unihub/workshop/shared/security/JwtTokenIssuerTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/security/JwtClaimsExtractorTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/infrastructure/security/RedisSessionTrackerAdapterTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/LoginUseCaseImplTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/RefreshTokenUseCaseImplTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ChangeTemporaryPasswordUseCaseImplTest.java`
   - **Acceptance Criteria:**
-    - `POST /api/v1/auth/login` returns an RS256-signed JWT access token containing a `sid` claim whose value exactly equals the `id` of the newly created `refresh_tokens` record.
-    - `POST /api/v1/auth/refresh` returns an RS256-signed JWT access token containing a `sid` claim whose value exactly equals the `id` of the newly rotated `refresh_tokens` record.
-    - Upon successful login and token refresh, Redis stores the key `session:jti:{sessionId}` pointing to the token's `jti` with TTL equal to the access token duration.
-    - `JwtClaimsExtractor` extracts the `sid` claim from incoming JWTs into `JwtAuthenticatedPrincipal.sid()`.
-    - Unit tests verify `sid` emission in `JwtTokenIssuer`, session tracking in `LoginUseCaseImpl` and `RefreshTokenUseCaseImpl`, and extractor behavior.
+    - `POST /api/v1/auth/login` returns an RS256-signed JWT access token containing a mandatory `sid` claim whose value exactly equals the `id` of the newly created `refresh_tokens` record.
+    - `POST /api/v1/auth/refresh` returns an RS256-signed JWT access token containing a mandatory `sid` claim whose value exactly equals the `id` of the newly rotated `refresh_tokens` record.
+    - `POST /api/v1/auth/password/temporary` returns an RS256-signed JWT access token containing a mandatory `sid` claim whose value exactly equals the `id` of the newly created `refresh_tokens` record.
+    - Upon successful login, token refresh, and temporary password change, Redis stores the key `session:jti:{sessionId}` pointing to the token's `jti` with TTL equal to the access token duration.
+    - `JwtClaimsExtractor` extracts the mandatory `sid` claim from incoming JWTs into `JwtAuthenticatedPrincipal.sid()`, throwing an exception if `sid` is missing or blank.
+    - Unit tests verify `sid` emission in `JwtTokenIssuer`, session tracking in `LoginUseCaseImpl`, `RefreshTokenUseCaseImpl`, and `ChangeTemporaryPasswordUseCaseImpl`, and extractor behavior.
     - _(Traces to: FR-02, FR-11, FR-12, FR-14, Preconditions, ADR-005)_
 
 #### Checkpoint: Phase 1
 
-- [ ] All login and refresh token flows issue `sid`-bound JWTs and track active session JTIs in Redis. Unit tests pass and `ModulithArchitectureTest` passes.
+- [x] All login, refresh, and password exchange flows issue mandatory `sid`-bound JWTs and track active session JTIs in Redis. Unit tests pass and `ModulithArchitectureTest` passes.
 
 ### Phase 2: Active Session Inspection
 
-- [ ] **T2 — Active session query: list active sessions with keyset cursor pagination and current session indicator (`GET /api/v1/auth/sessions`)**
+- [x] **T2 — Active session query: list active sessions with keyset cursor pagination and current session indicator (`GET /api/v1/auth/sessions`)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application (Ports/Use Cases), Infrastructure (Persistence), Presentation (Controller/DTOs)
@@ -77,7 +82,7 @@ This plan delivers the complete active session management capability (Domain 1: 
 
 #### Checkpoint: Phase 2
 
-- [ ] `GET /api/v1/auth/sessions` returns active sessions with cursor pagination and accurate `isCurrentSession` flags. Unit tests and `ModulithArchitectureTest` pass.
+- [x] `GET /api/v1/auth/sessions` returns active sessions with cursor pagination and accurate `isCurrentSession` flags. Unit tests and `ModulithArchitectureTest` pass.
 
 ### Phase 3: Targeted Session Revocation
 

@@ -28,7 +28,7 @@ The `public-key-distribution` feature exposes a dedicated, authenticated endpoin
 ### Authentication and Authorization
 
 - **FR-04:** The system SHALL reject requests that do not carry an `Authorization: Bearer <token>` header with HTTP `401 Unauthorized`.
-- **FR-05:** The system SHALL reject requests where the JWT is expired, malformed, has an invalid signature, or whose `jti` claim is present in the Redis JTI blacklist, with HTTP `401 Unauthorized`.
+- **FR-05:** The system SHALL reject requests where the JWT is expired, malformed, missing mandatory claims (`sub`, `org`, `jti`, `role`, `sid`, `iat`, `exp`), has an invalid signature, or whose `jti` claim is present in the Redis JTI blacklist, with HTTP `401 Unauthorized`.
 - **FR-06:** The system SHALL reject requests from authenticated users who do not have the `STAFF` role with HTTP `403 Forbidden`.
 
 ### Key Material Source

@@ -2,6 +2,7 @@ package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
 import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
+import com.unihub.workshop.iam.application.ports.in.GetActiveSessionsUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
@@ -41,7 +42,8 @@ class AuthControllerResetPasswordTest {
                 mock(ActivateAccountUseCase.class),
                 mock(ResendOtpUseCase.class),
                 resetPasswordUseCase,
-                mock(ChangeTemporaryPasswordUseCase.class));
+                mock(ChangeTemporaryPasswordUseCase.class),
+                mock(GetActiveSessionsUseCase.class));
 
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())

@@ -2,12 +2,15 @@ package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
 import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
+import com.unihub.workshop.iam.application.ports.in.GetActiveSessionsUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
+import com.unihub.workshop.iam.domain.model.ActiveSession;
+import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
 import com.unihub.workshop.iam.presentation.dto.ChangeTemporaryPasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginRequest;
@@ -20,6 +23,10 @@ import com.unihub.workshop.iam.presentation.dto.RegisterRequest;
 import com.unihub.workshop.iam.presentation.dto.RegisterResponse;
 import com.unihub.workshop.iam.presentation.dto.ResendOtpRequest;
 import com.unihub.workshop.iam.presentation.dto.ResetPasswordRequest;
+import com.unihub.workshop.iam.presentation.dto.SessionCursor;
+import com.unihub.workshop.iam.presentation.dto.SessionResponse;
+import com.unihub.workshop.shared.exception.UnauthorizedException;
+import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,15 +35,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -53,6 +63,7 @@ public class AuthController {
     private final ResendOtpUseCase resendOtpUseCase;
     private final ResetPasswordUseCase resetPasswordUseCase;
     private final ChangeTemporaryPasswordUseCase changeTemporaryPasswordUseCase;
+    private final GetActiveSessionsUseCase getActiveSessionsUseCase;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -140,5 +151,50 @@ public class AuthController {
                 refreshToken);
 
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/sessions")
+    public ApiResponse<SessionResponse> getActiveSessions(
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false, defaultValue = "20") Integer size,
+            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Full authentication is required to access this resource");
+        }
+
+        UUID userId;
+        UUID currentSessionId = null;
+
+        if (authentication.getPrincipal() instanceof JwtAuthenticatedPrincipal jwtPrincipal) {
+            userId = UUID.fromString(jwtPrincipal.sub());
+            if (jwtPrincipal.sid() != null && !jwtPrincipal.sid().isBlank()) {
+                currentSessionId = UUID.fromString(jwtPrincipal.sid());
+            }
+        } else if (authentication.getPrincipal() instanceof Jwt jwt) {
+            userId = UUID.fromString(jwt.getSubject());
+            String sid = jwt.getClaimAsString("sid");
+            if (sid != null && !sid.isBlank()) {
+                currentSessionId = UUID.fromString(sid);
+            }
+        } else {
+            throw new UnauthorizedException("Unauthorized: invalid token principal");
+        }
+
+        CursorPage<ActiveSession> page = getActiveSessionsUseCase.getActiveSessions(userId, currentSessionId, cursor, size);
+
+        List<SessionResponse.SessionItem> items = page.items().stream()
+                .map(s -> new SessionResponse.SessionItem(
+                        s.id(),
+                        s.deviceInfo(),
+                        s.ipAddress(),
+                        s.createdAt(),
+                        s.isCurrentSession()))
+                .toList();
+
+        SessionResponse response = new SessionResponse(
+                items,
+                new SessionCursor(page.nextCursor(), page.hasMore()));
+
+        return ApiResponse.success(response, "Active sessions retrieved");
     }
 }

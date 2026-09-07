@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.unihub.workshop.iam.domain.model.ActiveSession;
+import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 
 public interface RefreshTokenRepository {
@@ -12,4 +14,6 @@ public interface RefreshTokenRepository {
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     void revokeAllActiveTokensForUser(UUID userId, Instant revokedAt);
+
+    CursorPage<ActiveSession> findActiveSessions(UUID userId, String cursor, int limit);
 }

@@ -22,7 +22,7 @@ This plan builds the backend for Feature 9.2 in three vertical slices: first a r
 
 This phase establishes the security baseline required by every authenticated endpoint in this and all future features. It is the highest-risk task in the plan — a wrong security posture cascades across the entire backend — so it is built and verified independently before any business endpoint is written.
 
-- [x] **T1 — Authenticated requests to `/api/v1/**` are rejected with 401/403 based on JWT validity and role; public endpoints (Swagger, Actuator, JWKS, Stripe webhook) remain accessible without a token**
+- [x] **T1 — Authenticated requests to `/api/v1/**` are rejected with 401/403 based on JWT validity and role; public endpoints (Swagger, Actuator, JWKS, Stripe webhook) remain accessible without a token\*\*
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Shared/Security (new), Application config (`application.yml` / `application-prod.yml`), Shared/Config (RSA key, already present)
@@ -37,8 +37,8 @@ This phase establishes the security baseline required by every authenticated end
     - `apps/backend/src/test/java/com/unihub/workshop/shared/security/SecurityConfigTest.java` _(new)_
   - **Acceptance Criteria:**
     - A `GET /api/v1/admin/ingestion-jobs` request with **no `Authorization` header** returns `401 Unauthorized` with `Content-Type: application/problem+json`. _(Traces to: FR-01, Scenario 8)_
-    - A `GET /api/v1/admin/ingestion-jobs` request with a **valid JWT where `role = STUDENT`** returns `403 Forbidden`. _(Traces to: FR-02, Scenario 9)_
-    - A `GET /api/v1/admin/ingestion-jobs` request with a **valid JWT where `role = ORGANIZER`** passes the filter chain (returns any non-401/403 status — even 404 is acceptable at this stage before T2 is wired). _(Traces to: FR-01, FR-02)_
+    - A `GET /api/v1/admin/ingestion-jobs` request with a **valid JWT containing standard claims (`sub`, `org`, `jti`, `role`, `sid`, `iat`, `exp`) where `role = STUDENT`** returns `403 Forbidden`. _(Traces to: FR-02, Scenario 9)_
+    - A `GET /api/v1/admin/ingestion-jobs` request with a **valid JWT containing standard claims where `role = ORGANIZER`** passes the filter chain (returns any non-401/403 status — even 404 is acceptable at this stage before T2 is wired). _(Traces to: FR-01, FR-02)_
     - A `GET /api/v1/admin/ingestion-jobs` request with a **JWT whose `jti` is present in the Redis blacklist** returns `503 Service Unavailable` when Redis is unavailable (fail-closed). _(Traces to: FR-01, BR-08)_
     - A `GET /swagger-ui/index.html` request with **no token** returns `200 OK` (not blocked by security). _(Traces to: FR-05, BR-10)_
     - A `GET /actuator/health` request with **no token** returns `200 OK`. _(Traces to: FR-05, BR-10)_

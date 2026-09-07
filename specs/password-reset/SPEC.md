@@ -55,7 +55,7 @@ This feature provides two dedicated password modification flows for unauthentica
 - **FR-18:** The system SHALL reject the request with `400 Bad Request` (`urn:unihub:error:bad-request`) if the account exists and password matches but `is_temporary_password = false`.
 - **FR-19:** The system SHALL reject the request with `422 Unprocessable Content` (`urn:unihub:error:validation` with `validationErrors: ["newPassword: New password must be different from the temporary password."]`) if `newPassword` equals `currentPassword`.
 - **FR-20:** The system SHALL update `users.password_hash` with the Argon2id hash of `newPassword`, set `users.is_temporary_password = false`, update `users.last_login_at = now()`, and update `users.updated_at = now()`.
-- **FR-21:** The system SHALL immediately generate and issue an RS256-signed JWT access token (3600s TTL), persist a newly issued refresh token in `refresh_tokens`, and return a `200 OK` response containing `accessToken`, `refreshToken`, `tokenType: "Bearer"`, `expiresIn: 3600`, and full `user` profile data.
+- **FR-21:** The system SHALL immediately generate and issue an RS256-signed JWT access token (3600s TTL, containing standard claims including `sid` bound to the newly inserted `refresh_tokens.id`), track the active session in Redis (`session:jti:{sessionId}`), persist a newly issued refresh token in `refresh_tokens`, and return a `200 OK` response containing `accessToken`, `refreshToken`, `tokenType: "Bearer"`, `expiresIn: 3600`, and full `user` profile data.
 
 ### 3.4 Reliability & Natural State Invalidation
 
