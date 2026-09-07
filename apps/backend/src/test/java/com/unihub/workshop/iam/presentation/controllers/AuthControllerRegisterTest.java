@@ -1,16 +1,7 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
-import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
-import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
-import com.unihub.workshop.iam.application.ports.in.GetActiveSessionsUseCase;
-import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
-import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
-import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.shared.exception.ConflictException;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,18 +27,9 @@ class AuthControllerRegisterTest {
     @BeforeEach
     void setUp() {
         registerUserUseCase = mock(RegisterUserUseCase.class);
-        AuthController authController = new AuthController(
-                mock(LoginUseCase.class),
-                mock(RefreshTokenUseCase.class),
-                mock(LogoutUseCase.class),
-                mock(PublicKeyService.class),
-                registerUserUseCase,
-                mock(ActivateAccountUseCase.class),
-                mock(ResendOtpUseCase.class),
-                mock(ResetPasswordUseCase.class),
-                mock(ChangeTemporaryPasswordUseCase.class),
-                mock(GetActiveSessionsUseCase.class)
-        );
+        AuthController authController = AuthControllerTestBuilder.builder()
+                .withRegisterUserUseCase(registerUserUseCase)
+                .build();
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

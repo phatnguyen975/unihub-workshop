@@ -9,6 +9,7 @@ import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
+import com.unihub.workshop.iam.application.ports.in.RevokeSessionUseCase;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
@@ -38,7 +39,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +49,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,6 +68,7 @@ public class AuthController {
     private final ResetPasswordUseCase resetPasswordUseCase;
     private final ChangeTemporaryPasswordUseCase changeTemporaryPasswordUseCase;
     private final GetActiveSessionsUseCase getActiveSessionsUseCase;
+    private final RevokeSessionUseCase revokeSessionUseCase;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -180,7 +185,8 @@ public class AuthController {
             throw new UnauthorizedException("Unauthorized: invalid token principal");
         }
 
-        CursorPage<ActiveSession> page = getActiveSessionsUseCase.getActiveSessions(userId, currentSessionId, cursor, size);
+        CursorPage<ActiveSession> page = getActiveSessionsUseCase.getActiveSessions(userId, currentSessionId, cursor,
+                size);
 
         List<SessionResponse.SessionItem> items = page.items().stream()
                 .map(s -> new SessionResponse.SessionItem(
@@ -196,5 +202,40 @@ public class AuthController {
                 new SessionCursor(page.nextCursor(), page.hasMore()));
 
         return ApiResponse.success(response, "Active sessions retrieved");
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> revokeSession(@PathVariable UUID id, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Full authentication is required to access this resource");
+        }
+
+        UUID userId;
+        UUID currentSessionId = null;
+        String currentJti = null;
+        Instant exp = null;
+
+        if (authentication.getPrincipal() instanceof JwtAuthenticatedPrincipal jwtPrincipal) {
+            userId = UUID.fromString(jwtPrincipal.sub());
+            if (jwtPrincipal.sid() != null && !jwtPrincipal.sid().isBlank()) {
+                currentSessionId = UUID.fromString(jwtPrincipal.sid());
+            }
+            currentJti = jwtPrincipal.jti();
+            exp = jwtPrincipal.exp();
+        } else if (authentication.getPrincipal() instanceof Jwt jwt) {
+            userId = UUID.fromString(jwt.getSubject());
+            String sid = jwt.getClaimAsString("sid");
+            if (sid != null && !sid.isBlank()) {
+                currentSessionId = UUID.fromString(sid);
+            }
+            currentJti = jwt.getId();
+            exp = jwt.getExpiresAt();
+        } else {
+            throw new UnauthorizedException("Unauthorized: invalid token principal");
+        }
+
+        revokeSessionUseCase.revokeSession(userId, id, currentSessionId, currentJti, exp);
+
+        return ResponseEntity.noContent().build();
     }
 }

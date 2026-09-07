@@ -120,6 +120,18 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         return new CursorPage<>(items, nextCursor, hasMore);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<RefreshToken> findActiveSessionByIdAndUserId(UUID id, UUID userId, Instant now) {
+        return repository.findActiveSessionByIdAndUserId(id, userId, now).map(this::mapToDomain);
+    }
+
+    @Override
+    @Transactional
+    public boolean revokeActiveSession(UUID id, UUID userId, Instant revokedAt) {
+        return repository.revokeActiveSession(id, userId, revokedAt, revokedAt) > 0;
+    }
+
     private ActiveSession mapToActiveSession(RefreshTokenJpaEntity entity) {
         return new ActiveSession(
                 entity.getId(),

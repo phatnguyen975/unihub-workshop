@@ -1,17 +1,9 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
-import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
-import com.unihub.workshop.iam.application.ports.in.GetActiveSessionsUseCase;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
-import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase.RefreshResult;
-import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.iam.presentation.dto.RefreshTokenRequest;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
@@ -43,18 +35,13 @@ class AuthControllerRefreshTest {
         refreshTokenUseCase = mock(RefreshTokenUseCase.class);
         objectMapper = new ObjectMapper();
 
+        AuthController authController = AuthControllerTestBuilder.builder()
+                .withLoginUseCase(loginUseCase)
+                .withRefreshTokenUseCase(refreshTokenUseCase)
+                .build();
+
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(
-                        loginUseCase,
-                        refreshTokenUseCase,
-                        mock(LogoutUseCase.class),
-                        mock(PublicKeyService.class),
-                        mock(RegisterUserUseCase.class),
-                        mock(ActivateAccountUseCase.class),
-                        mock(ResendOtpUseCase.class),
-                        mock(ResetPasswordUseCase.class),
-                        mock(ChangeTemporaryPasswordUseCase.class),
-                        mock(GetActiveSessionsUseCase.class)))
+                .standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();
     }

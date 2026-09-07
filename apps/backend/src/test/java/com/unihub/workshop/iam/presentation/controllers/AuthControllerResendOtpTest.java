@@ -1,16 +1,7 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
-import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
-import com.unihub.workshop.iam.application.ports.in.ChangeTemporaryPasswordUseCase;
-import com.unihub.workshop.iam.application.ports.in.GetActiveSessionsUseCase;
-import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
-import com.unihub.workshop.iam.application.ports.in.LogoutUseCase;
-import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
-import com.unihub.workshop.iam.application.ports.in.RegisterUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.ResendOtpUseCase;
-import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.shared.exception.NotFoundException;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,19 +24,9 @@ class AuthControllerResendOtpTest {
     @BeforeEach
     void setUp() {
         resendOtpUseCase = mock(ResendOtpUseCase.class);
-        ActivateAccountUseCase activateAccountUseCase = mock(ActivateAccountUseCase.class);
-        AuthController authController = new AuthController(
-                mock(LoginUseCase.class),
-                mock(RefreshTokenUseCase.class),
-                mock(LogoutUseCase.class),
-                mock(PublicKeyService.class),
-                mock(RegisterUserUseCase.class),
-                activateAccountUseCase,
-                resendOtpUseCase,
-                mock(ResetPasswordUseCase.class),
-                mock(ChangeTemporaryPasswordUseCase.class),
-                mock(GetActiveSessionsUseCase.class));
-
+        AuthController authController = AuthControllerTestBuilder.builder()
+                .withResendOtpUseCase(resendOtpUseCase)
+                .build();
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

@@ -86,7 +86,7 @@ This plan delivers the complete active session management capability (Domain 1: 
 
 ### Phase 3: Targeted Session Revocation
 
-- [ ] **T3 — Single session revocation: terminate a specific session remotely or logout current session with fail-closed Redis invalidation (`DELETE /api/v1/auth/sessions/{id}`)**
+- [x] **T3 — Single session revocation: terminate a specific session remotely or logout current session with fail-closed Redis invalidation (`DELETE /api/v1/auth/sessions/{id}`)**
   - **Size:** M
   - **Depends on:** T1, T2
   - **Layers touched:** Application (Ports/Use Cases), Infrastructure (Persistence/Redis), Presentation (Controller)
@@ -111,7 +111,7 @@ This plan delivers the complete active session management capability (Domain 1: 
 
 #### Checkpoint: Phase 3
 
-- [ ] `DELETE /api/v1/auth/sessions/{id}` successfully revokes current and remote sessions with immediate distributed invalidation and fail-closed protection. Unit tests and `ModulithArchitectureTest` pass.
+- [x] `DELETE /api/v1/auth/sessions/{id}` successfully revokes current and remote sessions with immediate distributed invalidation and fail-closed protection. Unit tests and `ModulithArchitectureTest` pass.
 
 ### Phase 4: Bulk Remote Session Revocation
 

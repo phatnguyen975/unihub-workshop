@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
+import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,7 +47,8 @@ class RefreshTokenRepositoryAdapterTest {
         RefreshTokenJpaEntity e2 = createEntity(id2, userId, "Firefox", "2.2.2.2", t2);
         RefreshTokenJpaEntity e3 = createEntity(id3, userId, "Safari", "3.3.3.3", t3);
 
-        when(repository.findActiveSessions(eq(userId), any(Instant.class), isNull(), isNull(), eq(PageRequest.of(0, 3))))
+        when(repository.findActiveSessions(eq(userId), any(Instant.class), isNull(), isNull(),
+                eq(PageRequest.of(0, 3))))
                 .thenReturn(List.of(e1, e2, e3));
 
         CursorPage<ActiveSession> page = adapter.findActiveSessions(userId, null, 2);
@@ -75,7 +78,8 @@ class RefreshTokenRepositoryAdapterTest {
         Instant t3 = Instant.parse("2026-09-04T08:00:00Z");
         RefreshTokenJpaEntity e3 = createEntity(id3, userId, "Safari", "3.3.3.3", t3);
 
-        when(repository.findActiveSessions(eq(userId), any(Instant.class), eq(cursorTime), eq(cursorId), eq(PageRequest.of(0, 3))))
+        when(repository.findActiveSessions(eq(userId), any(Instant.class), eq(cursorTime), eq(cursorId),
+                eq(PageRequest.of(0, 3))))
                 .thenReturn(List.of(e3));
 
         CursorPage<ActiveSession> page = adapter.findActiveSessions(userId, cursor, 2);
@@ -100,7 +104,39 @@ class RefreshTokenRepositoryAdapterTest {
                 .hasMessage("Invalid cursor format");
     }
 
-    private RefreshTokenJpaEntity createEntity(UUID id, UUID userId, String deviceInfo, String ipAddress, Instant createdAt) {
+    @Test
+    void shouldFindActiveSessionByIdAndUserId() {
+        UUID sessionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant now = Instant.now();
+        RefreshTokenJpaEntity entity = createEntity(sessionId, userId, "Chrome", "127.0.0.1", now);
+
+        when(repository.findActiveSessionByIdAndUserId(eq(sessionId), eq(userId), any(Instant.class)))
+                .thenReturn(Optional.of(entity));
+
+        Optional<RefreshToken> result = adapter.findActiveSessionByIdAndUserId(sessionId, userId, now);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().id()).isEqualTo(sessionId);
+        assertThat(result.get().userId()).isEqualTo(userId);
+    }
+
+    @Test
+    void shouldRevokeActiveSession() {
+        UUID sessionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant revokedAt = Instant.now();
+
+        when(repository.revokeActiveSession(eq(sessionId), eq(userId), eq(revokedAt), eq(revokedAt)))
+                .thenReturn(1);
+
+        boolean success = adapter.revokeActiveSession(sessionId, userId, revokedAt);
+
+        assertThat(success).isTrue();
+    }
+
+    private RefreshTokenJpaEntity createEntity(UUID id, UUID userId, String deviceInfo, String ipAddress,
+            Instant createdAt) {
         RefreshTokenJpaEntity entity = new RefreshTokenJpaEntity();
         entity.setId(id);
         entity.setUserId(userId);
@@ -113,5 +149,6 @@ class RefreshTokenRepositoryAdapterTest {
         return entity;
     }
 
-    private record CursorData(Instant createdAt, UUID id) {}
+    private record CursorData(Instant createdAt, UUID id) {
+    }
 }

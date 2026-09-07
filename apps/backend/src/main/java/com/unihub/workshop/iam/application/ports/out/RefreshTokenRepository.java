@@ -16,4 +16,8 @@ public interface RefreshTokenRepository {
     void revokeAllActiveTokensForUser(UUID userId, Instant revokedAt);
 
     CursorPage<ActiveSession> findActiveSessions(UUID userId, String cursor, int limit);
+
+    Optional<RefreshToken> findActiveSessionByIdAndUserId(UUID id, UUID userId, Instant now);
+
+    boolean revokeActiveSession(UUID id, UUID userId, Instant revokedAt);
 }

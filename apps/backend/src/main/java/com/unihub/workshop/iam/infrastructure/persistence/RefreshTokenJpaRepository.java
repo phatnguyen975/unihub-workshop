@@ -40,4 +40,32 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpa
             @Param("cursorTime") Instant cursorTime,
             @Param("cursorId") UUID cursorId,
             Pageable pageable);
+
+    @Query("""
+            SELECT r FROM RefreshTokenJpaEntity r
+            WHERE r.id = :id
+              AND r.userId = :userId
+              AND r.revokedAt IS NULL
+              AND r.expiresAt > :now
+            """)
+    Optional<RefreshTokenJpaEntity> findActiveSessionByIdAndUserId(
+            @Param("id") UUID id,
+            @Param("userId") UUID userId,
+            @Param("now") Instant now);
+
+    @Transactional
+    @Modifying
+    @Query("""
+            UPDATE RefreshTokenJpaEntity r
+            SET r.revokedAt = :revokedAt
+            WHERE r.id = :id
+              AND r.userId = :userId
+              AND r.revokedAt IS NULL
+              AND r.expiresAt > :now
+            """)
+    int revokeActiveSession(
+            @Param("id") UUID id,
+            @Param("userId") UUID userId,
+            @Param("revokedAt") Instant revokedAt,
+            @Param("now") Instant now);
 }

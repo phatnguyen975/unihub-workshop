@@ -38,6 +38,19 @@ public class RedisSessionTrackerAdapter implements SessionTrackerPort {
     }
 
     @Override
+    public Duration getRemainingTtl(UUID sessionId) {
+        try {
+            Long expire = redisTemplate.getExpire(KEY_PREFIX + sessionId, java.util.concurrent.TimeUnit.SECONDS);
+            if (expire != null && expire > 0) {
+                return Duration.ofSeconds(expire);
+            }
+            return Duration.ofMinutes(60);
+        } catch (Exception e) {
+            throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
+        }
+    }
+
+    @Override
     public void removeSession(UUID sessionId) {
         try {
             redisTemplate.delete(KEY_PREFIX + sessionId);

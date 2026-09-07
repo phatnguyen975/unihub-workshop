@@ -5,7 +5,6 @@ import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,19 +34,9 @@ class AuthControllerGetSessionsTest {
     @BeforeEach
     void setUp() {
         getActiveSessionsUseCase = mock(GetActiveSessionsUseCase.class);
-
-        AuthController controller = new AuthController(
-                mock(LoginUseCase.class),
-                mock(RefreshTokenUseCase.class),
-                mock(LogoutUseCase.class),
-                mock(PublicKeyService.class),
-                mock(RegisterUserUseCase.class),
-                mock(ActivateAccountUseCase.class),
-                mock(ResendOtpUseCase.class),
-                mock(ResetPasswordUseCase.class),
-                mock(ChangeTemporaryPasswordUseCase.class),
-                getActiveSessionsUseCase);
-
+        AuthController controller = AuthControllerTestBuilder.builder()
+                .withGetActiveSessionsUseCase(getActiveSessionsUseCase)
+                .build();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

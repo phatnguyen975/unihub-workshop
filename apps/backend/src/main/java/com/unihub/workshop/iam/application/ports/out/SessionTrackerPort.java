@@ -9,5 +9,7 @@ public interface SessionTrackerPort {
 
     Optional<String> getActiveJti(UUID sessionId);
 
+    Duration getRemainingTtl(UUID sessionId);
+
     void removeSession(UUID sessionId);
 }
