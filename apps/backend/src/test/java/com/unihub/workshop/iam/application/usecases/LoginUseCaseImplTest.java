@@ -22,12 +22,20 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
+import com.unihub.workshop.shared.security.IssuedToken;
+import org.mockito.ArgumentCaptor;
+import java.time.Duration;
+import java.time.Instant;
+import com.unihub.workshop.iam.domain.model.RefreshToken;
+
 import static org.mockito.Mockito.*;
 
 class LoginUseCaseImplTest {
 
     private UserRepository userRepository;
     private RefreshTokenRepository refreshTokenRepository;
+    private SessionTrackerPort sessionTrackerPort;
     private JwtTokenIssuer jwtTokenIssuer;
     private SecurityProperties securityProperties;
     private PasswordEncoder passwordEncoder;
@@ -38,6 +46,7 @@ class LoginUseCaseImplTest {
     void setUp() {
         userRepository = mock(UserRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
+        sessionTrackerPort = mock(SessionTrackerPort.class);
         jwtTokenIssuer = mock(JwtTokenIssuer.class);
         securityProperties = mock(SecurityProperties.class);
         passwordEncoder = new Argon2PasswordEncoder(16, 32, 1, 4096, 1);
@@ -46,7 +55,7 @@ class LoginUseCaseImplTest {
         when(securityProperties.accessTokenTtlMinutes()).thenReturn(15);
         when(securityProperties.refreshTokenTtlDays()).thenReturn(7);
 
-        loginUseCase = new LoginUseCaseImpl(userRepository, refreshTokenRepository, jwtTokenIssuer, passwordEncoder,
+        loginUseCase = new LoginUseCaseImpl(userRepository, refreshTokenRepository, sessionTrackerPort, jwtTokenIssuer, passwordEncoder,
                 securityProperties, meterRegistry);
     }
 
@@ -59,8 +68,8 @@ class LoginUseCaseImplTest {
         User user = new User(UUID.randomUUID(), UUID.randomUUID(), UserRole.STUDENT, email, encodedPassword, true,
                 false, null);
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
-        when(jwtTokenIssuer.issueAccessToken(user.id().toString(), "STUDENT", user.organizationId().toString()))
-                .thenReturn("mock-access-token");
+        when(jwtTokenIssuer.issueToken(eq(user.id().toString()), eq("STUDENT"), eq(user.organizationId().toString()), anyString()))
+                .thenReturn(new IssuedToken("mock-access-token", "mock-jti", Instant.now().plusSeconds(900)));
 
         LoginUseCase.LoginResult result = loginUseCase.login(email, password, "device-1", "127.0.0.1");
 
@@ -71,7 +80,13 @@ class LoginUseCaseImplTest {
         assertThat(result.user()).isEqualTo(user);
 
         verify(userRepository).updateLastLoginAt(eq(user.id()), any());
-        verify(refreshTokenRepository).save(any());
+        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(captor.capture());
+        UUID sessionId = captor.getValue().id();
+        assertThat(sessionId).isNotNull();
+
+        verify(jwtTokenIssuer).issueToken(eq(user.id().toString()), eq("STUDENT"), eq(user.organizationId().toString()), eq(sessionId.toString()));
+        verify(sessionTrackerPort).trackSession(eq(sessionId), eq("mock-jti"), eq(Duration.ofMinutes(15)));
         assertThat(meterRegistry.counter("auth.login.attempts", "outcome", "success").count()).isEqualTo(1.0);
     }
 
@@ -85,14 +100,14 @@ class LoginUseCaseImplTest {
         User user = new User(UUID.randomUUID(), null, UserRole.STUDENT, email, encodedPassword, true,
                 false, null);
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
-        when(jwtTokenIssuer.issueAccessToken(user.id().toString(), "STUDENT", null))
-                .thenReturn("mock-access-token");
+        when(jwtTokenIssuer.issueToken(eq(user.id().toString()), eq("STUDENT"), isNull(), anyString()))
+                .thenReturn(new IssuedToken("mock-access-token", "mock-jti", Instant.now().plusSeconds(900)));
 
         LoginUseCase.LoginResult result = loginUseCase.login(email, password, "device-1", "127.0.0.1");
 
         assertThat(result.accessToken()).isEqualTo("mock-access-token");
         assertThat(result.user()).isEqualTo(user);
-        verify(jwtTokenIssuer).issueAccessToken(user.id().toString(), "STUDENT", null);
+        verify(jwtTokenIssuer).issueToken(eq(user.id().toString()), eq("STUDENT"), isNull(), anyString());
     }
 
     @Test

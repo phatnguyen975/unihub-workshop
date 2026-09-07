@@ -93,6 +93,7 @@ class SecurityConfigTest {
                 .claim("org", "org-456")
                 .claim("jti", "jti-789")
                 .claim("role", "ORGANIZER")
+                .claim("sid", "session-123")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
                 .build();
@@ -112,6 +113,7 @@ class SecurityConfigTest {
                 .claim("org", "org-456")
                 .claim("jti", "jti-789")
                 .claim("role", "STUDENT")
+                .claim("sid", "session-123")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
                 .build();
@@ -131,6 +133,7 @@ class SecurityConfigTest {
                 .claim("org", "org-456")
                 .claim("jti", "revoked-jti")
                 .claim("role", "ORGANIZER")
+                .claim("sid", "session-123")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
                 .build();
@@ -151,6 +154,7 @@ class SecurityConfigTest {
                 .claim("org", "org-456")
                 .claim("jti", "jti-789")
                 .claim("role", "ORGANIZER")
+                .claim("sid", "session-123")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
                 .build();

@@ -61,7 +61,12 @@ class IngestionJobControllerRejectArtifactTest {
                 .build();
 
         JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
-                UUID.randomUUID().toString(), ORG_ID.toString(), "ORGANIZER", "test@org.com", Instant.now(),
+                UUID.randomUUID().toString(),
+                ORG_ID.toString(),
+                UUID.randomUUID().toString(),
+                "ORGANIZER",
+                UUID.randomUUID().toString(),
+                Instant.now(),
                 Instant.now().plusSeconds(3600));
         auth = new TestingAuthenticationToken(principal, null, "ROLE_ORGANIZER");
     }

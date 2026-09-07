@@ -10,9 +10,12 @@ import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
+import com.unihub.workshop.shared.security.IssuedToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -22,6 +25,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
+    private final SessionTrackerPort sessionTrackerPort;
     private final JwtTokenIssuer jwtTokenIssuer;
     private final SecurityProperties securityProperties;
     private final MeterRegistry meterRegistry;
@@ -29,11 +33,13 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
     public RefreshTokenUseCaseImpl(
             RefreshTokenRepository refreshTokenRepository,
             UserRepository userRepository,
+            SessionTrackerPort sessionTrackerPort,
             JwtTokenIssuer jwtTokenIssuer,
             SecurityProperties securityProperties,
             MeterRegistry meterRegistry) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.userRepository = userRepository;
+        this.sessionTrackerPort = sessionTrackerPort;
         this.jwtTokenIssuer = jwtTokenIssuer;
         this.securityProperties = securityProperties;
         this.meterRegistry = meterRegistry;
@@ -84,19 +90,17 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
                 oldToken.expiresAt(),
                 now);
         refreshTokenRepository.save(revokedToken);
+        sessionTrackerPort.removeSession(oldToken.id());
 
         String orgId = user.organizationId() != null ? user.organizationId().toString() : null;
-        String accessToken = jwtTokenIssuer.issueAccessToken(
-                user.id().toString(),
-                user.role().name(),
-                orgId);
 
         String rawNewRefreshToken = TokenUtils.generateSecureToken();
         String newTokenHash = TokenUtils.hash(rawNewRefreshToken);
         Instant newExpiresAt = now.plus(securityProperties.refreshTokenTtlDays(), ChronoUnit.DAYS);
 
+        UUID newSessionId = UUID.randomUUID();
         RefreshToken newRefreshToken = new RefreshToken(
-                UUID.randomUUID(),
+                newSessionId,
                 user.id(),
                 newTokenHash,
                 userAgent,
@@ -105,10 +109,21 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
                 null);
         refreshTokenRepository.save(newRefreshToken);
 
+        IssuedToken issuedToken = jwtTokenIssuer.issueToken(
+                user.id().toString(),
+                user.role().name(),
+                orgId,
+                newSessionId.toString());
+
+        sessionTrackerPort.trackSession(
+                newSessionId,
+                issuedToken.jti(),
+                Duration.ofMinutes(securityProperties.accessTokenTtlMinutes()));
+
         meterRegistry.counter("auth.token.refresh", "outcome", "success").increment();
 
         return new RefreshResult(
-                accessToken,
+                issuedToken.token(),
                 rawNewRefreshToken,
                 "Bearer",
                 securityProperties.accessTokenTtlMinutes() * 60L);

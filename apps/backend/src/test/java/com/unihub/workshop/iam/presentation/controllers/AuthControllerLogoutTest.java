@@ -91,6 +91,7 @@ class AuthControllerLogoutTest {
         Jwt jwt = Jwt.withTokenValue("token").header("alg", "none")
                 .claim("sub", UUID.randomUUID().toString())
                 .claim("jti", "some-jti")
+                .claim("sid", UUID.randomUUID().toString())
                 .claim("exp", Instant.now().plusSeconds(3600))
                 .build();
 
@@ -111,6 +112,7 @@ class AuthControllerLogoutTest {
         Jwt jwt = Jwt.withTokenValue("token").header("alg", "none")
                 .claim("sub", UUID.randomUUID().toString())
                 .claim("jti", "some-jti")
+                .claim("sid", UUID.randomUUID().toString())
                 .claim("exp", Instant.now().plusSeconds(3600))
                 .build();
 

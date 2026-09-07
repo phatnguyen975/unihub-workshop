@@ -68,6 +68,7 @@ class IngestionJobControllerTest {
                 .claim("org", orgId.toString())
                 .claim("jti", "jti-123")
                 .claim("role", role)
+                .claim("sid", "session-123")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
@@ -139,6 +140,7 @@ class IngestionJobControllerTest {
                 .claim("org", "not-a-uuid")
                 .claim("jti", "jti-123")
                 .claim("role", "ORGANIZER")
+                .claim("sid", "session-123")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();

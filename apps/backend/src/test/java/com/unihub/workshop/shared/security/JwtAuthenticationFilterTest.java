@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -56,8 +57,10 @@ class JwtAuthenticationFilterTest {
         when(jwtDecoder.decode(token)).thenReturn(jwt);
 
         String jti = UUID.randomUUID().toString();
+        String sid = UUID.randomUUID().toString();
+        Instant now = Instant.now();
         JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
-                UUID.randomUUID().toString(), UUID.randomUUID().toString(), jti, "STUDENT", null, null);
+                UUID.randomUUID().toString(), UUID.randomUUID().toString(), jti, "STUDENT", sid, now, now.plusSeconds(3600));
 
         when(claimsExtractor.extract(jwt)).thenReturn(principal);
         when(jtiValidator.isTokenValid(jti)).thenReturn(false); // Blacklisted!

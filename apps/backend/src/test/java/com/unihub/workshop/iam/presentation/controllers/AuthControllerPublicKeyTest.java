@@ -67,6 +67,7 @@ class AuthControllerPublicKeyTest {
                 .claim("org", UUID.randomUUID().toString())
                 .claim("jti", "jti-123")
                 .claim("role", role)
+                .claim("sid", UUID.randomUUID().toString())
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();

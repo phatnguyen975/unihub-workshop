@@ -12,10 +12,13 @@ import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
+import com.unihub.workshop.shared.security.IssuedToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -26,6 +29,7 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final SessionTrackerPort sessionTrackerPort;
     private final JwtTokenIssuer jwtTokenIssuer;
     private final PasswordEncoder passwordEncoder;
     private final SecurityProperties securityProperties;
@@ -35,12 +39,14 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
     public ChangeTemporaryPasswordUseCaseImpl(
             UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
+            SessionTrackerPort sessionTrackerPort,
             JwtTokenIssuer jwtTokenIssuer,
             PasswordEncoder passwordEncoder,
             SecurityProperties securityProperties,
             MeterRegistry meterRegistry) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.sessionTrackerPort = sessionTrackerPort;
         this.jwtTokenIssuer = jwtTokenIssuer;
         this.passwordEncoder = passwordEncoder;
         this.securityProperties = securityProperties;
@@ -109,18 +115,13 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
 
         User updatedUser = user.changeTemporaryPassword(newPasswordHash, now);
 
-        String orgId = updatedUser.organizationId() != null ? updatedUser.organizationId().toString() : null;
-        String accessToken = jwtTokenIssuer.issueAccessToken(
-                updatedUser.id().toString(),
-                updatedUser.role().name(),
-                orgId);
-
         String rawRefreshToken = TokenUtils.generateSecureToken();
         String tokenHash = TokenUtils.hash(rawRefreshToken);
         Instant expiresAt = now.plus(securityProperties.refreshTokenTtlDays(), ChronoUnit.DAYS);
 
+        UUID sessionId = UUID.randomUUID();
         RefreshToken refreshToken = new RefreshToken(
-                UUID.randomUUID(),
+                sessionId,
                 updatedUser.id(),
                 tokenHash,
                 deviceInfo,
@@ -129,10 +130,22 @@ public class ChangeTemporaryPasswordUseCaseImpl implements ChangeTemporaryPasswo
                 null);
         refreshTokenRepository.save(refreshToken);
 
+        String orgId = updatedUser.organizationId() != null ? updatedUser.organizationId().toString() : null;
+        IssuedToken issuedToken = jwtTokenIssuer.issueToken(
+                updatedUser.id().toString(),
+                updatedUser.role().name(),
+                orgId,
+                sessionId.toString());
+
+        sessionTrackerPort.trackSession(
+                sessionId,
+                issuedToken.jti(),
+                Duration.ofMinutes(securityProperties.accessTokenTtlMinutes()));
+
         meterRegistry.counter("auth.password.temporary.attempts", "outcome", "success").increment();
 
         return new ChangeTemporaryPasswordResult(
-                accessToken,
+                issuedToken.token(),
                 rawRefreshToken,
                 "Bearer",
                 securityProperties.accessTokenTtlMinutes() * 60L,
