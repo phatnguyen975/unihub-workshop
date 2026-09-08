@@ -75,7 +75,7 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 ### Phase 3: Password Change — Caller can change their own password with automatic remote session revocation
 
-- [ ] **T3 — A caller can change their own password via `PATCH /api/v1/users/me/password`, with fail-closed Redis session revocation of all remote sessions**
+- [x] **T3 — A caller can change their own password via `PATCH /api/v1/users/me/password`, with fail-closed Redis session revocation of all remote sessions**
   - **Size:** M
   - **Depends on:** T1 (requires `UserController`, `UserRepository.findById`, `UserRepository.save`)
   - **Layers touched:** Application (new in port, new use-case impl with fail-closed orchestration), Infrastructure (no new adapter), Presentation (new handler + new request DTO)
@@ -99,11 +99,11 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1, T2, T3 are checked off.
-- [ ] Every acceptance criterion verified end-to-end by controller MockMvc tests and use-case unit tests.
-- [ ] `ModulithArchitectureTest` passes — `UserController` in the `iam` module does not breach module boundaries.
-- [ ] No regression in existing `AuthController` test suite.
-- [ ] Ready for `/review user-profile-management`.
+- [x] All tasks T1, T2, T3 are checked off.
+- [x] Every acceptance criterion verified end-to-end by controller MockMvc tests and use-case unit tests.
+- [x] `ModulithArchitectureTest` passes — `UserController` in the `iam` module does not breach module boundaries.
+- [x] No regression in existing `AuthController` test suite.
+- [x] Ready for `/review user-profile-management`.
 
 ## Risks and Mitigations
 

@@ -79,7 +79,7 @@ public record User(
                 createdAt,
                 Instant.now(),
                 createdBy,
-                updatedBy);
+                id);
     }
 
     public User changeTemporaryPassword(String newPasswordHash, Instant loginTime) {

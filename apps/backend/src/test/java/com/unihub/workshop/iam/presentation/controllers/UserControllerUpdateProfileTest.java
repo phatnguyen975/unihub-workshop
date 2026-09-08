@@ -7,6 +7,8 @@ import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
+
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -146,7 +148,7 @@ class UserControllerUpdateProfileTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"))
                 .andExpect(jsonPath("$.error.validationErrors[0]")
-                        .value(org.hamcrest.Matchers.containsString("phoneNumber")));
+                        .value(Matchers.containsString("phoneNumber")));
     }
 
     @Test
@@ -163,7 +165,24 @@ class UserControllerUpdateProfileTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"))
                 .andExpect(jsonPath("$.error.validationErrors[0]")
-                        .value(org.hamcrest.Matchers.containsString("fullName")));
+                        .value(Matchers.containsString("fullName")));
+    }
+
+    @Test
+    void shouldReturn422_whenAvatarUrlIsInvalid() throws Exception {
+        mockMvc.perform(patch("/api/v1/users/me")
+                .principal(createAuth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                            "avatarUrl": "https://"
+                        }
+                        """))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"))
+                .andExpect(jsonPath("$.error.validationErrors[0]")
+                        .value(Matchers.containsString("avatarUrl")));
     }
 
     @Test
@@ -180,7 +199,7 @@ class UserControllerUpdateProfileTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"))
                 .andExpect(
-                        jsonPath("$.error.validationErrors[0]").value(org.hamcrest.Matchers.containsString("email")));
+                        jsonPath("$.error.validationErrors[0]").value(Matchers.containsString("email")));
     }
 
     @Test

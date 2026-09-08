@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -70,5 +71,16 @@ class GetUserProfileUseCaseImplTest {
         assertThatThrownBy(() -> useCase.getProfile(null))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("User not found");
+    }
+
+    @Test
+    void shouldRouteToPrimaryDatabase_whenGettingProfile() throws NoSuchMethodException {
+        var method = GetUserProfileUseCaseImpl.class.getMethod("getProfile", UUID.class);
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.readOnly())
+                .as("FR-05 & BR-07 mandate Primary DB routing; readOnly must be false")
+                .isFalse();
     }
 }

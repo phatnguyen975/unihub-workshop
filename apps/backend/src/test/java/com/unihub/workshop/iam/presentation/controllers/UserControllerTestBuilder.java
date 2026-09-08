@@ -1,5 +1,6 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import com.unihub.workshop.iam.application.ports.in.ChangeUserPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.GetUserProfileUseCase;
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileUseCase;
 
@@ -9,6 +10,7 @@ public class UserControllerTestBuilder {
 
     private GetUserProfileUseCase getUserProfileUseCase = mock(GetUserProfileUseCase.class);
     private UpdateUserProfileUseCase updateUserProfileUseCase = mock(UpdateUserProfileUseCase.class);
+    private ChangeUserPasswordUseCase changeUserPasswordUseCase = mock(ChangeUserPasswordUseCase.class);
 
     public static UserControllerTestBuilder builder() {
         return new UserControllerTestBuilder();
@@ -24,7 +26,13 @@ public class UserControllerTestBuilder {
         return this;
     }
 
+    public UserControllerTestBuilder withChangeUserPasswordUseCase(
+            ChangeUserPasswordUseCase changeUserPasswordUseCase) {
+        this.changeUserPasswordUseCase = changeUserPasswordUseCase;
+        return this;
+    }
+
     public UserController build() {
-        return new UserController(getUserProfileUseCase, updateUserProfileUseCase);
+        return new UserController(getUserProfileUseCase, updateUserProfileUseCase, changeUserPasswordUseCase);
     }
 }

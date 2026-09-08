@@ -2,6 +2,7 @@ package com.unihub.workshop.iam.domain.model;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,5 +94,34 @@ class UserTest {
         assertThat(updated.fullName()).isEqualTo("Alice Smith");
         assertThat(updated.phoneNumber()).isNull();
         assertThat(updated.avatarUrl()).isNull();
+    }
+
+    @Test
+    void updatePasswordShouldUpdatePasswordHashAndAuditFields() {
+        UUID id = UUID.randomUUID();
+        UUID creatorId = UUID.randomUUID();
+        User original = new User(
+                id,
+                null,
+                UserRole.STUDENT,
+                "student@university.edu",
+                "+84912345678",
+                "old-hash",
+                "Alice Smith",
+                null,
+                true,
+                false,
+                null,
+                null,
+                Instant.now().minusSeconds(3600),
+                Instant.now().minusSeconds(3600),
+                creatorId,
+                creatorId);
+
+        User updated = original.updatePassword("new-argon2-hash");
+
+        assertThat(updated.passwordHash()).isEqualTo("new-argon2-hash");
+        assertThat(updated.updatedAt()).isNotNull();
+        assertThat(updated.updatedBy()).isEqualTo(id);
     }
 }

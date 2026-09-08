@@ -3,6 +3,7 @@ package com.unihub.workshop.iam.presentation.dto;
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileCommand;
 import com.unihub.workshop.shared.exception.ValidationException;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,7 +13,6 @@ import java.util.regex.Pattern;
 public class UpdateProfileRequest {
 
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[0-9]{8,15}$");
-    private static final Pattern URL_PATTERN = Pattern.compile("^(http|https)://.*$");
     private static final Set<String> ALLOWED_FIELDS = Set.of("fullName", "phoneNumber", "avatarUrl");
 
     private final String fullName;
@@ -111,7 +111,7 @@ public class UpdateProfileRequest {
                     parsedAvatarUrl = (String) raw;
                     if (parsedAvatarUrl.length() > 2048) {
                         errors.add("avatarUrl: Avatar URL must not exceed 2048 characters");
-                    } else if (!URL_PATTERN.matcher(parsedAvatarUrl).matches()) {
+                    } else if (!isValidAbsoluteUrl(parsedAvatarUrl)) {
                         errors.add("avatarUrl: Avatar URL must be a well-formed absolute URL");
                     }
                 }
@@ -131,28 +131,17 @@ public class UpdateProfileRequest {
                 hasAvatarUrl);
     }
 
-    public String getFullName() {
-        return fullName;
-    }
-
-    public boolean isFullNamePresent() {
-        return fullNamePresent;
-    }
-
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public boolean isPhoneNumberPresent() {
-        return phoneNumberPresent;
-    }
-
-    public String getAvatarUrl() {
-        return avatarUrl;
-    }
-
-    public boolean isAvatarUrlPresent() {
-        return avatarUrlPresent;
+    private static boolean isValidAbsoluteUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            String scheme = uri.getScheme();
+            return uri.isAbsolute()
+                    && uri.getHost() != null
+                    && !uri.getHost().isBlank()
+                    && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public UpdateUserProfileCommand toCommand() {

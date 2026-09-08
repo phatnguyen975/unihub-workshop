@@ -1,24 +1,26 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import com.unihub.workshop.iam.application.ports.in.ChangeUserPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.GetUserProfileUseCase;
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileCommand;
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileUseCase;
 import com.unihub.workshop.iam.domain.model.User;
+import com.unihub.workshop.iam.presentation.dto.ChangePasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.UpdateProfileRequest;
 import com.unihub.workshop.iam.presentation.dto.UserProfileResponse;
-import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.exception.ValidationException;
-import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
+import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -28,10 +30,11 @@ public class UserController {
 
     private final GetUserProfileUseCase getUserProfileUseCase;
     private final UpdateUserProfileUseCase updateUserProfileUseCase;
+    private final ChangeUserPasswordUseCase changeUserPasswordUseCase;
 
     @GetMapping("/me")
     public ApiResponse<UserProfileResponse> getMyProfile(Authentication authentication) {
-        UUID userId = extractUserId(authentication);
+        UUID userId = SecurityContextUtils.extractUserId(authentication);
         User user = getUserProfileUseCase.getProfile(userId);
         return ApiResponse.success(UserProfileResponse.from(user), "Profile retrieved successfully.");
     }
@@ -39,8 +42,8 @@ public class UserController {
     @PatchMapping("/me")
     public ApiResponse<UserProfileResponse> updateMyProfile(
             Authentication authentication,
-            @RequestBody(required = false) java.util.Map<String, Object> body) {
-        UUID userId = extractUserId(authentication);
+            @RequestBody(required = false) Map<String, Object> body) {
+        UUID userId = SecurityContextUtils.extractUserId(authentication);
         if (body == null) {
             throw new ValidationException("Request body must not be null");
         }
@@ -50,17 +53,18 @@ public class UserController {
         return ApiResponse.success(UserProfileResponse.from(updated), "Profile updated successfully.");
     }
 
-    private UUID extractUserId(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UnauthorizedException("Full authentication is required to access this resource");
+    @PatchMapping("/me/password")
+    public ApiResponse<Void> changeMyPassword(
+            Authentication authentication,
+            @Valid @RequestBody(required = false) ChangePasswordRequest request) {
+        if (request == null) {
+            throw new ValidationException("Request body must not be null");
         }
-
-        if (authentication.getPrincipal() instanceof JwtAuthenticatedPrincipal jwtPrincipal) {
-            return UUID.fromString(jwtPrincipal.sub());
-        } else if (authentication.getPrincipal() instanceof Jwt jwt) {
-            return UUID.fromString(jwt.getSubject());
-        } else {
-            throw new UnauthorizedException("Unauthorized: invalid token principal");
-        }
+        UUID userId = SecurityContextUtils.extractUserId(authentication);
+        UUID currentSessionId = SecurityContextUtils.extractRequiredSessionId(
+                authentication, "Current session ID (sid) is required for password change");
+        changeUserPasswordUseCase.changePassword(
+                userId, currentSessionId, request.currentPassword(), request.newPassword());
+        return ApiResponse.success(null, "Password changed successfully.");
     }
 }

@@ -19,7 +19,7 @@ public class GetUserProfileUseCaseImpl implements GetUserProfileUseCase {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public User getProfile(UUID userId) {
         if (userId == null) {
             throw new UnauthorizedException("User not found");
