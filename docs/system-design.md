@@ -1078,9 +1078,9 @@ flowchart TD
 
 #### Core Components & Lifecycle
 
-1. **Multiplexed Single Connection:** Each authenticated client (Web or Mobile) establishes only one persistent SSE connection at `GET /api/v1/stream/events`. The client passes its JWT access token, and the backend registers the connection in an in-memory `SseEmitterRegistry` mapped to the user ID and organization. All event types (`notification.new`, `ai.summary.completed`, `ai.summary.failed`, `attendance.updated`, `registration.updated`, `payment.confirmed`) flow over this single stream.
+1. **Multiplexed Single Connection:** Each authenticated client (Web or Mobile) establishes only one persistent SSE connection at `GET /api/v1/stream/events`. The client passes its JWT access token, and the backend registers the connection in an in-memory `SseEmitterRegistry` mapped to the user ID and organization. All event types (`notification.new`, `notification.read`, `ai.summary.completed`, `ai.summary.failed`, `attendance.updated`, `registration.updated`, `payment.confirmed`) flow over this single stream.
 2. **Stateless Multi-Instance Fan-Out via Redis Pub/Sub:** Because clients are load-balanced across multiple Spring Boot backend instances, an event generated on Node 1 or by a background Worker might target a client whose SSE connection is held by Node 2. When an event producer calls `RealtimeEventPublisher.publish(target, event)`, the backend publishes the serialized event to Redis Pub/Sub:
-   - `unihub:stream:user:{userId}`: For user-specific events (personal notifications, AI job results, payment confirmation).
+   - `unihub:stream:user:{userId}`: For user-specific events (personal notifications, notification read badge synchronization, AI job results, payment confirmation).
    - `unihub:stream:workshop:{workshopId}`: For workshop-scoped events (live check-in attendance counter updates, live registration count updates for organizers).
    - All backend nodes subscribe to these patterns via `RedisMessageListenerContainer`. The node currently holding the target client's `SseEmitter` serializes the payload and pushes it down the HTTP socket.
 3. **Heartbeat & Connection Resilience:** To prevent intermediate proxies (Nginx, ALBs) and browsers from timing out idle sockets, a scheduled task emits a `: ping\n\n` heartbeat comment every 15 seconds.

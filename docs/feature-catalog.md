@@ -419,11 +419,11 @@
 
 ### 7.2 `in-app-notification-management`
 
-**Description:** Provides the REST API for authenticated users to manage their in-app notifications: `GET /api/v1/notifications` (paginated list with unread count, optimized by composite index on `(user_id, is_read)`), `PATCH /api/v1/notifications/{id}/read` (mark single notification as read), and `PATCH /api/v1/notifications/read-all` (bulk mark-as-read). This feature provides the data contract for the web and mobile notification bell/badge UI elements driven by the `in_app_notifications.is_read` field and synchronized in real time via the SSE stream (F-10.5).
+**Description:** Provides the REST API for authenticated users to manage their in-app notifications: `GET /api/v1/notifications` (paginated list with unread count, optimized by composite index on `(user_id, is_read)`), `PATCH /api/v1/notifications/{id}/read` (mark single notification as read), and `PATCH /api/v1/notifications/read-all` (bulk mark-as-read). Upon successful DB update, the backend triggers the `RealtimeEventPublisher` port (F-10.5) to publish a `notification.read` event (`{ id?: string, all: boolean, unreadCount: number, readAt: string }`) to the user's personal channel (`unihub:stream:user:{userId}`). This ensures that active multi-device or multi-tab sessions immediately synchronize their unread badge counter and read status in real time without waiting for client polling or page refresh.
 
 | Attribute           | Detail                                                                                                                                                                                            |
 | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Backend Modules** | `notifications` (primary — notification read/mark-read use cases and REST controllers)                                                                                                            |
+| **Backend Modules** | `notifications` (primary — notification read/mark-read use cases and REST controllers), `shared/realtime` (RealtimeEventPublisher port)                                                           |
 | **Worker Modules**  | None                                                                                                                                                                                              |
 | **System Flow Ref** | None (read/update path for user-facing notification state), `docs/system-design.md §6 — Real-Time Event Distribution Architecture`                                                                |
 | **ADR Refs**        | ADR-006 (RBAC — users see only own notifications), ADR-015 (replica routing acceptable for reads), ADR-031 (SSE real-time synchronization)                                                        |
@@ -594,6 +594,7 @@ observability-platform-setup            (cross-cutting — deploy early alongsid
 
 real-time-event-streaming-hub           (cross-cutting infrastructure — provides unified SSE stream & Redis Pub/Sub)
     ├── notification-delivery-pipeline  (for real-time in-app notification bell & toast push)
+    ├── in-app-notification-management  (for multi-device read status and badge count sync)
     ├── ai-brochure-summarization       (for real-time AI summary completion push)
     ├── live-attendance-monitoring      (depends on: attendance-sync-reconciliation + real-time-event-streaming-hub)
     ├── payment-webhook-handling        (for real-time payment confirmation push to waiting student)
