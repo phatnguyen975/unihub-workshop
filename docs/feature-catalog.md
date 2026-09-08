@@ -137,7 +137,7 @@
 
 ### 1.8 `user-profile-management`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Allows authenticated users of any role to view and manage their own profile information. `GET /api/v1/users/me` retrieves the caller's full profile details (identity, contact details, organization, and student record link). `PATCH /api/v1/users/me` allows updating personal details (`fullName`, `phoneNumber`, `avatarUrl`), while role-specific identity fields (`organization_id`, `role`, `email`, `studentRecordId`) remain strictly immutable. `PATCH /api/v1/users/me/password` provides an authenticated, self-service password change flow requiring verification of `currentPassword` before hashing and updating to `newPassword`. Account status management (`is_active` enable/ban) is decoupled and handled exclusively by organizers in `organization-member-management` (F-1.5).
 

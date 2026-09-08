@@ -138,6 +138,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            org.springframework.http.converter.HttpMessageNotReadableException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        if (ex.getCause() instanceof com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException upe) {
+            String instance = ((ServletWebRequest) request).getRequest().getRequestURI();
+            String fieldName = upe.getPropertyName();
+            ProblemDetail problem = createProblemDetail(
+                    HttpStatus.UNPROCESSABLE_CONTENT,
+                    "urn:unihub:error:validation",
+                    "Unprocessable Content",
+                    "Request contains unrecognized or immutable field: " + fieldName,
+                    instance);
+            problem.setProperty("validationErrors", List.of(fieldName + ": Field is immutable or unrecognized"));
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(problem);
+        }
+        return super.handleHttpMessageNotReadable(ex, headers, status, request);
+    }
+
+    @Override
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception ex, Object body, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         String instance = ((ServletWebRequest) request).getRequest().getRequestURI();

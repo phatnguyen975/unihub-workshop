@@ -1,6 +1,7 @@
 # Spec: Active Session Management
 
 > **Status:** APPROVED  
+> **Domain:** 1 — Identity & Access Management  
 > **Owner/area:** `docs/feature-catalog.md §1.7`, `iam` module  
 > **Last revised:** 2026-09-07 — first version
 

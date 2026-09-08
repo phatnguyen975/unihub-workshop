@@ -79,7 +79,7 @@ public record User(
                 createdAt,
                 Instant.now(),
                 createdBy,
-                updatedBy);
+                id);
     }
 
     public User changeTemporaryPassword(String newPasswordHash, Instant loginTime) {
@@ -100,5 +100,25 @@ public record User(
                 loginTime,
                 createdBy,
                 updatedBy);
+    }
+
+    public User updateProfile(String newFullName, String newPhoneNumber, String newAvatarUrl) {
+        return new User(
+                id,
+                organizationId,
+                role,
+                email,
+                newPhoneNumber,
+                passwordHash,
+                newFullName != null ? newFullName : fullName,
+                newAvatarUrl,
+                isActive,
+                isTemporaryPassword,
+                lastLoginAt,
+                studentRecordId,
+                createdAt,
+                Instant.now(),
+                createdBy,
+                id);
     }
 }
