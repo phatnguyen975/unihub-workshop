@@ -48,14 +48,14 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 ### Phase 2: Profile Update — Caller can partially update their own mutable personal fields
 
-- [ ] **T2 — A caller can update `fullName`, `phoneNumber`, and/or `avatarUrl` via `PATCH /api/v1/users/me`**
+- [x] **T2 — A caller can update `fullName`, `phoneNumber`, and/or `avatarUrl` via `PATCH /api/v1/users/me`**
   - **Size:** M
   - **Depends on:** T1 (requires `UserController`, `UpdateProfileRequest` DTO, `User.updateProfile()`)
   - **Layers touched:** Application (new in port, new use-case impl), Infrastructure (no change), Presentation (new handler added to existing `UserController`)
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/UpdateUserProfileUseCase.java` — NEW inbound port: `User updateProfile(UUID userId, String fullName, String phoneNumber, String avatarUrl)`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/UpdateUserProfileUseCase.java` — NEW inbound port: `User updateProfile(UUID userId, UpdateUserProfileCommand command)`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/UpdateUserProfileUseCaseImpl.java` — NEW: load → `user.updateProfile(...)` (PATCH semantics: absent = keep existing value) → `userRepository.save(updated)` → return updated User
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/UserController.java` — ADD `PATCH /me` handler; `@Valid @RequestBody UpdateProfileRequest`; returns `ApiResponse<UserProfileResponse>`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/UserController.java` — ADD `PATCH /me` handler; `UpdateProfileRequest.from(body).toCommand()`; returns `ApiResponse<UserProfileResponse>`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/UpdateUserProfileUseCaseImplTest.java` — NEW: partial update (fullName only), clear phoneNumber (null), clear avatarUrl (null), all three, absent = untouched
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerUpdateProfileTest.java` — NEW: MockMvc for 200 OK (partial update preserves organizationId), 422 (blank fullName, invalid phoneNumber, invalid avatarUrl, immutable field `email`), 401
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerTestBuilder.java` — UPDATE: add `UpdateUserProfileUseCase` mock + builder method
@@ -71,7 +71,7 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 #### Checkpoint: Phase 2
 
-- [ ] `PATCH /api/v1/users/me` verified end-to-end by MockMvc tests: partial update, null-clear, immutable-field rejection, and validation rejections all produce correct HTTP status and error body. Full test suite passes.
+- [x] `PATCH /api/v1/users/me` verified end-to-end by MockMvc tests: partial update, null-clear, immutable-field rejection, and validation rejections all produce correct HTTP status and error body. Full test suite passes.
 
 ### Phase 3: Password Change — Caller can change their own password with automatic remote session revocation
 
