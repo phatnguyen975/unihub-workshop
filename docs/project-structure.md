@@ -155,7 +155,8 @@ apps/backend/
 │   │   │       │   ├── idempotency/          # Idempotency storage and replay helpers
 │   │   │       │   ├── events/               # Domain event markers and base contracts
 │   │   │       │   ├── web/                  # HTTP filters, exception mappers, API utilities
-│   │   │       │   └── observability/        # Micrometer metrics, logging context, tracing
+│   │   │       │   ├── observability/        # Micrometer metrics, logging context, tracing
+│   │   │       │   └── realtime/             # Server-Sent Events (SSE) streaming hub, Redis Pub/Sub subscriber & publisher
 │   │   │       ├── iam/                      # Auth, organizations, users, student directory validation
 │   │   │       │   ├── contracts/            # Public module interfaces for other modules
 │   │   │       │   ├── domain/               # Pure Java entities, value objects, domain events, business rules (no Spring/JPA annotations)
