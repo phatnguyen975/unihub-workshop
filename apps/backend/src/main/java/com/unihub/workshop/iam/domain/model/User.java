@@ -101,4 +101,24 @@ public record User(
                 createdBy,
                 updatedBy);
     }
+
+    public User updateProfile(String newFullName, String newPhoneNumber, String newAvatarUrl) {
+        return new User(
+                id,
+                organizationId,
+                role,
+                email,
+                newPhoneNumber,
+                passwordHash,
+                newFullName != null ? newFullName : fullName,
+                newAvatarUrl,
+                isActive,
+                isTemporaryPassword,
+                lastLoginAt,
+                studentRecordId,
+                createdAt,
+                Instant.now(),
+                createdBy,
+                id);
+    }
 }

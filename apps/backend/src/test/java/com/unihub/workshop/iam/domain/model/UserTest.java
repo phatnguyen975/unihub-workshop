@@ -42,4 +42,56 @@ class UserTest {
         assertThat(user.isActive()).isFalse();
         assertThat(user.role()).isEqualTo(UserRole.STUDENT);
     }
+
+    @Test
+    void updateProfileShouldReturnUpdatedUserWithNewValuesAndUpdatedAt() {
+        UUID id = UUID.randomUUID();
+        UUID studentRecordId = UUID.randomUUID();
+        UUID orgId = UUID.randomUUID();
+        User original = User.createStudent(id, "student@university.edu", "hash", "Alice Smith", studentRecordId, orgId);
+
+        User updated = original.updateProfile("Alice T. Smith", "+84912345678", "https://cdn.unihub.vn/avatar.jpg");
+
+        assertThat(updated.id()).isEqualTo(original.id());
+        assertThat(updated.email()).isEqualTo(original.email());
+        assertThat(updated.passwordHash()).isEqualTo(original.passwordHash());
+        assertThat(updated.role()).isEqualTo(original.role());
+        assertThat(updated.organizationId()).isEqualTo(original.organizationId());
+        assertThat(updated.studentRecordId()).isEqualTo(original.studentRecordId());
+        assertThat(updated.createdAt()).isEqualTo(original.createdAt());
+
+        assertThat(updated.fullName()).isEqualTo("Alice T. Smith");
+        assertThat(updated.phoneNumber()).isEqualTo("+84912345678");
+        assertThat(updated.avatarUrl()).isEqualTo("https://cdn.unihub.vn/avatar.jpg");
+        assertThat(updated.updatedAt()).isNotNull();
+        assertThat(updated.updatedBy()).isEqualTo(original.id());
+    }
+
+    @Test
+    void updateProfileShouldAllowNullPhoneNumberAndAvatarUrl() {
+        UUID id = UUID.randomUUID();
+        User original = new User(
+                id,
+                null,
+                UserRole.STUDENT,
+                "student@university.edu",
+                "+84912345678",
+                "hash",
+                "Alice Smith",
+                "https://cdn.unihub.vn/avatar.jpg",
+                true,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        User updated = original.updateProfile("Alice Smith", null, null);
+
+        assertThat(updated.fullName()).isEqualTo("Alice Smith");
+        assertThat(updated.phoneNumber()).isNull();
+        assertThat(updated.avatarUrl()).isNull();
+    }
 }

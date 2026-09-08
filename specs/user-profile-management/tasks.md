@@ -21,7 +21,7 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 ### Phase 1: Profile Retrieval — Establish the `UserController` scaffold and the first working endpoint
 
-- [ ] **T1 — A caller can retrieve their own full profile via `GET /api/v1/users/me`**
+- [x] **T1 — A caller can retrieve their own full profile via `GET /api/v1/users/me`**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application (in port, use-case impl), Infrastructure (no new adapter — existing `UserRepository.findById` used), Presentation (new controller + stub DTO)
@@ -44,9 +44,7 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 #### Checkpoint: Phase 1
 
-- [ ] `GET /api/v1/users/me` verified end-to-end by MockMvc tests (200 OK for all roles, 401 for missing token). `User.updateProfile()` domain method covered by unit tests. `UpdateProfileRequest` DTO compiles with validation annotations. Full test suite passes.
-
----
+- [x] `GET /api/v1/users/me` verified end-to-end by MockMvc tests (200 OK for all roles, 401 for missing token). `User.updateProfile()` domain method covered by unit tests. `UpdateProfileRequest` DTO compiles with validation annotations. Full test suite passes.
 
 ### Phase 2: Profile Update — Caller can partially update their own mutable personal fields
 
@@ -74,8 +72,6 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 #### Checkpoint: Phase 2
 
 - [ ] `PATCH /api/v1/users/me` verified end-to-end by MockMvc tests: partial update, null-clear, immutable-field rejection, and validation rejections all produce correct HTTP status and error body. Full test suite passes.
-
----
 
 ### Phase 3: Password Change — Caller can change their own password with automatic remote session revocation
 
