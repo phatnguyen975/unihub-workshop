@@ -27,7 +27,7 @@ The **Real-Time Event Streaming Hub** provides the centralized, cross-cutting in
 - **FR-02:** The system SHALL require valid HTTP Bearer token authentication via the `Authorization: Bearer <jwt>` header on the stream handshake request.
 - **FR-03:** The system SHALL reject handshake requests with `401 Unauthorized` (RFC 7807 problem detail) if the JWT is missing, expired, cryptographically invalid, or if its `jti` claim is present in the Redis blacklist.
 - **FR-04:** The system SHALL reject handshake requests with `403 Forbidden` (RFC 7807 problem detail) if the authenticated user account has `is_active = false`.
-- **FR-05:** The system SHALL apply token-bucket rate limiting on the handshake endpoint to protect against connection flood attacks (returning `429 Too Many Requests` if the client exceeds the limit).
+- **FR-05:** The system SHALL apply token-bucket rate limiting on the handshake endpoint via a dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`, pattern `/api/v1/stream/**`) to protect against connection flood attacks, returning `429 Too Many Requests` (RFC 7807 problem detail with type `urn:unihub:error:rate-limited` wrapped in the standard envelope) if the client exceeds the quota.
 - **FR-06:** The system SHALL emit response headers `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`, and `X-Accel-Buffering: no` on the handshake response to prevent intermediate buffering by reverse proxies.
 
 ### Connection Registry & Lifecycle Management
@@ -103,7 +103,7 @@ The SSE connection lifecycle represents a transient in-memory connection state m
 - **Idempotency & Deduplication:**
   - Every event emitted SHALL include a unique `id` (UUID v4) and `eventId` in payload, allowing client-side handlers to discard duplicate events if client retries or reconnections occur.
 - **Rate-Limiting:**
-  - Handshake requests at `GET /api/v1/stream/events` SHALL be metered by Bucket4j distributed rate limiting (F-10.2).
+  - Handshake requests at `GET /api/v1/stream/events` SHALL be metered by Bucket4j distributed rate limiting via a dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`) mapped to `/api/v1/stream/**`. Rejections return HTTP `429 Too Many Requests` with type `urn:unihub:error:rate-limited` wrapped in the standard API response envelope.
 - **Security & Network Hardening:**
   - Connection handshake requires RS256 JWT Bearer authentication. Query-string access tokens are disallowed to prevent leakage in proxy access logs.
   - Response headers must include `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no`, and `Connection: keep-alive`.
