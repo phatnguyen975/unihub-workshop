@@ -48,6 +48,33 @@ class UserRepositoryAdapterTest {
     }
 
     @Test
+    void shouldFindByIdAndOrganizationId() {
+        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+
+        UUID userId = UUID.randomUUID();
+        UUID orgId = UUID.randomUUID();
+        UserJpaEntity entity = new UserJpaEntity();
+        entity.setId(userId);
+        entity.setOrganizationId(orgId);
+        entity.setEmail("member@test.org");
+        entity.setRole(UserRole.STAFF.name());
+        entity.setPasswordHash("hash");
+        entity.setActive(true);
+        entity.setCreatedAt(Instant.now());
+        entity.setUpdatedAt(Instant.now());
+
+        when(jpaRepo.findByIdAndOrganizationId(userId, orgId)).thenReturn(Optional.of(entity));
+
+        Optional<User> result = adapter.findByIdAndOrganizationId(userId, orgId);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().id()).isEqualTo(userId);
+        assertThat(result.get().organizationId()).isEqualTo(orgId);
+        assertThat(result.get().email()).isEqualTo("member@test.org");
+    }
+
+    @Test
     void shouldActivateUser() {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
         UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);

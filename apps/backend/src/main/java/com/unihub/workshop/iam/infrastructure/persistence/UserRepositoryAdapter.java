@@ -38,6 +38,12 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findByIdAndOrganizationId(UUID id, UUID organizationId) {
+        return repository.findByIdAndOrganizationId(id, organizationId).map(this::toDomain);
+    }
+
+    @Override
     public Optional<User> findByEmail(String email) {
         return repository.findByEmail(email).map(this::toDomain);
     }

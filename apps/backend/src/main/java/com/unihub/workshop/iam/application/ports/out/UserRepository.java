@@ -10,6 +10,8 @@ import java.util.UUID;
 public interface UserRepository {
     Optional<User> findById(UUID id);
 
+    Optional<User> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);

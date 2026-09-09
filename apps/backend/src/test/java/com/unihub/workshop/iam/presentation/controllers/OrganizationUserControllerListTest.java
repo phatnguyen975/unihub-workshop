@@ -1,5 +1,6 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import com.unihub.workshop.iam.application.ports.in.GetOrganizationMemberUseCase;
 import com.unihub.workshop.iam.application.ports.in.ListMembersQuery;
 import com.unihub.workshop.iam.application.ports.in.ListOrganizationMembersUseCase;
 import com.unihub.workshop.iam.domain.model.CursorPage;
@@ -34,7 +35,8 @@ class OrganizationUserControllerListTest {
     @BeforeEach
     void setUp() {
         listOrganizationMembersUseCase = mock(ListOrganizationMembersUseCase.class);
-        OrganizationUserController controller = new OrganizationUserController(listOrganizationMembersUseCase);
+        OrganizationUserController controller = new OrganizationUserController(
+                listOrganizationMembersUseCase, mock(GetOrganizationMemberUseCase.class));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

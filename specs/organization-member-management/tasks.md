@@ -50,7 +50,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `limit > 100` returns `400 Bad Request` (`urn:unihub:error:bad-request`). _(FR-07; SPEC Scenario 5)_
     - Unauthenticated requests return `401 Unauthorized` (`urn:unihub:error:unauthorized`). Non-organizer callers return `403 Forbidden` (`urn:unihub:error:forbidden`). _(FR-25, FR-26; SPEC Scenarios 16, 17)_
 
-- [ ] **T2 — View individual organization member profile (`GET /api/v1/organizations/users/{userId}`)**
+- [x] **T2 — View individual organization member profile (`GET /api/v1/organizations/users/{userId}`)**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Application, Infrastructure, Presentation
@@ -72,9 +72,9 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
 
 #### Checkpoint: Phase 1 Complete
 
-- [ ] List and detail member query capabilities are fully verified with unit tests.
-- [ ] Read replica routing (`@Transactional(readOnly = true)`) is verified for both endpoints.
-- [ ] Standard response envelopes and RFC 7807 error envelopes match `API_CONTRACT.md`.
+- [x] List and detail member query capabilities are fully verified with unit tests.
+- [x] Read replica routing (`@Transactional(readOnly = true)`) is verified for both endpoints.
+- [x] Standard response envelopes and RFC 7807 error envelopes match `API_CONTRACT.md`.
 
 ### Phase 2: Member Lifecycle Mutations (Primary DB)
 

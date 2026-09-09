@@ -1,10 +1,12 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import com.unihub.workshop.iam.application.ports.in.GetOrganizationMemberUseCase;
 import com.unihub.workshop.iam.application.ports.in.ListMembersQuery;
 import com.unihub.workshop.iam.application.ports.in.ListOrganizationMembersUseCase;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.iam.presentation.dto.MemberDetailResponse;
 import com.unihub.workshop.iam.presentation.dto.MemberSummaryResponse;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
@@ -17,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +34,21 @@ import java.util.UUID;
 public class OrganizationUserController {
 
     private final ListOrganizationMembersUseCase listOrganizationMembersUseCase;
+    private final GetOrganizationMemberUseCase getOrganizationMemberUseCase;
+
+    @GetMapping("/{userId}")
+    public ApiResponse<MemberDetailResponse> getMemberDetail(
+            @PathVariable UUID userId,
+            Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Full authentication is required to access this resource");
+        }
+
+        UUID organizationId = extractAndVerifyOrganizerRole(authentication);
+        User user = getOrganizationMemberUseCase.execute(organizationId, userId);
+        return ApiResponse.success(MemberDetailResponse.from(user), "Member details retrieved");
+    }
 
     @GetMapping
     public ApiResponse<MemberSummaryResponse.Page> listMembers(
