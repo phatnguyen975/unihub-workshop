@@ -555,7 +555,7 @@
 
 ### 10.5 `real-time-event-streaming-hub`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Implements the platform-wide real-time event streaming infrastructure using **Server-Sent Events (SSE) and Redis Pub/Sub** (ADR-031). Provides an authenticated, long-lived HTTP stream endpoint (`GET /api/v1/stream/events`) for web clients. Maintains active client connections in an in-memory `SseEmitterRegistry` in the Core Backend Monolith. To support stateless horizontal scaling across multiple Spring Boot nodes behind Nginx, this feature subscribes each node to Redis Pub/Sub channels (`unihub:stream:user:{userId}` and `unihub:stream:workshop:{workshopId}`). When any domain module or background worker publishes an event via `RealtimeEventPublisher`, Redis distributes the event to all backend instances; the node holding the recipient's active `SseEmitter` serializes and streams the event. Also implements an automated 15-second heartbeat scheduler (`: ping\n\n`) to prevent socket idle timeouts across intermediate proxies, and handles client disconnects cleanly via `onCompletion` / `onTimeout` callbacks to prevent socket leaks.
 

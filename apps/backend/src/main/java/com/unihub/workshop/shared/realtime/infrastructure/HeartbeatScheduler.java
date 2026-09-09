@@ -1,6 +1,7 @@
 package com.unihub.workshop.shared.realtime.infrastructure;
 
 import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,14 +14,12 @@ import java.util.concurrent.TimeUnit;
  * to all active SSE connections to prevent idle proxy/NAT timeouts.
  */
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class HeartbeatScheduler {
 
     private final SseEmitterRegistry registry;
-
-    public HeartbeatScheduler(SseEmitterRegistry registry) {
-        this.registry = registry;
-    }
+    private final RealtimeMetrics realtimeMetrics;
 
     /**
      * Broadcasts a keep-alive ping comment to all registered active emitters.
@@ -46,6 +45,9 @@ public class HeartbeatScheduler {
                 } catch (Exception ignored) {
                 }
                 registry.remove(userId, emitter);
+                if (realtimeMetrics != null) {
+                    realtimeMetrics.incrementDisconnects("error");
+                }
             }
         });
     }

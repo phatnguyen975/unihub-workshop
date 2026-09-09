@@ -78,7 +78,7 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
     - Supports all 7 event types in the Unified Event Catalog: `notification.new`, `notification.read`, `ai.summary.completed`, `ai.summary.failed`, `attendance.updated`, `registration.updated`, `payment.confirmed` (FR-16, Scenario 9).
     - Discards messages safely with zero errors when an instance holds no matching active emitters (FR-14).
 
-- [ ] **T4 — Implement Telemetry Metrics, Stream Rate Limiting Tier & Modulith Architecture Verification**
+- [x] **T4 — Implement Telemetry Metrics, Stream Rate Limiting Tier & Modulith Architecture Verification**
   - **Size:** M
   - **Depends on:** T1, T2, T3
   - **Layers touched:** Infrastructure, Rate Limiting, Observability, Architecture Test
@@ -101,10 +101,10 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
 
 #### Checkpoint: Feature Complete
 
-- [ ] All 4 tasks (T1 through T4) are checked off.
-- [ ] Every acceptance criterion from `SPEC.md` and `API_CONTRACT.md` has been verified via unit tests.
-- [ ] `ModulithArchitectureTest` and full unit test suite pass.
-- [ ] Ready for `/review real-time-event-streaming-hub`.
+- [x] All 4 tasks (T1 through T4) are checked off.
+- [x] Every acceptance criterion from `SPEC.md` and `API_CONTRACT.md` has been verified via unit tests.
+- [x] `ModulithArchitectureTest` and full unit test suite pass.
+- [x] Ready for `/review real-time-event-streaming-hub`.
 
 ## Risks and Mitigations
 

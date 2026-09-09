@@ -3,6 +3,8 @@ package com.unihub.workshop.shared.realtime.application;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.realtime.application.ports.out.UserStatusPort;
 import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
+import com.unihub.workshop.shared.realtime.infrastructure.RealtimeMetrics;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +27,7 @@ class StreamSubscriptionServiceTest {
     void setUp() {
         registry = mock(SseEmitterRegistry.class);
         userStatusPort = mock(UserStatusPort.class);
-        subscriptionService = new StreamSubscriptionService(registry, userStatusPort, 1_800_000L);
+        subscriptionService = new StreamSubscriptionService(registry, userStatusPort, null, 1_800_000L);
     }
 
     @Test
@@ -59,12 +61,32 @@ class StreamSubscriptionServiceTest {
     @Test
     @DisplayName("should allow subscription when userStatusPort is null (fallback mode)")
     void shouldAllowSubscription_whenUserStatusPortIsNull() {
-        StreamSubscriptionService serviceWithoutPort = new StreamSubscriptionService(registry, null, 60_000L);
+        StreamSubscriptionService serviceWithoutPort = new StreamSubscriptionService(registry, null, null, 60_000L);
         UUID userId = UUID.randomUUID();
 
         SseEmitter emitter = serviceWithoutPort.subscribe(userId, "ORGANIZER", "org-1");
 
         assertThat(emitter).isNotNull();
         verify(registry).register(userId, emitter);
+    }
+
+    @Test
+    @DisplayName("handleDisconnect should remove emitter from registry and record disconnect metrics")
+    void handleDisconnect_shouldRemoveFromRegistryAndRecordMetrics() {
+        RealtimeMetrics metricsMock = mock(RealtimeMetrics.class);
+        StreamSubscriptionService serviceWithMetrics = new StreamSubscriptionService(registry, userStatusPort,
+                metricsMock, 60_000L);
+        UUID userId = UUID.randomUUID();
+        SseEmitter emitter = new SseEmitter(60_000L);
+
+        serviceWithMetrics.handleDisconnect(userId, emitter, "client_abort");
+        verify(registry).remove(userId, emitter);
+        verify(metricsMock).incrementDisconnects("client_abort");
+
+        serviceWithMetrics.handleDisconnect(userId, emitter, "timeout");
+        verify(metricsMock).incrementDisconnects("timeout");
+
+        serviceWithMetrics.handleDisconnect(userId, emitter, "error");
+        verify(metricsMock).incrementDisconnects("error");
     }
 }

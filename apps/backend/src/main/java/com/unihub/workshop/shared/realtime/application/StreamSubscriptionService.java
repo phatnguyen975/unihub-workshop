@@ -3,8 +3,8 @@ package com.unihub.workshop.shared.realtime.application;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.realtime.application.ports.out.UserStatusPort;
 import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
+import com.unihub.workshop.shared.realtime.infrastructure.RealtimeMetrics;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -21,14 +21,17 @@ public class StreamSubscriptionService {
 
     private final SseEmitterRegistry registry;
     private final UserStatusPort userStatusPort;
+    private final RealtimeMetrics realtimeMetrics;
     private final long streamTimeoutMs;
 
     public StreamSubscriptionService(
             SseEmitterRegistry registry,
-            @Autowired(required = false) UserStatusPort userStatusPort,
+            UserStatusPort userStatusPort,
+            RealtimeMetrics realtimeMetrics,
             @Value("${app.realtime.stream-timeout-ms:1800000}") long streamTimeoutMs) {
         this.registry = registry;
         this.userStatusPort = userStatusPort;
+        this.realtimeMetrics = realtimeMetrics;
         this.streamTimeoutMs = streamTimeoutMs;
     }
 
@@ -49,18 +52,14 @@ public class StreamSubscriptionService {
 
         SseEmitter emitter = new SseEmitter(streamTimeoutMs);
 
-        emitter.onCompletion(() -> {
-            log.debug("SSE stream completed for user: {}", userId);
-            registry.remove(userId, emitter);
-        });
+        emitter.onCompletion(() -> handleDisconnect(userId, emitter, "client_abort"));
 
         emitter.onTimeout(() -> {
-            log.debug("SSE stream timed out for user: {}", userId);
             try {
                 emitter.complete();
             } catch (Exception ignored) {
             }
-            registry.remove(userId, emitter);
+            handleDisconnect(userId, emitter, "timeout");
         });
 
         emitter.onError(throwable -> {
@@ -69,7 +68,7 @@ public class StreamSubscriptionService {
                 emitter.complete();
             } catch (Exception ignored) {
             }
-            registry.remove(userId, emitter);
+            handleDisconnect(userId, emitter, "error");
         });
 
         registry.register(userId, emitter);
@@ -77,5 +76,13 @@ public class StreamSubscriptionService {
                 userId, role, registry.getActiveConnectionCount());
 
         return emitter;
+    }
+
+    void handleDisconnect(UUID userId, SseEmitter emitter, String reason) {
+        log.debug("SSE stream disconnected for user: {}, reason: {}", userId, reason);
+        registry.remove(userId, emitter);
+        if (realtimeMetrics != null) {
+            realtimeMetrics.incrementDisconnects(reason);
+        }
     }
 }

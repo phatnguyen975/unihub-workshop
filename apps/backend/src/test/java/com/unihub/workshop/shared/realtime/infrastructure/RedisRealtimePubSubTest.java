@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +53,7 @@ class RedisRealtimePubSubTest {
 
         registry = new SseEmitterRegistry();
         publisherAdapter = new RedisRealtimePublisherAdapter(redisTemplate);
-        subscriber = new RedisRealtimeSubscriber(registry, workshopAuthorizationPort);
+        subscriber = new RedisRealtimeSubscriber(registry, workshopAuthorizationPort, null);
     }
 
     @Test
@@ -61,8 +62,7 @@ class RedisRealtimePubSubTest {
         UUID userId = UUID.randomUUID();
         RealtimeEvent<Map<String, String>> event = RealtimeEvent.of(
                 RealtimeEventType.NOTIFICATION_NEW,
-                Map.of("title", "Test Notification")
-        );
+                Map.of("title", "Test Notification"));
 
         publisherAdapter.publishToUser(userId, event);
 
@@ -80,8 +80,7 @@ class RedisRealtimePubSubTest {
         UUID workshopId = UUID.randomUUID();
         RealtimeEvent<Map<String, Object>> event = RealtimeEvent.of(
                 RealtimeEventType.ATTENDANCE_UPDATED,
-                Map.of("checkedInCount", 42, "capacity", 100)
-        );
+                Map.of("checkedInCount", 42, "capacity", 100));
 
         publisherAdapter.publishToWorkshop(workshopId, event);
 
@@ -108,12 +107,12 @@ class RedisRealtimePubSubTest {
                 eventId,
                 RealtimeEventType.NOTIFICATION_NEW.getValue(),
                 Instant.now(),
-                Map.of("title", "Hello User")
-        );
+                Map.of("title", "Hello User"));
 
         String channel = "unihub:stream:user:" + userId;
         String jsonPayload = objectMapper.writeValueAsString(event);
-        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8), jsonPayload.getBytes(StandardCharsets.UTF_8));
+        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8),
+                jsonPayload.getBytes(StandardCharsets.UTF_8));
 
         subscriber.onMessage(message, null);
 
@@ -122,7 +121,7 @@ class RedisRealtimePubSubTest {
     }
 
     @Test
-    @DisplayName("subscriber should deliver workshop event to authorized users and ignore unauthorized users")
+    @DisplayName("subscriber should deliver workshop event to authorized users using single batch authorization query")
     void subscriber_shouldDeliverWorkshopEventToAuthorizedUsersOnly() throws Exception {
         UUID workshopId = UUID.randomUUID();
         UUID authorizedOrgUserId = UUID.randomUUID();
@@ -137,24 +136,76 @@ class RedisRealtimePubSubTest {
         registry.register(authorizedStaffUserId, staffEmitter);
         registry.register(unauthorizedUserId, unauthorizedEmitter);
 
-        when(workshopAuthorizationPort.isUserAuthorizedForWorkshop(authorizedOrgUserId, workshopId)).thenReturn(true);
-        when(workshopAuthorizationPort.isUserAuthorizedForWorkshop(authorizedStaffUserId, workshopId)).thenReturn(true);
-        when(workshopAuthorizationPort.isUserAuthorizedForWorkshop(unauthorizedUserId, workshopId)).thenReturn(false);
+        when(workshopAuthorizationPort.filterAuthorizedUserIds(any(), eq(workshopId)))
+                .thenReturn(Set.of(authorizedOrgUserId, authorizedStaffUserId));
 
         RealtimeEvent<Map<String, Object>> event = RealtimeEvent.of(
                 RealtimeEventType.REGISTRATION_UPDATED,
-                Map.of("confirmedCount", 10)
-        );
+                Map.of("confirmedCount", 10));
 
         String channel = "unihub:stream:workshop:" + workshopId;
         String jsonPayload = objectMapper.writeValueAsString(event);
-        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8), jsonPayload.getBytes(StandardCharsets.UTF_8));
+        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8),
+                jsonPayload.getBytes(StandardCharsets.UTF_8));
 
         subscriber.onMessage(message, null);
 
+        // Verify batch query called exactly ONCE (eliminating N+1)
+        verify(workshopAuthorizationPort, times(1)).filterAuthorizedUserIds(any(), eq(workshopId));
         verify(orgEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
         verify(staffEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
         verifyNoInteractions(unauthorizedEmitter);
+    }
+
+    @Test
+    @DisplayName("subscriber should fail-closed and not deliver workshop events when workshopAuthorizationPort is null")
+    void subscriber_shouldFailClosedWhenAuthorizationPortIsNull() throws Exception {
+        RedisRealtimeSubscriber subscriberWithoutAuthPort = new RedisRealtimeSubscriber(registry, null, null);
+
+        UUID workshopId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        SseEmitter emitter = mock(SseEmitter.class);
+        registry.register(userId, emitter);
+
+        RealtimeEvent<Map<String, Object>> event = RealtimeEvent.of(
+                RealtimeEventType.REGISTRATION_UPDATED,
+                Map.of("confirmedCount", 10));
+
+        String channel = "unihub:stream:workshop:" + workshopId;
+        String jsonPayload = objectMapper.writeValueAsString(event);
+        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8),
+                jsonPayload.getBytes(StandardCharsets.UTF_8));
+
+        subscriberWithoutAuthPort.onMessage(message, null);
+
+        // Security requirement: fail-closed, no event delivered
+        verifyNoInteractions(emitter);
+    }
+
+    @Test
+    @DisplayName("subscriber should discard workshop event cleanly when no users are authorized")
+    void subscriber_shouldDiscardCleanlyWhenNoUsersAuthorized() throws Exception {
+        UUID workshopId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        SseEmitter emitter = mock(SseEmitter.class);
+        registry.register(userId, emitter);
+
+        when(workshopAuthorizationPort.filterAuthorizedUserIds(any(), eq(workshopId)))
+                .thenReturn(java.util.Collections.emptySet());
+
+        RealtimeEvent<Map<String, Object>> event = RealtimeEvent.of(
+                RealtimeEventType.REGISTRATION_UPDATED,
+                Map.of("confirmedCount", 10));
+
+        String channel = "unihub:stream:workshop:" + workshopId;
+        String jsonPayload = objectMapper.writeValueAsString(event);
+        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8),
+                jsonPayload.getBytes(StandardCharsets.UTF_8));
+
+        subscriber.onMessage(message, null);
+
+        verify(workshopAuthorizationPort, times(1)).filterAuthorizedUserIds(any(), eq(workshopId));
+        verifyNoInteractions(emitter);
     }
 
     @Test
@@ -163,7 +214,8 @@ class RedisRealtimePubSubTest {
         UUID userId = UUID.randomUUID();
         String channel = "unihub:stream:user:" + userId;
         String jsonPayload = "{\"eventId\":\"111\",\"eventType\":\"notification.new\",\"payload\":{}}";
-        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8), jsonPayload.getBytes(StandardCharsets.UTF_8));
+        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8),
+                jsonPayload.getBytes(StandardCharsets.UTF_8));
 
         assertThatCode(() -> subscriber.onMessage(message, null)).doesNotThrowAnyException();
         assertThat(registry.getActiveConnectionCount()).isZero();
@@ -184,7 +236,8 @@ class RedisRealtimePubSubTest {
 
         String channel = "unihub:stream:user:" + userId;
         String jsonPayload = "{\"eventId\":\"222\",\"eventType\":\"notification.new\",\"payload\":{}}";
-        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8), jsonPayload.getBytes(StandardCharsets.UTF_8));
+        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8),
+                jsonPayload.getBytes(StandardCharsets.UTF_8));
 
         subscriber.onMessage(message, null);
 
@@ -194,5 +247,34 @@ class RedisRealtimePubSubTest {
         // Broken emitter must be removed from registry
         assertThat(registry.getActiveConnectionCount()).isEqualTo(1);
         assertThat(registry.getEmitters(userId)).containsExactly(healthyEmitter);
+    }
+
+    @Test
+    @DisplayName("subscriber should record metrics for events pushed and error disconnects")
+    void subscriber_shouldRecordMetricsOnEventPushedAndOnError() throws Exception {
+        RealtimeMetrics metricsMock = mock(RealtimeMetrics.class);
+        RedisRealtimeSubscriber subscriberWithMetrics = new RedisRealtimeSubscriber(
+                registry,
+                workshopAuthorizationPort,
+                metricsMock);
+
+        UUID userId = UUID.randomUUID();
+        SseEmitter healthyEmitter = mock(SseEmitter.class);
+        SseEmitter brokenEmitter = mock(SseEmitter.class);
+        doThrow(new IOException("Connection reset by peer")).when(brokenEmitter)
+                .send(any(SseEmitter.SseEventBuilder.class));
+
+        registry.register(userId, healthyEmitter);
+        registry.register(userId, brokenEmitter);
+
+        String channel = "unihub:stream:user:" + userId;
+        String jsonPayload = "{\"eventId\":\"333\",\"eventType\":\"notification.new\",\"payload\":{}}";
+        Message message = new DefaultMessage(channel.getBytes(StandardCharsets.UTF_8),
+                jsonPayload.getBytes(StandardCharsets.UTF_8));
+
+        subscriberWithMetrics.onMessage(message, null);
+
+        verify(metricsMock, times(1)).incrementEventsPushed("notification.new");
+        verify(metricsMock, times(1)).incrementDisconnects("error");
     }
 }

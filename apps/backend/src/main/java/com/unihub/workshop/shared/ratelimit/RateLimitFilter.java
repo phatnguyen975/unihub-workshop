@@ -42,6 +42,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final BucketConfiguration registrationConfig;
     private final BucketConfiguration browsingConfig;
+    private final BucketConfiguration streamConfig;
 
     public RateLimitFilter(ProxyManager<byte[]> proxyManager, RateLimitProperties properties,
             RateLimitMetrics metrics) {
@@ -62,6 +63,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         .refillGreedy(properties.browsingTier().refillTokens(),
                                 properties.browsingTier().refillDuration()))
                 .build();
+
+        this.streamConfig = BucketConfiguration.builder()
+                .addLimit(limit -> limit.capacity(properties.streamTier().capacity())
+                        .refillGreedy(properties.streamTier().refillTokens(),
+                                properties.streamTier().refillDuration()))
+                .build();
     }
 
     @Override
@@ -69,8 +76,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String bucketKey = extractKey(request);
         RateLimitProperties.Tier tier = resolveTier(request.getRequestURI());
-        BucketConfiguration configuration = (tier == properties.registrationTier()) ? registrationConfig
-                : browsingConfig;
+        BucketConfiguration configuration;
+
+        if (tier == properties.registrationTier()) {
+            configuration = registrationConfig;
+        } else if (tier == properties.streamTier()) {
+            configuration = streamConfig;
+        } else {
+            configuration = browsingConfig;
+        }
 
         try {
             var bucket = proxyManager.builder()
@@ -114,7 +128,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } catch (Exception ex) {
             log.warn("Redis unavailable for rate limiting. Failing open. Key: {}, Path: {}, Error: {}",
                     bucketKey, request.getRequestURI(), ex.getClass().getName());
-            String tierTag = (tier == properties.registrationTier()) ? "registration" : "browsing";
+            String tierTag;
+            if (tier == properties.registrationTier()) {
+                tierTag = "registration";
+            } else if (tier == properties.streamTier()) {
+                tierTag = "stream";
+            } else {
+                tierTag = "browsing";
+            }
             metrics.incrementRedisUnavailable(tierTag);
             filterChain.doFilter(request, response);
         }
@@ -124,6 +145,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         for (String pattern : properties.registrationPathPatterns()) {
             if (pathMatcher.match(pattern, uri)) {
                 return properties.registrationTier();
+            }
+        }
+        for (String pattern : properties.streamPathPatterns()) {
+            if (pathMatcher.match(pattern, uri)) {
+                return properties.streamTier();
             }
         }
         return properties.browsingTier();

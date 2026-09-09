@@ -28,6 +28,7 @@ public class RedisRealtimeSubscriber implements MessageListener {
 
     private final SseEmitterRegistry registry;
     private final WorkshopAuthorizationPort workshopAuthorizationPort;
+    private final RealtimeMetrics realtimeMetrics;
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @Override
@@ -82,20 +83,22 @@ public class RedisRealtimeSubscriber implements MessageListener {
             return;
         }
 
-        for (UUID userId : connectedUserIds) {
-            boolean authorized = false;
-            if (workshopAuthorizationPort != null) {
-                authorized = workshopAuthorizationPort.isUserAuthorizedForWorkshop(userId, workshopId);
-            } else {
-                // If authorization port is not present, default to true for local testing
-                authorized = true;
-            }
+        if (workshopAuthorizationPort == null) {
+            log.warn("WorkshopAuthorizationPort is not configured, failing closed: no workshop events delivered for {}",
+                    workshopId);
+            return;
+        }
 
-            if (authorized) {
-                Set<SseEmitter> emitters = registry.getEmitters(userId);
-                for (SseEmitter emitter : emitters) {
-                    sendEvent(userId, emitter, eventId, eventType, jsonBody);
-                }
+        Set<UUID> authorizedUserIds = workshopAuthorizationPort.filterAuthorizedUserIds(connectedUserIds, workshopId);
+        if (authorizedUserIds == null || authorizedUserIds.isEmpty()) {
+            log.trace("No authorized users connected on this node for workshop {}", workshopId);
+            return;
+        }
+
+        for (UUID userId : authorizedUserIds) {
+            Set<SseEmitter> emitters = registry.getEmitters(userId);
+            for (SseEmitter emitter : emitters) {
+                sendEvent(userId, emitter, eventId, eventType, jsonBody);
             }
         }
     }
@@ -107,6 +110,9 @@ public class RedisRealtimeSubscriber implements MessageListener {
                     .name(eventType)
                     .data(jsonBody);
             emitter.send(eventBuilder);
+            if (realtimeMetrics != null) {
+                realtimeMetrics.incrementEventsPushed(eventType);
+            }
             log.debug("Successfully delivered SSE event {} (id: {}) to user {}", eventType, eventId, userId);
         } catch (Exception ex) {
             log.debug("Failed to deliver SSE event to user {}, evicting broken emitter: {}", userId, ex.getMessage());
@@ -115,6 +121,9 @@ public class RedisRealtimeSubscriber implements MessageListener {
             } catch (Exception ignored) {
             }
             registry.remove(userId, emitter);
+            if (realtimeMetrics != null) {
+                realtimeMetrics.incrementDisconnects("error");
+            }
         }
     }
 }

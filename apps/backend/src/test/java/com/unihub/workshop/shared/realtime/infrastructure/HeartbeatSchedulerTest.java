@@ -29,7 +29,7 @@ class HeartbeatSchedulerTest {
     @BeforeEach
     void setUp() {
         registry = new SseEmitterRegistry();
-        scheduler = new HeartbeatScheduler(registry);
+        scheduler = new HeartbeatScheduler(registry, null);
     }
 
     @Test

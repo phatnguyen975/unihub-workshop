@@ -62,7 +62,8 @@ class RateLimitFilterTierRoutingTest {
             "/api/v1/registrations, 5",
             "/api/v1/registrations/123, 5",
             "/api/v1/workshops, 100",
-            "/api/v1/unknown, 100"
+            "/api/v1/unknown, 100",
+            "/api/v1/stream/events, 10"
     })
     void shouldRouteToCorrectTierBasedOnPath(String path, String expectedLimit) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
