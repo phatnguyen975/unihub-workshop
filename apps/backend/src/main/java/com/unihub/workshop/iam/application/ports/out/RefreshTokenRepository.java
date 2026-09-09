@@ -25,4 +25,6 @@ public interface RefreshTokenRepository {
     List<RefreshToken> findActiveRemoteSessions(UUID userId, UUID currentSessionId, Instant now);
 
     int revokeAllOtherActiveSessions(UUID userId, UUID currentSessionId, Instant revokedAt);
+
+    List<RefreshToken> findAllActiveSessionsForUser(UUID userId, Instant now);
 }
