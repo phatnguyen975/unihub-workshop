@@ -32,4 +32,6 @@ public interface UserRepository {
             String search,
             String cursor,
             int limit);
+
+    void updateIsActive(UUID userId, UUID organizationId, boolean isActive);
 }

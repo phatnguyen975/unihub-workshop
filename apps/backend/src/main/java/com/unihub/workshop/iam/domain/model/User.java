@@ -150,4 +150,24 @@ public record User(
                 createdBy,
                 id);
     }
+
+    public User updateActiveStatus(boolean newIsActive, UUID updatedBy) {
+        return new User(
+                id,
+                organizationId,
+                role,
+                email,
+                phoneNumber,
+                passwordHash,
+                fullName,
+                avatarUrl,
+                newIsActive,
+                isTemporaryPassword,
+                lastLoginAt,
+                studentRecordId,
+                createdAt,
+                Instant.now(),
+                createdBy,
+                updatedBy);
+    }
 }

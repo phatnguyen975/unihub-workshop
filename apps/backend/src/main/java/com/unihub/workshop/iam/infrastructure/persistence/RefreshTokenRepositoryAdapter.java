@@ -146,6 +146,14 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         return repository.revokeAllOtherActiveSessions(userId, currentSessionId, revokedAt, revokedAt);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<RefreshToken> findAllActiveSessionsForUser(UUID userId, Instant now) {
+        return repository.findAllActiveSessionsForUser(userId, now).stream()
+                .map(this::mapToDomain)
+                .toList();
+    }
+
     private ActiveSession mapToActiveSession(RefreshTokenJpaEntity entity) {
         return new ActiveSession(
                 entity.getId(),

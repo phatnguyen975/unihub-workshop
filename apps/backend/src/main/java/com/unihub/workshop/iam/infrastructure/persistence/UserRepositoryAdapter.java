@@ -76,6 +76,12 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional
+    public void updateIsActive(UUID userId, UUID organizationId, boolean isActive) {
+        repository.updateIsActive(userId, organizationId, isActive, Instant.now());
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public CursorPage<User> findMembersByOrganizationId(
             UUID organizationId,
@@ -106,12 +112,13 @@ public class UserRepositoryAdapter implements UserRepository {
         }
 
         String roleStr = role != null ? role.name() : null;
+        String sanitizedSearch = sanitizeSearch(search);
         List<UserJpaEntity> entities = repository.findMembers(
                 organizationId,
                 callerId,
                 roleStr,
                 isActive,
-                search,
+                sanitizedSearch,
                 cursorTime,
                 cursorId,
                 PageRequest.of(0, limit + 1));
@@ -180,5 +187,15 @@ public class UserRepositoryAdapter implements UserRepository {
         entity.setCreatedBy(user.createdBy());
         entity.setUpdatedBy(user.updatedBy());
         return entity;
+    }
+
+    private String sanitizeSearch(String search) {
+        if (search == null) {
+            return null;
+        }
+        return search
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 }

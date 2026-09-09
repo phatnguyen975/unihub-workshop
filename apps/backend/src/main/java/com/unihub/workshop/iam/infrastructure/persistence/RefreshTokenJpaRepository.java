@@ -97,4 +97,15 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpa
             @Param("currentSessionId") UUID currentSessionId,
             @Param("revokedAt") Instant revokedAt,
             @Param("now") Instant now);
+
+    @Query("""
+            SELECT r FROM RefreshTokenJpaEntity r
+            WHERE r.userId = :userId
+                AND r.revokedAt IS NULL
+                AND r.expiresAt > :now
+            ORDER BY r.createdAt DESC, r.id DESC
+            """)
+    List<RefreshTokenJpaEntity> findAllActiveSessionsForUser(
+            @Param("userId") UUID userId,
+            @Param("now") Instant now);
 }

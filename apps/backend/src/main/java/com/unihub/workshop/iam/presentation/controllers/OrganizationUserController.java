@@ -5,6 +5,8 @@ import com.unihub.workshop.iam.application.ports.in.ListMembersQuery;
 import com.unihub.workshop.iam.application.ports.in.ListOrganizationMembersUseCase;
 import com.unihub.workshop.iam.application.ports.in.ProvisionUserCommand;
 import com.unihub.workshop.iam.application.ports.in.ProvisionUserUseCase;
+import com.unihub.workshop.iam.application.ports.in.UpdateMemberStatusCommand;
+import com.unihub.workshop.iam.application.ports.in.UpdateMemberStatusUseCase;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
@@ -12,6 +14,8 @@ import com.unihub.workshop.iam.presentation.dto.MemberDetailResponse;
 import com.unihub.workshop.iam.presentation.dto.MemberSummaryResponse;
 import com.unihub.workshop.iam.presentation.dto.ProvisionUserRequest;
 import com.unihub.workshop.iam.presentation.dto.ProvisionUserResponse;
+import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusRequest;
+import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusResponse;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
@@ -26,6 +30,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -46,6 +51,7 @@ public class OrganizationUserController {
     private final ListOrganizationMembersUseCase listOrganizationMembersUseCase;
     private final GetOrganizationMemberUseCase getOrganizationMemberUseCase;
     private final ProvisionUserUseCase provisionUserUseCase;
+    private final UpdateMemberStatusUseCase updateMemberStatusUseCase;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -53,12 +59,7 @@ public class OrganizationUserController {
             @Valid @RequestBody ProvisionUserRequest request,
             Authentication authentication) {
 
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UnauthorizedException("Full authentication is required to access this resource");
-        }
-
-        UUID callerId = SecurityContextUtils.extractUserId(authentication);
-        UUID organizationId = extractAndVerifyOrganizerRole(authentication);
+        OrganizerContext ctx = resolveOrganizerContext(authentication);
 
         UserRole role;
         try {
@@ -68,8 +69,8 @@ public class OrganizationUserController {
         }
 
         ProvisionUserCommand command = new ProvisionUserCommand(
-                organizationId,
-                callerId,
+                ctx.organizationId(),
+                ctx.callerId(),
                 request.email(),
                 request.fullName(),
                 request.phoneNumber(),
@@ -81,17 +82,32 @@ public class OrganizationUserController {
                 "User provisioned successfully. Temporary credentials sent via email.");
     }
 
+    @PatchMapping("/{userId}/status")
+    public ApiResponse<UpdateMemberStatusResponse> updateMemberStatus(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateMemberStatusRequest request,
+            Authentication authentication) {
+
+        OrganizerContext ctx = resolveOrganizerContext(authentication);
+
+        User user = updateMemberStatusUseCase.execute(new UpdateMemberStatusCommand(
+                ctx.organizationId(),
+                ctx.callerId(),
+                userId,
+                request.isActive()));
+
+        return ApiResponse.success(
+                UpdateMemberStatusResponse.from(user),
+                "Member account status updated successfully.");
+    }
+
     @GetMapping("/{userId}")
     public ApiResponse<MemberDetailResponse> getMemberDetail(
             @PathVariable UUID userId,
             Authentication authentication) {
 
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UnauthorizedException("Full authentication is required to access this resource");
-        }
-
-        UUID organizationId = extractAndVerifyOrganizerRole(authentication);
-        User user = getOrganizationMemberUseCase.execute(organizationId, userId);
+        OrganizerContext ctx = resolveOrganizerContext(authentication);
+        User user = getOrganizationMemberUseCase.execute(ctx.organizationId(), userId);
         return ApiResponse.success(MemberDetailResponse.from(user), "Member details retrieved");
     }
 
@@ -104,12 +120,7 @@ public class OrganizationUserController {
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false, defaultValue = "20") Integer limit) {
 
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UnauthorizedException("Full authentication is required to access this resource");
-        }
-
-        UUID callerId = SecurityContextUtils.extractUserId(authentication);
-        UUID organizationId = extractAndVerifyOrganizerRole(authentication);
+        OrganizerContext ctx = resolveOrganizerContext(authentication);
 
         if (limit == null || limit < 1 || limit > 100) {
             throw new BadRequestException("limit must be between 1 and 100");
@@ -129,8 +140,8 @@ public class OrganizationUserController {
         }
 
         ListMembersQuery query = new ListMembersQuery(
-                organizationId,
-                callerId,
+                ctx.organizationId(),
+                ctx.callerId(),
                 userRole,
                 isActive,
                 search != null ? search.trim() : null,
@@ -148,6 +159,18 @@ public class OrganizationUserController {
                 new MemberSummaryResponse.Cursor(page.nextCursor(), page.hasMore()));
 
         return ApiResponse.success(response, "Organization members retrieved");
+    }
+
+    private record OrganizerContext(UUID callerId, UUID organizationId) {
+    }
+
+    private OrganizerContext resolveOrganizerContext(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Full authentication is required to access this resource");
+        }
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = extractAndVerifyOrganizerRole(authentication);
+        return new OrganizerContext(callerId, organizationId);
     }
 
     private UUID extractAndVerifyOrganizerRole(Authentication authentication) {

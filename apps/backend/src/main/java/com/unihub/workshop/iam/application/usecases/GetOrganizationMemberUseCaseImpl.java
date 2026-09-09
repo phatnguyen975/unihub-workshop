@@ -30,6 +30,6 @@ public class GetOrganizationMemberUseCaseImpl implements GetOrganizationMemberUs
         }
 
         return userRepository.findByIdAndOrganizationId(memberUserId, organizationId)
-                .orElseThrow(() -> new NotFoundException("Member not found"));
+                .orElseThrow(() -> new NotFoundException("Member not found in your organization."));
     }
 }

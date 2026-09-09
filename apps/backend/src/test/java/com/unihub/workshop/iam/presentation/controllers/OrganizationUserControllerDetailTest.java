@@ -101,14 +101,14 @@ class OrganizationUserControllerDetailTest {
     @Test
     void shouldReturn404_whenMemberNotFoundInOrganization() throws Exception {
         when(getOrganizationMemberUseCase.execute(ORG_ID, TARGET_USER_ID))
-                .thenThrow(new NotFoundException("Member not found"));
+                .thenThrow(new NotFoundException("Member not found in your organization."));
 
         mockMvc.perform(get("/api/v1/organizations/users/{userId}", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:not-found"))
-                .andExpect(jsonPath("$.error.detail").value("Member not found"));
+                .andExpect(jsonPath("$.error.detail").value("Member not found in your organization."));
     }
 
     @Test

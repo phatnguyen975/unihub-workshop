@@ -27,6 +27,14 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     void activateUser(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying
+    @Query("UPDATE UserJpaEntity u SET u.isActive = :isActive, u.updatedAt = :now WHERE u.id = :id AND u.organizationId = :organizationId")
+    int updateIsActive(
+            @Param("id") UUID id,
+            @Param("organizationId") UUID organizationId,
+            @Param("isActive") boolean isActive,
+            @Param("now") Instant now);
+
+    @Modifying
     @Query("""
             UPDATE UserJpaEntity u
             SET u.passwordHash = :newPasswordHash,
@@ -46,9 +54,9 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
                 AND (:isActive IS NULL OR u.isActive = :isActive)
                 AND (
                     :search IS NULL OR :search = ''
-                    OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:search), '%')
-                    OR LOWER(u.email) LIKE CONCAT('%', LOWER(:search), '%')
-                    OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:search), '%'))
+                    OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
+                    OR LOWER(u.email) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
+                    OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\')
                 )
                 AND (
                     :cursorTime IS NULL

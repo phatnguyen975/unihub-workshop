@@ -101,7 +101,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - Malformed payload or validation error returns `422 Unprocessable Content` (`urn:unihub:error:validation`). _(API_CONTRACT §3.3)_
     - Non-organizer caller returns `403 Forbidden`. Unauthenticated caller returns `401 Unauthorized`. _(FR-25, FR-26; SPEC Scenarios 16, 17)_
 
-- [ ] **T4 — Update member active status (Ban/Unban) with fail-closed session invalidation and notification event (`PATCH /api/v1/organizations/users/{userId}/status`)**
+- [x] **T4 — Update member active status (Ban/Unban) with fail-closed session invalidation and notification event (`PATCH /api/v1/organizations/users/{userId}/status`)**
   - **Size:** M
   - **Depends on:** T1, T2
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -131,10 +131,10 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
 
 #### Checkpoint: Feature Complete
 
-- [ ] All 4 tasks completed and all individual acceptance criteria pass.
-- [ ] Unit tests for all affected controllers, use cases, and repository adapters execute and pass.
-- [ ] Spring Modulith architectural boundaries verify cleanly (`ModulithArchitectureTest`).
-- [ ] Ready for `/review organization-member-management`.
+- [x] All 4 tasks completed and all individual acceptance criteria pass.
+- [x] Unit tests for all affected controllers, use cases, and repository adapters execute and pass.
+- [x] Spring Modulith architectural boundaries verify cleanly (`ModulithArchitectureTest`).
+- [x] Ready for `/review organization-member-management`.
 
 ## Risks and Mitigations
 

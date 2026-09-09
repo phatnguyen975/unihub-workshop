@@ -168,6 +168,25 @@ class UserRepositoryAdapterTest {
                 .hasMessage("Invalid cursor format");
     }
 
+    @Test
+    void shouldFindMembersByOrganizationId_escapesWildcardCharactersInSearch() {
+        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+
+        UUID orgId = UUID.randomUUID();
+        UUID callerId = UUID.randomUUID();
+
+        when(jpaRepo.findMembers(eq(orgId), eq(callerId), isNull(), isNull(), eq("100\\%\\_test\\\\user"), isNull(),
+                isNull(), eq(PageRequest.of(0, 21))))
+                .thenReturn(List.of());
+
+        adapter.findMembersByOrganizationId(
+                orgId, callerId, null, null, "100%_test\\user", null, 20);
+
+        verify(jpaRepo).findMembers(eq(orgId), eq(callerId), isNull(), isNull(), eq("100\\%\\_test\\\\user"), isNull(),
+                isNull(), eq(PageRequest.of(0, 21)));
+    }
+
     private UserJpaEntity createMemberEntity(UUID id, UUID orgId, String role, String email, Instant createdAt) {
         UserJpaEntity entity = new UserJpaEntity();
         entity.setId(id);

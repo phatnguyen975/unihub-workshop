@@ -51,7 +51,7 @@ class GetOrganizationMemberUseCaseImplTest {
 
         assertThatThrownBy(() -> useCase.execute(ORG_ID, USER_ID))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessage("Member not found");
+                .hasMessage("Member not found in your organization.");
     }
 
     @Test
