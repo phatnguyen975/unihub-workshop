@@ -1,6 +1,8 @@
 package com.unihub.workshop.iam.application.ports.out;
 
+import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
+import com.unihub.workshop.iam.domain.model.UserRole;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,4 +21,13 @@ public interface UserRepository {
     void activate(UUID userId);
 
     boolean updateTemporaryPassword(UUID userId, String newPasswordHash, Instant loginTime);
+
+    CursorPage<User> findMembersByOrganizationId(
+            UUID organizationId,
+            UUID callerId,
+            UserRole role,
+            Boolean isActive,
+            String search,
+            String cursor,
+            int limit);
 }

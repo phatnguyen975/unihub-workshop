@@ -26,7 +26,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
 
 ### Phase 1: Member Roster Queries (Read Replica)
 
-- [ ] **T1 — List organization members with Keyset cursor pagination and multi-attribute filtering (`GET /api/v1/organizations/users`)**
+- [x] **T1 — List organization members with Keyset cursor pagination and multi-attribute filtering (`GET /api/v1/organizations/users`)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
