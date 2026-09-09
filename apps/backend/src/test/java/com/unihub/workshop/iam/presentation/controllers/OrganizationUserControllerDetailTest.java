@@ -1,7 +1,6 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
 import com.unihub.workshop.iam.application.ports.in.GetOrganizationMemberUseCase;
-import com.unihub.workshop.iam.application.ports.in.ListOrganizationMembersUseCase;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.shared.exception.NotFoundException;
@@ -24,7 +23,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OrganizationUserControllerDetailTest {
 
     private MockMvc mockMvc;
-    private ListOrganizationMembersUseCase listOrganizationMembersUseCase;
     private GetOrganizationMemberUseCase getOrganizationMemberUseCase;
 
     private static final UUID CALLER_ID = UUID.randomUUID();
@@ -33,10 +31,10 @@ class OrganizationUserControllerDetailTest {
 
     @BeforeEach
     void setUp() {
-        listOrganizationMembersUseCase = mock(ListOrganizationMembersUseCase.class);
         getOrganizationMemberUseCase = mock(GetOrganizationMemberUseCase.class);
-        OrganizationUserController controller = new OrganizationUserController(
-                listOrganizationMembersUseCase, getOrganizationMemberUseCase);
+        OrganizationUserController controller = OrganizationUserControllerTestBuilder.builder()
+                .withGetOrganizationMemberUseCase(getOrganizationMemberUseCase)
+                .build();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
                 .build();

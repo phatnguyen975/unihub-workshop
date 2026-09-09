@@ -78,7 +78,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
 
 ### Phase 2: Member Lifecycle Mutations (Primary DB)
 
-- [ ] **T3 — Provision new `STAFF` or `ORGANIZER` member account (`POST /api/v1/organizations/users`)**
+- [x] **T3 — Provision new `STAFF` or `ORGANIZER` member account (`POST /api/v1/organizations/users`)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -90,6 +90,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/ProvisionUserResponse.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ProvisionUserUseCaseImplTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerProvisionTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerTestBuilder.java`
   - **Files (modified):**
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserController.java` (add endpoint method)
   - **Acceptance Criteria:**
@@ -118,6 +119,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserJpaRepository.java` (add status update query)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserRepositoryAdapter.java` (implement status update)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserController.java` (add endpoint method)
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerTestBuilder.java` (add status use case mock)
   - **Acceptance Criteria:**
     - `PATCH /api/v1/organizations/users/{userId}/status` with `{ "isActive": false }` adds all active user JTIs to the Redis blacklist, removes sessions from the Redis session tracker, revokes all active refresh tokens in PostgreSQL, updates `users.is_active = false`, and publishes `UserStatusChangedEvent` (`isActive = false`) to the transactional outbox, returning `200 OK`. _(FR-19, FR-21; SPEC Scenario 11)_
     - If Redis is unavailable during a ban attempt, the operation fails with `503 Service Unavailable` (`urn:unihub:error:service-unavailable`) with `Retry-After` header, leaving PostgreSQL tokens and user status unmodified (fail-closed). _(FR-21; SPEC Scenario 12)_

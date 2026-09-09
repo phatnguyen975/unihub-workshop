@@ -3,25 +3,35 @@ package com.unihub.workshop.iam.presentation.controllers;
 import com.unihub.workshop.iam.application.ports.in.GetOrganizationMemberUseCase;
 import com.unihub.workshop.iam.application.ports.in.ListMembersQuery;
 import com.unihub.workshop.iam.application.ports.in.ListOrganizationMembersUseCase;
+import com.unihub.workshop.iam.application.ports.in.ProvisionUserCommand;
+import com.unihub.workshop.iam.application.ports.in.ProvisionUserUseCase;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.presentation.dto.MemberDetailResponse;
 import com.unihub.workshop.iam.presentation.dto.MemberSummaryResponse;
+import com.unihub.workshop.iam.presentation.dto.ProvisionUserRequest;
+import com.unihub.workshop.iam.presentation.dto.ProvisionUserResponse;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
+import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -35,6 +45,41 @@ public class OrganizationUserController {
 
     private final ListOrganizationMembersUseCase listOrganizationMembersUseCase;
     private final GetOrganizationMemberUseCase getOrganizationMemberUseCase;
+    private final ProvisionUserUseCase provisionUserUseCase;
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<ProvisionUserResponse> provisionMember(
+            @Valid @RequestBody ProvisionUserRequest request,
+            Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Full authentication is required to access this resource");
+        }
+
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = extractAndVerifyOrganizerRole(authentication);
+
+        UserRole role;
+        try {
+            role = UserRole.valueOf(request.role().trim().toUpperCase());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new ValidationException("role", "Invalid role. Allowed values: STAFF, ORGANIZER");
+        }
+
+        ProvisionUserCommand command = new ProvisionUserCommand(
+                organizationId,
+                callerId,
+                request.email(),
+                request.fullName(),
+                request.phoneNumber(),
+                role);
+
+        User user = provisionUserUseCase.execute(command);
+        return ApiResponse.success(
+                ProvisionUserResponse.from(user),
+                "User provisioned successfully. Temporary credentials sent via email.");
+    }
 
     @GetMapping("/{userId}")
     public ApiResponse<MemberDetailResponse> getMemberDetail(

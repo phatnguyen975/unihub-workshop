@@ -62,6 +62,35 @@ public record User(
                 null);
     }
 
+    public static User provisionMember(
+            UUID id,
+            UUID organizationId,
+            UserRole role,
+            String email,
+            String phoneNumber,
+            String passwordHash,
+            String fullName,
+            UUID createdBy) {
+        Instant now = Instant.now();
+        return new User(
+                id != null ? id : UUID.randomUUID(),
+                organizationId,
+                role,
+                email,
+                phoneNumber,
+                passwordHash,
+                fullName,
+                null,
+                true,
+                true,
+                null,
+                null,
+                now,
+                now,
+                createdBy,
+                createdBy);
+    }
+
     public User updatePassword(String newPasswordHash) {
         return new User(
                 id,
