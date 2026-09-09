@@ -59,6 +59,13 @@ public class SseEmitterRegistry {
     }
 
     /**
+     * Retrieves all user IDs with at least one active connection on this node.
+     */
+    public Set<UUID> getConnectedUserIds() {
+        return Collections.unmodifiableSet(userEmitters.keySet());
+    }
+
+    /**
      * Retrieves a snapshot of all active emitters across all users.
      */
     public List<SseEmitter> getAllEmitters() {

@@ -58,7 +58,7 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
 
 ### Phase 2: Distributed Event Distribution & Observability
 
-- [ ] **T3 — Implement Multi-Node Redis Pub/Sub Event Distribution & Wire Serialization**
+- [x] **T3 — Implement Multi-Node Redis Pub/Sub Event Distribution & Wire Serialization**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure
@@ -116,4 +116,4 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
 
 ## Open Questions / Assumptions
 
-- _None._ All technical interfaces, Redis topic conventions, and SSE wire envelopes are finalized and approved in `SPEC.md` and `API_CONTRACT.md`.
+_None._ All technical interfaces, Redis topic conventions, and SSE wire envelopes are finalized and approved in `SPEC.md` and `API_CONTRACT.md`.

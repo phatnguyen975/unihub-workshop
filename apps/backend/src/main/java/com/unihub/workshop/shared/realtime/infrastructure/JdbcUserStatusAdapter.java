@@ -1,6 +1,7 @@
 package com.unihub.workshop.shared.realtime.infrastructure;
 
 import com.unihub.workshop.shared.realtime.application.ports.out.UserStatusPort;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -11,13 +12,10 @@ import java.util.UUID;
  * Lightweight JDBC adapter checking user active status from users table.
  */
 @Component
+@RequiredArgsConstructor
 public class JdbcUserStatusAdapter implements UserStatusPort {
 
     private final JdbcTemplate jdbcTemplate;
-
-    public JdbcUserStatusAdapter(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
 
     @Override
     public boolean isUserActive(UUID userId) {
