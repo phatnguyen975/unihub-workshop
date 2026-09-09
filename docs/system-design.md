@@ -86,7 +86,7 @@ The system architecture is organized into a strict tiered structure to distribut
 - Offline-first mobile check-in with a local SQLite queue and batched reconciliation to the cloud-backed authoritative store.
 
 <p align="center">
-  <img src="./diagrams/system_architecture.png" style="width:100%;" alt="System Architecture Diagram">
+  <img src="./diagrams/system_architecture.svg" style="width:100%;" alt="System Architecture Diagram">
 </p>
 
 | Architectural Pattern              | Implementation Details                                                                                                                                                                                                                                                                                         |
@@ -224,6 +224,7 @@ sequenceDiagram
 - **Transactional Outbox Implementation:** To eliminate distributed transaction vulnerability, event emission is tightly integrated with domain operations. The registration record modifications and event storage occur in the same database transaction, natively mapped to Spring Modulith’s `event_publication` table.
 - **Deferred QR Code Generation:** QR payload and signature are generated and persisted only when a registration transitions to `CONFIRMED` status - never at the `PENDING` insert step. For free workshops, this happens atomically within the single confirmation transaction. For paid workshops, it happens inside the payment-confirmation transaction after the gateway returns `Approved`. This ensures that a cryptographically valid QR code can never be extracted from a `PENDING` record prior to payment completion. The `qr_payload`, `qr_signature`, and `qr_issued_at` columns in the `registrations` table are therefore nullable and are only populated on the `PENDING` -> `CONFIRMED` state transition.
 - **Dual-Case Reconciliation Sweeper:** The background cleanup job acts as a defensive synchronization boundary. Instead of blindly cancelling expired `PENDING` states, it first issues an API call to the Payment Gateway. If a webhook was lost but payment succeeded, it heals the state to `CONFIRMED`. If the checkout was abandoned, it marks it as `FAILED`, refunds the Redis capacity, and unlocks the idempotency state.
+- **Live Registration Broadcasting:** When a registration transitions to `CONFIRMED` or `CANCELED`, the backend publishes a `registration.updated` event to the workshop Redis Pub/Sub channel (`unihub:stream:workshop:{workshopId}`). Organizers viewing the Workshop Registration Dashboard (F-4.4) receive live count and occupancy updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual polling or page reloads.
 
 ### Payment Webhook Handling Flow
 
@@ -277,6 +278,10 @@ sequenceDiagram
         Registry->>Broker: Externalize WorkshopRegisteredEvent
         Broker->>Worker: Deliver event
         Worker->>Notify: Send confirmation email / in-app notification
+      and Real-time push via SSE
+        API->>Redis: Publish payment.confirmed to unihub:stream:user:{studentUserId}
+        API->>Redis: Publish registration.updated to unihub:stream:workshop:{workshopId}
+        Redis-->>API: Distribute events to active SSE client connections
       end
     end
   end
@@ -600,6 +605,11 @@ sequenceDiagram
     DB-->>API: Returned registration_id list (successful inserts)
     API->>API: Reconcile in_memory_pending_list against returned list, any missing IDs are marked ALREADY_USED
     API->>API: Build structured response array of { sync_id, status }
+    opt New check-ins persisted
+      API->>Redis: Publish attendance.updated to workshop:{workshopId}:attendance
+      Redis->>API: Distribute to active SSE connections
+      API-->>Web / Mobile: SSE Event (attendance.updated)
+    end
     API-->>GW: 207 Multi-Status
     GW-->>Mobile: 207 Multi-Status
     Mobile->>Mobile: Bulk Update SQLite using status codes
@@ -612,6 +622,7 @@ sequenceDiagram
 - **In-Memory Idempotent Filter:** The API classifies each fetched record in RAM before writing anything. Existing rows with the same `sync_id` are treated as `SUCCESS` for legitimate retries, while a different `sync_id` against the same `registration_id` is treated as `ALREADY_USED` for a real double scan.
 - **Pessimistic DB Constraints with Returned Identifiers:** The system relies on database-level unique constraints and atomic upsert mechanisms provided by the storage engine. Bulk writes return the identifiers that were successfully persisted; the API reconciles this returned list against the attempted inserts. Any attempted insert missing from the returned set lost the micro-second race and is marked `ALREADY_USED`. This approach avoids relying on exception-based control flow and keeps the reconciliation deterministic.
 - **Structured 207 Multi-Status Reconciliation:** The API returns a single `207 Multi-Status` payload with explicit `{ sync_id, status }` objects such as `SUCCESS`, `INVALID_TICKET`, and `ALREADY_USED`. The mobile client uses those exact status codes to reconcile local SQLite state without parsing free-form messages.
+- **Live Attendance Broadcasting:** Following successful persistence of new check-ins, the backend broadcasts an `attendance.updated` event to the Redis Pub/Sub channel for that workshop (`workshop:{workshopId}:attendance`). All organizers viewing the Live Attendance Dashboard and on-site check-in staff assigned to the workshop (F-6.3) receive real-time count updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual page refreshes.
 
 ### Async AI Summarization Flow
 
@@ -628,6 +639,7 @@ sequenceDiagram
   participant Broker as RabbitMQ
   participant Worker as Background Workers
   participant AI as AI Service
+  participant Redis as Redis Pub/Sub
   participant DLQ as Dead Letter Queue
 
   Organizer->>Web: Upload brochure PDF
@@ -645,11 +657,19 @@ sequenceDiagram
   alt Success
     AI-->>Worker: Summary
     Worker->>DB: Update job (Status: COMPLETED, result)
+    Worker->>Redis: Publish ai.summary.completed to unihub:stream:user:{organizerId}
+    Redis->>API: Distribute event to active SSE node
+    API-->>Web: SSE Event (ai.summary.completed)
+    Web->>Organizer: Display summary dialog in real time
   else Transient Error (HTTP 429 / Timeout / 5xx)
     AI-->>Worker: Error/Rate Limit/Timeout
     Worker-->>Broker: Retry with backoff
   else Max Retries Exceeded
     Worker->>DB: Update job (Status: FAILED)
+    Worker->>Redis: Publish ai.summary.failed to unihub:stream:user:{organizerId}
+    Redis->>API: Distribute event to active SSE node
+    API-->>Web: SSE Event (ai.summary.failed)
+    Web->>Organizer: Display error notice with retry option
     Worker-->>Broker: Mark message unprocessable
     Broker-->>DLQ: Route failed job for review
   end
@@ -657,7 +677,7 @@ sequenceDiagram
 
 - **Decoupled Processing:** The API persists the job and event publication entry, then returns `202` so heavy PDF processing runs asynchronously.
 - **Local Preprocessing:** The worker extracts, cleans, and chunks text before calling the AI service to avoid oversized payloads and token limit errors.
-- **Job State Tracking:** The database explicitly tracks `PROCESSING`, `COMPLETED`, and `FAILED` states so the Web App can poll or subscribe via WebSockets/SSE and notify the Organizer when the summary is ready or has failed.
+- **Real-Time Job Notification via SSE:** The database explicitly tracks `PROCESSING`, `COMPLETED`, and `FAILED` states. Upon completion or terminal failure, the worker publishes an event to Redis Pub/Sub, which the backend SSE Hub pushes directly to the Organizer's active browser stream (`GET /api/v1/stream/events`). The client UI immediately displays the generated summary without short-polling delays. The `GET /api/v1/workshops/{id}/brochure/summary-job` endpoint is retained as a fallback for clients reconnecting after network drops.
 - **Rate Limiting Resilience:** The worker treats AI provider `HTTP 429` responses the same as transient timeouts and `5xx` failures, using broker-backed backoff retries to absorb temporary throttling without losing the job.
 - **Dead Letter Queue (DLQ) and Failure Handling:** When max retries are exhausted, the worker marks the database job as `FAILED` before the broker routes the unprocessable payload to the DLQ. This prevents zombie `PROCESSING` jobs and frontend infinite loading while preserving the event for monitoring or manual replay by Ops.
 
@@ -999,7 +1019,73 @@ flowchart TD
 - **Scope:** Runs only against `PUBLISHED` workshops where Redis counter key exists.
 - **Atomicity:** The Redis `SET` is unconditional - the computed database value is always authoritative. This is safe because the reconciler runs infrequently and the drift window is bounded.
 - **Observability:** Emit a `capacity.drift.detected` counter metric via Micrometer each time a correction is applied. Alert on sustained drift frequency as a signal of systemic rollback failures.
-- **Complementary to Sweeper:** The existing Dual-Case Reconciliation Sweeper already performs `INCR` on `FAILED`/timed-out `PENDING` registrations. This reconciliation job is an additional safety net that resets counters to ground truth regardless of what caused the drift.
+
+### Real-Time Event Distribution Architecture (Server-Sent Events & Redis Pub/Sub)
+
+UniHub utilizes Server-Sent Events (SSE) combined with Redis Pub/Sub (ADR-031) to deliver asynchronous events to web clients in real time without polling.
+
+#### Architecture Diagram
+
+```mermaid
+flowchart TD
+  subgraph Clients["Web Clients"]
+    Web1["Organizer Browser (Client A)"]
+    Web2["Student Browser (Client B)"]
+  end
+
+  subgraph Gateway["API Gateway (Nginx)"]
+    Nginx["Nginx Reverse Proxy\n(proxy_buffering off, keepalive)"]
+  end
+
+  subgraph BackendCluster["Core Backend Monolith (Horizontally Scaled)"]
+    Node1["Backend Node 1\nSseEmitterRegistry"]
+    Node2["Backend Node 2\nSseEmitterRegistry"]
+  end
+
+  subgraph PubSub["Redis Pub/Sub"]
+    UserChannel["Channel: unihub:stream:user:{userId}"]
+    WorkshopChannel["Channel: unihub:stream:workshop:{workshopId}"]
+  end
+
+  subgraph Producers["Event Producers"]
+    Worker["Background Workers\n(AI Summary / Batch CSV)"]
+    Payments["Stripe Webhook Handler\n(Payment Confirmed)"]
+    Attendances["Attendance Sync Reconciler\n(Check-in Counter)"]
+    Notifications["In-App Notification Service\n(New Bell Alert)"]
+  end
+
+  Web1 -- "GET /api/v1/stream/events" --> Nginx
+  Web2 -- "GET /api/v1/stream/events" --> Nginx
+  Nginx -- Forward Stream --> Node1
+  Nginx -- Forward Stream --> Node2
+
+  Node1 -- Subscribe --> UserChannel
+  Node1 -- Subscribe --> WorkshopChannel
+  Node2 -- Subscribe --> UserChannel
+  Node2 -- Subscribe --> WorkshopChannel
+
+  Producers -->|Publish Event| UserChannel
+  Producers -->|Publish Event| WorkshopChannel
+
+  UserChannel -. Broadcast .-> Node1
+  UserChannel -. Broadcast .-> Node2
+  WorkshopChannel -. Broadcast .-> Node1
+  WorkshopChannel -. Broadcast .-> Node2
+
+  Node1 -- "SSE push (HTTP stream)" --> Web1
+  Node2 -- "SSE push (HTTP stream)" --> Web2
+```
+
+#### Core Components & Lifecycle
+
+1. **Multiplexed Single Connection:** Each authenticated client (Web or Mobile) establishes only one persistent SSE connection at `GET /api/v1/stream/events`. The client passes its JWT access token, and the backend registers the connection in an in-memory `SseEmitterRegistry` mapped to the user ID and organization. All event types (`notification.new`, `notification.read`, `ai.summary.completed`, `ai.summary.failed`, `attendance.updated`, `registration.updated`, `payment.confirmed`) flow over this single stream.
+2. **Stateless Multi-Instance Fan-Out via Redis Pub/Sub:** Because clients are load-balanced across multiple Spring Boot backend instances, an event generated on Node 1 or by a background Worker might target a client whose SSE connection is held by Node 2. When an event producer calls `RealtimeEventPublisher.publish(target, event)`, the backend publishes the serialized event to Redis Pub/Sub:
+   - `unihub:stream:user:{userId}`: For user-specific events (personal notifications, notification read badge synchronization, AI job results, payment confirmation).
+   - `unihub:stream:workshop:{workshopId}`: For workshop-scoped events (live check-in attendance counter updates, live registration count updates for organizers).
+   - All backend nodes subscribe to these patterns via `RedisMessageListenerContainer`. The node currently holding the target client's `SseEmitter` serializes the payload and pushes it down the HTTP socket.
+3. **Heartbeat & Connection Resilience:** To prevent intermediate proxies (Nginx, ALBs) and browsers from timing out idle sockets, a scheduled task emits a `: ping\n\n` heartbeat comment every 15 seconds.
+4. **Client Lifecycle & Cleanup:** The `SseEmitterRegistry` registers `onCompletion`, `onTimeout`, and `onError` callbacks on every `SseEmitter` to promptly evict closed connections from memory, preventing memory leaks and dangling socket descriptors.
+5. **Fallback to Polling:** If a client environment blocks streaming connections (e.g., highly restrictive corporate proxies), the client gracefully falls back to existing REST endpoints (`GET .../summary-job`, `GET .../notifications`).
 
 ### System Telemetry & Core Metrics to Track
 

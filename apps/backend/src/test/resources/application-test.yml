@@ -32,3 +32,9 @@ rate-limit:
     capacity: 100
     refill-tokens: 100
     refill-duration: 60s
+  stream-path-patterns:
+    - "/api/v1/stream/**"
+  stream-tier:
+    capacity: 10
+    refill-tokens: 10
+    refill-duration: 60s

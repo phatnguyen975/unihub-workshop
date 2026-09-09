@@ -51,6 +51,9 @@ app:
     allowed-origin-patterns:
       - "http://localhost:[*]"
       - "https://app.unihub.com"
+  realtime:
+    heartbeat-interval-seconds: ${APP_REALTIME_HEARTBEAT_INTERVAL_SECONDS:15}
+    stream-timeout-ms: ${APP_REALTIME_STREAM_TIMEOUT_MS:1800000}
 
 # =============================================================================
 # Datasource Configuration
@@ -117,6 +120,12 @@ rate-limit:
   browsing-tier:
     capacity: 100
     refill-tokens: 100
+    refill-duration: 60s
+  stream-path-patterns:
+    - "/api/v1/stream/**"
+  stream-tier:
+    capacity: 10
+    refill-tokens: 10
     refill-duration: 60s
 
 # =============================================================================

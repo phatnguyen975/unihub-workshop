@@ -49,6 +49,7 @@ Wildcard origins (`*`) are strictly prohibited in production. The backend must e
 - Success responses must use `Content-Type: application/json`.
 - Error responses must use `Content-Type: application/problem+json` (RFC 7807).
 - Upload endpoints must use `Content-Type: multipart/form-data` (PDF brochures, CSV rosters).
+- Real-time streaming endpoints must use `Content-Type: text/event-stream; charset=UTF-8` (Server-Sent Events).
 
 ### Date/Time & Time Zone
 
@@ -218,6 +219,76 @@ All RFC 7807 error responses use a unified URI identifier in the `error.type` fi
   }
 }
 ```
+
+## Server-Sent Events (SSE) Streaming Standards
+
+This section defines the real-time push contract between the backend and client applications (Web and Mobile) using Server-Sent Events.
+
+### Stream Connection Endpoint
+
+Authenticated clients establish a single, multiplexed connection to receive real-time updates:
+
+- **Endpoint:** `GET /api/v1/stream/events`
+- **Protocol:** HTTP/1.1 or HTTP/2 Streaming
+- **Response Content-Type:** `text/event-stream; charset=UTF-8`
+- **Response Headers:**
+  - `Cache-Control: no-cache, no-transform`
+  - `Connection: keep-alive`
+  - `X-Accel-Buffering: no` (advisory to Nginx to prevent buffering)
+
+### Handshake & Authentication
+
+- **Primary Authentication:** The connection must be authenticated via the standard HTTP header `Authorization: Bearer <jwt>`.
+- **Client Implementation:** Web clients use `@microsoft/fetch-event-source` rather than the browser's native `EventSource`, allowing standard header-based JWT authentication and fine-grained error lifecycle management. Mobile clients (React Native) use `react-native-sse` to support live attendance monitoring (F-6.3) when connectivity is active.
+- **Handshake Status Codes:**
+  - `200 OK`: Stream opened successfully.
+  - `401 Unauthorized`: Missing, expired, or invalid JWT (standard RFC 7807 problem detail returned before stream begins).
+  - `403 Forbidden`: User account banned or inactive.
+  - `429 Too Many Requests`: Distributed rate limit exceeded on initial handshake request.
+
+### Wire Envelope Format
+
+Every event emitted over the stream conforms to standard SSE formatting:
+
+```text
+id: <uuid>
+event: <event_name>
+data: {"success": true, "data": { ... }, "timestamp": "2026-09-09T08:30:00Z"}
+retry: 3000
+<blank line>
+```
+
+- `id`: Unique event ID (UUIDv4) allowing client auto-reconnection via `Last-Event-ID`.
+- `event`: Name of the domain event defining the schema of `data`.
+- `data`: Serialized JSON payload containing the event data and timestamp.
+- `retry`: Recommended reconnection interval in milliseconds (default: 3000ms).
+- `<blank line>`: Mandatory terminating empty line (`\n\n`) per the W3C SSE specification. Client parsers only commit and dispatch the event buffer upon receiving this blank line.
+
+### Heartbeat (Keep-Alive)
+
+To prevent intermediary proxies (Nginx, cloud load balancers, corporate firewalls) from closing idle TCP sockets, the server emits a heartbeat comment every 15 seconds:
+
+```text
+: ping
+<blank line>
+```
+
+- Lines beginning with a colon (`:`) are comments in the SSE specification and are ignored by client event parsers.
+- The terminating `<blank line>` (`\n\n`) flushes the comment buffer across network buffers and intermediary proxies.
+
+### Unified Event Catalog
+
+All real-time events are multiplexed over this single user connection. The client dispatches handling based on the `event` field:
+
+| Event Name             | Module Owner    | Trigger Condition                                                              | Payload `data` Contract                                                                                                                 |
+| :--------------------- | :-------------- | :----------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
+| `notification.new`     | `notifications` | A new in-app notification is persisted                                         | `{ id: string, title: string, type: string, linkUrl?: string, createdAt: string }`                                                      |
+| `notification.read`    | `notifications` | Notification(s) marked as read via PATCH API (multi-device badge sync)         | `{ id?: string, all: boolean, unreadCount: number, readAt: string }`                                                                    |
+| `ai.summary.completed` | `workshops`     | AI brochure summary background job completed                                   | `{ jobId: string, workshopId: string, resultText: string }`                                                                             |
+| `ai.summary.failed`    | `workshops`     | AI brochure summary background job failed                                      | `{ jobId: string, workshopId: string, errorMessage: string }`                                                                           |
+| `attendance.updated`   | `attendances`   | Staff completed check-in sync batch (streamed to Organizer and assigned Staff) | `{ workshopId: string, checkedInCount: number, capacity: number, lastSyncedAt: string }`                                                |
+| `registration.updated` | `registrations` | A registration is confirmed or canceled (streamed to Organizer dashboard)      | `{ workshopId: string, confirmedCount: number, pendingCount: number, capacity: number, availableSeats: number, lastUpdatedAt: string }` |
+| `payment.confirmed`    | `payments`      | Stripe payment confirmed for registered student                                | `{ registrationId: string, workshopId: string, qrPayload: string, qrIssuedAt: string }`                                                 |
 
 ## API Logging
 

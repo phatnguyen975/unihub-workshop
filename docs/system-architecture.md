@@ -11,10 +11,10 @@ config:
   theme: neutral
 ---
 flowchart LR
-    Client(["Client (Web / Mobile)"]) -- HTTP --> Nginx["API Gateway / Load Balancer (Nginx)"]
-    Nginx -- Load Balancing --> App1["Core Backend Monolith (Node 1)"] & App2["Core Backend Monolith (Node 2)"]
-    App1 -. "Cache-Aside + Token Bucket" .-> Redis["Cache / Rate Limiter (Redis)"]
-    App2 -. "Cache-Aside + Token Bucket" .-> Redis
+    Client(["Client (Web / Mobile)"]) -- "HTTP / SSE" --> Nginx["API Gateway / Load Balancer (Nginx)"]
+    Nginx -- "Load Balancing & SSE Stream" --> App1["Core Backend Monolith (Node 1)"] & App2["Core Backend Monolith (Node 2)"]
+    App1 -. "Cache + Rate Limit + Pub/Sub" .-> Redis["Cache / Rate Limiter / Pub-Sub (Redis)"]
+    App2 -. "Cache + Rate Limit + Pub/Sub" .-> Redis
     App1 -- Read Data (Cache Miss) --> Replica["PostgreSQL Replica (Neon)"]
     App2 -- Read Data (Cache Miss) --> Replica
     App1 -- Search Queries --> ES["Search Engine (Elasticsearch)"]
@@ -36,6 +36,7 @@ flowchart LR
     Worker -- Sync Workshop Data (CQRS) --> ES
     Worker -- Summarization Requests --> AI["AI Summarization Service"]
     Worker -- Notification Requests --> Notify["Notification Providers"]
+    Worker -. "Event Pub/Sub" .-> Redis
     Prometheus -- "Scrape Metrics (/actuator)" --> App1
     Prometheus -- "Scrape Metrics (/actuator)" --> App2
     Prometheus -- "Scrape Metrics (/actuator)" --> Worker
