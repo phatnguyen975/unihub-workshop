@@ -33,39 +33,41 @@ Nginx acts as a pure reverse proxy and load balancer; it performs **no rate limi
 ### 3.2 Path-Based Bucket Configuration
 
 - **FR-03:** The system SHALL apply a **registration-tier** bucket configuration (tighter capacity and/or refill rate) to all requests whose path matches the registration endpoint group (e.g., `POST /api/v1/registrations/**`).
-- **FR-04:** The system SHALL apply a **browsing-tier** bucket configuration (relaxed capacity and/or refill rate) to all other bucket-protected endpoints not covered by the registration tier.
-- **FR-05:** The capacity and refill-rate values for each tier SHALL be externalized as configuration properties (e.g., in `application.yml`) so they can be tuned without code changes.
+- **FR-04:** The system SHALL apply an **auth-tier** bucket configuration (default: 20 tokens capacity, refill 20 tokens per 60s) to all requests whose path matches authentication and credential endpoint patterns (e.g., `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/activate`, `/api/v1/auth/otp/**`, `/api/v1/auth/password/**`, `/api/v1/auth/refresh`) to prevent brute-force attacks and CPU exhaustion from Argon2id hashing.
+- **FR-05:** The system SHALL apply a **stream-tier** bucket configuration (default: 10 tokens capacity, refill 10 tokens per 60s) to all requests whose path matches real-time SSE stream endpoints (`/api/v1/stream/**`).
+- **FR-06:** The system SHALL apply a **default-tier** bucket configuration (fallback capacity and/or refill rate) to all other bucket-protected endpoints not covered by the registration, auth, or stream tiers.
+- **FR-07:** The capacity and refill-rate values for each tier SHALL be externalized as configuration properties (e.g., in `application.yml`) so they can be tuned without code changes.
 
 ### 3.3 Token Consumption and 429 Response
 
-- **FR-06:** The system SHALL atomically decrement one token from the caller's bucket in Redis for each protected request before delegating to the next filter in the chain.
-- **FR-07:** The system SHALL return HTTP `429 Too Many Requests` (RFC 7807 `application/problem+json`) immediately — without invoking any downstream filter, use case, or database call — when the token decrement results in an exhausted bucket.
-- **FR-08:** Every response to a bucket-protected endpoint — whether the request is allowed (2xx) or rejected (429) — SHALL include the following response headers:
+- **FR-08:** The system SHALL atomically decrement one token from the caller's bucket in Redis for each protected request before delegating to the next filter in the chain.
+- **FR-09:** The system SHALL return HTTP `429 Too Many Requests` (RFC 7807 `application/problem+json`) immediately — without invoking any downstream filter, use case, or database call — when the token decrement results in an exhausted bucket.
+- **FR-10:** Every response to a bucket-protected endpoint — whether the request is allowed (2xx) or rejected (429) — SHALL include the following response headers:
   - `X-RateLimit-Limit`: The total token capacity of the caller's bucket for the matched tier.
   - `X-RateLimit-Remaining`: The number of tokens remaining after this request (0 when the bucket is exhausted).
   - `X-RateLimit-Retry-After`: The number of seconds the client should wait before retrying (0 when tokens are available; a positive integer when the bucket is exhausted).
 
 ### 3.4 Fail-Open on Redis Unavailability
 
-- **FR-09:** When the Redis connection cannot be established or a Redis command times out during bucket evaluation, the system SHALL skip bucket evaluation entirely and allow the request to proceed to the next filter in the chain (fail-open).
-- **FR-10:** On every fail-open event, the system SHALL log a `WARN`-level structured log entry containing at minimum: the bucket key, the request path, and the exception class/message that caused the Redis failure.
-- **FR-11:** On every fail-open event, the system SHALL increment the Micrometer counter `rate_limiter.redis_unavailable` (tagged `tier=<registration|browsing>`) so that Prometheus can alert on Redis degradation.
+- **FR-11:** When the Redis connection cannot be established or a Redis command times out during bucket evaluation, the system SHALL skip bucket evaluation entirely and allow the request to proceed to the next filter in the chain (fail-open).
+- **FR-12:** On every fail-open event, the system SHALL log a `WARN`-level structured log entry containing at minimum: the bucket key, the request path, and the exception class/message that caused the Redis failure.
+- **FR-13:** On every fail-open event, the system SHALL increment the Micrometer counter `rate_limiter.redis_unavailable` (tagged `tier=<registration|auth|stream|default>`) so that Prometheus can alert on Redis degradation.
 
 ### 3.5 Nginx Constraint
 
-- **FR-12:** The Nginx configuration (`infra/nginx/`) SHALL NOT contain any `limit_req_zone`, `limit_req`, or equivalent rate-limiting directives. All rate limiting is performed exclusively by the Core Backend Monolith filter.
+- **FR-14:** The Nginx configuration (`infra/nginx/`) SHALL NOT contain any `limit_req_zone`, `limit_req`, or equivalent rate-limiting directives. All rate limiting is performed exclusively by the Core Backend Monolith filter.
 
 ### 3.6 CORS Exposure
 
-- **FR-13:** The `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Retry-After` headers SHALL be declared in the backend's CORS configuration under `Access-Control-Expose-Headers` so that the React web client can read them from cross-origin responses.
+- **FR-15:** The `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Retry-After` headers SHALL be declared in the backend's CORS configuration under `Access-Control-Expose-Headers` so that the React web client can read them from cross-origin responses.
 
 ## 4. Business Rules
 
 - **BR-01:** The Token Bucket algorithm is the mandated rate-limiting strategy (ADR-019). Sliding window or fixed window algorithms must not be used, as Token Bucket better absorbs legitimate short bursts during the opening registration wave.
 - **BR-02:** Redis holds the shared token counter state. No node-local (JVM-heap) token counters may be used as primary enforcement, because they would produce inconsistent limits across horizontally scaled backend nodes.
-- **BR-03:** The fail-open decision (FR-09) applies **only** to rate limiting. Redis unavailability for the seat-capacity `DECR` operation (the `capacity:{workshopId}` key used during overbooking prevention) is handled separately and is fail-closed (ADR-010). The rate-limit filter must not conflate or interfere with those capacity keys.
+- **BR-03:** The fail-open decision (FR-11) applies **only** to rate limiting. Redis unavailability for the seat-capacity `DECR` operation (the `capacity:{workshopId}` key used during overbooking prevention) is handled separately and is fail-closed (ADR-010). The rate-limit filter must not conflate or interfere with those capacity keys.
 - **BR-04:** The bucket key namespace for rate limiting (e.g., `rate_limit:{key}`) must be distinct from all other Redis key namespaces used by the system (`capacity:`, `jti:blacklist:`, etc.) to prevent accidental collision or eviction interference.
-- **BR-05:** Registration-tier limits are tighter than browsing-tier limits (ADR-019). The specific numeric values are configuration-driven (FR-05); the ordering constraint — registration tier capacity ≤ browsing tier capacity, and/or registration tier refill rate ≤ browsing tier refill rate — must be validated at startup to prevent misconfiguration.
+- **BR-05:** Registration-tier limits are tighter than default-tier limits (ADR-019). The specific numeric values are configuration-driven (FR-07); the ordering constraint — registration tier capacity ≤ default tier capacity, and/or registration tier refill rate ≤ default tier refill rate — must be validated at startup to prevent misconfiguration.
 - **BR-06:** The rate-limit filter must execute **before** any business logic in the Spring Security filter chain — specifically before the idempotency-key check, before the authentication filter resolves user identity for domain purposes, and before any use-case delegation.
 
   > **Notes:** The filter reads the JWT to extract `jwt.sub` for keying (FR-01), but does so in a best-effort, read-only manner without validating the JWT signature. Signature validation is the responsibility of the authentication filter. If JWT parsing fails, the filter falls back to IP keying (FR-02) and continues — it must not throw a 401 or 400 at this stage.
@@ -84,7 +86,7 @@ N/A — this feature does not introduce or modify any stateful PostgreSQL entity
 - **Idempotency:** Not applicable — rate limiting operates on request arrival; each request always attempts exactly one token decrement regardless of prior requests.
 - **Security:** The bucket key for authenticated users must be `jwt.sub` (the user's UUID), never a client-supplied header value such as `X-User-Id`. For unauthenticated IP keying, the IP must be extracted from the `X-Forwarded-For` header set by Nginx (the trusted proxy), taking only the leftmost entry that represents the real client — not blind trust of all `X-Forwarded-For` values, which can be spoofed by clients.
 - **Reliability / Failure modes:**
-  - **Redis unreachable:** fail-open (FR-09). Log WARN + increment metric (FR-10, FR-11).
+  - **Redis unreachable:** fail-open (FR-11). Log WARN + increment metric (FR-12, FR-13).
   - **Redis command timeout:** Bucket4j command timeout must be configured short (recommended ≤ 100 ms) to bound added latency. On timeout, treat as Redis unavailable and fail open.
   - **JVM crash mid-decrement:** Bucket4j sets a TTL on bucket keys in Redis. On key expiry and recreation the counter resets to full capacity — a safe, self-healing outcome.
 - **Observability:**
@@ -124,11 +126,11 @@ And the response includes X-RateLimit-Retry-After with a positive integer (secon
 
 ```gherkin
 Given a request with no Authorization header from client IP 192.168.1.42
-And the browsing-tier bucket for IP "192.168.1.42" has 10 tokens remaining
+And the default-tier bucket for IP "192.168.1.42" has 10 tokens remaining
 When the request reaches the rate-limit filter
 Then the filter keys the bucket by IP "192.168.1.42"
 And the filter allows the request to proceed
-And the response includes the three X-RateLimit-* headers reflecting the browsing-tier bucket state
+And the response includes the three X-RateLimit-* headers reflecting the default-tier bucket state
 ```
 
 ### Scenario 4: Fail-open when Redis is unavailable
@@ -143,13 +145,13 @@ And a WARN-level structured log entry is written containing the bucket key, requ
 And the Micrometer counter "rate_limiter.redis_unavailable" with tag "tier=registration" is incremented by 1
 ```
 
-### Scenario 5: Registration-tier is tighter than or equal to browsing-tier
+### Scenario 5: Registration-tier is tighter than or equal to default-tier
 
 ```gherkin
 Given the application configuration is loaded at startup
-When the bucket configuration for registration-tier and browsing-tier are compared
-Then the registration-tier token capacity is less than or equal to the browsing-tier token capacity
-And/Or the registration-tier refill rate is less than or equal to the browsing-tier refill rate
+When the bucket configuration for registration-tier and default-tier are compared
+Then the registration-tier token capacity is less than or equal to the default-tier token capacity
+And/Or the registration-tier refill rate is less than or equal to the default-tier refill rate
 And startup fails with a descriptive error if this constraint is violated
 ```
 
@@ -179,8 +181,21 @@ Given a request that carries a malformed or expired JWT token
 When the rate-limit filter processes the request
 Then the filter catches the JWT parsing exception without returning a 500 error
 And the filter falls back to the client IP address as the bucket key
-And bucket evaluation proceeds normally using the IP-keyed browsing-tier bucket
+And bucket evaluation proceeds normally using the IP-keyed default-tier bucket
 And the downstream filters receive the request as if no JWT was present at the rate-limiting stage
+```
+
+### Scenario 9: Authentication requests route to auth-tier bucket
+
+```gherkin
+Given an unauthenticated request from client IP "192.168.1.50" to "POST /api/v1/auth/login"
+And the auth-tier bucket for IP "192.168.1.50" has 20 tokens remaining
+When the request reaches the rate-limit filter
+Then the filter matches the auth-path-patterns and selects the auth-tier configuration
+And the filter keys the bucket by IP "192.168.1.50"
+And the filter consumes 1 token and allows the request to proceed
+And the response header "X-RateLimit-Limit" equals "20"
+And the response header "X-RateLimit-Remaining" equals "19"
 ```
 
 ## 8. Out of Scope
@@ -203,7 +218,7 @@ And the downstream filters receive the request as if no JWT was present at the r
 | `docs/system-design.md §4 — Workshop Registration Flow`      | Rate limiting as Step 1 in the registration flow, preceding idempotency check and Redis capacity DECR                                                |
 | `docs/system-design.md §6 — System Telemetry & Core Metrics` | Bucket4j rate-limiting drop rate tracked via Redis counter; Grafana `redis-bucket4j.json` dashboard                                                  |
 | `docs/adrs.md ADR-010`                                       | Redis fail-open for rate limiting; `rate_limiter.redis_unavailable` metric mandate; fail-closed for capacity DECR (distinct concern)                 |
-| `docs/adrs.md ADR-019`                                       | Bucket4j Token Bucket mandate; per-user bucket keying by `jwt.sub`; backend filter placement (Nginx excluded); registration vs. browsing tier tuning |
+| `docs/adrs.md ADR-019`                                       | Bucket4j Token Bucket mandate; per-user bucket keying by `jwt.sub`; backend filter placement (Nginx excluded); registration vs. default tier tuning  |
 | `docs/api-standards.md §Standard Response Headers`           | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After` header spec                                                                  |
 | `docs/api-standards.md §CORS Policy`                         | `X-RateLimit-*` headers must appear in `Access-Control-Expose-Headers` and `Access-Control-Allow-Headers`                                            |
 | `docs/api-standards.md §HTTP Status Codes`                   | 429 Too Many Requests — Bucket4j rate limit exceeded                                                                                                 |

@@ -315,13 +315,21 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 
 ## 4. Rate Limiting Behavior
 
-All three endpoints are **public** (unauthenticated) and are protected by the global Bucket4j Token Bucket rate limiter at the application filter layer:
+All three endpoints are **public** (unauthenticated) and are protected by the dedicated Bucket4j `auth-tier` Token Bucket rate limiter (capacity: 20 tokens, refill: 20 per 60s per client IP) at the application filter layer:
 
 - Headers returned on every request:
-  - `X-RateLimit-Limit` — configured bucket capacity.
+  - `X-RateLimit-Limit` — configured bucket capacity (default: `20`).
   - `X-RateLimit-Remaining` — tokens remaining in the current window.
   - `X-RateLimit-Retry-After` — seconds until refill.
 - Exceeding the rate limit returns `429 Too Many Requests` with `error.type = "urn:unihub:error:rate-limited"`.
+
+### Endpoint Routing Summary
+
+| Path                           | Auth | Rate Limit Tier | Notes                        |
+| :----------------------------- | :--: | :-------------- | :--------------------------- |
+| `POST /api/v1/auth/register`   |  No  | Auth (20/60s)   | Configured in `public-paths` |
+| `POST /api/v1/auth/activate`   |  No  | Auth (20/60s)   | Configured in `public-paths` |
+| `POST /api/v1/auth/otp/resend` |  No  | Auth (20/60s)   | Configured in `public-paths` |
 
 ## 5. Security & Cryptography Summary
 

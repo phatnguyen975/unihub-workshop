@@ -103,7 +103,7 @@ This feature provides two dedicated password modification flows for unauthentica
 
 - **Primary Database Routing:** All reads and writes for password verification, token updates, and session revocation MUST execute against the primary PostgreSQL database to avoid replication lag anomalies (ADR-015).
 - **Concurrency & Atomicity:** Verification and password update in `POST /api/v1/auth/password/reset` and `POST /api/v1/auth/password/temporary` MUST occur in a single `@Transactional` block with optimistic locking or row locking where necessary to prevent double consumption under concurrent requests.
-- **Rate Limiting:** Public endpoints (`/password/reset`, `/password/temporary`, `/otp/resend`) MUST be governed by Redis Token Bucket rate limiting (`shared/ratelimit`, unauthenticated public tier: 60 req/min) with `429 Too Many Requests` and `Retry-After` header.
+- **Rate Limiting:** Public endpoints (`/password/reset`, `/password/temporary`, `/otp/resend`) MUST be governed by Redis Token Bucket rate limiting (`shared/ratelimit`, `auth-tier`: capacity 20 tokens, refill 20 tokens / 60s per client IP) with `429 Too Many Requests` and `Retry-After` header.
 - **Password Security:** Password hashing MUST use Argon2id with parameters conformant with ADR-005. Raw passwords MUST NEVER be logged, cached, or returned in responses.
 - **Observability:** Emit structured logs with `traceId` and masked user identity. Publish Micrometer metrics for password reset counts and failure rates.
 

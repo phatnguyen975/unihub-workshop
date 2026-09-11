@@ -1,11 +1,18 @@
 package com.unihub.workshop.shared.ratelimit;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.distributed.proxy.RemoteBucketBuilder;
 import jakarta.servlet.FilterChain;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,14 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.function.Supplier;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RateLimitFilterUnauthenticatedTest {
@@ -42,11 +41,22 @@ class RateLimitFilterUnauthenticatedTest {
 
     @BeforeEach
     void setUp() {
-        RateLimitProperties.Tier regTier = new RateLimitProperties.Tier(5, 5, Duration.ofSeconds(10));
-        RateLimitProperties.Tier browsTier = new RateLimitProperties.Tier(100, 100, Duration.ofSeconds(60));
-        properties = new RateLimitProperties(regTier, browsTier, java.util.List.of());
+        properties = RateLimitProperties.builder()
+            .defaultTier(100, 100, Duration.ofSeconds(60))
+            .addTier(
+                "registration",
+                5,
+                5,
+                Duration.ofSeconds(10),
+                java.util.List.of()
+            )
+            .build();
 
-        filter = new RateLimitFilter(proxyManager, properties, mock(RateLimitMetrics.class));
+        filter = new RateLimitFilter(
+            proxyManager,
+            properties,
+            mock(RateLimitMetrics.class)
+        );
 
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
@@ -60,8 +70,12 @@ class RateLimitFilterUnauthenticatedTest {
         when(bucket.tryConsumeAndReturnRemaining(1)).thenReturn(probe);
 
         when(proxyManager.builder()).thenReturn(builderMock);
-        when(builderMock.build(any(byte[].class), ArgumentMatchers.<Supplier<BucketConfiguration>>any()))
-                .thenReturn(bucket);
+        when(
+            builderMock.build(
+                any(byte[].class),
+                ArgumentMatchers.<Supplier<BucketConfiguration>>any()
+            )
+        ).thenReturn(bucket);
     }
 
     @Test
@@ -70,8 +84,10 @@ class RateLimitFilterUnauthenticatedTest {
 
         filter.doFilter(request, response, filterChain);
 
-        verify(builderMock).build(eq("rate_limit:192.168.1.1".getBytes(StandardCharsets.UTF_8)),
-                ArgumentMatchers.<Supplier<BucketConfiguration>>any());
+        verify(builderMock).build(
+            eq("rate_limit:192.168.1.1".getBytes(StandardCharsets.UTF_8)),
+            ArgumentMatchers.<Supplier<BucketConfiguration>>any()
+        );
         verify(filterChain).doFilter(request, response);
     }
 
@@ -82,8 +98,10 @@ class RateLimitFilterUnauthenticatedTest {
 
         filter.doFilter(request, response, filterChain);
 
-        verify(builderMock).build(eq("rate_limit:203.0.113.195".getBytes(StandardCharsets.UTF_8)),
-                ArgumentMatchers.<Supplier<BucketConfiguration>>any());
+        verify(builderMock).build(
+            eq("rate_limit:203.0.113.195".getBytes(StandardCharsets.UTF_8)),
+            ArgumentMatchers.<Supplier<BucketConfiguration>>any()
+        );
         verify(filterChain).doFilter(request, response);
     }
 
@@ -94,8 +112,10 @@ class RateLimitFilterUnauthenticatedTest {
 
         filter.doFilter(request, response, filterChain);
 
-        verify(builderMock).build(eq("rate_limit:192.168.1.5".getBytes(StandardCharsets.UTF_8)),
-                ArgumentMatchers.<Supplier<BucketConfiguration>>any());
+        verify(builderMock).build(
+            eq("rate_limit:192.168.1.5".getBytes(StandardCharsets.UTF_8)),
+            ArgumentMatchers.<Supplier<BucketConfiguration>>any()
+        );
         verify(filterChain).doFilter(request, response);
     }
 }

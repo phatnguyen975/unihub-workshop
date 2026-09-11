@@ -472,13 +472,22 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 All endpoints in this contract are authenticated and protected by the platform's distributed rate limiting filter (`RateLimitFilter`) via Bucket4j and Redis:
 
-- **Bucket Tier:** `AUTHENTICATED` user tier.
+- **Tier Classification:** Default Tier (all endpoints under `/api/v1/organizations/users`).
 - **Capacity & Refill:** 100 requests per minute per user ID (`jwt.sub`).
 - **Standard Headers Returned:**
   - `X-RateLimit-Limit: 100`
   - `X-RateLimit-Remaining: <count>`
-  - `X-RateLimit-Reset: <epoch-seconds>`
+  - `X-RateLimit-Retry-After: <seconds>`
 - **Breach Behavior:** HTTP `429 Too Many Requests` (`urn:unihub:error:rate-limited`) with `Retry-After` header.
+
+### Endpoint Routing Summary
+
+| Path                                                | Auth | Role        | Rate Limit Tier | Notes                  |
+| :-------------------------------------------------- | :--: | :---------- | :-------------- | :--------------------- |
+| `POST /api/v1/organizations/users`                  | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
+| `PATCH /api/v1/organizations/users/{userId}/status` | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
+| `GET /api/v1/organizations/users/{userId}`          | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
+| `GET /api/v1/organizations/users`                   | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
 
 ## 5. Idempotency Behavior
 

@@ -18,7 +18,7 @@ This contract defines the network interface for the **Real-Time Event Streaming 
   - `Connection: keep-alive`
   - `X-Accel-Buffering: no` (disables reverse proxy buffering in Nginx)
 - **Error Response Format:** RFC 7807 Problem Details wrapped in the standard JSON envelope (`{"success": false, "error": {...}, "metadata": {...}}`) with Content-Type `application/problem+json`, returned synchronously on handshake rejection before stream establishment.
-- **Rate Limiting:** Dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`) mapped to `/api/v1/stream/**` via Bucket4j distributed token bucket. Protects backend from socket exhaustion while isolating browsing quota.
+- **Rate Limiting:** Dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`) mapped to `/api/v1/stream/**` via Bucket4j distributed token bucket. Protects backend from socket exhaustion while isolating default-tier quota.
 - **Authentication:** Standard HTTP Bearer header (`Authorization: Bearer <jwt>`) using RS256 JWT tokens. Passing tokens via query parameters is strictly forbidden to prevent token leakage in web server access logs.
 - **Client Implementation Recommendation:** Web clients must use `@microsoft/fetch-event-source` to enable custom `Authorization` headers. Mobile React Native clients use `react-native-sse`.
 - **Date/Time Formatting:** ISO 8601 UTC string format (e.g. `2026-09-09T05:00:00Z`).

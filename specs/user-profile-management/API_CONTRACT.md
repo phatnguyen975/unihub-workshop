@@ -68,17 +68,17 @@ This contract specifies the HTTP REST interface for the **User Profile Managemen
 
 **Field Descriptions (`data`):**
 
-| Field             | Type              | Nullable | Description                                                                                             |
-| :---------------- | :---------------- | :------: | :------------------------------------------------------------------------------------------------------ |
-| `id`              | UUID (string)     |    No    | Unique user identifier.                                                                                 |
-| `email`           | String            |    No    | Primary authentication credential; immutable.                                                           |
-| `fullName`        | String            |    No    | User's display name; max 200 characters.                                                                |
-| `role`            | String (enum)     |    No    | `STUDENT`, `ORGANIZER`, or `STAFF`. Managed by provisioning flows.                                      |
-| `phoneNumber`     | String            |   Yes    | International phone number. Omitted from response when stored value is `null`.                          |
-| `avatarUrl`       | String (URL)      |   Yes    | Absolute URL of the user's avatar image. Omitted from response when stored value is `null`.             |
-| `lastLoginAt`     | String (ISO 8601) |   Yes    | Timestamp of the user's last successful authentication. Omitted when `null`.                            |
+| Field             | Type              | Nullable | Description                                                                                               |
+| :---------------- | :---------------- | :------: | :-------------------------------------------------------------------------------------------------------- |
+| `id`              | UUID (string)     |    No    | Unique user identifier.                                                                                   |
+| `email`           | String            |    No    | Primary authentication credential; immutable.                                                             |
+| `fullName`        | String            |    No    | User's display name; max 200 characters.                                                                  |
+| `role`            | String (enum)     |    No    | `STUDENT`, `ORGANIZER`, or `STAFF`. Managed by provisioning flows.                                        |
+| `phoneNumber`     | String            |   Yes    | International phone number. Omitted from response when stored value is `null`.                            |
+| `avatarUrl`       | String (URL)      |   Yes    | Absolute URL of the user's avatar image. Omitted from response when stored value is `null`.               |
+| `lastLoginAt`     | String (ISO 8601) |   Yes    | Timestamp of the user's last successful authentication. Omitted when `null`.                              |
 | `organizationId`  | UUID (string)     |   Yes    | Associated organization identifier. Non-null for `ORGANIZER` or affiliated students; omitted when `null`. |
-| `studentRecordId` | UUID (string)     |   Yes    | Link to student directory record for verified students; omitted when `null`.                            |
+| `studentRecordId` | UUID (string)     |   Yes    | Link to student directory record for verified students; omitted when `null`.                              |
 
 > [!IMPORTANT]
 > All nullable fields (`phoneNumber`, `avatarUrl`, `lastLoginAt`, `organizationId`, `studentRecordId`) are omitted from the JSON payload when their stored value is `null`, conforming to `@JsonInclude(JsonInclude.Include.NON_NULL)` and `docs/api-standards.md`. The example above illustrates a profile where all fields are populated.
@@ -314,13 +314,21 @@ Upon a **successful** request (all validations pass, Redis is reachable):
 
 ## 4. Rate Limiting Behavior
 
-All three endpoints are subject to the platform's standard **Browsing Tier** Bucket4j Token Bucket filter backed by centralized Redis counters (ADR-019):
+All three endpoints are subject to the platform's standard **Default Tier** Bucket4j Token Bucket filter backed by centralized Redis counters (ADR-019):
 
-- **Tier Classification:** Browsing Tier (all endpoints under `/api/v1/users`).
+- **Tier Classification:** Default Tier (all endpoints under `/api/v1/users`).
 - **Bucket Keying:** Keyed by authenticated user identifier (`jwt.sub`).
-- **Bucket Configuration:** Configuration-driven via `rate-limit.browsing-tier` in `application.yml` (default: capacity 100 tokens, refill 100 tokens per 60 seconds).
+- **Bucket Configuration:** Configuration-driven via `rate-limit.default-tier` in `application.yml` (default: capacity 100 tokens, refill 100 tokens per 60 seconds).
 - **On Limit Exceeded:** Returns HTTP `429 Too Many Requests` with RFC 7807 problem type `urn:unihub:error:rate-limited`, headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After`, and `Retry-After`.
 - **Fail-Open Policy:** If Redis is unavailable for rate-limit checks, the filter allows the request through and emits telemetry (ADR-019). This is strictly distinct from the fail-closed Redis policy on the password-change blacklist write (FR-23, BR-06).
+
+### Endpoint Routing Summary
+
+| Path                              | Auth | Role                      | Rate Limit Tier | Notes              |
+| :-------------------------------- | :--: | :------------------------ | :-------------- | :----------------- |
+| `GET /api/v1/users/me`            | Yes  | Any (`STUDENT/ORG/STAFF`) | Default (100)   | Keyed by `jwt.sub` |
+| `PATCH /api/v1/users/me`          | Yes  | Any (`STUDENT/ORG/STAFF`) | Default (100)   | Keyed by `jwt.sub` |
+| `PATCH /api/v1/users/me/password` | Yes  | Any (`STUDENT/ORG/STAFF`) | Default (100)   | Keyed by `jwt.sub` |
 
 ## 5. Idempotency Behavior
 

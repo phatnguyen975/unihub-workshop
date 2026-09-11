@@ -149,7 +149,13 @@ None. This is a read-only endpoint. No database records are created or modified.
 
 ## 4. Rate Limiting Behavior
 
-This endpoint is **not** subject to the Bucket4j registration rate-limit tier (which is restricted to `/api/v1/registrations/**` paths, per `application.yml`). Standard server-side TCP connection limits at the Nginx gateway layer apply. No custom per-user rate limit is applied to this endpoint.
+This endpoint is an authenticated endpoint and is subject to the platform's standard **default-tier** Bucket4j Token Bucket rate limiter (capacity: 100 tokens, refill: 100 tokens per 60 seconds, keyed by `jwt.sub`). Standard response headers `X-RateLimit-Limit: 100`, `X-RateLimit-Remaining`, and `X-RateLimit-Retry-After` are returned on every request.
+
+### Endpoint Routing Summary
+
+| Path                          | Auth | Role    | Rate Limit Tier | Notes                          |
+| :---------------------------- | :--: | :------ | :-------------- | :----------------------------- |
+| `GET /api/v1/auth/public-key` | Yes  | `STAFF` | Default (100)   | Keyed by `jwt.sub`, PEM format |
 
 ## 5. Cross-Endpoint Consistency Notes
 

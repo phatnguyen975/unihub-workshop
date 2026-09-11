@@ -1,7 +1,7 @@
 package com.unihub.workshop;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.docs.Documenter;
 
@@ -12,7 +12,9 @@ import org.springframework.modulith.docs.Documenter;
  */
 class ModulithArchitectureTest {
 
-    ApplicationModules modules = ApplicationModules.of(WorkshopApplication.class);
+    ApplicationModules modules = ApplicationModules.of(
+        WorkshopApplication.class
+    );
 
     @Test
     void verifiesModularStructure() {
@@ -25,8 +27,8 @@ class ModulithArchitectureTest {
     void createModuleDocumentation() {
         // Generates C4 component diagrams and Asciidoc summaries
         new Documenter(modules)
-                .writeDocumentation()
-                .writeModulesAsPlantUml()
-                .writeIndividualModulesAsPlantUml();
+            .writeDocumentation()
+            .writeModulesAsPlantUml()
+            .writeIndividualModulesAsPlantUml();
     }
 }

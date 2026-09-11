@@ -102,7 +102,7 @@ This feature provides authenticated users across all roles (`STUDENT`, `STAFF`, 
 - **Performance:** Keyset cursor pagination query execution time on the primary database must remain under 30ms at p95 under standard concurrent load.
 - **Concurrency & Distributed Consistency:** The solution must be completely stateless at the application layer. Multiple backend server nodes operating behind the load balancer must observe identical session and revocation state without requiring sticky sessions.
 - **Idempotency:** `DELETE` operations are idempotent from a system-state standpoint. Once revoked, subsequent revocation requests on the same session identifier predictably return `404 Not Found`.
-- **Rate Limiting:** Session listing and revocation endpoints are non-registration endpoints and are governed by the **browsing tier** Token Bucket filter (`rate-limit.browsing-tier`, per ADR-019), keyed by authenticated user ID (`jwt.sub`) and operating in fail-open mode if Redis is unavailable (ADR-010).
+- **Rate Limiting:** Session listing and revocation endpoints are non-registration endpoints and are governed by the **default tier** Token Bucket filter (`rate-limit.default-tier`, per ADR-019), keyed by authenticated user ID (`jwt.sub`) and operating in fail-open mode if Redis is unavailable (ADR-010).
 - **Security:**
   - Strict Bearer token authentication required across all endpoints.
   - Access tokens bound to session records via cryptographic claims.

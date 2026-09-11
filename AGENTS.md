@@ -78,9 +78,17 @@ Every feature in this repository **must** go through this pipeline, driven by fi
 The `/review` is not a terminal step. If it produces findings, the cycle is `/review → /fix → /review` until no blocking findings remain. This is **not an automated loop** — every arrow above is a separate, explicit human-invoked command. The agent does not chain commands on its own initiative — a human reviews the output of `/spec` and `/plan` and explicitly decides to proceed before the next command is run.
 
 > [!NOTE]
-> `specs/` and `docs/` are kept consistent _as part of_ `/build` itself, at the moment an improvement is proposed and approved — see section 4.4, "Mid-build improvement proposals." By the time a feature reaches `/review`, `specs/` and `docs/` are already expected to be accurate; `/review` and `/fix` exist to catch implementation defects, not specification drift.
+> `specs/` and `docs/` are kept consistent _as part of_ `/build` itself, at the moment an improvement is proposed and approved — see section 4.5, "Mid-build improvement proposals." By the time a feature reaches `/review`, `specs/` and `docs/` are already expected to be accurate; `/review` and `/fix` exist to catch implementation defects, not specification drift.
 
-### 4.1 Skills Catalog
+### 4.1 Feature Status Lifecycle
+
+Every feature in `docs/feature-catalog.md` maintains an explicit status:
+
+- **`DONE`**: The feature has completed all development stages (`/spec` → `/plan` → `/build` → `/review`), passed all tests and human verification, and is merged/active in production code.
+- **`READY`**: All prerequisite dependencies in `Appendix A: Feature Dependency Map` are `DONE` (or the feature has no dependencies). The feature is eligible for immediate `/spec` invocation.
+- **`BLOCKED`**: One or more prerequisite dependencies in `Appendix A: Feature Dependency Map` are not yet `DONE`. The feature cannot be started yet.
+
+### 4.2 Skills Catalog
 
 | #   | Skill                                    | Phase        | Purpose                                                                                                |
 | :-- | :--------------------------------------- | :----------- | :----------------------------------------------------------------------------------------------------- |
@@ -97,7 +105,7 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 | 11  | `code-review-and-quality`                | Review       | Multi-axis review before merge                                                                         |
 | 12  | `debugging-and-root-cause-analysis`      | Fix/Build    | Reproduce → localize → hypothesize → fix root cause → regression test                                  |
 
-### 4.2 `/spec <feature-name>`
+### 4.3 `/spec <feature-name>`
 
 **Skills invoked:**
 
@@ -106,6 +114,8 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 
 **Agent responsibility:** Read every relevant file in `docs/` (per the Documentation Map above) before drafting either artifact. This **must** include `docs/feature-catalog.md` to confirm the feature is listed, identify the correct module owner, and understand documented constraints and dependencies. Cross-reference every requirement against the actual flow described in `docs/system-design.md` — do not invent behavior that contradicts it.
 
+**Feature readiness check (mandatory):** Before drafting any spec or API contract, the agent **must** verify that `<feature-name>` has status `READY` in `docs/feature-catalog.md`. If the feature is `BLOCKED` (or already `DONE`), the agent must **stop immediately** and ask the human for confirmation before proceeding, explicitly listing which prerequisite dependencies from `Appendix A: Feature Dependency Map` are not yet `DONE`.
+
 **Human verification gate (mandatory, blocking):** The human reads `SPEC.md` (and `API_CONTRACT.md` if produced) and explicitly approves before `/plan` may be run. If acceptance criteria are not testable, or a requirement is ambiguous, the agent must stop and ask rather than guess.
 
 **Feature naming:** The agent does **not** choose feature names. The human supplies `<feature-name>`, which **must** exactly match one of the kebab-case feature names listed in `docs/feature-catalog.md`. If the supplied name does not match any catalogued feature, or if it is ambiguous (e.g., matches a bare module name like `registrations` instead of `free-workshop-registration`), the agent must ask for clarification and cite the relevant section of `docs/feature-catalog.md` rather than guessing scope.
@@ -113,7 +123,7 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 > [!NOTE]
 > The human must read and approve these artifacts first — this is a hard gate, not a suggestion. The agent does not self-approve its own spec. If the human approves, the spec becomes the contract for implementation, then you change the status to `APPROVED`. If the human rejects it, revise these artifacts with the human's feedback and fix them until approval is granted.
 
-### 4.3 `/plan <feature-name>`
+### 4.4 `/plan <feature-name>`
 
 **Skill invoked:**
 
@@ -121,7 +131,7 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 
 **Human verification gate (mandatory, blocking):** The human reviews `tasks.md` for correct ordering, scope, and granularity (no task should span more than ~10 files) before `/build` may begin.
 
-### 4.4 `/build <feature-name> <task-id>`
+### 4.5 `/build <feature-name> <task-id>`
 
 Run once per task in `tasks.md`, in order.
 
@@ -166,7 +176,7 @@ Run once per task in `tasks.md`, in order.
 >
 > This is the **only** mechanism that keeps `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` consistent with each other and with the actual implementation.
 
-### 4.5 `/review <feature-name>`
+### 4.6 `/review <feature-name>`
 
 Run after all tasks for a feature are complete.
 
@@ -176,13 +186,19 @@ Run after all tasks for a feature are complete.
 - `security-and-hardening` — re-run in full-checklist mode if the feature touches auth, payments, webhooks, or RBAC.
 - `performance-and-efficiency-engineering` — invoked when the feature touched any database query, a loop over a collection, or a call to an external/slow dependency during `/build`. Re-checks specifically for N+1 query shapes, missing indexes, unbounded results, and unguarded hot-path I/O — independently of whatever was already checked during `/build`, since this category of defect is easy to miss once and obvious once flagged.
 
-**Scope:** By this point, `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` are assumed accurate — any legitimate deviation already went through the improvement-proposal flow in section 4.4. `/review` therefore checks the implementation **against** these artifacts; it does not re-open or re-question the artifacts themselves. If the agent believes it has found a genuine specification gap rather than an implementation defect, it must say so explicitly in `review-notes.md` and flag that the human may need to restart an improvement proposal retroactively — but `/review` itself never edits `specs/` or `docs/`.
+**Scope:** By this point, `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` are assumed accurate — any legitimate deviation already went through the improvement-proposal flow in section 4.5. `/review` therefore checks the implementation **against** these artifacts; it does not re-open or re-question the artifacts themselves. If the agent believes it has found a genuine specification gap rather than an implementation defect, it must say so explicitly in `review-notes.md` and flag that the human may need to restart an improvement proposal retroactively — but `/review` itself never edits `specs/` or `docs/`.
 
 **Output:** `specs/<feature-name>/review-notes.md`, listing every finding found by the agent, classified by severity (Critical / Should-fix / Nit / FYI). The agent presents this summary and stops — it does not fix anything yet.
 
 **Human verification gate (mandatory, blocking):** The human reads `review-notes.md`, confirms or disputes each AI-found finding, and adds any additional findings the AI missed. The combined, human-confirmed list is the only valid input to `/fix`.
 
-### 4.6 `/fix <feature-name>`
+**Feature completion & dependency unblocking:** When `/review` passes with zero blocking findings (or after all findings from `/fix` have been verified and resolved) and the human explicitly confirms the feature is `DONE`:
+
+1. The agent updates `<feature-name>`'s status in `docs/feature-catalog.md` from `READY` to `DONE` (`> **Status:** DONE`).
+2. The agent inspects `Appendix A: Feature Dependency Map` in `docs/feature-catalog.md` to identify any downstream features that depend on this feature.
+3. For each dependent feature whose prerequisite dependencies are now all `DONE`, the agent automatically unblocks it by updating its status from `BLOCKED` to `READY` (`> **Status:** READY`).
+
+### 4.7 `/fix <feature-name>`
 
 Run whenever `/review` produced a human-confirmed list of findings.
 
@@ -190,7 +206,7 @@ Run whenever `/review` produced a human-confirmed list of findings.
 
 - `debugging-and-root-cause-analysis` — always runs, once per finding. **For each finding:** reproduce the minimal failing case → localize the cause → form a hypothesis → fix the root cause (not the symptom) → add a regression test that fails before the fix and passes after.
 
-**Rule:** `/fix` only ever changes code and tests to bring the implementation back into line with the already-approved `SPEC.md` / `API_CONTRACT.md` / `tasks.md`. It never edits `specs/` or `docs/` — those are only ever changed through the improvement-proposal flow in section 4.4. A fix is never applied without a regression test, even for findings that look trivial. This is the same Red-Green-Refactor discipline as `/build` — a review finding is not exempt from TDD.
+**Rule:** `/fix` only ever changes code and tests to bring the implementation back into line with the already-approved `SPEC.md` / `API_CONTRACT.md` / `tasks.md`. It never edits `specs/` or `docs/` — those are only ever changed through the improvement-proposal flow in section 4.5. A fix is never applied without a regression test, even for findings that look trivial. This is the same Red-Green-Refactor discipline as `/build` — a review finding is not exempt from TDD.
 
 **After all findings are fixed:** The agent reports completion and the human re-runs `/review` on the same feature. Repeat `/review → /fix → /review` until zero blocking findings remain. The feature is then considered complete.
 
@@ -239,5 +255,5 @@ These apply to all code regardless of which skill or command produced it.
 - **Never silently expand a task's scope.** If implementing a task reveals that the spec or plan is wrong or incomplete, stop and surface this rather than improvising beyond what was approved.
 - **Never invent business behavior not present in `docs/`.** If `docs/system-design.md` or `docs/adrs.md` doesn't specify a behavior, ask rather than assume.
 - **Fail-mode decisions (fail-open vs fail-closed)** must match what `docs/adrs.md` already specifies — do not change these without an explicit human decision.
-- Never apply a fix from `/fix` without the regression-test discipline described in section 4.6 — a review finding is never patched directly.
-- **Never let implementation silently diverge from the approved spec.** If a better approach is discovered mid-build, follow the two-gate improvement-proposal process in section 4.4 — record it, get it approved, update `specs/` and `docs/` together, get that update approved, then resume — never implement first and reconcile later.
+- Never apply a fix from `/fix` without the regression-test discipline described in section 4.7 — a review finding is never patched directly.
+- **Never let implementation silently diverge from the approved spec.** If a better approach is discovered mid-build, follow the two-gate improvement-proposal process in section 4.5 — record it, get it approved, update `specs/` and `docs/` together, get that update approved, then resume — never implement first and reconcile later.

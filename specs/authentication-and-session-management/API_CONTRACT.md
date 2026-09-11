@@ -389,15 +389,15 @@ Per ADR-010, JTI blacklist checks on protected requests are fail-closed. If Redi
 
 ### Rate Limiting
 
-Per NFR-09, the `/api/v1/auth/login` and `/api/v1/auth/refresh` endpoints are subject to the **browsing-tier** Bucket4j rate limit (capacity: 100 tokens, refill: 100 per minute). They are NOT subject to the registration-tier (capacity: 5 per 10 seconds) rate limit.
+Per NFR-09, the `/api/v1/auth/login` and `/api/v1/auth/refresh` endpoints are subject to the **auth-tier** Bucket4j rate limit (capacity: 20 tokens, refill: 20 per minute per client IP). They are NOT subject to the registration-tier (capacity: 5 per 10 seconds) or default-tier rate limits. `/api/v1/auth/logout` is an authenticated endpoint governed by the **default-tier** (keyed by `jwt.sub`).
 
 ## Endpoint Routing Summary
 
 The table below summarises which paths are public and which are protected, as configured in `app.security.public-paths` and enforced by `SecurityConfig`:
 
-| Path                         | Auth | Rate Limit Tier | Notes                        |
-| :--------------------------- | :--: | :-------------- | :--------------------------- |
-| `POST /api/v1/auth/login`    |  No  | Browsing        | Configured in `public-paths` |
-| `POST /api/v1/auth/refresh`  |  No  | Browsing        | Configured in `public-paths` |
-| `POST /api/v1/auth/logout`   | Yes  | Browsing        | Bearer token required        |
-| `GET /.well-known/jwks.json` |  No  | None            | Configured in `public-paths` |
+| Path                         | Auth | Rate Limit Tier | Notes                                             |
+| :--------------------------- | :--: | :-------------- | :------------------------------------------------ |
+| `POST /api/v1/auth/login`    |  No  | Auth            | Configured in `public-paths` (20 req/60s per IP)  |
+| `POST /api/v1/auth/refresh`  |  No  | Auth            | Configured in `public-paths` (20 req/60s per IP)  |
+| `POST /api/v1/auth/logout`   | Yes  | Default         | Bearer token required (100 req/60s per user)      |
+| `GET /.well-known/jwks.json` |  No  | Default         | Configured in `public-paths` (100 req/60s per IP) |

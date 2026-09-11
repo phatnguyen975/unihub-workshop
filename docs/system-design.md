@@ -818,9 +818,18 @@ The backend securely holds the private key used to sign QR codes. QR payloads ar
 
 Registration demand peaks at 12,000 concurrent users within the first 10 minutes, with 60% concentrated in the initial 3-minute window. To keep the backend stable under that burst, the Core Backend Monolith enforces a distributed **Token Bucket** rate limiter at the application filter layer using **Bucket4j** with **Redis** as the shared state store. The API Gateway remains a forwarding proxy and does not perform rate limiting.
 
-Each user or IP is assigned a bucket with a fixed capacity of tokens. Every `POST /registrations` request consumes a token, and tokens refill at a steady rate. This allows short bursts during the first 3 minutes while still capping sustained throughput, preventing the registration service and database from being overwhelmed.
+Each user (keyed by `jwt.sub`) or unauthenticated client (keyed by client IP) is assigned a bucket with a fixed capacity of tokens according to the requested endpoint tier.
 
-When a bucket is empty, the Core Backend Monolith returns HTTP `429 Too Many Requests` to the gateway, which relays the response to the client. The frontend shows a simple "Please wait" message and retries with backoff, protecting the system while keeping the user informed.
+#### Rate Limiting Tiers
+
+| Tier                  | Default Capacity | Default Refill | Endpoint Scope                                                                                                                                    | Rationale                                                                                                                                          |
+| :-------------------- | :--------------: | :------------: | :------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Registration Tier** |     5 tokens     |   5 per 10s    | `POST /api/v1/registrations/**`                                                                                                                   | Smooths the 12,000-user spike; protects PostgreSQL registration pipeline and Redis capacity pre-checks.                                            |
+| **Auth Tier**         |    20 tokens     |   20 per 60s   | `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/activate`, `/api/v1/auth/otp/**`, `/api/v1/auth/password/**`, `/api/v1/auth/refresh` | Protects CPU-intensive Argon2id hashing and OTP verification against DoS and brute-force while accommodating campus NAT IP bursts.                 |
+| **Stream Tier**       |    10 tokens     |   10 per 60s   | `GET /api/v1/stream/**`                                                                                                                           | Prevents connection flooding and SSE socket exhaustion.                                                                                            |
+| **Default Tier**      |    100 tokens    |  100 per 60s   | All other API routes                                                                                                                              | General fallback tier providing relaxed throughput for catalog navigation, profile management, session inspections, and other platform operations. |
+
+When a bucket is empty, the Core Backend Monolith returns HTTP `429 Too Many Requests` with `X-RateLimit-*` headers to the gateway, which relays the response to the client. The frontend shows a simple "Please wait" message and retries with backoff, protecting the system while keeping the user informed.
 
 ```mermaid
 sequenceDiagram

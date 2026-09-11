@@ -94,7 +94,7 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
     - Micrometer gauge `realtime.sse.active_connections` accurately tracks the number of open SSE connections in memory across connect/disconnect events (NFR Observability).
     - Micrometer counter `realtime.events.pushed.total` increments tagged by `event_type` upon each event sent to an emitter socket (NFR Observability).
     - Micrometer counter `realtime.sse.disconnects.total` tracks connection termination reasons (`client_abort`, `timeout`, `error`) (NFR Observability).
-    - Rate limiter configures a dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`) mapped to `/api/v1/stream/**`, protecting against socket flood DoS while isolating general browsing quota (FR-05).
+    - Rate limiter configures a dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`) mapped to `/api/v1/stream/**`, protecting against socket flood DoS while isolating default-tier quota (FR-05).
     - Handshake rate-limit rejection returns HTTP `429 Too Many Requests` with type `urn:unihub:error:rate-limited` wrapped in the standard `ApiResponse` envelope (`{"success": false, "error": {...}, "metadata": {...}}`) with `X-RateLimit-*` headers (API Contract).
     - All existing rate limit tests in F-10.2 continue to pass without regression.
     - `ModulithArchitectureTest` verifies that `com.unihub.workshop.shared.realtime` respects module boundaries as an open shared module without package encapsulation violations.
