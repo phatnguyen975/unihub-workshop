@@ -3,14 +3,15 @@ package com.unihub.workshop.iam.presentation.controllers;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.security.RedisJtiValidator;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
@@ -35,10 +36,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "datasource.replica.driver-class-name=org.h2.Driver"
 })
 @ActiveProfiles("test")
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@RequiredArgsConstructor
 class AuthControllerPublicKeyTest {
 
-    @Autowired
-    private WebApplicationContext context;
+    private final WebApplicationContext context;
 
     private MockMvc mockMvc;
 

@@ -53,7 +53,7 @@ class AuthControllerLogoutTest {
                 .build();
 
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
-                .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
+                .setControllerAdvice(new GlobalExceptionHandler(null), new GlobalResponseBodyAdvice())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {

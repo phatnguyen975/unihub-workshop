@@ -31,7 +31,7 @@ class AuthControllerRegisterTest {
                 .withRegisterUserUseCase(registerUserUseCase)
                 .build();
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
-                .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
+                .setControllerAdvice(new GlobalExceptionHandler(null), new GlobalResponseBodyAdvice())
                 .build();
     }
 

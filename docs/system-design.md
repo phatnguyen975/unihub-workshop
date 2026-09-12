@@ -859,11 +859,11 @@ External payment gateways are inherently unreliable due to network latency, time
 
 To prevent this, the payment integration uses a **Circuit Breaker** implemented with **Resilience4j**. The breaker continuously tracks failure rate and slow-call rate; when thresholds are exceeded, it opens and blocks further payment calls.
 
-When the circuit is open, the system fails fast instead of hanging. Calls intercepted by Resilience4j throw `CallNotPermittedException`, which `GlobalExceptionHandler` maps to `503 Service Unavailable` (`urn:unihub:error:service-unavailable`) accompanied by a `Retry-After` HTTP header matching the configured open-state wait duration. This prevents thread pool exhaustion and informs clients exactly when downstream recovery attempts will begin.
+When the circuit is open, the system fails fast instead of hanging. Calls intercepted by Resilience4j throw `CallNotPermittedException`, which `GlobalExceptionHandler` maps to `503 Service Unavailable` accompanied by a `Retry-After` HTTP header matching the configured open-state wait duration of the specific tripped circuit breaker (falling back to the default wait duration). For generic system-level outages (such as DB or Redis unavailable), `ServiceUnavailableException` provides a configurable default header via `app.http.retry-after-seconds` (defaulting to 30s). This prevents thread pool exhaustion and informs clients exactly when downstream recovery attempts will begin.
 
 #### Circuit Breaker Configuration
 
-All Circuit Breaker thresholds and state parameters are configurable via environment variables in `application.yml`:
+All Circuit Breaker thresholds and state parameters are declared with clean, concrete default values in `application.yml` and can be overridden via standard Spring Boot relaxed environment variable binding (e.g., `RESILIENCE4J_CIRCUITBREAKER_CONFIGS_DEFAULT_FAILURE_RATE_THRESHOLD`):
 
 | Configuration Property                                | Default Value | Purpose                                                                         |
 | :---------------------------------------------------- | :------------ | :------------------------------------------------------------------------------ |

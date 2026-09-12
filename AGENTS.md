@@ -242,7 +242,7 @@ These apply to all code regardless of which skill or command produced it.
 - **Clean code baseline.** Small functions with a single responsibility, intention-revealing names, no magic numbers/strings (use named constants or enums), no commented-out code committed.
 - **Optimize for maintainability over cleverness.** Prefer the obvious, slightly more verbose solution over a clever one-liner if it is easier for a future reader (human or agent) to understand without additional context.
 - **Immutability by default** (Java `record`/`final` fields for domain objects, TypeScript `readonly`/`const`) unless mutation is required and justified.
-- **Use Lombok to reduce boilerplate code.** Prefer standard Lombok annotations such as `@Getter`, `@Setter`, `@RequiredArgsConstructor`, and `@Builder` where they improve readability and maintainability. Avoid excessive or unnecessary Lombok usage when it makes the code harder to understand.
+- **Use Lombok to reduce boilerplate code.** Prefer standard Lombok annotations such as `@Getter`, `@Setter`, `@RequiredArgsConstructor` (not `@Autowired`), and `@Builder` where they improve readability and maintainability. Avoid excessive or unnecessary Lombok usage when it makes the code harder to understand.
 - **No framework leakage into the domain layer.** Domain classes never import Spring, JPA, or any TypeScript framework-specific type.
 - **TypeScript-specific (for `apps/web/` or `apps/mobile/`):** Strict mode enabled (`strict: true` in `tsconfig.json`), no `any` without an explicit justifying comment, prefer discriminated unions over optional-field-heavy types for state modeling.
 
@@ -255,5 +255,4 @@ These apply to all code regardless of which skill or command produced it.
 - **Never silently expand a task's scope.** If implementing a task reveals that the spec or plan is wrong or incomplete, stop and surface this rather than improvising beyond what was approved.
 - **Never invent business behavior not present in `docs/`.** If `docs/system-design.md` or `docs/adrs.md` doesn't specify a behavior, ask rather than assume.
 - **Fail-mode decisions (fail-open vs fail-closed)** must match what `docs/adrs.md` already specifies — do not change these without an explicit human decision.
-- Never apply a fix from `/fix` without the regression-test discipline described in section 4.7 — a review finding is never patched directly.
 - **Never let implementation silently diverge from the approved spec.** If a better approach is discovered mid-build, follow the two-gate improvement-proposal process in section 4.5 — record it, get it approved, update `specs/` and `docs/` together, get that update approved, then resume — never implement first and reconcile later.

@@ -42,7 +42,7 @@ class AuthControllerRefreshTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(authController)
-                .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
+                .setControllerAdvice(new GlobalExceptionHandler(null), new GlobalResponseBodyAdvice())
                 .build();
     }
 

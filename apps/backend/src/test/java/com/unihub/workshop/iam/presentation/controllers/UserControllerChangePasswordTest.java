@@ -40,7 +40,7 @@ class UserControllerChangePasswordTest {
                 .withChangeUserPasswordUseCase(changeUserPasswordUseCase)
                 .build();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler(), new GlobalResponseBodyAdvice())
+                .setControllerAdvice(new GlobalExceptionHandler(null), new GlobalResponseBodyAdvice())
                 .build();
     }
 
