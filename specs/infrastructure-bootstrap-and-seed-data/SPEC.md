@@ -121,10 +121,26 @@ datasource:
     url: ${SPRING_DATASOURCE_PRIMARY_URL}
     username: ${SPRING_DATASOURCE_PRIMARY_USERNAME}
     password: ${SPRING_DATASOURCE_PRIMARY_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_PRIMARY_HIKARI_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout-ms: 30000
+      idle-timeout-ms: 600000
+      max-lifetime-ms: 1800000
+      pool-name: primary-pool
   replica:
     url: ${SPRING_DATASOURCE_REPLICA_URL}
     username: ${SPRING_DATASOURCE_REPLICA_USERNAME}
     password: ${SPRING_DATASOURCE_REPLICA_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_REPLICA_HIKARI_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout-ms: 30000
+      idle-timeout-ms: 600000
+      max-lifetime-ms: 1800000
+      pool-name: replica-pool
 ```
 
 The routing key resolution **SHALL** be based exclusively on the current Spring transaction context:
@@ -138,7 +154,7 @@ The routing key resolution **SHALL** be based exclusively on the current Spring 
 
 The `RoutingDataSource` **SHALL** be registered as the primary `DataSource` bean so that Spring Data JPA, HikariCP, and JDBC templates transparently use it without per-repository configuration.
 
-Two underlying `HikariDataSource` beans **SHALL** be defined: one for the primary JDBC URL and one for the replica JDBC URL, each with independently tuned HikariCP pool sizes configured via `application.yml` properties.
+Two underlying `HikariDataSource` beans **SHALL** be defined: one for the primary JDBC URL (with default pool name `primary-pool`) and one for the replica JDBC URL (with default pool name `replica-pool`), each with independently tuned HikariCP pool parameters (`maximum-pool-size`, `minimum-idle`, `connection-timeout-ms`, `idle-timeout-ms`, `max-lifetime-ms`, `pool-name`) configured via `application.yml` properties and tagged for Prometheus/Grafana pool metrics (`database-hikaricp.json`).
 
 The existing `spring.datasource.url` key in both `application.yml` files **SHALL** be replaced by the `datasource.primary.*` / `datasource.replica.*` structure above as part of this feature's implementation.
 

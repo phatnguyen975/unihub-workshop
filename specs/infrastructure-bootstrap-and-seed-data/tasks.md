@@ -32,11 +32,13 @@ No REST endpoints are introduced. Every task is verified through unit tests that
     - `apps/backend/src/main/java/com/unihub/workshop/shared/database/TransactionAwareRoutingDataSource.java` — `AbstractRoutingDataSource` subclass; `determineCurrentLookupKey()` reads `TransactionSynchronizationManager.isCurrentTransactionReadOnly()`; returns `"replica"` when `true`, `"primary"` otherwise
     - `apps/backend/src/main/java/com/unihub/workshop/shared/database/DataSourceRoutingConfig.java` — `@Configuration`; defines `primaryDataSource()` and `replicaDataSource()` as `HikariDataSource` beans; defines `routingDataSource()` as `@Primary DataSource` targeting both
     - `apps/backend/src/test/java/com/unihub/workshop/shared/database/DataSourceRoutingConfigTest.java` — unit tests: routing bean is `TransactionAwareRoutingDataSource`; `readOnly=true` transaction → key `"replica"`; `readOnly=false` transaction → key `"primary"`; no active transaction → key `"primary"`
+    - `apps/backend/src/test/resources/application-test.yml` — in-memory H2 primary & replica datasource configuration for test profile
     - `apps/workers/src/main/resources/application.yml` — same YAML restructuring as backend; add `spring.flyway.enabled: false`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/database/DataSourceProperties.java` — `@ConfigurationProperties` record (workers package)
     - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/database/TransactionAwareRoutingDataSource.java` — mirrors backend routing logic (workers package)
     - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/database/DataSourceRoutingConfig.java` — mirrors backend config (workers package)
     - `apps/workers/src/test/java/com/unihub/workshop/workers/shared/database/DataSourceRoutingConfigTest.java` — mirrors backend routing tests (workers package)
+    - `apps/workers/src/test/resources/application-test.yml` — in-memory H2 primary & replica datasource configuration for test profile
   - **Acceptance Criteria:**
     - The backend application context exposes a `@Primary DataSource` bean that is an instance of `TransactionAwareRoutingDataSource` (FR-10, AC-13).
     - The workers application context exposes the same type as the `@Primary DataSource` bean (AC-15, FR-10).
@@ -51,6 +53,7 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 - [x] `DataSourceRoutingConfigTest` passes in both `apps/backend` and `apps/workers`.
 - [x] Neither `application.yml` contains `spring.datasource.url`; both contain `datasource.primary.*` and `datasource.replica.*`.
 - [x] `spring.flyway.enabled: false` is present in the workers `application.yml`.
+- [x] Both `application-test.yml` files configure H2 in-memory primary and replica datasources for isolated test execution.
 - [x] Full unit test suite passes in both apps (including `ModulithArchitectureTest` in backend).
 - [x] Build is clean (`./gradlew test` green for both apps).
 

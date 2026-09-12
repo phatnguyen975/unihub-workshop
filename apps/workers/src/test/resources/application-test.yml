@@ -1,0 +1,20 @@
+# =============================================================================
+# Spring Boot Application Configuration — Test Profile (Workers)
+# =============================================================================
+datasource:
+  primary:
+    url: jdbc:h2:mem:workerstestdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      pool-name: primary-pool
+  replica:
+    url: jdbc:h2:mem:workerstestdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      pool-name: replica-pool

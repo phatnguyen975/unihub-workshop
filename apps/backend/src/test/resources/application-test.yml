@@ -1,26 +1,38 @@
 # =============================================================================
-# Spring Boot Application Configuration
+# Spring Boot Application Configuration — Test Profile (Backend)
 # =============================================================================
 spring:
   data:
     redis:
       password: ${SPRING_DATA_REDIS_PASSWORD}
 
+datasource:
+  primary:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      pool-name: primary-pool
+  replica:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      pool-name: replica-pool
+
 app:
   otp:
     hmac-secret: test-secret-key-must-be-long-enough-for-hmac-sha256-testing
     ttl-minutes: 15
 
-# =============================================================================
-# RSA Key Configuration
-# =============================================================================
 rsa:
   private-key: classpath:security/valid-private.pem
   public-key: classpath:security/valid-public.pem
 
-# =============================================================================
-# Rate Limit Configuration
-# =============================================================================
 rate-limit:
   default-tier:
     capacity: 100
