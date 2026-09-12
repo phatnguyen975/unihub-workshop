@@ -3,6 +3,7 @@ package com.unihub.workshop.shared.ratelimit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.shared.web.ClientIpExtractor;
+import com.unihub.workshop.shared.web.RequestLoggingFilter;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
@@ -18,7 +19,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -143,15 +143,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     MediaType.APPLICATION_PROBLEM_JSON_VALUE
                 );
 
-                String traceId = MDC.get("traceId");
-                if (traceId == null) {
-                    traceId = "unknown";
-                }
-
-                String processedBy = MDC.get("processedBy");
-                if (processedBy == null) {
-                    processedBy = "unknown";
-                }
+                String traceId = RequestLoggingFilter.getCurrentTraceId();
+                String processedBy =
+                    RequestLoggingFilter.getCurrentProcessedBy();
 
                 String detail = String.format(
                     "Rate limit exceeded. Try again in %d seconds.",

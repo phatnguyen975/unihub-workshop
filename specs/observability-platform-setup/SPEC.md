@@ -2,7 +2,7 @@
 
 > **Status:** APPROVED  
 > **Domain:** 10 — System Reliability & Infrastructure  
-> **Owner/area:** `shared/observability` (Core Backend), `shared/config` (Core Backend + Workers), `infra/prometheus/`, `infra/grafana/`  
+> **Owner/area:** `shared/web` (Core Backend — HTTP logging filter & client IP extractor), `shared/config` (Core Backend + Workers — Micrometer tags & Actuator configuration), `infra/prometheus/`, `infra/grafana/`  
 > **Last revised:** 2026-07-22 — first version
 
 ## 1. Overview
@@ -10,8 +10,8 @@
 `observability-platform-setup` establishes the foundational observability and telemetry infrastructure across the Core Backend Monolith and the Background Workers runtime. It enables real-time monitoring of JVM health, application-layer behaviour, and infrastructure dependencies by:
 
 1. Activating a **Micrometer** metrics registry backed by the **Prometheus** format and exposing metrics at the Spring Boot Actuator endpoint `/actuator/prometheus`.
-2. Configuring **Prometheus** pull-based scraping of every Spring Boot instance (backend and workers), as well as infrastructure services (MinIO, RabbitMQ), as Infrastructure-as-Code inside `infra/prometheus/`.
-3. Provisioning six **Grafana** base dashboards via IaC (`infra/grafana/`) to visualise JVM, HikariCP, Redis/Bucket4j, RabbitMQ, Resilience4j, and MinIO telemetry.
+2. Configuring **Prometheus** pull-based scraping of every Spring Boot instance (backend and workers), as well as infrastructure services (MinIO, RabbitMQ, Nginx), as Infrastructure-as-Code inside `infra/prometheus/`.
+3. Provisioning seven **Grafana** base dashboards via IaC (`infra/grafana/`) to visualise JVM, HikariCP, Redis/Bucket4j, RabbitMQ, Resilience4j, MinIO, and Nginx Gateway telemetry.
 4. Implementing a **structured JSON HTTP request-logging filter** that injects `traceId`, `correlationId`, and `processedBy` into the MDC context, producing log output conformant with the format defined in `docs/api-standards.md`.
 
 This feature is cross-cutting infrastructure — it does not instrument specific business metrics (e.g. capacity drift counters, rate-limit drop counts). Business features add those custom metrics against the Micrometer registry configured here. The feature must be deployed early, before or alongside the first functional feature, so that every subsequent feature benefits from live telemetry from day one.
@@ -56,15 +56,16 @@ This feature is cross-cutting infrastructure — it does not instrument specific
 
 - **FR-11:** The system SHALL provision a Prometheus datasource in Grafana by providing a YAML file at `infra/grafana/provisioning/datasources/prometheus.yml` that points to the Prometheus container's internal Docker network address, so that dashboards can query metrics without manual UI configuration.
 - **FR-12:** The system SHALL provision a file-based dashboard provider in Grafana by providing a YAML file at `infra/grafana/provisioning/dashboards/dashboards.yml` that instructs Grafana to load all JSON files from the `infra/grafana/dashboards/` directory on startup.
-- **FR-13:** The system SHALL provide the following six Grafana dashboard JSON files in `infra/grafana/dashboards/`:
-  | File | Metrics Coverage |
+- **FR-13:** The system SHALL provide the following seven Grafana dashboard JSON files in `infra/grafana/dashboards/`:
+  | File                                | Metrics Coverage                                                                                                                         |
   | :---------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-  | `jvm-spring-boot.json` | JVM heap/non-heap memory, GC pause durations, live thread count, CPU usage, uptime |
-  | `database-hikaricp.json` | HikariCP active connections, connection acquisition latency, pool pending threads, connection timeouts |
-  | `redis-bucket4j.json` | Redis command latency, Bucket4j rate-limit drop count (HTTP 429), Redis availability failures (`rate_limiter.redis_unavailable` counter) |
-  | `rabbitmq-metrics.json` | Queue depth per queue, consumer count, delivery rate, DLQ message count, consumer lag |
-  | `resilience4j-circuit-breaker.json` | Circuit breaker state transitions (CLOSED/OPEN/HALF_OPEN), failure rate, slow call rate, not-permitted calls |
-  | `minio-storage.json` | MinIO bucket object count, total storage used, request error rate |
+  | `jvm-spring-boot.json`              | JVM heap/non-heap memory, GC pause durations, live thread count, CPU usage, uptime                                                       |
+  | `database-hikaricp.json`            | HikariCP active connections, connection acquisition latency, pool pending threads, connection timeouts                                   |
+  | `redis-bucket4j.json`               | Redis command latency, Bucket4j rate-limit drop count (HTTP 429), Redis availability failures (`rate_limiter.redis_unavailable` counter) |
+  | `rabbitmq-metrics.json`             | Queue depth per queue, consumer count, delivery rate, DLQ message count, consumer lag                                                    |
+  | `resilience4j-circuit-breaker.json` | Circuit breaker state transitions (CLOSED/OPEN/HALF_OPEN), failure rate, slow call rate, not-permitted calls                             |
+  | `minio-storage.json`                | MinIO bucket object count, total storage used, request error rate                                                                        |
+  | `nginx-api-gateway.json`            | Nginx active/waiting connections, reading/writing connections, HTTP request throughput handled by reverse proxy                          |
 - **FR-14:** Each Grafana dashboard JSON file SHALL be parameterised with template variables for `datasource` and `instance` (or `job`) so that dashboards function correctly in both single-node and multi-node deployments without modification.
 - **FR-15:** The system SHALL set Grafana to provision dashboards in `disableDelete: true` mode for the file-based provider, so that IaC-managed dashboards cannot be accidentally deleted from the Grafana UI.
 - **FR-16:** The system SHALL configure the Grafana container in `infra/docker-compose.yml` with volume mounts for both `infra/grafana/provisioning/` and `infra/grafana/dashboards/`, ensuring all provisioning files are present at first boot.
@@ -73,27 +74,27 @@ This feature is cross-cutting infrastructure — it does not instrument specific
 
 - **FR-17:** The system SHALL implement an HTTP request-logging filter on the Core Backend Monolith that intercepts every inbound request and, after the response is committed, writes a single structured log entry per request.
 - **FR-18:** For every intercepted request, the logging filter SHALL inject the following values into the MDC context before delegating to the filter chain, so that all downstream log statements within the same request thread carry these fields automatically:
-  | MDC key | Source |
+  | MDC key         | Source                                                                                                                                                                                     |
   | :-------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `traceId` | Server-generated unique identifier for the request (e.g., UUID or 16-character hex string); also written to the `metadata.traceId` field of success responses per `docs/api-standards.md`. |
-  | `correlationId` | Value of the inbound `X-Correlation-ID` request header; if absent, an empty string or omitted. |
-  | `processedBy` | Hostname or configured node ID of the Spring Boot instance handling the request (same value written to `metadata.processedBy` in success responses). |
+  | `traceId`       | Server-generated unique identifier for the request (e.g., UUID or 16-character hex string); also written to the `metadata.traceId` field of success responses per `docs/api-standards.md`. |
+  | `correlationId` | Value of the inbound `X-Correlation-ID` request header; if absent, an empty string or omitted.                                                                                             |
+  | `processedBy`   | Hostname or configured node ID of the Spring Boot instance handling the request (same value written to `metadata.processedBy` in success responses).                                       |
 - **FR-19:** The structured log entry produced by the filter SHALL include at minimum the following fields in the exact structure required by `docs/api-standards.md §API Logging` production JSON format:
-  | Field | Description |
+  | Field               | Description                                                     |
   | :------------------ | :-------------------------------------------------------------- |
-  | `@timestamp` | ISO 8601 UTC timestamp of log emission |
-  | `level` | Log level (`INFO` for 2xx/3xx; `WARN` for 4xx; `ERROR` for 5xx) |
-  | `logger_name` | Fully-qualified class name of the logging filter |
-  | `message` | Fixed string `"API Request Completed"` |
-  | `traceId` | Same value as MDC `traceId` |
-  | `mdc.correlationId` | Inbound `X-Correlation-ID` header value |
-  | `mdc.http.method` | HTTP method (e.g., `GET`, `POST`) |
-  | `mdc.http.uri` | Request URI path |
-  | `mdc.http.status` | HTTP response status code as a string |
-  | `mdc.duration_ms` | Total request duration in milliseconds |
-  | `mdc.processedBy` | Hosting node ID |
-  | `mdc.clientIp` | Client IP address as observed by the application |
-  | `mdc.userAgent` | `User-Agent` request header value |
+  | `@timestamp`        | ISO 8601 UTC timestamp of log emission                          |
+  | `level`             | Log level (`INFO` for 2xx/3xx; `WARN` for 4xx; `ERROR` for 5xx) |
+  | `logger_name`       | Fully-qualified class name of the logging filter                |
+  | `message`           | Fixed string `"API Request Completed"`                          |
+  | `traceId`           | Same value as MDC `traceId`                                     |
+  | `mdc.correlationId` | Inbound `X-Correlation-ID` header value                         |
+  | `mdc.http.method`   | HTTP method (e.g., `GET`, `POST`)                               |
+  | `mdc.http.uri`      | Request URI path                                                |
+  | `mdc.http.status`   | HTTP response status code as a string                           |
+  | `mdc.duration_ms`   | Total request duration in milliseconds                          |
+  | `mdc.processedBy`   | Hosting node ID                                                 |
+  | `mdc.clientIp`      | Client IP address as observed by the application                |
+  | `mdc.userAgent`     | `User-Agent` request header value                               |
 - **FR-20:** The logging filter SHALL always clear the MDC context after the response is committed and before the thread returns to the pool, to prevent MDC leakage between requests in a thread-pool environment.
 - **FR-21:** The system SHALL configure `logback-spring.xml` with two profiles as per API Standards:
   - Under the `dev` Spring profile: a human-readable text appender in the format `[LEVEL] traceId METHOD URI -> STATUS (DURATIONms) -> PROCESSED_BY`.
@@ -199,13 +200,13 @@ Then all scrape targets show State: UP
 And the last successful scrape time is within the configured scrape interval
 ```
 
-### Scenario 6: Grafana starts with all six dashboards pre-provisioned (FR-11, FR-12, FR-13, FR-16)
+### Scenario 6: Grafana starts with all seven dashboards pre-provisioned (FR-11, FR-12, FR-13, FR-16)
 
-```
+```gherkin
 Given the Docker Compose stack is running
 And the Grafana container has provisioning directories mounted
 When a user logs into Grafana without importing any dashboard manually
-Then the Grafana Dashboards list contains exactly the following dashboards: JVM & Spring Boot, Database – HikariCP, Redis & Bucket4j, RabbitMQ Metrics, Resilience4j Circuit Breaker, MinIO Storage
+Then the Grafana Dashboards list contains exactly the following dashboards: JVM & Spring Boot, Database – HikariCP, Redis & Bucket4j, RabbitMQ Metrics, Resilience4j Circuit Breaker, MinIO Storage, Nginx - API Gateway
 ```
 
 ### Scenario 7: Grafana dashboards display live data from Prometheus (FR-11, FR-13, FR-14)

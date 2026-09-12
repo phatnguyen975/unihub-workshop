@@ -1,6 +1,5 @@
 package com.unihub.workshop.shared.web;
 
-import org.slf4j.MDC;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -15,15 +14,22 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
 
     @Override
-    public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+    public boolean supports(
+        MethodParameter returnType,
+        Class<? extends HttpMessageConverter<?>> converterType
+    ) {
         return true;
     }
 
     @Override
-    public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
-            Class<? extends HttpMessageConverter<?>> selectedConverterType,
-            ServerHttpRequest request, ServerHttpResponse response) {
-
+    public Object beforeBodyWrite(
+        Object body,
+        MethodParameter returnType,
+        MediaType selectedContentType,
+        Class<? extends HttpMessageConverter<?>> selectedConverterType,
+        ServerHttpRequest request,
+        ServerHttpResponse response
+    ) {
         if (body instanceof Resource || body instanceof byte[]) {
             return body;
         }
@@ -32,24 +38,21 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        if (request.getURI().getPath().startsWith("/actuator")
-                || request.getURI().getPath().startsWith("/.well-known")) {
+        if (
+            request.getURI().getPath().startsWith("/actuator") ||
+            request.getURI().getPath().startsWith("/.well-known")
+        ) {
             return body;
         }
 
-        String traceId = MDC.get(RequestLoggingFilter.MDC_TRACE_ID);
-        if (traceId == null) {
-            traceId = "unknown";
-        }
-
-        String processedBy = MDC.get(RequestLoggingFilter.MDC_PROCESSED_BY);
-        if (processedBy == null) {
-            processedBy = "unknown";
-        }
+        String traceId = RequestLoggingFilter.getCurrentTraceId();
+        String processedBy = RequestLoggingFilter.getCurrentProcessedBy();
 
         if (body instanceof ApiResponse<?> apiResponse) {
             if (apiResponse.getMetadata() == null) {
-                apiResponse.setMetadata(new ApiResponse.Metadata(traceId, processedBy));
+                apiResponse.setMetadata(
+                    new ApiResponse.Metadata(traceId, processedBy)
+                );
             }
             return apiResponse;
         }
@@ -59,7 +62,9 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
                 problemDetail.getProperties().remove("traceId");
             }
             ApiResponse<Void> apiResponse = ApiResponse.error(problemDetail);
-            apiResponse.setMetadata(new ApiResponse.Metadata(traceId, processedBy));
+            apiResponse.setMetadata(
+                new ApiResponse.Metadata(traceId, processedBy)
+            );
             return apiResponse;
         }
 

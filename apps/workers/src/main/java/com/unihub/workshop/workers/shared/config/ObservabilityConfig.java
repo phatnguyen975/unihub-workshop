@@ -28,8 +28,11 @@ public class ObservabilityConfig {
      * @param host            value of {@code management.metrics.tags.host}
      */
     public ObservabilityConfig(
-            @Value("${spring.application.name}") String applicationName,
-            @Value("${management.metrics.tags.host:${HOSTNAME:unknown}}") String host) {
+        @Value("${spring.application.name}") String applicationName,
+        @Value(
+            "${management.metrics.tags.host:${HOSTNAME:unknown}}"
+        ) String host
+    ) {
         this.applicationName = applicationName;
         this.host = host;
     }
@@ -44,7 +47,7 @@ public class ObservabilityConfig {
      */
     @Bean
     public MeterRegistryCustomizer<MeterRegistry> observabilityCommonTags() {
-        return registry -> configureCommonTags(registry);
+        return this::configureCommonTags;
     }
 
     /**
@@ -59,7 +62,8 @@ public class ObservabilityConfig {
      * @param registry the registry to configure
      */
     void configureCommonTags(MeterRegistry registry) {
-        registry.config()
-                .commonTags("application", applicationName, "host", host);
+        registry
+            .config()
+            .commonTags("application", applicationName, "host", host);
     }
 }
