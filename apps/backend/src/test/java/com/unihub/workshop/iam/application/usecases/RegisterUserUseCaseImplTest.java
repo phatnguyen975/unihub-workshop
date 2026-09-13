@@ -4,7 +4,7 @@ import com.unihub.workshop.iam.application.ports.out.StudentDirectoryRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.application.ports.out.UserVerificationTokenRepository;
 import com.unihub.workshop.iam.application.utils.OtpService;
-import com.unihub.workshop.iam.domain.events.OtpRequestedEvent;
+import com.unihub.workshop.shared.events.OtpRequestedEvent;
 import com.unihub.workshop.iam.domain.model.StudentDirectory;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;

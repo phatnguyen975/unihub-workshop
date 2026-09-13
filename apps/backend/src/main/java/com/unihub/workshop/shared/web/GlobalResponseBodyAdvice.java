@@ -9,6 +9,7 @@ import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 @ControllerAdvice
 public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
@@ -30,7 +31,11 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
         ServerHttpRequest request,
         ServerHttpResponse response
     ) {
-        if (body instanceof Resource || body instanceof byte[]) {
+        if (
+            body instanceof Resource ||
+            body instanceof byte[] ||
+            body instanceof ResponseBodyEmitter
+        ) {
             return body;
         }
 

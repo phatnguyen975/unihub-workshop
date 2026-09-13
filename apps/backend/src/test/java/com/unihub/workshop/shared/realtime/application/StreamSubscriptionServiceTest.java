@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.shared.exception.ForbiddenException;
+import com.unihub.workshop.shared.realtime.application.ports.out.EmitterRegistryPort;
 import com.unihub.workshop.shared.realtime.application.ports.out.UserStatusPort;
 import com.unihub.workshop.shared.realtime.config.RealtimeProperties;
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
 import com.unihub.workshop.shared.realtime.infrastructure.RealtimeMetrics;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,13 +18,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @DisplayName("StreamSubscriptionService Unit Tests")
 class StreamSubscriptionServiceTest {
 
-    private SseEmitterRegistry registry;
+    private EmitterRegistryPort registry;
     private UserStatusPort userStatusPort;
     private StreamSubscriptionService subscriptionService;
 
     @BeforeEach
     void setUp() {
-        registry = mock(SseEmitterRegistry.class);
+        registry = mock(EmitterRegistryPort.class);
         userStatusPort = mock(UserStatusPort.class);
         subscriptionService = new StreamSubscriptionService(
             registry,

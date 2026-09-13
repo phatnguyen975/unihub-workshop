@@ -1,6 +1,6 @@
 package com.unihub.workshop.shared.realtime.infrastructure;
 
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
+import com.unihub.workshop.shared.realtime.application.ports.out.RealtimeMetricsPort;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  * - realtime.sse.disconnects.total (Counter tagged with reason)
  */
 @Component
-public class RealtimeMetrics {
+public class RealtimeMetrics implements RealtimeMetricsPort {
 
     private final MeterRegistry meterRegistry;
 

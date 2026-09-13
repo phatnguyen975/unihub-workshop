@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.realtime.application.ports.out.WorkshopAuthorizationPort;
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.UUID;

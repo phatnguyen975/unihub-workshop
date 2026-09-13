@@ -5,9 +5,8 @@ import java.util.UUID;
 import org.springframework.modulith.events.Externalized;
 
 /**
- * Event published when an organization member active status is updated (ban or
- * unban). Externalized to RabbitMQ queue q.notifications via routing key
- * "notifications".
+ * Event published when an organization member active status is updated (ban or unban).
+ * Externalized to RabbitMQ queue q.notifications via routing key "notifications".
  */
 @Externalized("unihub.events::notifications")
 public record UserStatusChangedEvent(

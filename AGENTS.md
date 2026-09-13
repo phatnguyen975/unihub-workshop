@@ -97,7 +97,7 @@ Every feature in `docs/feature-catalog.md` maintains an explicit status:
 | 3   | `task-planning-and-breakdown`            | Plan         | Break approved spec into vertical-slice tasks — one capability per task, spanning every layer it needs |
 | 4   | `test-driven-development`                | Build        | Red-Green-Refactor; 4-layer mock-based unit testing                                                    |
 | 5   | `incremental-implementation`             | Build        | Build one task's vertical slice layer by layer, innermost-to-outermost                                 |
-| 6   | `modular-boundary-enforcement`           | Build        | Keep cross-module access through `contracts/` only; run `ModulithArchitectureTest`                     |
+| 6   | `modular-boundary-enforcement`           | Build        | Keep cross-module access through `api/` only; run `ModulithArchitectureTest`                           |
 | 7   | `database-schema-evolution`              | Build        | Safe, additive-only schema migrations                                                                  |
 | 8   | `idempotency-and-exactly-once-design`    | Build        | Exactly-once semantics for retry-risk mutations                                                        |
 | 9   | `security-and-hardening`                 | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                                               |
@@ -225,9 +225,9 @@ If `/review → /fix` repeats more than twice for the same feature without conve
 
 ## 6. Module Boundaries (Modular Monolith)
 
-- Backend (`apps/backend/`) modules: `iam`, `workshops`, `registrations`, `payments`, `attendances`, `notifications`, `search` — each follows Clean Architecture (`domain/ → application/ → infrastructure/ → presentation/`), with `contracts/` as the only public surface other modules may depend on.
-- Cross-module calls must go through `contracts/` interfaces or domain events (via the Spring Modulith event publication registry) — never reach into another module's `domain/`, `application/`, or `infrastructure/` package directly.
-- Workers (`apps/workers/`) follow Hexagonal Architecture per pipeline (`inbound/ → core/ → outbound/`), with `core/` having zero outward dependencies.
+- Backend (`apps/backend/`) modules: `iam`, `workshops`, `registrations`, `payments`, `attendances`, `notifications`, `search` — each follows Clean Architecture (`domain/` → `application/` → `infrastructure/` → `presentation/`), with `api/` (Facade Pattern) as the only public surface other modules may depend on.
+- Cross-module calls must go through `api/` facade interfaces or domain events (via the Spring Modulith event publication registry) — never reach into another module's `domain/`, `application/`, or `infrastructure/` package directly.
+- Workers (`apps/workers/`) follow Hexagonal Architecture per pipeline (`inbound/` → `core/` → `outbound/`), with `core/` having zero outward dependencies.
 - See `docs/project-structure.md` for the full per-module directory layout and the `modular-boundary-enforcement` skill for enforcement workflow.
 - `modular-boundary-enforcement` is verified concretely via `apps/backend/src/test/java/com/unihub/workshop/ModulithArchitectureTest.java` — running `ApplicationModules.of(...).verify()` — which must pass before any feature touching module boundaries is considered complete. This is a static architecture check, not an integration test, and is always permitted under section 5.
 
@@ -238,7 +238,7 @@ These apply to all code regardless of which skill or command produced it.
 - **Design patterns over ad-hoc logic.** Where a well-known pattern fits (Strategy for pluggable notification channels, Factory for payment provider adapters, Builder for complex DTOs), use it explicitly rather than reinventing an equivalent structure inline.
 - **DRY, but not at the cost of layer purity.** Shared logic belongs in the appropriate shared kernel (`shared/` in backend, `core/` in workers) — never duplicated across modules, but also never pulled across a module boundary just to avoid duplication (see section 6).
 - **Minimize dependencies.** Before adding a library, check whether the existing stack (see section 2) already solves the problem. Do not introduce a new dependency for something one of the already-approved libraries covers.
-- **Low coupling, high cohesion.** A class should depend on abstractions (ports/interfaces) it owns or that are defined in `contracts/`, never on another module's concrete implementation.
+- **Low coupling, high cohesion.** A class should depend on abstractions (ports/interfaces) it owns or that are defined in `api/` facades, never on another module's concrete implementation.
 - **Clean code baseline.** Small functions with a single responsibility, intention-revealing names, no magic numbers/strings (use named constants or enums), no commented-out code committed.
 - **Optimize for maintainability over cleverness.** Prefer the obvious, slightly more verbose solution over a clever one-liner if it is easier for a future reader (human or agent) to understand without additional context.
 - **Immutability by default** (Java `record`/`final` fields for domain objects, TypeScript `readonly`/`const`) unless mutation is required and justified.

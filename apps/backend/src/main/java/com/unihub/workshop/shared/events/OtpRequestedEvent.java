@@ -1,9 +1,13 @@
-package com.unihub.workshop.iam.domain.events;
+package com.unihub.workshop.shared.events;
 
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.modulith.events.Externalized;
 
+/**
+ * Public integration event published when an OTP is requested.
+ * Externalized to RabbitMQ queue q.notifications via routing key "notifications".
+ */
 @Externalized("unihub.events::notifications")
 public record OtpRequestedEvent(
     UUID userId,

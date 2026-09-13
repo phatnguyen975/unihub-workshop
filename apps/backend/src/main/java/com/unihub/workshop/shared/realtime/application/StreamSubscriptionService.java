@@ -1,10 +1,10 @@
 package com.unihub.workshop.shared.realtime.application;
 
 import com.unihub.workshop.shared.exception.ForbiddenException;
+import com.unihub.workshop.shared.realtime.application.ports.out.EmitterRegistryPort;
+import com.unihub.workshop.shared.realtime.application.ports.out.RealtimeMetricsPort;
 import com.unihub.workshop.shared.realtime.application.ports.out.UserStatusPort;
 import com.unihub.workshop.shared.realtime.config.RealtimeProperties;
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
-import com.unihub.workshop.shared.realtime.infrastructure.RealtimeMetrics;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,15 +18,15 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Slf4j
 public class StreamSubscriptionService {
 
-    private final SseEmitterRegistry registry;
+    private final EmitterRegistryPort registry;
     private final UserStatusPort userStatusPort;
-    private final RealtimeMetrics realtimeMetrics;
+    private final RealtimeMetricsPort realtimeMetrics;
     private final RealtimeProperties realtimeProperties;
 
     public StreamSubscriptionService(
-        SseEmitterRegistry registry,
+        EmitterRegistryPort registry,
         UserStatusPort userStatusPort,
-        RealtimeMetrics realtimeMetrics,
+        RealtimeMetricsPort realtimeMetrics,
         RealtimeProperties realtimeProperties
     ) {
         this.registry = registry;

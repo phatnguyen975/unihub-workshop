@@ -1,80 +1,49 @@
 # UniHub Workshop — System Architecture
 
 ```mermaid
----
-config:
-  layout: elk
-  look: classic
-  fontFamily: '''Inter Variable'', sans-serif'
-  themeVariables:
-    fontFamily: '''Inter Variable'', sans-serif'
-  theme: neutral
----
 flowchart LR
-    Client(["Client (Web / Mobile)"]) -- "HTTP / SSE" --> Nginx["API Gateway / Load Balancer (Nginx)"]
-    Nginx -- "Load Balancing & SSE Stream" --> App1["Core Backend Monolith (Node 1)"] & App2["Core Backend Monolith (Node 2)"]
-    App1 -. "Cache + Rate Limit + Pub/Sub" .-> Redis["Cache / Rate Limiter / Pub-Sub (Redis)"]
+    Client(["Client (Web / Mobile)"]) -- "HTTP / SSE" --> Nginx{{"API Gateway / Load Balancer (Nginx)"}}
+    Nginx -- "Load Balancing & SSE Stream" --> App1("Core Backend Monolith (Node 1)") & App2("Core Backend Monolith (Node 2)")
+    App1 -. "Cache + Rate Limit + Pub/Sub" .-> Redis("Cache / Rate Limiter / Pub-Sub (Redis)")
     App2 -. "Cache + Rate Limit + Pub/Sub" .-> Redis
-    App1 -- Read Data (Cache Miss) --> Replica["PostgreSQL Replica (Neon)"]
+    App1 -- Read Data (Cache Miss) --> Replica[("PostgreSQL Replica (Neon)")]
     App2 -- Read Data (Cache Miss) --> Replica
-    App1 -- Search Queries --> ES["Search Engine (Elasticsearch)"]
+    App1 -- Search Queries --> ES[("Search Engine (Elasticsearch)")]
     App2 -- Search Queries --> ES
-    App1 -- Write Data (Domain + Outbox) --> Primary["PostgreSQL Primary (Neon)"]
+    App1 -- Write Data (Domain + Outbox) --> Primary[("PostgreSQL Primary (Neon)")]
     App2 -- Write Data (Domain + Outbox) --> Primary
     Primary -- Replication --> Replica
-    App1 -- Payment Requests --> Pay["Payment Gateway"]
+    App1 -- Payment Requests --> Pay("Payment Gateway")
     App2 -- Payment Requests --> Pay
-    App1 -- Upload PDFs --> S3["Object Storage (MinIO)"]
+    App1 -- Upload PDFs --> S3("Object Storage (MinIO)")
     App2 -- Upload PDFs --> S3
-    Legacy["Legacy Student Management System"] -- Drop Nightly CSV Exports --> S3
-    Worker["Background Workers (Spring Batch)"] -- Batch Validation --> Replica
-    App1 -- Externalize Events --> Rabbit["Message Broker (RabbitMQ)"]
+    Legacy("Legacy Student Management System") -- Drop Nightly CSV Exports --> S3
+    Worker("Background Workers (Spring Batch)") -- Batch Validation --> Replica
+    App1 -- Externalize Events --> Rabbit("Message Broker (RabbitMQ)")
     App2 -- Externalize Events --> Rabbit
     Worker -- Write Async Results --> Primary
     Worker -- Consume Task Queues --> Rabbit
     Worker -- Read PDFs/CSVs --> S3
     Worker -- Sync Workshop Data (CQRS) --> ES
-    Worker -- Summarization Requests --> AI["AI Summarization Service"]
-    Worker -- Notification Requests --> Notify["Notification Providers"]
+    Worker -- Summarization Requests --> AI("AI Summarization Service")
+    Worker -- Notification Requests --> Notify("Notification Providers")
     Worker -. "Event Pub/Sub" .-> Redis
-    Prometheus -- "Scrape Metrics (/actuator)" --> App1
+    Prometheus[("Monitoring Server (Prometheus)")] -- "Scrape Metrics (/actuator)" --> App1
     Prometheus -- "Scrape Metrics (/actuator)" --> App2
     Prometheus -- "Scrape Metrics (/actuator)" --> Worker
-    Grafana -- "Query Time-Series" --> Prometheus
+    Grafana("Telemetry Dashboard (Grafana)") -- "Query Time-Series" --> Prometheus
 
-    Nginx@{ shape: hex}
-    App1@{ shape: rounded}
-    App2@{ shape: rounded}
-    Prometheus["Monitoring Server (Prometheus)"]@{ shape: cyl}
-    Grafana["Telemetry Dashboard (Grafana)"]@{ shape: rounded}
-    Redis@{ shape: rounded}
-    Replica@{ shape: cyl}
-    ES@{ shape: cyl}
-    Primary@{ shape: cyl}
-    Pay@{ shape: rounded}
-    S3@{ shape: rounded}
-    Legacy@{ shape: rounded}
-    Worker@{ shape: rounded}
-    Rabbit@{ shape: rounded}
-    AI@{ shape: rounded}
-    Notify@{ shape: rounded}
-     Client:::client
-     Nginx:::nginx
-     App1:::app
-     App2:::app
-     Redis:::redis
-     Replica:::db
-     ES:::db
-     Primary:::db
-     Pay:::external
-     S3:::storage
-     Legacy:::external
-     Worker:::worker
-     Rabbit:::broker
-     AI:::external
-     Notify:::external
-     Prometheus:::monitor
-     Grafana:::monitor
+    class Client client
+    class Nginx nginx
+    class App1,App2 app
+    class Redis redis
+    class Replica,ES,Primary db
+    class Pay,Legacy,AI,Notify external
+    class S3 storage
+    class Worker worker
+    class Rabbit broker
+    class Prometheus,Grafana monitor
+
     classDef client fill:#f0f7ff,stroke:#0052cc,stroke-width:2px
     classDef nginx fill:#f6ffed,stroke:#52c41a,stroke-width:2px
     classDef app fill:#e6f7ff,stroke:#1890ff,stroke-width:2px

@@ -5,10 +5,8 @@ import java.util.UUID;
 import org.springframework.modulith.events.Externalized;
 
 /**
- * Event published when a user account (e.g. root ORGANIZER or provisioned
- * STAFF/ORGANIZER) is created with a system-generated temporary password.
- * Externalized to RabbitMQ queue q.notifications via routing key
- * "notifications".
+ * Event published when a user account is created with a system-generated temporary password.
+ * Externalized to RabbitMQ queue q.notifications via routing key "notifications".
  */
 @Externalized("unihub.events::notifications")
 public record UserProvisionedEvent(

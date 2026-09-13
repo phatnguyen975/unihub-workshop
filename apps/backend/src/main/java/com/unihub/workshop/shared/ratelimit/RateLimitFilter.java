@@ -213,19 +213,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         Base64.getUrlDecoder().decode(parts[1]),
                         StandardCharsets.UTF_8
                     );
-                    // Minimal parsing to extract "sub" claim
-                    int subIndex = payload.indexOf("\"sub\":\"");
-                    if (subIndex != -1) {
-                        int endQuote = payload.indexOf("\"", subIndex + 7);
-                        if (endQuote != -1) {
-                            String sub = payload.substring(
-                                subIndex + 7,
-                                endQuote
-                            );
-                            return "rate_limit:" + sub;
-                        }
+                    var node = objectMapper.readTree(payload);
+                    var subNode = node.get("sub");
+                    if (subNode != null && !subNode.asText().isBlank()) {
+                        return "rate_limit:" + subNode.asText();
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    // Fallback to IP keying on malformed token
+                }
             }
         }
         // Fallback for unauthenticated requests

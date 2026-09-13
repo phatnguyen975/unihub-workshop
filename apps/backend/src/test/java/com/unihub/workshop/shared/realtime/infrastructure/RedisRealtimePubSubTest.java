@@ -8,10 +8,9 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.unihub.workshop.shared.realtime.api.RealtimeEvent;
+import com.unihub.workshop.shared.realtime.api.RealtimeEventType;
 import com.unihub.workshop.shared.realtime.application.ports.out.WorkshopAuthorizationPort;
-import com.unihub.workshop.shared.realtime.domain.RealtimeEvent;
-import com.unihub.workshop.shared.realtime.domain.RealtimeEventType;
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;

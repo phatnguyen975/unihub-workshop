@@ -49,13 +49,13 @@ If scope isn't given, ask one or a few orienting questions — enough to learn w
 
 Most persistent → most transient. Map this onto the actual project structure; don't hardcode paths.
 
-| Level                                       | Contains                                                                  | Loaded                |
-| ------------------------------------------- | ------------------------------------------------------------------------- | --------------------- |
-| 1. Rules Files (CLAUDE.md, AGENTS.md, etc.) | Project-wide conventions, stack, commands, boundaries                     | Always                |
-| 2. Spec / Architecture Docs                 | The relevant section for the current feature/session                      | Per feature/session   |
-| 3. Relevant Source Files                    | Files to be touched, their tests, one existing pattern to follow          | Per task              |
-| 4. Error Output / Test Results              | The specific failure being worked on                                      | Per iteration         |
-| 5. Conversation History / Prior Session     | This session so far, or a prior session's snapshot artifact if one exists | Accumulates, compacts |
+| Level                                                         | Contains                                                                  | Loaded                |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------- |
+| 1. Rules Files (`CLAUDE.md`, `AGENTS.md`, `CONTEXT.md`, etc.) | Project-wide conventions, rules, stacks, commands, boundaries             | Always                |
+| 2. Spec / Architecture Docs                                   | The relevant section for the current feature/session                      | Per feature/session   |
+| 3. Relevant Source Files                                      | Files to be touched, their tests, one existing pattern to follow          | Per task              |
+| 4. Error Output / Test Results                                | The specific failure being worked on                                      | Per iteration         |
+| 5. Conversation History / Prior Session                       | This session so far, or a prior session's snapshot artifact if one exists | Accumulates, compacts |
 
 How to read each level efficiently, not just what it contains:
 

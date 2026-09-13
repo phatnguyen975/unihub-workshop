@@ -1,11 +1,9 @@
-package com.unihub.workshop.shared.realtime.contracts;
-
-import com.unihub.workshop.shared.realtime.domain.RealtimeEvent;
+package com.unihub.workshop.shared.realtime.api;
 
 import java.util.UUID;
 
 /**
- * Public contract for publishing real-time platform events across backend instances.
+ * Public module API for publishing real-time platform events across backend instances.
  * Injected by domain modules and background workers to broadcast updates.
  */
 public interface RealtimeEventPublisher {

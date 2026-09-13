@@ -24,10 +24,17 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/SseEmitterRegistry.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/ports/out/EmitterRegistryPort.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/ports/out/UserStatusPort.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/ports/out/WorkshopAuthorizationPort.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/SseEmitterRegistry.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/JdbcUserStatusAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/JdbcWorkshopAuthorizationAdapter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/StreamSubscriptionService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/presentation/StreamController.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/domain/SseEmitterRegistryTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/application/StreamSubscriptionServiceTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/infrastructure/SseEmitterRegistryTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/infrastructure/JdbcWorkshopAuthorizationAdapterTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/presentation/StreamControllerTest.java`
   - **Acceptance Criteria:**
     - An authenticated user connecting to `GET /api/v1/stream/events` receives HTTP 200 with headers `Content-Type: text/event-stream; charset=UTF-8`, `Cache-Control: no-cache, no-transform`, and `X-Accel-Buffering: no` (FR-01, FR-06, Scenario 1).
@@ -62,9 +69,9 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/contracts/RealtimeEventPublisher.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/RealtimeEvent.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/RealtimeEventType.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/api/RealtimeEventPublisher.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/api/RealtimeEvent.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/api/RealtimeEventType.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/RedisRealtimePublisherAdapter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/RedisRealtimeSubscriber.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/config/RealtimeRedisConfig.java`

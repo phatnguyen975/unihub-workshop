@@ -1,6 +1,5 @@
 package com.unihub.workshop.shared.realtime.infrastructure;
 
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

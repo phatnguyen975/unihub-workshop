@@ -8,8 +8,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "app.realtime")
 public record RealtimeProperties(
-        @DefaultValue("15") int heartbeatIntervalSeconds,
-        @DefaultValue("1800000") long streamTimeoutMs) {
+    @DefaultValue("15") int heartbeatIntervalSeconds,
+    @DefaultValue("1800000") long streamTimeoutMs
+) {
     public RealtimeProperties {
         if (heartbeatIntervalSeconds <= 0) {
             heartbeatIntervalSeconds = 15;

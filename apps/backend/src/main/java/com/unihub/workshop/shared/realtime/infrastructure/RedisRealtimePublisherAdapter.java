@@ -2,8 +2,8 @@ package com.unihub.workshop.shared.realtime.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.unihub.workshop.shared.realtime.contracts.RealtimeEventPublisher;
-import com.unihub.workshop.shared.realtime.domain.RealtimeEvent;
+import com.unihub.workshop.shared.realtime.api.RealtimeEvent;
+import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

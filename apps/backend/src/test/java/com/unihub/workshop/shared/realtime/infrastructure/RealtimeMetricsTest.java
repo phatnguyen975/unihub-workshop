@@ -1,6 +1,5 @@
 package com.unihub.workshop.shared.realtime.infrastructure;
 
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
