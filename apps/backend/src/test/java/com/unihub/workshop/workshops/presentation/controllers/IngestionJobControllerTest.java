@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.unihub.workshop.WorkshopApplication;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.security.RedisJtiValidator;
 import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
@@ -20,14 +21,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest(
-    classes = com.unihub.workshop.WorkshopApplication.class,
+    classes = WorkshopApplication.class,
     properties = {
         "spring.flyway.enabled=false",
         "spring.data.redis.repositories.enabled=false",
@@ -42,7 +46,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 @RequiredArgsConstructor
 class IngestionJobControllerTest {
 
-    private final org.springframework.web.context.WebApplicationContext context;
+    private final WebApplicationContext context;
 
     private MockMvc mockMvc;
 
@@ -57,14 +61,9 @@ class IngestionJobControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc =
-            org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(
-                context
-            )
-                .apply(
-                    org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity()
-                )
-                .build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+            .apply(SecurityMockMvcConfigurers.springSecurity())
+            .build();
         when(redisJtiValidator.isTokenValid(anyString())).thenReturn(true);
     }
 

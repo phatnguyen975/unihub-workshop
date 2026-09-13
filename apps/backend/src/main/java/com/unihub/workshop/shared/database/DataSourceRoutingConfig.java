@@ -19,7 +19,10 @@ public class DataSourceRoutingConfig {
     private final DataSourceProperties properties;
 
     public DataSourceRoutingConfig(DataSourceProperties properties) {
-        this.properties = Objects.requireNonNull(properties, "DataSourceProperties must not be null");
+        this.properties = Objects.requireNonNull(
+            properties,
+            "DataSourceProperties must not be null"
+        );
     }
 
     @Bean
@@ -52,7 +55,10 @@ public class DataSourceRoutingConfig {
         @Qualifier("primaryDataSource") DataSource primaryDataSource,
         @Qualifier("replicaDataSource") DataSource replicaDataSource
     ) {
-        return new TransactionAwareRoutingDataSource(primaryDataSource, replicaDataSource);
+        return new TransactionAwareRoutingDataSource(
+            primaryDataSource,
+            replicaDataSource
+        );
     }
 
     private HikariDataSource createHikariDataSource(

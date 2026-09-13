@@ -16,7 +16,6 @@
  * </ul>
  * This module is configured as {@link org.springframework.modulith.ApplicationModule.Type#OPEN}
  * and must never depend on any business domain module.
- * </p>
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Shared Kernel",

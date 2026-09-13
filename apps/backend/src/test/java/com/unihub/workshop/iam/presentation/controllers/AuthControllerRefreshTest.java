@@ -1,5 +1,12 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.iam.application.ports.in.LoginUseCase;
 import com.unihub.workshop.iam.application.ports.in.RefreshTokenUseCase;
@@ -15,13 +22,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 class AuthControllerRefreshTest {
 
     private MockMvc mockMvc;
@@ -36,76 +36,107 @@ class AuthControllerRefreshTest {
         objectMapper = new ObjectMapper();
 
         AuthController authController = AuthControllerTestBuilder.builder()
-                .withLoginUseCase(loginUseCase)
-                .withRefreshTokenUseCase(refreshTokenUseCase)
-                .build();
+            .withLoginUseCase(loginUseCase)
+            .withRefreshTokenUseCase(refreshTokenUseCase)
+            .build();
 
-        mockMvc = MockMvcBuilders
-                .standaloneSetup(authController)
-                .setControllerAdvice(new GlobalExceptionHandler(null), new GlobalResponseBodyAdvice())
-                .build();
+        mockMvc = MockMvcBuilders.standaloneSetup(authController)
+            .setControllerAdvice(
+                new GlobalExceptionHandler(null),
+                new GlobalResponseBodyAdvice()
+            )
+            .build();
     }
 
     @Test
     void shouldReturn200OnSuccessfulRefresh() throws Exception {
-        RefreshTokenRequest request = new RefreshTokenRequest("valid-refresh-token");
+        RefreshTokenRequest request = new RefreshTokenRequest(
+            "valid-refresh-token"
+        );
         RefreshResult result = new RefreshResult(
-                "new-access-token",
-                "new-refresh-token",
-                "Bearer",
-                3600);
+            "new-access-token",
+            "new-refresh-token",
+            "Bearer",
+            3600
+        );
 
-        when(refreshTokenUseCase.refresh(anyString(), anyString(), anyString())).thenReturn(result);
+        when(
+            refreshTokenUseCase.refresh(anyString(), anyString(), anyString())
+        ).thenReturn(result);
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .header("User-Agent", "Test-Agent")
-                .with(request1 -> {
-                    request1.setRemoteAddr("127.0.0.1");
-                    return request1;
-                }))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Token refreshed"))
-                .andExpect(jsonPath("$.data.accessToken").value("new-access-token"))
-                .andExpect(jsonPath("$.data.refreshToken").value("new-refresh-token"))
-                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.data.expiresIn").value(3600));
+        mockMvc
+            .perform(
+                post("/api/v1/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request))
+                    .header("User-Agent", "Test-Agent")
+                    .with(request1 -> {
+                        request1.setRemoteAddr("127.0.0.1");
+                        return request1;
+                    })
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Token refreshed"))
+            .andExpect(jsonPath("$.data.accessToken").value("new-access-token"))
+            .andExpect(
+                jsonPath("$.data.refreshToken").value("new-refresh-token")
+            )
+            .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+            .andExpect(jsonPath("$.data.expiresIn").value(3600));
     }
 
     @Test
     void shouldReturn422OnBlankRefreshToken() throws Exception {
         RefreshTokenRequest request = new RefreshTokenRequest("");
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andDo(MockMvcResultHandlers.print()).andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"))
-                .andExpect(
-                        jsonPath("$.error.validationErrors[0]").value("refreshToken: refreshToken must not be blank"));
+        mockMvc
+            .perform(
+                post("/api/v1/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request))
+            )
+            .andDo(MockMvcResultHandlers.print())
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            )
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    "refreshToken: refreshToken must not be blank"
+                )
+            );
     }
 
     @Test
     void shouldReturn401WhenUseCaseThrowsUnauthorized() throws Exception {
-        RefreshTokenRequest request = new RefreshTokenRequest("invalid-refresh-token");
+        RefreshTokenRequest request = new RefreshTokenRequest(
+            "invalid-refresh-token"
+        );
 
-        when(refreshTokenUseCase.refresh(anyString(), anyString(), anyString()))
-                .thenThrow(new UnauthorizedException("Invalid refresh token"));
+        when(
+            refreshTokenUseCase.refresh(anyString(), anyString(), anyString())
+        ).thenThrow(new UnauthorizedException("Invalid refresh token"));
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .header("User-Agent", "Test-Agent")
-                .with(request1 -> {
-                    request1.setRemoteAddr("127.0.0.1");
-                    return request1;
-                }))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.type").value("urn:unihub:error:unauthorized"))
-                .andExpect(jsonPath("$.error.detail").value("Invalid refresh token"));
+        mockMvc
+            .perform(
+                post("/api/v1/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request))
+                    .header("User-Agent", "Test-Agent")
+                    .with(request1 -> {
+                        request1.setRemoteAddr("127.0.0.1");
+                        return request1;
+                    })
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value("Invalid refresh token")
+            );
     }
 }

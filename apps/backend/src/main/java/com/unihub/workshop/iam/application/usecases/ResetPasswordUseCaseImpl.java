@@ -9,11 +9,10 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ValidationException;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Instant;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
 
 @Service
 public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
@@ -27,12 +26,13 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
     private final String dummyTokenHash;
 
     public ResetPasswordUseCaseImpl(
-            UserRepository userRepository,
-            UserVerificationTokenRepository userVerificationTokenRepository,
-            RefreshTokenRepository refreshTokenRepository,
-            OtpService otpService,
-            PasswordEncoder passwordEncoder,
-            MeterRegistry meterRegistry) {
+        UserRepository userRepository,
+        UserVerificationTokenRepository userVerificationTokenRepository,
+        RefreshTokenRepository refreshTokenRepository,
+        OtpService otpService,
+        PasswordEncoder passwordEncoder,
+        MeterRegistry meterRegistry
+    ) {
         this.userRepository = userRepository;
         this.userVerificationTokenRepository = userVerificationTokenRepository;
         this.refreshTokenRepository = refreshTokenRepository;
@@ -45,7 +45,8 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
     @Override
     @Transactional
     public void resetPassword(String email, String otp, String newPassword) {
-        String normalizedEmail = email != null ? email.toLowerCase().trim() : "";
+        String normalizedEmail =
+            email != null ? email.toLowerCase().trim() : "";
         User user = userRepository.findByEmail(normalizedEmail).orElse(null);
 
         if (user == null) {
@@ -60,8 +61,12 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
             throw invalidOtp();
         }
 
-        UserVerificationToken token = userVerificationTokenRepository.findLatestByUserIdAndType(
-                user.id(), UserVerificationToken.TYPE_PASSWORD_RESET_OTP).orElse(null);
+        UserVerificationToken token = userVerificationTokenRepository
+            .findLatestByUserIdAndType(
+                user.id(),
+                UserVerificationToken.TYPE_PASSWORD_RESET_OTP
+            )
+            .orElse(null);
 
         if (token == null) {
             otpService.verifyOtp(otp, dummyTokenHash);
@@ -71,7 +76,9 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
 
         if (token.isConsumed() || token.isExpired()) {
             otpService.verifyOtp(otp, dummyTokenHash);
-            recordFailure(token.isConsumed() ? "already_consumed" : "expired_otp");
+            recordFailure(
+                token.isConsumed() ? "already_consumed" : "expired_otp"
+            );
             throw invalidOtp();
         }
 
@@ -80,7 +87,9 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
             throw invalidOtp();
         }
 
-        boolean consumed = userVerificationTokenRepository.markConsumed(token.id());
+        boolean consumed = userVerificationTokenRepository.markConsumed(
+            token.id()
+        );
         if (!consumed) {
             recordFailure("already_consumed");
             throw invalidOtp();
@@ -89,17 +98,32 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
         String newPasswordHash = passwordEncoder.encode(newPassword);
         userRepository.save(user.updatePassword(newPasswordHash));
 
-        refreshTokenRepository.revokeAllActiveTokensForUser(user.id(), Instant.now());
+        refreshTokenRepository.revokeAllActiveTokensForUser(
+            user.id(),
+            Instant.now()
+        );
 
-        meterRegistry.counter("auth.password.reset.attempts", "outcome", "success").increment();
+        meterRegistry
+            .counter("auth.password.reset.attempts", "outcome", "success")
+            .increment();
     }
 
     private void recordFailure(String reason) {
-        meterRegistry.counter("auth.password.reset.attempts", "outcome", "failure", "reason", reason)
-                .increment();
+        meterRegistry
+            .counter(
+                "auth.password.reset.attempts",
+                "outcome",
+                "failure",
+                "reason",
+                reason
+            )
+            .increment();
     }
 
     private ValidationException invalidOtp() {
-        return new ValidationException("otp", "Invalid or expired verification code.");
+        return new ValidationException(
+            "otp",
+            "Invalid or expired verification code."
+        );
     }
 }

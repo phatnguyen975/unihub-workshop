@@ -12,8 +12,7 @@ import org.slf4j.MDC;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Servlet filter that produces one structured log entry per inbound HTTP
- * request.
+ * Servlet filter that produces one structured log entry per inbound HTTP request.
  *
  * <p>
  * For every request, this filter:

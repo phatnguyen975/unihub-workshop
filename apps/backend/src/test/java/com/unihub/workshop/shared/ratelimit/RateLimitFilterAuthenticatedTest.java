@@ -10,6 +10,7 @@ import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.distributed.proxy.RemoteBucketBuilder;
 import java.time.Duration;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,7 +66,7 @@ class RateLimitFilterAuthenticatedTest {
             builderMock.build(
                 any(byte[].class),
                 org.mockito.ArgumentMatchers.<
-                    java.util.function.Supplier<BucketConfiguration>
+                    Supplier<BucketConfiguration>
                 >any()
             )
         ).thenReturn(bucket);

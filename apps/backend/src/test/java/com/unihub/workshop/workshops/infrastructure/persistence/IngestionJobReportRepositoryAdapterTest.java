@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.infrastructure.persistence;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.unihub.workshop.WorkshopApplication;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
@@ -17,7 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestConstructor;
 
 @SpringBootTest(
-    classes = com.unihub.workshop.WorkshopApplication.class,
+    classes = WorkshopApplication.class,
     properties = {
         "spring.flyway.enabled=false",
         "datasource.primary.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1",

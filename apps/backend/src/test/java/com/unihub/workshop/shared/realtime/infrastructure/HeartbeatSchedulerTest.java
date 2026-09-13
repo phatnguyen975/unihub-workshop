@@ -1,5 +1,14 @@
 package com.unihub.workshop.shared.realtime.infrastructure;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,18 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
-@DisplayName("HeartbeatScheduler Unit Tests")
 class HeartbeatSchedulerTest {
 
     private SseEmitterRegistry registry;
@@ -56,24 +54,34 @@ class HeartbeatSchedulerTest {
     }
 
     @Test
-    @DisplayName("should safely evict broken emitter from registry upon IOException without throwing exception")
-    void sendHeartbeat_shouldEvictBrokenEmitter_withoutThrowingException() throws Exception {
+    @DisplayName(
+        "should safely evict broken emitter from registry upon IOException without throwing exception"
+    )
+    void sendHeartbeat_shouldEvictBrokenEmitter_withoutThrowingException()
+        throws Exception {
         UUID user1 = UUID.randomUUID();
         SseEmitter healthyEmitter = mock(SseEmitter.class);
         SseEmitter brokenEmitter = mock(SseEmitter.class);
 
         doThrow(new IOException("Connection reset by peer"))
-                .when(brokenEmitter).send(any(SseEmitter.SseEventBuilder.class));
+            .when(brokenEmitter)
+            .send(any(SseEmitter.SseEventBuilder.class));
 
         registry.register(user1, healthyEmitter);
         registry.register(user1, brokenEmitter);
 
         assertThat(registry.getActiveConnectionCount()).isEqualTo(2);
 
-        assertThatCode(() -> scheduler.sendHeartbeat()).doesNotThrowAnyException();
+        assertThatCode(() ->
+            scheduler.sendHeartbeat()
+        ).doesNotThrowAnyException();
 
-        verify(healthyEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
-        verify(brokenEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+        verify(healthyEmitter, times(1)).send(
+            any(SseEmitter.SseEventBuilder.class)
+        );
+        verify(brokenEmitter, times(1)).send(
+            any(SseEmitter.SseEventBuilder.class)
+        );
 
         // Broken emitter should be evicted, healthy remains
         assertThat(registry.getActiveConnectionCount()).isEqualTo(1);
@@ -81,13 +89,19 @@ class HeartbeatSchedulerTest {
     }
 
     @Test
-    @DisplayName("should be annotated with @Scheduled fixedDelay and 15s default interval")
+    @DisplayName(
+        "should be annotated with @Scheduled fixedDelay and 15s default interval"
+    )
     void sendHeartbeat_isAnnotatedWithScheduled() throws NoSuchMethodException {
-        Method method = HeartbeatScheduler.class.getDeclaredMethod("sendHeartbeat");
+        Method method = HeartbeatScheduler.class.getDeclaredMethod(
+            "sendHeartbeat"
+        );
         Scheduled scheduled = method.getAnnotation(Scheduled.class);
 
         assertThat(scheduled).isNotNull();
-        assertThat(scheduled.fixedDelayString()).isEqualTo("${app.realtime.heartbeat-interval-seconds:15}");
+        assertThat(scheduled.fixedDelayString()).isEqualTo(
+            "${app.realtime.heartbeat-interval-seconds:15}"
+        );
         assertThat(scheduled.timeUnit()).isEqualTo(TimeUnit.SECONDS);
     }
 }

@@ -6,6 +6,5 @@ import java.util.UUID;
 public interface OrganizationDirectory {
     Optional<OrganizationInfo> findBySlug(String slug);
 
-    record OrganizationInfo(UUID id, String name) {
-    }
+    record OrganizationInfo(UUID id, String name) {}
 }

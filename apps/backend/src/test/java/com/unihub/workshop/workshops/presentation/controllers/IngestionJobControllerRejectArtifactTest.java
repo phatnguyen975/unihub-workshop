@@ -7,6 +7,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.unihub.workshop.WorkshopApplication;
 import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestConstructor;
@@ -27,7 +29,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest(
-    classes = com.unihub.workshop.WorkshopApplication.class,
+    classes = WorkshopApplication.class,
     properties = {
         "spring.flyway.enabled=false",
         "spring.data.redis.repositories.enabled=false",
@@ -133,7 +135,7 @@ class IngestionJobControllerRejectArtifactTest {
     void getRejectArtifactUrl_NotFound_Returns404() throws Exception {
         when(getRejectArtifactUrlUseCase.execute(JOB_ID, ORG_ID)).thenThrow(
             new AppException(
-                org.springframework.http.HttpStatus.NOT_FOUND,
+                HttpStatus.NOT_FOUND,
                 "urn:unihub:error:not-found",
                 "IngestionJobReport not found"
             )

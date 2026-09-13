@@ -5,9 +5,10 @@ import java.util.UUID;
 
 public interface RevokeSessionUseCase {
     void revokeSession(
-            UUID userId,
-            UUID sessionIdToRevoke,
-            UUID currentSessionId,
-            String currentJti,
-            Instant currentTokenExpiresAt);
+        UUID userId,
+        UUID sessionIdToRevoke,
+        UUID currentSessionId,
+        String currentJti,
+        Instant currentTokenExpiresAt
+    );
 }

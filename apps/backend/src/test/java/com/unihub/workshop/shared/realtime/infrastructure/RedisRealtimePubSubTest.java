@@ -31,7 +31,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Redis Real-Time Pub/Sub Unit Tests")
 class RedisRealtimePubSubTest {
 
     @Mock

@@ -7,15 +7,17 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 public final class TokenUtils {
+
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    private TokenUtils() {
-    }
+    private TokenUtils() {}
 
     public static String hash(String rawToken) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedHash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            byte[] encodedHash = digest.digest(
+                rawToken.getBytes(StandardCharsets.UTF_8)
+            );
             StringBuilder hexString = new StringBuilder(2 * encodedHash.length);
             for (byte b : encodedHash) {
                 String hex = Integer.toHexString(0xff & b);

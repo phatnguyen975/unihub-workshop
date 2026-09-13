@@ -1,11 +1,10 @@
 package com.unihub.workshop.iam.domain.model;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class UserTest {
 
@@ -18,7 +17,14 @@ class UserTest {
         String passwordHash = "argon2hash";
         String fullName = "Alice Smith";
 
-        User user = User.createStudent(id, email, passwordHash, fullName, studentRecordId, orgId);
+        User user = User.createStudent(
+            id,
+            email,
+            passwordHash,
+            fullName,
+            studentRecordId,
+            orgId
+        );
 
         assertThat(user.id()).isEqualTo(id);
         assertThat(user.email()).isEqualTo(email);
@@ -35,7 +41,14 @@ class UserTest {
 
     @Test
     void createStudentWithoutOrgShouldAllowNullOrgAndStudentRecord() {
-        User user = User.createStudent(null, "external@test.com", "hash", "External User", null, null);
+        User user = User.createStudent(
+            null,
+            "external@test.com",
+            "hash",
+            "External User",
+            null,
+            null
+        );
 
         assertThat(user.id()).isNotNull();
         assertThat(user.organizationId()).isNull();
@@ -49,21 +62,38 @@ class UserTest {
         UUID id = UUID.randomUUID();
         UUID studentRecordId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
-        User original = User.createStudent(id, "student@university.edu", "hash", "Alice Smith", studentRecordId, orgId);
+        User original = User.createStudent(
+            id,
+            "student@university.edu",
+            "hash",
+            "Alice Smith",
+            studentRecordId,
+            orgId
+        );
 
-        User updated = original.updateProfile("Alice T. Smith", "+84912345678", "https://cdn.unihub.vn/avatar.jpg");
+        User updated = original.updateProfile(
+            "Alice T. Smith",
+            "+84912345678",
+            "https://cdn.unihub.vn/avatar.jpg"
+        );
 
         assertThat(updated.id()).isEqualTo(original.id());
         assertThat(updated.email()).isEqualTo(original.email());
         assertThat(updated.passwordHash()).isEqualTo(original.passwordHash());
         assertThat(updated.role()).isEqualTo(original.role());
-        assertThat(updated.organizationId()).isEqualTo(original.organizationId());
-        assertThat(updated.studentRecordId()).isEqualTo(original.studentRecordId());
+        assertThat(updated.organizationId()).isEqualTo(
+            original.organizationId()
+        );
+        assertThat(updated.studentRecordId()).isEqualTo(
+            original.studentRecordId()
+        );
         assertThat(updated.createdAt()).isEqualTo(original.createdAt());
 
         assertThat(updated.fullName()).isEqualTo("Alice T. Smith");
         assertThat(updated.phoneNumber()).isEqualTo("+84912345678");
-        assertThat(updated.avatarUrl()).isEqualTo("https://cdn.unihub.vn/avatar.jpg");
+        assertThat(updated.avatarUrl()).isEqualTo(
+            "https://cdn.unihub.vn/avatar.jpg"
+        );
         assertThat(updated.updatedAt()).isNotNull();
         assertThat(updated.updatedBy()).isEqualTo(original.id());
     }
@@ -72,22 +102,23 @@ class UserTest {
     void updateProfileShouldAllowNullPhoneNumberAndAvatarUrl() {
         UUID id = UUID.randomUUID();
         User original = new User(
-                id,
-                null,
-                UserRole.STUDENT,
-                "student@university.edu",
-                "+84912345678",
-                "hash",
-                "Alice Smith",
-                "https://cdn.unihub.vn/avatar.jpg",
-                true,
-                false,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            id,
+            null,
+            UserRole.STUDENT,
+            "student@university.edu",
+            "+84912345678",
+            "hash",
+            "Alice Smith",
+            "https://cdn.unihub.vn/avatar.jpg",
+            true,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
 
         User updated = original.updateProfile("Alice Smith", null, null);
 
@@ -101,22 +132,23 @@ class UserTest {
         UUID id = UUID.randomUUID();
         UUID creatorId = UUID.randomUUID();
         User original = new User(
-                id,
-                null,
-                UserRole.STUDENT,
-                "student@university.edu",
-                "+84912345678",
-                "old-hash",
-                "Alice Smith",
-                null,
-                true,
-                false,
-                null,
-                null,
-                Instant.now().minusSeconds(3600),
-                Instant.now().minusSeconds(3600),
-                creatorId,
-                creatorId);
+            id,
+            null,
+            UserRole.STUDENT,
+            "student@university.edu",
+            "+84912345678",
+            "old-hash",
+            "Alice Smith",
+            null,
+            true,
+            false,
+            null,
+            null,
+            Instant.now().minusSeconds(3600),
+            Instant.now().minusSeconds(3600),
+            creatorId,
+            creatorId
+        );
 
         User updated = original.updatePassword("new-argon2-hash");
 

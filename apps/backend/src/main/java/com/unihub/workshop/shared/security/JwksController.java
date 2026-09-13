@@ -4,11 +4,10 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.unihub.workshop.shared.exception.InternalServerException;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import lombok.RequiredArgsConstructor;
-
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -23,16 +22,17 @@ public class JwksController {
         }
 
         RSAKey rsaKey = new RSAKey.Builder(rsaKeyProperties.publicKey())
-                .keyUse(KeyUse.SIGNATURE)
-                .algorithm(JWSAlgorithm.RS256)
-                .build();
+            .keyUse(KeyUse.SIGNATURE)
+            .algorithm(JWSAlgorithm.RS256)
+            .build();
 
         JwksResponse.Jwk jwk = new JwksResponse.Jwk(
-                rsaKey.getKeyType().getValue(),
-                rsaKey.getPublicExponent().toString(),
-                rsaKey.getKeyUse().identifier(),
-                rsaKey.getModulus().toString(),
-                rsaKey.getAlgorithm().getName());
+            rsaKey.getKeyType().getValue(),
+            rsaKey.getPublicExponent().toString(),
+            rsaKey.getKeyUse().identifier(),
+            rsaKey.getModulus().toString(),
+            rsaKey.getAlgorithm().getName()
+        );
 
         return new JwksResponse(List.of(jwk));
     }

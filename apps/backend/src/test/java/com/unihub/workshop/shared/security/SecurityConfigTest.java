@@ -7,6 +7,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.unihub.workshop.WorkshopApplication;
 import com.unihub.workshop.shared.exception.AppException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -29,7 +30,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest(
     classes = {
-        com.unihub.workshop.WorkshopApplication.class,
+        WorkshopApplication.class,
         SecurityConfigTest.DummyController.class,
     },
     properties = {

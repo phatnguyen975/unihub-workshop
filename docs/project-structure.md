@@ -142,7 +142,7 @@ apps/backend/
 │   │   │       │   ├── exception/            # RFC 7807 problem details and domain exception mappers
 │   │   │       │   ├── ratelimit/            # Token-bucket distributed rate limiting filter via Bucket4j and Redis
 │   │   │       │   ├── realtime/             # Server-Sent Events (SSE) streaming hub, emitter registry, Redis Pub/Sub
-│   │   │       │   │   ├── api/              # Public streaming interfaces (RealtimeEvent, RealtimeEventType, RealtimeEventPublisher)
+│   │   │       │   │   ├── api/              # Public streaming interfaces
 │   │   │       │   │   ├── application/      # Stream subscription service and outbound ports
 │   │   │       │   │   ├── config/           # Realtime Redis and scheduler properties
 │   │   │       │   │   ├── infrastructure/   # SseEmitter registry, heartbeat scheduler, Redis publisher/subscriber
@@ -150,7 +150,7 @@ apps/backend/
 │   │   │       │   ├── resilience/           # Resilience4j circuit breakers and chaos testing adapters
 │   │   │       │   ├── security/             # JWT RS256, JTI blacklist, Public Key distribution, auth utilities
 │   │   │       │   ├── seed/                 # Startup database seeding for organizations and root organizers
-│   │   │       │   ├── web/                  # Standard ApiResponse envelope and HTTP web formatting
+│   │   │       │   ├── web/                  # Standard API response envelope and HTTP web formatting
 │   │   │       │   └── package-info.java     # @ApplicationModule(type = OPEN)
 │   │   │       ├── iam/                      # Identity & Access Management (STANDARD REFERENCE TEMPLATE)
 │   │   │       │   ├── package-info.java     # @ApplicationModule(displayName = "IAM Module", allowedDependencies = {"shared"})
@@ -161,7 +161,7 @@ apps/backend/
 │   │   │       │   │   ├── events/           # Public in-process module events for peer modules via @ApplicationModuleListener
 │   │   │       │   │   └── package-info.java # @NamedInterface("api") declaring the exposed surface
 │   │   │       │   ├── domain/               # 100% Pure Java (no Spring, JPA, or Servlet annotations)
-│   │   │       │   │   ├── model/            # Business entities and value objects (User, Session, Token)
+│   │   │       │   │   ├── model/            # Business entities and value objects
 │   │   │       │   │   ├── events/           # Internal Domain Events (pure Java records, scoped strictly to aggregate internals)
 │   │   │       │   │   └── exceptions/       # Pure domain business exceptions
 │   │   │       │   ├── application/          # Use case orchestration and port definitions
@@ -204,33 +204,28 @@ apps/backend/
 └── settings.gradle                           # Gradle settings for the backend module
 ```
 
-#### Internal Module Communication & Architecture
+#### Internal Module Communication
 
-##### 1. Inter-Module Communication (Spring Modulith)
+**1. Inter-Module Communication (Spring Modulith)**
 
-**A. Synchronous Queries via Facade Pattern**
+- **Synchronous Queries via Facade Pattern:** For synchronous inter-module queries, modules communicate exclusively via the **Facade Pattern**:
+  - **Public API Surface (`<module>/api/`):**
+    - `<Module>Api.java`: Minimal public interface defining synchronous queries offered to other modules. Created strictly on demand **YAGNI** when another module genuinely needs it; speculative facade methods are prohibited.
+    - `dto/`: Pure, immutable Java records for cross-module data exchange (e.g. `UserSummaryDto`). **Domain entities and JPA `@Entity` persistence models must never escape the module boundary.**
+    - `events/`: Public module events published for peer modules in the monolith.
+    - `package-info.java`: Annotated with `@NamedInterface("api")` declaring the package as the module's exposed surface.
+  - **Private Facade Implementation (`<module>/application/facade/`):**
+    - `<Module>Facade.java` (or `<Module>ApiImpl.java`): Implements the `<Module>Api` interface. Lives privately inside `application/facade/` and injects internal use cases or repository ports to satisfy requests, mapping internal types to public DTOs.
+  - **Encapsulation Enforcement:** Enforced by Spring Modulith `@ApplicationModule` and static ArchUnit fitness functions in `ModulithArchitectureTest`. Any direct access to another module's `domain/`, `application/`, `infrastructure/`, or `presentation/` breaks the build.
 
-For synchronous inter-module queries, modules communicate exclusively via the **Facade Pattern**:
+- **Event Architecture & Categorization:** The UniHub platform classifies events into four explicit, non-overlapping categories to guarantee layer purity, prevent circular dependencies, and support horizontal scaling:
 
-- **Public API Surface (`<module>/api/`):**
-  - `<Module>Api.java`: Minimal public interface defining synchronous queries offered to other modules. Created strictly on demand **YAGNI** when another module genuinely needs it; speculative facade methods are prohibited.
-  - `dto/`: Pure, immutable Java records for cross-module data exchange (e.g. `UserSummaryDto`). **Domain entities and JPA `@Entity` persistence models must never escape the module boundary.**
-  - `events/`: Public module events published for peer modules in the monolith.
-  - `package-info.java`: Annotated with `@NamedInterface("api")` declaring the package as the module's exposed surface.
-- **Private Facade Implementation (`<module>/application/facade/`):**
-  - `<Module>Facade.java` (or `<Module>ApiImpl.java`): Implements the `<Module>Api` interface. Lives privately inside `application/facade/` and injects internal use cases or repository ports to satisfy requests, mapping internal types to public DTOs.
-- **Encapsulation Enforcement:** Enforced by Spring Modulith `@ApplicationModule` and static ArchUnit fitness functions in `ModulithArchitectureTest`. Any direct access to another module's `domain/`, `application/`, `infrastructure/`, or `presentation/` breaks the build.
-
-**B. Event Architecture & Categorization**
-
-The UniHub platform classifies events into four explicit, non-overlapping categories to guarantee layer purity, prevent circular dependencies, and support horizontal scaling:
-
-| Event Category                                | Location                  | Purity / Annotations                                         | Scope & Transport                                          | Publishing & Consumption Pattern                                                                                                           | Purpose & Real-World Example                                                                                                                                                                                                                                                                                                                        |
-| :-------------------------------------------- | :------------------------ | :----------------------------------------------------------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Internal Domain Event**                  | `<module>/domain/events/` | **100% Pure Java** (Zero framework, zero Spring annotations) | Intra-module (Internal to Aggregate)                       | Created by Domain Entities; handled synchronously within the same Use Case.                                                                | Captures state transitions internal to an aggregate (e.g., `UserRegisteredInternalEvent`). Never exposed outside the module.                                                                                                                                                                                                                        |
-| **2. Public In-Process Module Event**         | `<module>/api/events/`    | Pure Java records (Optional Modulith metadata)               | Inter-module (In-process inside Monolith)                  | Published via Spring `ApplicationEventPublisher`. Peer modules listen via `@ApplicationModuleListener`.                                    | Decoupled cross-module reactive side effects inside the monolith (e.g., `WorkshopPublishedEvent` triggering search index synchronization).                                                                                                                                                                                                          |
-| **3. Transactional Outbox Integration Event** | `shared/events/`          | Spring Modulith `@Externalized("unihub.events::<key>")`      | Monolith → RabbitMQ → Background Workers (`apps/workers/`) | Persisted to PostgreSQL `event_publication` table in the same DB transaction; dispatched to RabbitMQ exchange `unihub.events`.             | Asynchronous worker processing (e.g., `UserProvisionedEvent`, `UserStatusChangedEvent`, `OtpRequestedEvent` consumed by notifications worker for email sending). Centralized in `shared/events/` to allow both business modules (`iam`) and startup seeders (`shared.seed.SeedRunner`) to publish without circular dependencies (`shared <-> iam`). |
-| **4. Real-Time Stream Event**                 | `shared/realtime/api/`    | `RealtimeEvent<T>` generic record + `RealtimeEventType` enum | Monolith → Redis Pub/Sub → Web/Mobile SSE Stream           | Injected via `RealtimeEventPublisher`, distributed across backend nodes via Redis Pub/Sub, streamed via SSE (`GET /api/v1/stream/events`). | Instant client-side UI push updates (e.g., in-app notification bell `notification.new`, payment confirmation `payment.confirmed`, live check-in counters `attendance.updated`).                                                                                                                                                                     |
+| Event Category                                | Location                  | Purity / Annotations                                         | Scope & Transport                                          | Publishing & Consumption Pattern                                                                                                           |
+| :-------------------------------------------- | :------------------------ | :----------------------------------------------------------- | :--------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Internal Domain Event**                  | `<module>/domain/events/` | **100% Pure Java** (Zero framework, zero Spring annotations) | Intra-module (Internal to Aggregate)                       | Created by Domain Entities; handled synchronously within the same Use Case.                                                                |
+| **2. Public In-Process Module Event**         | `<module>/api/events/`    | Pure Java records (Optional Modulith metadata)               | Inter-module (In-process inside Monolith)                  | Published via Spring `ApplicationEventPublisher`. Peer modules listen via `@ApplicationModuleListener`.                                    |
+| **3. Transactional Outbox Integration Event** | `shared/events/`          | Spring Modulith `@Externalized("unihub.events::<key>")`      | Monolith → RabbitMQ → Background Workers (`apps/workers/`) | Persisted to PostgreSQL `event_publication` table in the same DB transaction; dispatched to RabbitMQ exchange `unihub.events`.             |
+| **4. Real-Time Stream Event**                 | `shared/realtime/api/`    | `RealtimeEvent<T>` generic record + `RealtimeEventType` enum | Monolith → Redis Pub/Sub → Web/Mobile SSE Stream           | Injected via `RealtimeEventPublisher`, distributed across backend nodes via Redis Pub/Sub, streamed via SSE (`GET /api/v1/stream/events`). |
 
 ```mermaid
 flowchart LR
@@ -259,12 +254,12 @@ flowchart LR
   end
 
   Registrations -- sync query --> WS_API
-  WS_API -- Facade --> Workshops
+  WS_API -- facade --> Workshops
   Payments -- sync query --> REG_API
-  REG_API -- Facade --> Registrations
+  REG_API -- facade --> Registrations
   Attendances -- sync query --> REG_API
   Notifications -- sync query --> IAM_API
-  IAM_API -- Facade --> IAM
+  IAM_API -- facade --> IAM
   Workshops -- WorkshopPublishedEvent --> Publisher
   Publisher -- internal listener --> Notifications
   Publisher --> Registry
@@ -283,11 +278,9 @@ flowchart LR
   style Eventing fill:#fff7d6,stroke:#b7791f,color:#000000
 ```
 
-##### 2. Intra-Module Architecture (Clean Architecture)
+**2. Intra-Module Architecture (Clean Architecture)**
 
-**A. Inward Dependency Rule**
-
-In Clean Architecture, intra-module dependencies point strictly inward (`Presentation` → `Application` → `Domain`), while `Infrastructure` implements outbound ports defined by `Application` (Dependency Inversion Principle) and encapsulates all external technical integrations. The Domain model remains 100% Pure Java with zero framework leakage.
+- **Inward Dependency Rule:** In Clean Architecture, intra-module dependencies point strictly inward (`Presentation` → `Application` → `Domain`), while `Infrastructure` implements outbound ports defined by `Application` (Dependency Inversion Principle) and encapsulates all external technical integrations. The Domain model remains 100% Pure Java with zero framework leakage.
 
 ```mermaid
 flowchart LR
@@ -309,9 +302,7 @@ flowchart LR
   classDef external fill:#ffe6e6,stroke:#c53030,stroke-width:1.2px,color:#742a2a
 ```
 
-**B. Taxonomy of `infrastructure/` Adapters**
-
-In Clean Architecture, `infrastructure/` houses all **Outbound Adapters** that implement the outbound port interfaces defined in `application/ports/out/`. Depending on the external technologies a module interacts with, `infrastructure/` is organized into standard, single-responsibility subpackages:
+- **Taxonomy of `infrastructure/` Adapters:** In Clean Architecture, `infrastructure/` houses all **Outbound Adapters** that implement the outbound port interfaces defined in `application/ports/out/`. Depending on the external technologies a module interacts with, `infrastructure/` is organized into standard, single-responsibility subpackages:
 
 | Subpackage              | Technology / Integration                   | Role & Typical Contents                                                                                                        |
 | :---------------------- | :----------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
@@ -335,23 +326,23 @@ apps/workers/
 │   │   │   └── com/unihub/workshop/workers/
 │   │   │       ├── WorkersApplication.java
 │   │   │       ├── shared/                   # Shared worker infrastructure
-│   │   │       │   ├── config/               # MinIO S3 and Micrometer/Prometheus observability beans
+│   │   │       │   ├── config/               # RabbitMQ, S3, Elasticsearch, and observability beans
 │   │   │       │   └── database/             # Read/write replica-routing data source and configuration
 │   │   │       ├── batch_ingestion/          # Nightly CSV ingestion worker (concrete Hexagonal reference template)
-│   │   │       │   ├── inbound/              # Schedulers (NightlyIngestionScheduler) and Spring Batch job configurations
+│   │   │       │   ├── inbound/              # Schedulers and Spring Batch job configurations
 │   │   │       │   ├── core/                 # Pure domain models, pipeline logic, and port interfaces
-│   │   │       │   │   ├── models/           # Domain records (SourceFile, StudentDirectoryRow, RejectedStudentRow, IngestionMetrics, IngestionJobReport)
+│   │   │       │   │   ├── models/           # Domain records
 │   │   │       │   │   ├── pipeline/         # Streaming CSV reader, row validator, chunk duplicate resolver
 │   │   │       │   │   ├── ports/            # Port contracts isolating core from adapters
-│   │   │       │   │   │   ├── in/           # Inbound ports (IngestStudentCsv, RunFileAdmission)
-│   │   │       │   │   │   └── out/          # Outbound ports (ObjectStore, RejectArtifactStore, DirectoryWriter, CheckpointStore, EventPublisher)
-│   │   │       │   │   └── usecases/         # Job orchestration services (CsvIngestionWithQuarantineService, FileAdmissionService)
+│   │   │       │   │   │   ├── in/           # Inbound ports
+│   │   │       │   │   │   └── out/          # Outbound ports
+│   │   │       │   │   └── usecases/         # Job orchestration services
 │   │   │       │   └── outbound/             # Technology-specific outbound adapters
-│   │   │       │       ├── persistence/      # Spring Data JPA repositories & Postgres adapters (IngestionJobReportWriter, StudentDirectoryWriter)
+│   │   │       │       ├── persistence/      # Spring Data JPA repositories & Postgres adapters
 │   │   │       │       ├── storage/          # MinIO S3 object store, reject artifact store, Redis checkpoint store
 │   │   │       │       ├── ai_providers/     # External AI API adapters
-│   │   │       │       ├── messaging/        # RabbitMQ AMQP event publisher (FileCompletedEvent, FileRejectedEvent)
-│   │   │       │       └── config/           # Module-specific properties (BatchIngestionProperties) and Spring beans
+│   │   │       │       ├── messaging/        # RabbitMQ AMQP event publisher
+│   │   │       │       └── config/           # Module-specific properties and Spring beans
 │   │   │       ├── maintenance/              # Recurring TTL cleanup & database maintenance workers (follows batch_ingestion template)
 │   │   │       ├── notifications/            # Notification fan-out workers (follows batch_ingestion template)
 │   │   │       ├── search_sync/              # Elasticsearch CQRS sync workers (follows batch_ingestion template)
@@ -366,13 +357,12 @@ apps/workers/
 ├── .env                                      # Local dev env vars (DB, RabbitMQ, S3, AI API key)
 ├── .env.example                              # Env var template committed to source control
 ├── build.gradle                              # Gradle build definition
-├── settings.gradle                           # Gradle settings for the workers module
-└── README.md                                 # Worker-specific run and troubleshooting notes
+└── settings.gradle                           # Gradle settings for the workers module
 ```
 
 #### Internal Module Communication
 
-**A. Hexagonal Architecture (Intra-Module Flow):**
+**1. Hexagonal Architecture (Intra-Module Flow):**
 
 - Both `inbound` and `outbound` adapters depend inward on `core` via ports; `core` has zero outward dependencies.
 - External triggers and systems are isolated behind adapters to keep task logic deterministic and testable.
@@ -397,7 +387,7 @@ flowchart LR
   classDef external fill:#ffe6e6,stroke:#c53030,stroke-width:1.2px,color:#742a2a
 ```
 
-**B. Task-Driven Async Pipeline (AI Processing Example):**
+**2. Task-Driven Async Pipeline (AI Processing Example):**
 
 - Worker consumes brokered events, performs local chunking to protect payload limits, and writes results to PostgreSQL.
 - On repeated failures, the broker routes the message to the DLQ for inspection and replay.

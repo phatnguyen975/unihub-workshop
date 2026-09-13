@@ -1,18 +1,17 @@
 package com.unihub.workshop.shared.security;
 
-import com.unihub.workshop.shared.exception.InternalServerException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.unihub.workshop.shared.exception.InternalServerException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.Base64;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class PublicKeyServiceTest {
 
@@ -28,7 +27,10 @@ class PublicKeyServiceTest {
         publicKey = (RSAPublicKey) keyPair.getPublic();
         RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
 
-        RsaKeyProperties rsaKeyProperties = new RsaKeyProperties(privateKey, publicKey);
+        RsaKeyProperties rsaKeyProperties = new RsaKeyProperties(
+            privateKey,
+            publicKey
+        );
         publicKeyService = new PublicKeyService(rsaKeyProperties);
     }
 
@@ -40,9 +42,10 @@ class PublicKeyServiceTest {
         assertThat(pem).endsWith("\n-----END PUBLIC KEY-----");
         assertThat(pem).contains("\n"); // check for line breaks
 
-        String base64Body = pem.replace("-----BEGIN PUBLIC KEY-----\n", "")
-                .replace("\n-----END PUBLIC KEY-----", "")
-                .replaceAll("\n", "");
+        String base64Body = pem
+            .replace("-----BEGIN PUBLIC KEY-----\n", "")
+            .replace("\n-----END PUBLIC KEY-----", "")
+            .replaceAll("\n", "");
 
         byte[] decoded = Base64.getDecoder().decode(base64Body);
         assertThat(decoded).isEqualTo(publicKey.getEncoded());
@@ -67,8 +70,10 @@ class PublicKeyServiceTest {
         keyPairGenerator.initialize(2048);
         KeyPair keyPair = keyPairGenerator.generateKeyPair();
 
-        RsaKeyProperties newProperties = new RsaKeyProperties((RSAPrivateKey) keyPair.getPrivate(),
-                (RSAPublicKey) keyPair.getPublic());
+        RsaKeyProperties newProperties = new RsaKeyProperties(
+            (RSAPrivateKey) keyPair.getPrivate(),
+            (RSAPublicKey) keyPair.getPublic()
+        );
         PublicKeyService newService = new PublicKeyService(newProperties);
         String keyId2 = newService.getKeyId();
 
@@ -86,15 +91,15 @@ class PublicKeyServiceTest {
     @Test
     void shouldThrowInternalServerExceptionWhenRsaKeyPropertiesIsNull() {
         assertThatThrownBy(() -> new PublicKeyService(null))
-                .isInstanceOf(InternalServerException.class)
-                .hasMessage("RSA public key is not loaded.");
+            .isInstanceOf(InternalServerException.class)
+            .hasMessage("RSA public key is not loaded.");
     }
 
     @Test
     void shouldThrowInternalServerExceptionWhenPublicKeyIsNull() {
         RsaKeyProperties invalidProperties = new RsaKeyProperties(null, null);
         assertThatThrownBy(() -> new PublicKeyService(invalidProperties))
-                .isInstanceOf(InternalServerException.class)
-                .hasMessage("RSA public key is not loaded.");
+            .isInstanceOf(InternalServerException.class)
+            .hasMessage("RSA public key is not loaded.");
     }
 }

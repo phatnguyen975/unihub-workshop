@@ -1,7 +1,7 @@
 package com.unihub.workshop.shared.exception;
 
-import org.springframework.http.HttpStatus;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 
 public class AppException extends RuntimeException {
 
@@ -16,14 +16,24 @@ public class AppException extends RuntimeException {
         this.properties = null;
     }
 
-    public AppException(HttpStatus status, String type, String message, Throwable cause) {
+    public AppException(
+        HttpStatus status,
+        String type,
+        String message,
+        Throwable cause
+    ) {
         super(message, cause);
         this.status = status;
         this.type = type;
         this.properties = null;
     }
 
-    public AppException(HttpStatus status, String type, String message, Map<String, Object> properties) {
+    public AppException(
+        HttpStatus status,
+        String type,
+        String message,
+        Map<String, Object> properties
+    ) {
         super(message);
         this.status = status;
         this.type = type;

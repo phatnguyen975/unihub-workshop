@@ -4,11 +4,10 @@ import com.unihub.workshop.workers.batch_ingestion.core.models.SourceFile;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.in.IngestStudentCsv;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.in.RunFileAdmission;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionObjectStore;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor

@@ -1,6 +1,12 @@
 package com.unihub.workshop.shared.security;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 import jakarta.servlet.FilterChain;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,22 +20,18 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
-import java.time.Instant;
-import java.util.UUID;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
     @Mock
     private JwtDecoder jwtDecoder;
+
     @Mock
     private JwtClaimsExtractor claimsExtractor;
+
     @Mock
     private RedisJtiValidator jtiValidator;
+
     @Mock
     private HandlerExceptionResolver exceptionResolver;
 
@@ -60,7 +62,14 @@ class JwtAuthenticationFilterTest {
         String sid = UUID.randomUUID().toString();
         Instant now = Instant.now();
         JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
-                UUID.randomUUID().toString(), UUID.randomUUID().toString(), jti, "STUDENT", sid, now, now.plusSeconds(3600));
+            UUID.randomUUID().toString(),
+            UUID.randomUUID().toString(),
+            jti,
+            "STUDENT",
+            sid,
+            now,
+            now.plusSeconds(3600)
+        );
 
         when(claimsExtractor.extract(jwt)).thenReturn(principal);
         when(jtiValidator.isTokenValid(jti)).thenReturn(false); // Blacklisted!
@@ -69,8 +78,12 @@ class JwtAuthenticationFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         // Assert
-        verify(exceptionResolver).resolveException(eq(request), eq(response), eq(null),
-                any(AuthenticationCredentialsNotFoundException.class));
+        verify(exceptionResolver).resolveException(
+            eq(request),
+            eq(response),
+            eq(null),
+            any(AuthenticationCredentialsNotFoundException.class)
+        );
         verify(filterChain, never()).doFilter(request, response);
     }
 }

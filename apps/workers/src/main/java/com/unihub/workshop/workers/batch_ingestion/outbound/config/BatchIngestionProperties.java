@@ -1,9 +1,8 @@
 package com.unihub.workshop.workers.batch_ingestion.outbound.config;
 
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.Set;
 
 @Configuration
 @ConfigurationProperties(prefix = "app.batch-ingestion")

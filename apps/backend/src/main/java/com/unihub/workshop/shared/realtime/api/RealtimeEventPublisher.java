@@ -7,7 +7,6 @@ import java.util.UUID;
  * Injected by domain modules and background workers to broadcast updates.
  */
 public interface RealtimeEventPublisher {
-
     /**
      * Publishes a real-time event targeting a specific user across all their active
      * sessions.

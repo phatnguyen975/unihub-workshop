@@ -6,7 +6,6 @@ package com.unihub.workshop.shared.resilience;
  * the `dev` profile.
  */
 public interface ChaosMockAdapter {
-
     /**
      * Applies simulated chaos (latency and/or exceptions) based on configuration.
      * Should be called by downstream features wrapping external service calls.

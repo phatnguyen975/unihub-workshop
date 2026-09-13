@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.ApplicationArguments;
@@ -73,7 +74,7 @@ class SeedRunnerTest {
         when(
             jdbcTemplate.query(
                 anyString(),
-                org.mockito.ArgumentMatchers.<RowMapper<UUID>>any(),
+                ArgumentMatchers.<RowMapper<UUID>>any(),
                 eq("engineering")
             )
         ).thenReturn(List.of(orgId));
@@ -213,7 +214,7 @@ class SeedRunnerTest {
         when(
             jdbcTemplate.query(
                 anyString(),
-                org.mockito.ArgumentMatchers.<RowMapper<UUID>>any(),
+                ArgumentMatchers.<RowMapper<UUID>>any(),
                 eq("unknown")
             )
         ).thenReturn(List.of());

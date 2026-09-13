@@ -19,9 +19,10 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
     private final OtpService otpService;
 
     public ActivateAccountUseCaseImpl(
-            UserRepository userRepository,
-            UserVerificationTokenRepository userVerificationTokenRepository,
-            OtpService otpService) {
+        UserRepository userRepository,
+        UserVerificationTokenRepository userVerificationTokenRepository,
+        OtpService otpService
+    ) {
         this.userRepository = userRepository;
         this.userVerificationTokenRepository = userVerificationTokenRepository;
         this.otpService = otpService;
@@ -30,17 +31,22 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
     @Override
     @Transactional
     public void activate(String email, String otp) {
-        String normalizedEmail = email != null ? email.toLowerCase().trim() : "";
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(this::invalidOtp);
+        String normalizedEmail =
+            email != null ? email.toLowerCase().trim() : "";
+        User user = userRepository
+            .findByEmail(normalizedEmail)
+            .orElseThrow(this::invalidOtp);
 
         if (user.isActive()) {
             throw new ConflictException("Account is already active.");
         }
 
-        UserVerificationToken token = userVerificationTokenRepository.findLatestByUserIdAndType(
-                user.id(), UserVerificationToken.TYPE_ACTIVATION_OTP)
-                .orElseThrow(this::invalidOtp);
+        UserVerificationToken token = userVerificationTokenRepository
+            .findLatestByUserIdAndType(
+                user.id(),
+                UserVerificationToken.TYPE_ACTIVATION_OTP
+            )
+            .orElseThrow(this::invalidOtp);
 
         if (token.isConsumed() || token.isExpired()) {
             throw invalidOtp();
@@ -57,6 +63,9 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
     }
 
     private ValidationException invalidOtp() {
-        return new ValidationException("otp", "Invalid or expired activation code.");
+        return new ValidationException(
+            "otp",
+            "Invalid or expired activation code."
+        );
     }
 }

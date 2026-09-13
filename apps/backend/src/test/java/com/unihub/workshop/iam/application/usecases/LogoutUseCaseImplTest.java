@@ -1,12 +1,22 @@
 package com.unihub.workshop.iam.application.usecases;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 import com.unihub.workshop.iam.application.ports.out.JtiBlacklistPort;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
-import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.application.utils.TokenUtils;
+import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,22 +24,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
-import java.time.Duration;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class LogoutUseCaseImplTest {
 
     @Mock
     private JtiBlacklistPort jtiBlacklistPort;
+
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
@@ -44,31 +44,58 @@ class LogoutUseCaseImplTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        useCase = new LogoutUseCaseImpl(jtiBlacklistPort, refreshTokenRepository, meterRegistry);
+        useCase = new LogoutUseCaseImpl(
+            jtiBlacklistPort,
+            refreshTokenRepository,
+            meterRegistry
+        );
     }
 
     @Test
     void shouldBlacklistJtiAndRevokeSpecificToken() {
         String rawToken = "raw-token";
         String tokenHash = TokenUtils.hash(rawToken);
-        RefreshToken token = new RefreshToken(UUID.randomUUID(), userId, tokenHash, "dev", "ip",
-                Instant.now().plusSeconds(100), null);
+        RefreshToken token = new RefreshToken(
+            UUID.randomUUID(),
+            userId,
+            tokenHash,
+            "dev",
+            "ip",
+            Instant.now().plusSeconds(100),
+            null
+        );
 
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(token));
+        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(
+            Optional.of(token)
+        );
 
         useCase.logout(accessToken, jti, expiresAt, userId, rawToken);
 
-        ArgumentCaptor<Duration> durationCaptor = ArgumentCaptor.forClass(Duration.class);
-        verify(jtiBlacklistPort).blacklistJti(eq(jti), durationCaptor.capture());
-        assertThat(durationCaptor.getValue()).isGreaterThan(Duration.ofMinutes(59));
+        ArgumentCaptor<Duration> durationCaptor = ArgumentCaptor.forClass(
+            Duration.class
+        );
+        verify(jtiBlacklistPort).blacklistJti(
+            eq(jti),
+            durationCaptor.capture()
+        );
+        assertThat(durationCaptor.getValue()).isGreaterThan(
+            Duration.ofMinutes(59)
+        );
 
-        ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+        ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(
+            RefreshToken.class
+        );
         verify(refreshTokenRepository).save(tokenCaptor.capture());
         assertThat(tokenCaptor.getValue().revokedAt()).isNotNull();
 
-        verify(refreshTokenRepository, never()).revokeAllActiveTokensForUser(any(), any());
+        verify(refreshTokenRepository, never()).revokeAllActiveTokensForUser(
+            any(),
+            any()
+        );
 
-        assertThat(meterRegistry.counter("auth.logout", "outcome", "success").count()).isEqualTo(1);
+        assertThat(
+            meterRegistry.counter("auth.logout", "outcome", "success").count()
+        ).isEqualTo(1);
     }
 
     @Test
@@ -76,21 +103,36 @@ class LogoutUseCaseImplTest {
         useCase.logout(accessToken, jti, expiresAt, userId, null);
 
         verify(jtiBlacklistPort).blacklistJti(eq(jti), any(Duration.class));
-        verify(refreshTokenRepository).revokeAllActiveTokensForUser(eq(userId), any(Instant.class));
+        verify(refreshTokenRepository).revokeAllActiveTokensForUser(
+            eq(userId),
+            any(Instant.class)
+        );
         verify(refreshTokenRepository, never()).save(any());
 
-        assertThat(meterRegistry.counter("auth.logout", "outcome", "success").count()).isEqualTo(1);
+        assertThat(
+            meterRegistry.counter("auth.logout", "outcome", "success").count()
+        ).isEqualTo(1);
     }
 
     @Test
     void shouldFailIfRedisFails() {
-        doThrow(new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis down"))
-                .when(jtiBlacklistPort).blacklistJti(any(), any());
+        doThrow(
+            new ServiceUnavailableException(
+                "urn:unihub:error:service-unavailable",
+                "Redis down"
+            )
+        )
+            .when(jtiBlacklistPort)
+            .blacklistJti(any(), any());
 
-        assertThatThrownBy(() -> useCase.logout(accessToken, jti, expiresAt, userId, "raw"))
-                .isInstanceOf(ServiceUnavailableException.class);
+        assertThatThrownBy(() ->
+            useCase.logout(accessToken, jti, expiresAt, userId, "raw")
+        ).isInstanceOf(ServiceUnavailableException.class);
 
         verify(refreshTokenRepository, never()).save(any());
-        verify(refreshTokenRepository, never()).revokeAllActiveTokensForUser(any(), any());
+        verify(refreshTokenRepository, never()).revokeAllActiveTokensForUser(
+            any(),
+            any()
+        );
     }
 }

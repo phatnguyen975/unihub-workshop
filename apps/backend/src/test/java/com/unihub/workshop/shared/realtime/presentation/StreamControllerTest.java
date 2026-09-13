@@ -25,7 +25,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-@DisplayName("StreamController Unit Tests")
 class StreamControllerTest {
 
     private MockMvc mockMvc;

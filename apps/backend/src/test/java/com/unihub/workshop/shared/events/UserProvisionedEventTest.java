@@ -1,12 +1,11 @@
 package com.unihub.workshop.shared.events;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.modulith.events.Externalized;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.springframework.modulith.events.Externalized;
 
 class UserProvisionedEventTest {
 
@@ -17,7 +16,14 @@ class UserProvisionedEventTest {
         Instant before = Instant.now().minusMillis(100);
 
         UserProvisionedEvent event = new UserProvisionedEvent(
-                userId, orgId, "engineering", "admin@eng.unihub.edu", "Admin User", "ORGANIZER", "tempPass123");
+            userId,
+            orgId,
+            "engineering",
+            "admin@eng.unihub.edu",
+            "Admin User",
+            "ORGANIZER",
+            "tempPass123"
+        );
 
         assertThat(event.userId()).isEqualTo(userId);
         assertThat(event.organizationId()).isEqualTo(orgId);
@@ -31,8 +37,12 @@ class UserProvisionedEventTest {
 
     @Test
     void annotation_hasExternalizedToNotificationsQueue() {
-        Externalized annotation = UserProvisionedEvent.class.getAnnotation(Externalized.class);
+        Externalized annotation = UserProvisionedEvent.class.getAnnotation(
+            Externalized.class
+        );
         assertThat(annotation).isNotNull();
-        assertThat(annotation.value()).isEqualTo("unihub.events::notifications");
+        assertThat(annotation.value()).isEqualTo(
+            "unihub.events::notifications"
+        );
     }
 }

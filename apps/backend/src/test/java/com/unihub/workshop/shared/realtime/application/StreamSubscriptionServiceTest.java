@@ -15,7 +15,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-@DisplayName("StreamSubscriptionService Unit Tests")
 class StreamSubscriptionServiceTest {
 
     private EmitterRegistryPort registry;

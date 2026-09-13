@@ -3,13 +3,13 @@ package com.unihub.workshop.iam.infrastructure.security;
 import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.micrometer.core.instrument.MeterRegistry;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Component;
-
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
@@ -25,33 +25,53 @@ public class RedisSessionTrackerAdapter implements SessionTrackerPort {
         try {
             redisTemplate.opsForValue().set(KEY_PREFIX + sessionId, jti, ttl);
         } catch (Exception e) {
-            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
-            throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
+            meterRegistry
+                .counter("auth.blacklist.redis_unavailable")
+                .increment();
+            throw new ServiceUnavailableException(
+                "urn:unihub:error:service-unavailable",
+                "Redis is unavailable"
+            );
         }
     }
 
     @Override
     public Optional<String> getActiveJti(UUID sessionId) {
         try {
-            String jti = redisTemplate.opsForValue().get(KEY_PREFIX + sessionId);
+            String jti = redisTemplate
+                .opsForValue()
+                .get(KEY_PREFIX + sessionId);
             return Optional.ofNullable(jti);
         } catch (Exception e) {
-            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
-            throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
+            meterRegistry
+                .counter("auth.blacklist.redis_unavailable")
+                .increment();
+            throw new ServiceUnavailableException(
+                "urn:unihub:error:service-unavailable",
+                "Redis is unavailable"
+            );
         }
     }
 
     @Override
     public Duration getRemainingTtl(UUID sessionId) {
         try {
-            Long expire = redisTemplate.getExpire(KEY_PREFIX + sessionId, java.util.concurrent.TimeUnit.SECONDS);
+            Long expire = redisTemplate.getExpire(
+                KEY_PREFIX + sessionId,
+                TimeUnit.SECONDS
+            );
             if (expire != null && expire > 0) {
                 return Duration.ofSeconds(expire);
             }
             return Duration.ofMinutes(60);
         } catch (Exception e) {
-            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
-            throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
+            meterRegistry
+                .counter("auth.blacklist.redis_unavailable")
+                .increment();
+            throw new ServiceUnavailableException(
+                "urn:unihub:error:service-unavailable",
+                "Redis is unavailable"
+            );
         }
     }
 
@@ -60,8 +80,13 @@ public class RedisSessionTrackerAdapter implements SessionTrackerPort {
         try {
             redisTemplate.delete(KEY_PREFIX + sessionId);
         } catch (Exception e) {
-            meterRegistry.counter("auth.blacklist.redis_unavailable").increment();
-            throw new ServiceUnavailableException("urn:unihub:error:service-unavailable", "Redis is unavailable");
+            meterRegistry
+                .counter("auth.blacklist.redis_unavailable")
+                .increment();
+            throw new ServiceUnavailableException(
+                "urn:unihub:error:service-unavailable",
+                "Redis is unavailable"
+            );
         }
     }
 }

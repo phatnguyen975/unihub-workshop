@@ -24,7 +24,6 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("JDBC Workshop Authorization Adapter Unit Tests")
 class JdbcWorkshopAuthorizationAdapterTest {
 
     @Mock

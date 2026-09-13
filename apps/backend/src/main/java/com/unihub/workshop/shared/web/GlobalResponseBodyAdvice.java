@@ -31,6 +31,10 @@ public class GlobalResponseBodyAdvice implements ResponseBodyAdvice<Object> {
         ServerHttpRequest request,
         ServerHttpResponse response
     ) {
+        if (body == null) {
+            return null;
+        }
+
         if (
             body instanceof Resource ||
             body instanceof byte[] ||

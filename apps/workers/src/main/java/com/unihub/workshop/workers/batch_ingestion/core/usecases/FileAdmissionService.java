@@ -7,7 +7,6 @@ import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionEvent
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionJobReportWriter;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionObjectStore;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.OrganizationDirectory;
-
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -25,12 +24,13 @@ public class FileAdmissionService implements RunFileAdmission {
     private final long maxFileSizeBytes;
 
     public FileAdmissionService(
-            IngestionObjectStore objectStore,
-            OrganizationDirectory organizationDirectory,
-            IngestionJobReportWriter reportWriter,
-            IngestionEventPublisher eventPublisher,
-            Set<String> expectedFaculties,
-            long maxFileSizeBytes) {
+        IngestionObjectStore objectStore,
+        OrganizationDirectory organizationDirectory,
+        IngestionJobReportWriter reportWriter,
+        IngestionEventPublisher eventPublisher,
+        Set<String> expectedFaculties,
+        long maxFileSizeBytes
+    ) {
         this.objectStore = objectStore;
         this.organizationDirectory = organizationDirectory;
         this.reportWriter = reportWriter;
@@ -43,14 +43,15 @@ public class FileAdmissionService implements RunFileAdmission {
     public void admitFiles() {
         List<SourceFile> inboxFiles = objectStore.listInboxFiles();
 
-        inboxFiles.stream()
-                .sorted(Comparator.comparing(SourceFile::createdAt))
-                .forEach(this::processFile);
+        inboxFiles
+            .stream()
+            .sorted(Comparator.comparing(SourceFile::createdAt))
+            .forEach(this::processFile);
     }
 
     private void processFile(SourceFile file) {
-        Optional<OrganizationDirectory.OrganizationInfo> orgInfoOpt = organizationDirectory
-                .findBySlug(file.organizationSlug());
+        Optional<OrganizationDirectory.OrganizationInfo> orgInfoOpt =
+            organizationDirectory.findBySlug(file.organizationSlug());
 
         if (orgInfoOpt.isEmpty()) {
             objectStore.moveToRejected(file.key(), file.organizationSlug());
@@ -76,21 +77,25 @@ public class FileAdmissionService implements RunFileAdmission {
     }
 
     private void rejectFile(SourceFile file, UUID organizationId) {
-        String rejectedKey = objectStore.moveToRejected(file.key(), file.organizationSlug());
+        String rejectedKey = objectStore.moveToRejected(
+            file.key(),
+            file.organizationSlug()
+        );
 
         IngestionJobReport report = new IngestionJobReport(
-                UUID.randomUUID(),
-                null,
-                organizationId,
-                file.key(),
-                IngestionJobReport.Outcome.FILE_REJECTED,
-                0,
-                0,
-                rejectedKey,
-                null,
-                Instant.now(),
-                Instant.now(),
-                Instant.now());
+            UUID.randomUUID(),
+            null,
+            organizationId,
+            file.key(),
+            IngestionJobReport.Outcome.FILE_REJECTED,
+            0,
+            0,
+            rejectedKey,
+            null,
+            Instant.now(),
+            Instant.now(),
+            Instant.now()
+        );
         reportWriter.save(report);
 
         eventPublisher.publishFileRejectedEvent(organizationId, file.key());

@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record RejectArtifactUrlResult(
-        UUID jobId,
-        String artifactType,
-        String downloadUrl,
-        Instant expiresAt) {
-}
+    UUID jobId,
+    String artifactType,
+    String downloadUrl,
+    Instant expiresAt
+) {}

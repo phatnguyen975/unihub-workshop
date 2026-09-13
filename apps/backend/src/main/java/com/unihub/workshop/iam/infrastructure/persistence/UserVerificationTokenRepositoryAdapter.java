@@ -2,18 +2,21 @@ package com.unihub.workshop.iam.infrastructure.persistence;
 
 import com.unihub.workshop.iam.application.ports.out.UserVerificationTokenRepository;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
-import org.springframework.stereotype.Component;
-
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Component;
 
 @Component
-public class UserVerificationTokenRepositoryAdapter implements UserVerificationTokenRepository {
+public class UserVerificationTokenRepositoryAdapter
+    implements UserVerificationTokenRepository
+{
 
     private final UserVerificationTokenJpaRepository repository;
 
-    public UserVerificationTokenRepositoryAdapter(UserVerificationTokenJpaRepository repository) {
+    public UserVerificationTokenRepositoryAdapter(
+        UserVerificationTokenJpaRepository repository
+    ) {
         this.repository = repository;
     }
 
@@ -25,9 +28,16 @@ public class UserVerificationTokenRepositoryAdapter implements UserVerificationT
     }
 
     @Override
-    public Optional<UserVerificationToken> findLatestByUserIdAndType(UUID userId, String tokenType) {
-        return repository.findFirstByUserIdAndTokenTypeOrderByCreatedAtDesc(userId, tokenType)
-                .map(this::toDomain);
+    public Optional<UserVerificationToken> findLatestByUserIdAndType(
+        UUID userId,
+        String tokenType
+    ) {
+        return repository
+            .findFirstByUserIdAndTokenTypeOrderByCreatedAtDesc(
+                userId,
+                tokenType
+            )
+            .map(this::toDomain);
     }
 
     @Override
@@ -40,22 +50,28 @@ public class UserVerificationTokenRepositoryAdapter implements UserVerificationT
         repository.invalidateActiveTokens(userId, tokenType, Instant.now());
     }
 
-    private UserVerificationToken toDomain(UserVerificationTokenJpaEntity entity) {
+    private UserVerificationToken toDomain(
+        UserVerificationTokenJpaEntity entity
+    ) {
         return new UserVerificationToken(
-                entity.getId(),
-                entity.getUserId(),
-                entity.getTokenType(),
-                entity.getTokenHash(),
-                entity.getExpiresAt(),
-                entity.getUsedAt(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt(),
-                entity.getCreatedBy(),
-                entity.getUpdatedBy());
+            entity.getId(),
+            entity.getUserId(),
+            entity.getTokenType(),
+            entity.getTokenHash(),
+            entity.getExpiresAt(),
+            entity.getUsedAt(),
+            entity.getCreatedAt(),
+            entity.getUpdatedAt(),
+            entity.getCreatedBy(),
+            entity.getUpdatedBy()
+        );
     }
 
-    private UserVerificationTokenJpaEntity toEntity(UserVerificationToken token) {
-        UserVerificationTokenJpaEntity entity = new UserVerificationTokenJpaEntity();
+    private UserVerificationTokenJpaEntity toEntity(
+        UserVerificationToken token
+    ) {
+        UserVerificationTokenJpaEntity entity =
+            new UserVerificationTokenJpaEntity();
         entity.setId(token.id());
         entity.setUserId(token.userId());
         entity.setTokenType(token.tokenType());

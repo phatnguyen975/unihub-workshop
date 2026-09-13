@@ -7,5 +7,4 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Configuration
 @EnableScheduling
 @EnableConfigurationProperties(RealtimeProperties.class)
-public class RealtimeConfig {
-}
+public class RealtimeConfig {}

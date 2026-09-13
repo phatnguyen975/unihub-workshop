@@ -1,4 +1,3 @@
 package com.unihub.workshop.shared.seed;
 
-public record OrganizationSeedEntry(String name, String slug) {
-}
+public record OrganizationSeedEntry(String name, String slug) {}

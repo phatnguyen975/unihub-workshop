@@ -13,8 +13,14 @@ public class PostgresTtlCleanupAdapter implements TtlCleanupPort {
 
     @Override
     public int purgeExpiredRows(String tableName, int batchSize) {
-        String sql = "DELETE FROM " + tableName + " WHERE id IN (SELECT id FROM " + tableName
-                + " WHERE expires_at < NOW() LIMIT " + batchSize + ")";
+        String sql =
+            "DELETE FROM " +
+            tableName +
+            " WHERE id IN (SELECT id FROM " +
+            tableName +
+            " WHERE expires_at < NOW() LIMIT " +
+            batchSize +
+            ")";
         return jdbcTemplate.update(sql);
     }
 }

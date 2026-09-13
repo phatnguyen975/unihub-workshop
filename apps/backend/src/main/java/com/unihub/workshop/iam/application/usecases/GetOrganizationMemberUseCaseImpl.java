@@ -5,13 +5,14 @@ import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.NotFoundException;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
-
 @Service
-public class GetOrganizationMemberUseCaseImpl implements GetOrganizationMemberUseCase {
+public class GetOrganizationMemberUseCaseImpl
+    implements GetOrganizationMemberUseCase
+{
 
     private final UserRepository userRepository;
 
@@ -29,7 +30,10 @@ public class GetOrganizationMemberUseCaseImpl implements GetOrganizationMemberUs
             throw new BadRequestException("memberUserId must not be null");
         }
 
-        return userRepository.findByIdAndOrganizationId(memberUserId, organizationId)
-                .orElseThrow(() -> new NotFoundException("Member not found in your organization."));
+        return userRepository
+            .findByIdAndOrganizationId(memberUserId, organizationId)
+            .orElseThrow(() ->
+                new NotFoundException("Member not found in your organization.")
+            );
     }
 }

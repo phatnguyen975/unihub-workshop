@@ -7,7 +7,9 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class PostgresIngestionJobReportWriter implements IngestionJobReportWriter {
+public class PostgresIngestionJobReportWriter
+    implements IngestionJobReportWriter
+{
 
     private final IngestionJobReportRepository repository;
 

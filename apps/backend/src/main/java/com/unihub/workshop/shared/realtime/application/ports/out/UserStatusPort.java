@@ -7,7 +7,6 @@ import java.util.UUID;
  * establishing streaming connection.
  */
 public interface UserStatusPort {
-
     /**
      * Checks if the user with the given ID is active and not banned.
      *
