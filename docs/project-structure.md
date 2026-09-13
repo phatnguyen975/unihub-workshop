@@ -354,6 +354,7 @@ apps/workers/
 │   └── test/
 │       └── java/
 │           └── com/unihub/workshop/workers/
+│               └── HexagonalArchitectureTest.java
 ├── .env                                      # Local dev env vars (DB, RabbitMQ, S3, AI API key)
 ├── .env.example                              # Env var template committed to source control
 ├── build.gradle                              # Gradle build definition
@@ -366,6 +367,15 @@ apps/workers/
 
 - Both `inbound` and `outbound` adapters depend inward on `core` via ports; `core` has zero outward dependencies.
 - External triggers and systems are isolated behind adapters to keep task logic deterministic and testable.
+- **Encapsulation & Boundary Enforcement:** Enforced by static ArchUnit fitness functions in `HexagonalArchitectureTest`:
+  - **Core Isolation:** `core/` (Use Cases, Models, Pipeline, Ports) must never depend on `inbound/` or `outbound/` adapters.
+  - **Adapter Decoupling:** `inbound/` and `outbound/` adapters must never depend directly on each other; all interactions must be mediated through `core/` ports.
+  - **Port Abstraction:** Inbound ports (`core/ports/in/`) and outbound ports (`core/ports/out/`) must be pure Java interfaces.
+  - **Pure Domain Models:** Classes in `core/models/` must be pure Java records/classes independent of Spring, JPA, AWS SDK, and messaging brokers.
+  - **Inter-Worker Isolation:** Worker business modules (`batch_ingestion`, `maintenance`, `notifications`, `search_sync`, `ai_processing`) are completely autonomous and must never depend on each other.
+  - **Shared Kernel Independence:** `workers/shared/` infrastructure must never depend on business worker modules.
+  - **Encapsulation of Repositories:** Spring Data JPA repositories in `outbound/persistence/` are encapsulated within their adapters and cannot be accessed from outside.
+  - **Mandatory Constructor Injection:** Field injection (`@Autowired`) is strictly banned across all worker components.
 
 ```mermaid
 flowchart LR
