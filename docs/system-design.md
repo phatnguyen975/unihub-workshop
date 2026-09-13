@@ -606,7 +606,7 @@ sequenceDiagram
     API->>API: Reconcile in_memory_pending_list against returned list, any missing IDs are marked ALREADY_USED
     API->>API: Build structured response array of { sync_id, status }
     opt New check-ins persisted
-      API->>Redis: Publish attendance.updated to workshop:{workshopId}:attendance
+      API->>Redis: Publish attendance.updated to unihub:stream:workshop:{workshopId}
       Redis->>API: Distribute to active SSE connections
       API-->>Web / Mobile: SSE Event (attendance.updated)
     end
@@ -622,7 +622,7 @@ sequenceDiagram
 - **In-Memory Idempotent Filter:** The API classifies each fetched record in RAM before writing anything. Existing rows with the same `sync_id` are treated as `SUCCESS` for legitimate retries, while a different `sync_id` against the same `registration_id` is treated as `ALREADY_USED` for a real double scan.
 - **Pessimistic DB Constraints with Returned Identifiers:** The system relies on database-level unique constraints and atomic upsert mechanisms provided by the storage engine. Bulk writes return the identifiers that were successfully persisted; the API reconciles this returned list against the attempted inserts. Any attempted insert missing from the returned set lost the micro-second race and is marked `ALREADY_USED`. This approach avoids relying on exception-based control flow and keeps the reconciliation deterministic.
 - **Structured 207 Multi-Status Reconciliation:** The API returns a single `207 Multi-Status` payload with explicit `{ sync_id, status }` objects such as `SUCCESS`, `INVALID_TICKET`, and `ALREADY_USED`. The mobile client uses those exact status codes to reconcile local SQLite state without parsing free-form messages.
-- **Live Attendance Broadcasting:** Following successful persistence of new check-ins, the backend broadcasts an `attendance.updated` event to the Redis Pub/Sub channel for that workshop (`workshop:{workshopId}:attendance`). All organizers viewing the Live Attendance Dashboard and on-site check-in staff assigned to the workshop (F-6.3) receive real-time count updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual page refreshes.
+- **Live Attendance Broadcasting:** Following successful persistence of new check-ins, the backend broadcasts an `attendance.updated` event to the Redis Pub/Sub channel for that workshop (`unihub:stream:workshop:{workshopId}`). All organizers viewing the Live Attendance Dashboard and on-site check-in staff assigned to the workshop (F-6.3) receive real-time count updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual page refreshes.
 
 ### Async AI Summarization Flow
 

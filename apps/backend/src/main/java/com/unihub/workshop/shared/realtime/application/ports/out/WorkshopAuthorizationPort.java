@@ -1,5 +1,7 @@
 package com.unihub.workshop.shared.realtime.application.ports.out;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -9,6 +11,14 @@ import java.util.UUID;
  * assigned staff).
  */
 public interface WorkshopAuthorizationPort {
+    /**
+     * Finds all user IDs authorized to receive real-time events for a specific workshop
+     * (organizers of the owning organization and assigned staff).
+     *
+     * @param workshopId the target workshop ID
+     * @return the set of authorized user IDs
+     */
+    Set<UUID> findAuthorizedUserIds(UUID workshopId);
 
     /**
      * Filters a set of user IDs, returning only those authorized for the workshop.
@@ -17,7 +27,21 @@ public interface WorkshopAuthorizationPort {
      * @param workshopId the target workshop ID
      * @return the subset of user IDs authorized for the workshop
      */
-    Set<UUID> filterAuthorizedUserIds(Set<UUID> userIds, UUID workshopId);
+    default Set<UUID> filterAuthorizedUserIds(
+        Set<UUID> userIds,
+        UUID workshopId
+    ) {
+        if (userIds == null || userIds.isEmpty() || workshopId == null) {
+            return Collections.emptySet();
+        }
+        Set<UUID> authorized = findAuthorizedUserIds(workshopId);
+        if (authorized == null || authorized.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<UUID> result = new HashSet<>(userIds);
+        result.retainAll(authorized);
+        return result;
+    }
 
     /**
      * Checks if a single user is authorized for the given workshop.
@@ -30,6 +54,7 @@ public interface WorkshopAuthorizationPort {
         if (userId == null || workshopId == null) {
             return false;
         }
-        return filterAuthorizedUserIds(Set.of(userId), workshopId).contains(userId);
+        Set<UUID> authorized = findAuthorizedUserIds(workshopId);
+        return authorized != null && authorized.contains(userId);
     }
 }

@@ -78,13 +78,9 @@ class StreamControllerTest {
     void shouldEstablishStream_whenAuthenticated() throws Exception {
         Authentication auth = createAuthentication(USER_ID, ROLE, ORG_ID);
         SseEmitter emitter = new SseEmitter(1_800_000L);
-        when(
-            subscriptionService.subscribe(
-                eq(USER_ID),
-                eq(ROLE),
-                eq(ORG_ID.toString())
-            )
-        ).thenReturn(emitter);
+        when(subscriptionService.subscribe(eq(USER_ID), eq(ROLE))).thenReturn(
+            emitter
+        );
 
         mockMvc
             .perform(
@@ -107,11 +103,7 @@ class StreamControllerTest {
             )
             .andExpect(header().string("X-Accel-Buffering", "no"));
 
-        verify(subscriptionService).subscribe(
-            eq(USER_ID),
-            eq(ROLE),
-            eq(ORG_ID.toString())
-        );
+        verify(subscriptionService).subscribe(eq(USER_ID), eq(ROLE));
     }
 
     @Test
@@ -139,7 +131,7 @@ class StreamControllerTest {
     )
     void shouldReturn403_whenUserIsInactive() throws Exception {
         Authentication auth = createAuthentication(USER_ID, ROLE, ORG_ID);
-        when(subscriptionService.subscribe(any(), any(), any())).thenThrow(
+        when(subscriptionService.subscribe(any(), any())).thenThrow(
             new ForbiddenException(
                 "urn:unihub:error:account-inactive",
                 "User account is inactive or banned"

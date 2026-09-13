@@ -4,7 +4,6 @@ import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -58,14 +57,6 @@ public final class SecurityContextUtils {
     }
 
     public static UUID extractOrganizationId(Authentication authentication) {
-        return extractOptionalOrganizationId(authentication).orElseThrow(() ->
-            new ForbiddenException("Missing organization context")
-        );
-    }
-
-    public static Optional<UUID> extractOptionalOrganizationId(
-        Authentication authentication
-    ) {
         validateAuthentication(authentication);
 
         String org = null;
@@ -79,11 +70,11 @@ public final class SecurityContextUtils {
         }
 
         if (org == null || org.isBlank()) {
-            return Optional.empty();
+            throw new ForbiddenException("Missing organization context");
         }
 
         try {
-            return Optional.of(UUID.fromString(org));
+            return UUID.fromString(org);
         } catch (IllegalArgumentException e) {
             throw new ForbiddenException("Invalid organization context");
         }

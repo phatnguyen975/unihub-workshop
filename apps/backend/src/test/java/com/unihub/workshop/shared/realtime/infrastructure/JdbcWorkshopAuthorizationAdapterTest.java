@@ -42,36 +42,70 @@ class JdbcWorkshopAuthorizationAdapterTest {
 
     @Test
     @DisplayName(
-        "filterAuthorizedUserIds should return empty set immediately when userIds is null or empty"
+        "findAuthorizedUserIds should return empty set immediately when workshopId is null"
     )
-    void filterAuthorizedUserIds_shouldReturnEmptyWhenUserIdsEmpty() {
+    void findAuthorizedUserIds_shouldReturnEmptyWhenWorkshopIdNull() {
+        assertThat(adapter.findAuthorizedUserIds(null)).isEmpty();
+        verifyNoInteractions(namedJdbcTemplate);
+    }
+
+    @Test
+    @DisplayName(
+        "findAuthorizedUserIds should query database with workshopId and return matching authorized user IDs"
+    )
+    void findAuthorizedUserIds_shouldQueryDatabaseAndReturnAuthorizedIds() {
+        UUID workshopId = UUID.randomUUID();
+        UUID user1 = UUID.randomUUID();
+        UUID user2 = UUID.randomUUID();
+
+        when(
+            namedJdbcTemplate.query(
+                anyString(),
+                anyMap(),
+                ArgumentMatchers.<RowMapper<UUID>>any()
+            )
+        ).thenReturn(List.of(user1, user2));
+
+        Set<UUID> result = adapter.findAuthorizedUserIds(workshopId);
+
+        assertThat(result).containsExactlyInAnyOrder(user1, user2);
+
+        verify(namedJdbcTemplate).query(
+            anyString(),
+            paramCaptor.capture(),
+            ArgumentMatchers.<RowMapper<UUID>>any()
+        );
+
+        Map<String, Object> params = paramCaptor.getValue();
+        assertThat(params.get("workshopId")).isEqualTo(workshopId);
+        assertThat(params).doesNotContainKey("userIds");
+    }
+
+    @Test
+    @DisplayName(
+        "findAuthorizedUserIds should fail-closed and return empty set when database throws exception"
+    )
+    void findAuthorizedUserIds_shouldFailClosedOnDatabaseException() {
         UUID workshopId = UUID.randomUUID();
 
-        assertThat(adapter.filterAuthorizedUserIds(null, workshopId)).isEmpty();
-        assertThat(
-            adapter.filterAuthorizedUserIds(Collections.emptySet(), workshopId)
-        ).isEmpty();
-        verifyNoInteractions(namedJdbcTemplate);
+        when(
+            namedJdbcTemplate.query(
+                anyString(),
+                anyMap(),
+                ArgumentMatchers.<RowMapper<UUID>>any()
+            )
+        ).thenThrow(new DataAccessException("Database connection timeout") {});
+
+        Set<UUID> result = adapter.findAuthorizedUserIds(workshopId);
+
+        assertThat(result).isEmpty();
     }
 
     @Test
     @DisplayName(
-        "filterAuthorizedUserIds should return empty set immediately when workshopId is null"
+        "filterAuthorizedUserIds default method should delegate to findAuthorizedUserIds and retain intersection"
     )
-    void filterAuthorizedUserIds_shouldReturnEmptyWhenWorkshopIdNull() {
-        UUID userId = UUID.randomUUID();
-
-        assertThat(
-            adapter.filterAuthorizedUserIds(Set.of(userId), null)
-        ).isEmpty();
-        verifyNoInteractions(namedJdbcTemplate);
-    }
-
-    @Test
-    @DisplayName(
-        "filterAuthorizedUserIds should query database and return matching authorized user IDs"
-    )
-    void filterAuthorizedUserIds_shouldQueryDatabaseAndReturnAuthorizedIds() {
+    void filterAuthorizedUserIds_shouldDelegateAndRetainIntersection() {
         UUID workshopId = UUID.randomUUID();
         UUID user1 = UUID.randomUUID();
         UUID user2 = UUID.randomUUID();
@@ -86,54 +120,18 @@ class JdbcWorkshopAuthorizationAdapterTest {
         ).thenReturn(List.of(user1, user2));
 
         Set<UUID> result = adapter.filterAuthorizedUserIds(
-            Set.of(user1, user2, user3),
+            Set.of(user1, user3),
             workshopId
         );
 
-        assertThat(result).containsExactlyInAnyOrder(user1, user2);
-
-        verify(namedJdbcTemplate).query(
-            anyString(),
-            paramCaptor.capture(),
-            ArgumentMatchers.<RowMapper<UUID>>any()
-        );
-
-        Map<String, Object> params = paramCaptor.getValue();
-        assertThat(params.get("workshopId")).isEqualTo(workshopId);
-        assertThat(params.get("userIds")).isEqualTo(
-            Set.of(user1, user2, user3)
-        );
+        assertThat(result).containsExactly(user1);
     }
 
     @Test
     @DisplayName(
-        "filterAuthorizedUserIds should fail-closed and return empty set when database throws exception"
+        "isUserAuthorizedForWorkshop default method should delegate to findAuthorizedUserIds"
     )
-    void filterAuthorizedUserIds_shouldFailClosedOnDatabaseException() {
-        UUID workshopId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-
-        when(
-            namedJdbcTemplate.query(
-                anyString(),
-                anyMap(),
-                ArgumentMatchers.<RowMapper<UUID>>any()
-            )
-        ).thenThrow(new DataAccessException("Database connection timeout") {});
-
-        Set<UUID> result = adapter.filterAuthorizedUserIds(
-            Set.of(userId),
-            workshopId
-        );
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    @DisplayName(
-        "isUserAuthorizedForWorkshop default method should delegate to filterAuthorizedUserIds"
-    )
-    void isUserAuthorizedForWorkshop_shouldDelegateToBatchFilter() {
+    void isUserAuthorizedForWorkshop_shouldDelegateToFindAuthorizedUserIds() {
         UUID workshopId = UUID.randomUUID();
         UUID authorizedUser = UUID.randomUUID();
         UUID unauthorizedUser = UUID.randomUUID();

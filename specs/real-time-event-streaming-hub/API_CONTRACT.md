@@ -81,6 +81,7 @@ _(Begins with a colon `:`; treated as an ignored comment by client parsers to ma
 id: <uuid>
 event: <event_name>
 data: {"eventId":"<uuid>","eventType":"<event_name>","timestamp":"<iso8601_utc>","payload":{<event_specific_fields>}}
+retry: 3000
 
 ```
 
@@ -98,6 +99,7 @@ The following 7 event types are multiplexed over the single connection:
 id: 550e8400-e29b-41d4-a716-446655440001
 event: notification.new
 data: {"eventId":"550e8400-e29b-41d4-a716-446655440001","eventType":"notification.new","timestamp":"2026-09-09T05:15:00Z","payload":{"id":"7f2c1b4d-9a8e-4a6c-b3d1-e5c7a9f8b012","title":"Workshop Venue Changed","type":"WORKSHOP_RESCHEDULED","linkUrl":"/workshops/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d","createdAt":"2026-09-09T05:15:00Z"}}
+retry: 3000
 
 ```
 
@@ -111,6 +113,7 @@ data: {"eventId":"550e8400-e29b-41d4-a716-446655440001","eventType":"notificatio
 id: 550e8400-e29b-41d4-a716-446655440002
 event: notification.read
 data: {"eventId":"550e8400-e29b-41d4-a716-446655440002","eventType":"notification.read","timestamp":"2026-09-09T05:15:30Z","payload":{"id":"7f2c1b4d-9a8e-4a6c-b3d1-e5c7a9f8b012","all":false,"unreadCount":2,"readAt":"2026-09-09T05:15:30Z"}}
+retry: 3000
 
 ```
 
@@ -124,6 +127,7 @@ data: {"eventId":"550e8400-e29b-41d4-a716-446655440002","eventType":"notificatio
 id: 550e8400-e29b-41d4-a716-446655440003
 event: ai.summary.completed
 data: {"eventId":"550e8400-e29b-41d4-a716-446655440003","eventType":"ai.summary.completed","timestamp":"2026-09-09T05:16:00Z","payload":{"jobId":"1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d","workshopId":"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d","resultText":"This interactive workshop covers advanced Cloud-Native architecture..."}}
+retry: 3000
 
 ```
 
@@ -137,6 +141,7 @@ data: {"eventId":"550e8400-e29b-41d4-a716-446655440003","eventType":"ai.summary.
 id: 550e8400-e29b-41d4-a716-446655440004
 event: ai.summary.failed
 data: {"eventId":"550e8400-e29b-41d4-a716-446655440004","eventType":"ai.summary.failed","timestamp":"2026-09-09T05:16:15Z","payload":{"jobId":"1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d","workshopId":"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d","errorMessage":"PDF document contains encrypted text layer and cannot be extracted."}}
+retry: 3000
 
 ```
 
@@ -150,6 +155,7 @@ data: {"eventId":"550e8400-e29b-41d4-a716-446655440004","eventType":"ai.summary.
 id: 550e8400-e29b-41d4-a716-446655440005
 event: attendance.updated
 data: {"eventId":"550e8400-e29b-41d4-a716-446655440005","eventType":"attendance.updated","timestamp":"2026-09-09T05:17:00Z","payload":{"workshopId":"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d","checkedInCount":85,"capacity":100,"lastSyncedAt":"2026-09-09T05:17:00Z"}}
+retry: 3000
 
 ```
 
@@ -163,6 +169,7 @@ data: {"eventId":"550e8400-e29b-41d4-a716-446655440005","eventType":"attendance.
 id: 550e8400-e29b-41d4-a716-446655440006
 event: registration.updated
 data: {"eventId":"550e8400-e29b-41d4-a716-446655440006","eventType":"registration.updated","timestamp":"2026-09-09T05:17:30Z","payload":{"workshopId":"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d","confirmedCount":95,"pendingCount":5,"capacity":100,"availableSeats":0,"lastUpdatedAt":"2026-09-09T05:17:30Z"}}
+retry: 3000
 
 ```
 
@@ -176,6 +183,7 @@ data: {"eventId":"550e8400-e29b-41d4-a716-446655440006","eventType":"registratio
 id: 550e8400-e29b-41d4-a716-446655440007
 event: payment.confirmed
 data: {"eventId":"550e8400-e29b-41d4-a716-446655440007","eventType":"payment.confirmed","timestamp":"2026-09-09T05:18:00Z","payload":{"registrationId":"3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f","workshopId":"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d","qrPayload":"unihub:reg:3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f:sig:abc123xyz","qrIssuedAt":"2026-09-09T05:18:00Z"}}
+retry: 3000
 
 ```
 

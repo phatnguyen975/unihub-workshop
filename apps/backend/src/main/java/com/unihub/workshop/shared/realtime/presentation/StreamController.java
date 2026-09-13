@@ -29,8 +29,7 @@ public class StreamController {
      * Establishes a real-time event streaming connection for the authenticated client.
      *
      * @param authentication the authenticated user principal from security context
-     * @param response       the HTTP servlet response to configure streaming
-     *                       headers
+     * @param response       the HTTP servlet response to configure streaming headers
      * @return an SseEmitter streaming live platform events
      */
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -40,16 +39,11 @@ public class StreamController {
     ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         String role = SecurityContextUtils.extractRole(authentication);
-        String orgId = SecurityContextUtils.extractOptionalOrganizationId(
-            authentication
-        )
-            .map(UUID::toString)
-            .orElse(null);
 
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
         response.setHeader("X-Accel-Buffering", "no");
         response.setHeader(HttpHeaders.CONNECTION, "keep-alive");
 
-        return subscriptionService.subscribe(userId, role, orgId);
+        return subscriptionService.subscribe(userId, role);
     }
 }

@@ -24,7 +24,6 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/SseConnection.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/SseEmitterRegistry.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/StreamSubscriptionService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/presentation/StreamController.java`
