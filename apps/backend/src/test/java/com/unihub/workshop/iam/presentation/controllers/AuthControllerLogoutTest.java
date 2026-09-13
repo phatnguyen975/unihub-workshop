@@ -10,19 +10,13 @@ import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
-import org.springframework.web.method.support.ModelAndViewContainer;
-import org.springframework.web.context.request.NativeWebRequest;
-import org.springframework.web.bind.support.WebDataBinderFactory;
 
-import java.security.Principal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -54,24 +48,6 @@ class AuthControllerLogoutTest {
 
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(new GlobalExceptionHandler(null), new GlobalResponseBodyAdvice())
-                .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
-                    @Override
-                    public boolean supportsParameter(MethodParameter parameter) {
-                        return parameter.getParameterType().isAssignableFrom(Jwt.class);
-                    }
-
-                    @Override
-                    public Object resolveArgument(MethodParameter parameter,
-                            ModelAndViewContainer mavContainer,
-                            NativeWebRequest webRequest,
-                            WebDataBinderFactory binderFactory) {
-                        Principal principal = webRequest.getUserPrincipal();
-                        if (principal instanceof JwtAuthenticationToken) {
-                            return ((JwtAuthenticationToken) principal).getToken();
-                        }
-                        return null;
-                    }
-                })
                 .build();
     }
 

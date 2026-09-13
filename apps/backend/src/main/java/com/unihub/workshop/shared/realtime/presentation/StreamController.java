@@ -1,10 +1,9 @@
 package com.unihub.workshop.shared.realtime.presentation;
 
-import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.realtime.application.StreamSubscriptionService;
-import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -12,8 +11,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.UUID;
 
 /**
  * REST controller exposing the Server-Sent Events handshake endpoint.
@@ -37,19 +34,17 @@ public class StreamController {
      * @return an SseEmitter streaming live platform events
      */
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(Authentication authentication, HttpServletResponse response) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UnauthorizedException("Full authentication is required to access this resource");
-        }
-
+    public SseEmitter subscribe(
+        Authentication authentication,
+        HttpServletResponse response
+    ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
-        String role = null;
-        String orgId = null;
-
-        if (authentication.getPrincipal() instanceof JwtAuthenticatedPrincipal jwtPrincipal) {
-            role = jwtPrincipal.role();
-            orgId = jwtPrincipal.org();
-        }
+        String role = SecurityContextUtils.extractRole(authentication);
+        String orgId = SecurityContextUtils.extractOptionalOrganizationId(
+            authentication
+        )
+            .map(UUID::toString)
+            .orElse(null);
 
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
         response.setHeader("X-Accel-Buffering", "no");

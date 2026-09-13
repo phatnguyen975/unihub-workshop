@@ -33,6 +33,7 @@ app:
     access-token-ttl-minutes: 60
     refresh-token-ttl-days: 7
     public-paths:
+      - "/error"
       - "/actuator/**"
       - "/swagger-ui.html"
       - "/swagger-ui/**"

@@ -26,7 +26,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
 
 ### Phase 1: Member Roster Queries (Read Replica)
 
-- [x] **T1 — List organization members with Keyset cursor pagination and multi-attribute filtering (`GET /api/v1/organizations/users`)**
+- [x] **T1 — List organization members with Keyset cursor pagination and multi-attribute filtering (`GET /api/v1/admin/organizations/users`)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -34,23 +34,23 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/ListOrganizationMembersUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/ListMembersQuery.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/ListOrganizationMembersUseCaseImpl.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserController.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationController.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/MemberSummaryResponse.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ListOrganizationMembersUseCaseImplTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerListTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationControllerListTest.java`
   - **Files (modified):**
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/UserRepository.java` (add member search/query method with cursor and filters)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserJpaRepository.java` (add JPQL cursor pagination query)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserRepositoryAdapter.java` (implement cursor pagination and query execution)
   - **Acceptance Criteria:**
-    - `GET /api/v1/organizations/users` with no filters returns `200 OK` containing members of the caller's organization across all roles (`ORGANIZER`, `STAFF`, `STUDENT`), strictly excluding the calling organizer (`user_id != currentUserId`). _(FR-01; SPEC Scenario 1)_
-    - `GET /api/v1/organizations/users?role=STUDENT&isActive=true` filters members matching both conditions conjunctively. _(FR-02, FR-03, FR-05; SPEC Scenario 2)_
-    - `GET /api/v1/organizations/users?search=keyword` performs a case-insensitive partial match across `full_name`, `email`, and `phone_number`. _(FR-04; SPEC Scenario 3)_
+    - `GET /api/v1/admin/organizations/users` with no filters returns `200 OK` containing members of the caller's organization across all roles (`ORGANIZER`, `STAFF`, `STUDENT`), strictly excluding the calling organizer (`user_id != currentUserId`). _(FR-01; SPEC Scenario 1)_
+    - `GET /api/v1/admin/organizations/users?role=STUDENT&isActive=true` filters members matching both conditions conjunctively. _(FR-02, FR-03, FR-05; SPEC Scenario 2)_
+    - `GET /api/v1/admin/organizations/users?search=keyword` performs a case-insensitive partial match across `full_name`, `email`, and `phone_number`. _(FR-04; SPEC Scenario 3)_
     - Keyset pagination with `limit=20` returns 20 items, `cursor.hasMore=true`, and an opaque Base64 `cursor.nextCursor`. Querying with `cursor=<nextCursor>` returns the next page. _(FR-06, FR-07; SPEC Scenario 4)_
     - `limit > 100` returns `400 Bad Request` (`urn:unihub:error:bad-request`). _(FR-07; SPEC Scenario 5)_
     - Unauthenticated requests return `401 Unauthorized` (`urn:unihub:error:unauthorized`). Non-organizer callers return `403 Forbidden` (`urn:unihub:error:forbidden`). _(FR-25, FR-26; SPEC Scenarios 16, 17)_
 
-- [x] **T2 — View individual organization member profile (`GET /api/v1/organizations/users/{userId}`)**
+- [x] **T2 — View individual organization member profile (`GET /api/v1/admin/organizations/users/{userId}`)**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Application, Infrastructure, Presentation
@@ -59,14 +59,14 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/GetOrganizationMemberUseCaseImpl.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/MemberDetailResponse.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/GetOrganizationMemberUseCaseImplTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerDetailTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationControllerDetailTest.java`
   - **Files (modified):**
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/UserRepository.java` (add `findByIdAndOrganizationId`)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserJpaRepository.java` (add finder method)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserRepositoryAdapter.java` (implement finder)
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserController.java` (add endpoint method)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationController.java` (add endpoint method)
   - **Acceptance Criteria:**
-    - `GET /api/v1/organizations/users/{userId}` for a member in the caller's organization returns `200 OK` with the complete member profile (`id`, `organizationId`, `email`, `fullName`, `role`, `phoneNumber`, `avatarUrl`, `isActive`, `isTemporaryPassword`, `studentRecordId`, `lastLoginAt`, `createdAt`, `updatedAt`). _(FR-09; SPEC Scenario 6)_
+    - `GET /api/v1/admin/organizations/users/{userId}` for a member in the caller's organization returns `200 OK` with the complete member profile (`id`, `organizationId`, `email`, `fullName`, `role`, `phoneNumber`, `avatarUrl`, `isActive`, `isTemporaryPassword`, `studentRecordId`, `lastLoginAt`, `createdAt`, `updatedAt`). _(FR-09; SPEC Scenario 6)_
     - Requesting a `userId` that does not exist or belongs to another organization returns `404 Not Found` (`urn:unihub:error:not-found`) with uniform detail message to avoid leaking user existence across organizations. _(FR-10, FR-28; SPEC Scenario 7)_
     - Non-organizer caller returns `403 Forbidden`. Unauthenticated caller returns `401 Unauthorized`. _(FR-25, FR-26; SPEC Scenarios 16, 17)_
 
@@ -78,7 +78,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
 
 ### Phase 2: Member Lifecycle Mutations (Primary DB)
 
-- [x] **T3 — Provision new `STAFF` or `ORGANIZER` member account (`POST /api/v1/organizations/users`)**
+- [x] **T3 — Provision new `STAFF` or `ORGANIZER` member account (`POST /api/v1/admin/organizations/users`)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -89,19 +89,19 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/ProvisionUserRequest.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/ProvisionUserResponse.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ProvisionUserUseCaseImplTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerProvisionTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerTestBuilder.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationControllerProvisionTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationControllerTestBuilder.java`
   - **Files (modified):**
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserController.java` (add endpoint method)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationController.java` (add endpoint method)
   - **Acceptance Criteria:**
-    - `POST /api/v1/organizations/users` with valid payload (`email`, `fullName`, `phoneNumber`, `role='STAFF'|'ORGANIZER'`) returns `201 Created` with member metadata. User record in database has `is_active=true`, `is_temporary_password=true`, and an Argon2id-hashed password generated via `PasswordGenerator`. _(FR-12, FR-15, FR-16; SPEC Scenario 8)_
+    - `POST /api/v1/admin/organizations/users` with valid payload (`email`, `fullName`, `phoneNumber`, `role='STAFF'|'ORGANIZER'`) returns `201 Created` with member metadata. User record in database has `is_active=true`, `is_temporary_password=true`, and an Argon2id-hashed password generated via `PasswordGenerator`. _(FR-12, FR-15, FR-16; SPEC Scenario 8)_
     - Plaintext temporary password is NOT exposed in the HTTP response; a `UserProvisionedEvent` is published to the transactional outbox (`event_publication` table) destined for `unihub.events::notifications` containing the plaintext temporary password. _(FR-17; SPEC Scenario 8)_
     - Submitting `role='STUDENT'` returns `422 Unprocessable Content` (`urn:unihub:error:student-provisioning-forbidden`) and no record is created. _(FR-13; SPEC Scenario 9)_
     - Submitting an email that already exists globally in the system returns `409 Conflict` (`urn:unihub:error:conflict`). _(FR-14; SPEC Scenario 10)_
     - Malformed payload or validation error returns `422 Unprocessable Content` (`urn:unihub:error:validation`). _(API_CONTRACT §3.3)_
     - Non-organizer caller returns `403 Forbidden`. Unauthenticated caller returns `401 Unauthorized`. _(FR-25, FR-26; SPEC Scenarios 16, 17)_
 
-- [x] **T4 — Update member active status (Ban/Unban) with fail-closed session invalidation and notification event (`PATCH /api/v1/organizations/users/{userId}/status`)**
+- [x] **T4 — Update member active status (Ban/Unban) with fail-closed session invalidation and notification event (`PATCH /api/v1/admin/organizations/users/{userId}/status`)**
   - **Size:** M
   - **Depends on:** T1, T2
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -113,15 +113,15 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/UpdateMemberStatusRequest.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/UpdateMemberStatusResponse.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/UpdateMemberStatusUseCaseImplTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerStatusTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationControllerStatusTest.java`
   - **Files (modified):**
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/UserRepository.java` (add `updateIsActive`)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserJpaRepository.java` (add status update query)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserRepositoryAdapter.java` (implement status update)
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserController.java` (add endpoint method)
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationUserControllerTestBuilder.java` (add status use case mock)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationController.java` (add endpoint method)
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationControllerTestBuilder.java` (add status use case mock)
   - **Acceptance Criteria:**
-    - `PATCH /api/v1/organizations/users/{userId}/status` with `{ "isActive": false }` adds all active user JTIs to the Redis blacklist, removes sessions from the Redis session tracker, revokes all active refresh tokens in PostgreSQL, updates `users.is_active = false`, and publishes `UserStatusChangedEvent` (`isActive = false`) to the transactional outbox, returning `200 OK`. _(FR-19, FR-21; SPEC Scenario 11)_
+    - `PATCH /api/v1/admin/organizations/users/{userId}/status` with `{ "isActive": false }` adds all active user JTIs to the Redis blacklist, removes sessions from the Redis session tracker, revokes all active refresh tokens in PostgreSQL, updates `users.is_active = false`, and publishes `UserStatusChangedEvent` (`isActive = false`) to the transactional outbox, returning `200 OK`. _(FR-19, FR-21; SPEC Scenario 11)_
     - If Redis is unavailable during a ban attempt, the operation fails with `503 Service Unavailable` (`urn:unihub:error:service-unavailable`) with `Retry-After` header, leaving PostgreSQL tokens and user status unmodified (fail-closed). _(FR-21; SPEC Scenario 12)_
     - Attempting to modify caller's own active status returns `403 Forbidden` (`urn:unihub:error:self-status-modification-forbidden`). _(FR-20; SPEC Scenario 13)_
     - `PATCH` with `{ "isActive": true }` sets `users.is_active = true` in PostgreSQL and publishes `UserStatusChangedEvent` (`isActive = true`) to outbox without Redis session manipulation, returning `200 OK`. _(FR-19, FR-22; SPEC Scenario 14)_

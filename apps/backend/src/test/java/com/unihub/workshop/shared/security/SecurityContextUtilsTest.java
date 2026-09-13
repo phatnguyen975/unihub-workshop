@@ -51,23 +51,128 @@ class SecurityContextUtilsTest {
     }
 
     @Test
-    void extractRequiredSessionId_shouldReturnSessionId_whenSidPresent() {
+    void extractSessionId_shouldReturnSessionId_whenSidPresent() {
         JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
                 USER_ID.toString(), null, "jti", "STUDENT", SESSION_ID.toString(), Instant.now(), Instant.now());
         TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_STUDENT");
 
-        UUID result = SecurityContextUtils.extractRequiredSessionId(auth, "sid is required");
+        UUID result = SecurityContextUtils.extractSessionId(auth);
         assertThat(result).isEqualTo(SESSION_ID);
     }
 
     @Test
-    void extractRequiredSessionId_shouldThrowBadRequest_whenSidMissing() {
+    void extractSessionId_shouldThrowBadRequest_whenSidMissing() {
         JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
                 USER_ID.toString(), null, "jti", "STUDENT", null, Instant.now(), Instant.now());
         TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_STUDENT");
 
-        assertThatThrownBy(() -> SecurityContextUtils.extractRequiredSessionId(auth, "sid is required"))
+        assertThatThrownBy(() -> SecurityContextUtils.extractSessionId(auth))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessage("sid is required");
+                .hasMessage("Current session ID (sid) is required in token");
+    }
+
+    @Test
+    void extractOrganizationId_shouldReturnOrgId_whenValidInPrincipal() {
+        UUID orgId = UUID.randomUUID();
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+                USER_ID.toString(), orgId.toString(), "jti", "ORGANIZER", SESSION_ID.toString(), Instant.now(), Instant.now());
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_ORGANIZER");
+
+        UUID result = SecurityContextUtils.extractOrganizationId(auth);
+        assertThat(result).isEqualTo(orgId);
+    }
+
+    @Test
+    void extractOrganizationId_shouldReturnOrgId_whenValidInJwt() {
+        UUID orgId = UUID.randomUUID();
+        Jwt jwt = Jwt.withTokenValue("mock")
+                .header("alg", "none")
+                .subject(USER_ID.toString())
+                .claim("org", orgId.toString())
+                .build();
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(jwt, null, "ROLE_ORGANIZER");
+
+        UUID result = SecurityContextUtils.extractOrganizationId(auth);
+        assertThat(result).isEqualTo(orgId);
+    }
+
+    @Test
+    void extractOrganizationId_shouldThrowForbidden_whenOrgMissing() {
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+                USER_ID.toString(), null, "jti", "STUDENT", SESSION_ID.toString(), Instant.now(), Instant.now());
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_STUDENT");
+
+        assertThatThrownBy(() -> SecurityContextUtils.extractOrganizationId(auth))
+                .isInstanceOf(com.unihub.workshop.shared.exception.ForbiddenException.class)
+                .hasMessage("Missing organization context");
+    }
+
+    @Test
+    void extractOrganizationId_shouldThrowForbidden_whenOrgInvalidUuid() {
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+                USER_ID.toString(), "not-a-uuid", "jti", "ORGANIZER", SESSION_ID.toString(), Instant.now(), Instant.now());
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_ORGANIZER");
+
+        assertThatThrownBy(() -> SecurityContextUtils.extractOrganizationId(auth))
+                .isInstanceOf(com.unihub.workshop.shared.exception.ForbiddenException.class)
+                .hasMessage("Invalid organization context");
+    }
+
+    @Test
+    void extractRole_shouldReturnRole_whenInPrincipalOrJwtOrAuthority() {
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+                USER_ID.toString(), null, "jti", "ORGANIZER", null, Instant.now(), Instant.now());
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_ORGANIZER");
+        assertThat(SecurityContextUtils.extractRole(auth)).isEqualTo("ORGANIZER");
+
+        Jwt jwt = Jwt.withTokenValue("mock").header("alg", "none").subject(USER_ID.toString()).claim("role", "STAFF").build();
+        TestingAuthenticationToken jwtAuth = new TestingAuthenticationToken(jwt, null, "ROLE_STAFF");
+        assertThat(SecurityContextUtils.extractRole(jwtAuth)).isEqualTo("STAFF");
+    }
+
+    @Test
+    void extractJtiAndExpirationAndToken_shouldExtractSuccessfully() {
+        Instant exp = Instant.now().plusSeconds(3600);
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+                USER_ID.toString(), null, "jti-test", "STUDENT", null, Instant.now(), exp);
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, "raw-token", "ROLE_STUDENT");
+
+        assertThat(SecurityContextUtils.extractJti(auth)).isEqualTo("jti-test");
+        assertThat(SecurityContextUtils.extractExpiration(auth)).isEqualTo(exp);
+        assertThat(SecurityContextUtils.extractToken(auth)).isEqualTo("raw-token");
+    }
+
+    @Test
+    void extractToken_shouldExtractFromJwtAuthenticationToken() {
+        Jwt jwt = Jwt.withTokenValue("jwt-token-value")
+                .header("alg", "none")
+                .subject(USER_ID.toString())
+                .claim("jti", "jti-val")
+                .build();
+        org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth =
+                new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt);
+
+        assertThat(SecurityContextUtils.extractToken(jwtAuth)).isEqualTo("jwt-token-value");
+    }
+
+    @Test
+    void verifyRole_shouldSucceedWhenRoleMatches() {
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+                USER_ID.toString(), null, "jti", "ORGANIZER", null, Instant.now(), Instant.now());
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_ORGANIZER");
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
+                SecurityContextUtils.verifyRole(auth, "ORGANIZER"));
+    }
+
+    @Test
+    void verifyRole_shouldThrowForbiddenWhenRoleMismatches() {
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+                USER_ID.toString(), null, "jti", "STAFF", null, Instant.now(), Instant.now());
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(principal, null, "ROLE_STAFF");
+
+        assertThatThrownBy(() -> SecurityContextUtils.verifyRole(auth, "ORGANIZER"))
+                .isInstanceOf(com.unihub.workshop.shared.exception.ForbiddenException.class)
+                .hasMessage("Access denied");
     }
 }

@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class OrganizationUserControllerProvisionTest {
+class OrganizationControllerProvisionTest {
 
     private MockMvc mockMvc;
     private ProvisionUserUseCase provisionUserUseCase;
@@ -41,7 +41,7 @@ class OrganizationUserControllerProvisionTest {
         provisionUserUseCase = mock(ProvisionUserUseCase.class);
         objectMapper = new ObjectMapper();
 
-        OrganizationUserController controller = OrganizationUserControllerTestBuilder.builder()
+        OrganizationController controller = OrganizationControllerTestBuilder.builder()
                 .withProvisionUserUseCase(provisionUserUseCase)
                 .build();
 
@@ -88,7 +88,7 @@ class OrganizationUserControllerProvisionTest {
 
         when(provisionUserUseCase.execute(any(ProvisionUserCommand.class))).thenReturn(createdUser);
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
@@ -117,7 +117,7 @@ class OrganizationUserControllerProvisionTest {
                         "The STUDENT role cannot be provisioned by an organization. Students must self-register.",
                         List.of("role: STUDENT role cannot be provisioned")));
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
@@ -136,7 +136,7 @@ class OrganizationUserControllerProvisionTest {
         when(provisionUserUseCase.execute(any(ProvisionUserCommand.class)))
                 .thenThrow(new ConflictException("An account with this email already exists."));
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
@@ -151,7 +151,7 @@ class OrganizationUserControllerProvisionTest {
         ProvisionUserRequest request = new ProvisionUserRequest(
                 "not-an-email", "Valid Name", null, "STAFF");
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
@@ -165,7 +165,7 @@ class OrganizationUserControllerProvisionTest {
         ProvisionUserRequest request = new ProvisionUserRequest(
                 "user@techclub.org", "   ", null, "STAFF");
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
@@ -184,7 +184,7 @@ class OrganizationUserControllerProvisionTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
@@ -198,7 +198,7 @@ class OrganizationUserControllerProvisionTest {
         ProvisionUserRequest request = new ProvisionUserRequest(
                 "user@techclub.org", "Test User", null, "STAFF");
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
@@ -211,7 +211,7 @@ class OrganizationUserControllerProvisionTest {
         ProvisionUserRequest request = new ProvisionUserRequest(
                 "user@techclub.org", "Test User", null, "STAFF");
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
                 .principal(createAuth(CALLER_ID, ORG_ID, "STAFF")))
@@ -225,7 +225,7 @@ class OrganizationUserControllerProvisionTest {
         ProvisionUserRequest request = new ProvisionUserRequest(
                 "user@techclub.org", "Test User", null, "STAFF");
 
-        mockMvc.perform(post("/api/v1/organizations/users")
+        mockMvc.perform(post("/api/v1/admin/organizations/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
                 .principal(createAuth(CALLER_ID, null, "ORGANIZER")))

@@ -7,43 +7,43 @@ import com.unihub.workshop.iam.application.ports.in.UpdateMemberStatusUseCase;
 
 import static org.mockito.Mockito.mock;
 
-public class OrganizationUserControllerTestBuilder {
+public class OrganizationControllerTestBuilder {
 
     private ListOrganizationMembersUseCase listOrganizationMembersUseCase = mock(ListOrganizationMembersUseCase.class);
     private GetOrganizationMemberUseCase getOrganizationMemberUseCase = mock(GetOrganizationMemberUseCase.class);
     private ProvisionUserUseCase provisionUserUseCase = mock(ProvisionUserUseCase.class);
     private UpdateMemberStatusUseCase updateMemberStatusUseCase = mock(UpdateMemberStatusUseCase.class);
 
-    public static OrganizationUserControllerTestBuilder builder() {
-        return new OrganizationUserControllerTestBuilder();
+    public static OrganizationControllerTestBuilder builder() {
+        return new OrganizationControllerTestBuilder();
     }
 
-    public OrganizationUserControllerTestBuilder withListOrganizationMembersUseCase(
+    public OrganizationControllerTestBuilder withListOrganizationMembersUseCase(
             ListOrganizationMembersUseCase listOrganizationMembersUseCase) {
         this.listOrganizationMembersUseCase = listOrganizationMembersUseCase;
         return this;
     }
 
-    public OrganizationUserControllerTestBuilder withGetOrganizationMemberUseCase(
+    public OrganizationControllerTestBuilder withGetOrganizationMemberUseCase(
             GetOrganizationMemberUseCase getOrganizationMemberUseCase) {
         this.getOrganizationMemberUseCase = getOrganizationMemberUseCase;
         return this;
     }
 
-    public OrganizationUserControllerTestBuilder withProvisionUserUseCase(
+    public OrganizationControllerTestBuilder withProvisionUserUseCase(
             ProvisionUserUseCase provisionUserUseCase) {
         this.provisionUserUseCase = provisionUserUseCase;
         return this;
     }
 
-    public OrganizationUserControllerTestBuilder withUpdateMemberStatusUseCase(
+    public OrganizationControllerTestBuilder withUpdateMemberStatusUseCase(
             UpdateMemberStatusUseCase updateMemberStatusUseCase) {
         this.updateMemberStatusUseCase = updateMemberStatusUseCase;
         return this;
     }
 
-    public OrganizationUserController build() {
-        return new OrganizationUserController(
+    public OrganizationController build() {
+        return new OrganizationController(
                 listOrganizationMembersUseCase,
                 getOrganizationMemberUseCase,
                 provisionUserUseCase,

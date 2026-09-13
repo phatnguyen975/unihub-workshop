@@ -1,9 +1,8 @@
 package com.unihub.workshop.shared.events;
 
-import org.springframework.modulith.events.Externalized;
-
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.modulith.events.Externalized;
 
 /**
  * Event published when an organization member active status is updated (ban or
@@ -12,19 +11,20 @@ import java.util.UUID;
  */
 @Externalized("unihub.events::notifications")
 public record UserStatusChangedEvent(
+    UUID userId,
+    UUID organizationId,
+    String email,
+    String fullName,
+    boolean isActive,
+    Instant occurredAt
+) {
+    public UserStatusChangedEvent(
         UUID userId,
         UUID organizationId,
         String email,
         String fullName,
-        boolean isActive,
-        Instant occurredAt) {
-
-    public UserStatusChangedEvent(
-            UUID userId,
-            UUID organizationId,
-            String email,
-            String fullName,
-            boolean isActive) {
+        boolean isActive
+    ) {
         this(userId, organizationId, email, fullName, isActive, Instant.now());
     }
 }

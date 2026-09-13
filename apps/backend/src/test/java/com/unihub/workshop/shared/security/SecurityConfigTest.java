@@ -208,4 +208,11 @@ class SecurityConfigTest {
             .perform(get("/api/v1/payments/webhook"))
             .andExpect(status().isOk());
     }
+
+    @Test
+    void shouldReturn401_forNonApiEndpointsWithoutToken() throws Exception {
+        mockMvc
+            .perform(get("/non-api-endpoint"))
+            .andExpect(status().isUnauthorized());
+    }
 }

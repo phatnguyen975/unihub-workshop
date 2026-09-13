@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class OrganizationUserControllerStatusTest {
+class OrganizationControllerStatusTest {
 
     private MockMvc mockMvc;
     private UpdateMemberStatusUseCase updateMemberStatusUseCase;
@@ -45,7 +45,7 @@ class OrganizationUserControllerStatusTest {
         updateMemberStatusUseCase = mock(UpdateMemberStatusUseCase.class);
         objectMapper = new ObjectMapper();
 
-        OrganizationUserController controller = OrganizationUserControllerTestBuilder.builder()
+        OrganizationController controller = OrganizationControllerTestBuilder.builder()
                 .withUpdateMemberStatusUseCase(updateMemberStatusUseCase)
                 .build();
 
@@ -95,7 +95,7 @@ class OrganizationUserControllerStatusTest {
 
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(false);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", TARGET_USER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -115,7 +115,7 @@ class OrganizationUserControllerStatusTest {
 
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(true);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", TARGET_USER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -129,7 +129,7 @@ class OrganizationUserControllerStatusTest {
     @Test
     @DisplayName("422 Unprocessable Content: missing or null isActive triggers validation error")
     void shouldReturn422_whenIsActiveMissingOrNull() throws Exception {
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", TARGET_USER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -143,7 +143,7 @@ class OrganizationUserControllerStatusTest {
     void shouldReturn400_whenUserIdIsNotAValidUUID() throws Exception {
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(false);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", "not-a-valid-uuid")
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", "not-a-valid-uuid")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -159,7 +159,7 @@ class OrganizationUserControllerStatusTest {
 
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(false);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", CALLER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", CALLER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -177,7 +177,7 @@ class OrganizationUserControllerStatusTest {
 
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(false);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", TARGET_USER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -198,7 +198,7 @@ class OrganizationUserControllerStatusTest {
 
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(false);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", TARGET_USER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -215,7 +215,7 @@ class OrganizationUserControllerStatusTest {
     void shouldReturn403_whenCallerIsNotOrganizer() throws Exception {
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(false);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", TARGET_USER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "STAFF"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -229,7 +229,7 @@ class OrganizationUserControllerStatusTest {
     void shouldReturn401_whenUnauthenticated() throws Exception {
         UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(false);
 
-        mockMvc.perform(patch("/api/v1/organizations/users/{userId}/status", TARGET_USER_ID)
+        mockMvc.perform(patch("/api/v1/admin/organizations/users/{userId}/status", TARGET_USER_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())

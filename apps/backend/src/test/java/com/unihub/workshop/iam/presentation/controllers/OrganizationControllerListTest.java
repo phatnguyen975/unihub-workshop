@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class OrganizationUserControllerListTest {
+class OrganizationControllerListTest {
 
     private MockMvc mockMvc;
     private ListOrganizationMembersUseCase listOrganizationMembersUseCase;
@@ -34,7 +34,7 @@ class OrganizationUserControllerListTest {
     @BeforeEach
     void setUp() {
         listOrganizationMembersUseCase = mock(ListOrganizationMembersUseCase.class);
-        OrganizationUserController controller = OrganizationUserControllerTestBuilder.builder()
+        OrganizationController controller = OrganizationControllerTestBuilder.builder()
                 .withListOrganizationMembersUseCase(listOrganizationMembersUseCase)
                 .build();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -76,7 +76,7 @@ class OrganizationUserControllerListTest {
 
         when(listOrganizationMembersUseCase.execute(any(ListMembersQuery.class))).thenReturn(page);
 
-        mockMvc.perform(get("/api/v1/organizations/users")
+        mockMvc.perform(get("/api/v1/admin/organizations/users")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -106,7 +106,7 @@ class OrganizationUserControllerListTest {
         CursorPage<User> page = new CursorPage<>(List.of(), null, false);
         when(listOrganizationMembersUseCase.execute(any(ListMembersQuery.class))).thenReturn(page);
 
-        mockMvc.perform(get("/api/v1/organizations/users?role=STUDENT&isActive=true")
+        mockMvc.perform(get("/api/v1/admin/organizations/users?role=STUDENT&isActive=true")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -123,7 +123,7 @@ class OrganizationUserControllerListTest {
         CursorPage<User> page = new CursorPage<>(List.of(), null, false);
         when(listOrganizationMembersUseCase.execute(any(ListMembersQuery.class))).thenReturn(page);
 
-        mockMvc.perform(get("/api/v1/organizations/users?search=alice&cursor=prevCursor&limit=10")
+        mockMvc.perform(get("/api/v1/admin/organizations/users?search=alice&cursor=prevCursor&limit=10")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
@@ -134,7 +134,7 @@ class OrganizationUserControllerListTest {
 
     @Test
     void shouldReturn400_whenLimitIsGreaterThan100() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users?limit=101")
+        mockMvc.perform(get("/api/v1/admin/organizations/users?limit=101")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -143,7 +143,7 @@ class OrganizationUserControllerListTest {
 
     @Test
     void shouldReturn400_whenLimitIsLessThan1() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users?limit=0")
+        mockMvc.perform(get("/api/v1/admin/organizations/users?limit=0")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -152,7 +152,7 @@ class OrganizationUserControllerListTest {
 
     @Test
     void shouldReturn400_whenRoleIsInvalid() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users?role=INVALID_ROLE")
+        mockMvc.perform(get("/api/v1/admin/organizations/users?role=INVALID_ROLE")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -162,7 +162,7 @@ class OrganizationUserControllerListTest {
     @Test
     void shouldReturn400_whenSearchExceeds200Characters() throws Exception {
         String longSearch = "a".repeat(201);
-        mockMvc.perform(get("/api/v1/organizations/users?search=" + longSearch)
+        mockMvc.perform(get("/api/v1/admin/organizations/users?search=" + longSearch)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -171,7 +171,7 @@ class OrganizationUserControllerListTest {
 
     @Test
     void shouldReturn401_whenUnauthenticated() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users"))
+        mockMvc.perform(get("/api/v1/admin/organizations/users"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:unauthorized"));
@@ -179,13 +179,13 @@ class OrganizationUserControllerListTest {
 
     @Test
     void shouldReturn403_whenRoleIsNotOrganizer() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users")
+        mockMvc.perform(get("/api/v1/admin/organizations/users")
                 .principal(createAuth(CALLER_ID, ORG_ID, "STAFF")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:forbidden"));
 
-        mockMvc.perform(get("/api/v1/organizations/users")
+        mockMvc.perform(get("/api/v1/admin/organizations/users")
                 .principal(createAuth(CALLER_ID, ORG_ID, "STUDENT")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
@@ -194,7 +194,7 @@ class OrganizationUserControllerListTest {
 
     @Test
     void shouldReturn403_whenOrgClaimIsMissing() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users")
+        mockMvc.perform(get("/api/v1/admin/organizations/users")
                 .principal(createAuth(CALLER_ID, null, "ORGANIZER")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))

@@ -12,6 +12,8 @@ import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,9 +21,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -33,16 +32,22 @@ public class UserController {
     private final ChangeUserPasswordUseCase changeUserPasswordUseCase;
 
     @GetMapping("/me")
-    public ApiResponse<UserProfileResponse> getMyProfile(Authentication authentication) {
+    public ApiResponse<UserProfileResponse> getMyProfile(
+        Authentication authentication
+    ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         User user = getUserProfileUseCase.getProfile(userId);
-        return ApiResponse.success(UserProfileResponse.from(user), "Profile retrieved successfully.");
+        return ApiResponse.success(
+            UserProfileResponse.from(user),
+            "Profile retrieved successfully."
+        );
     }
 
     @PatchMapping("/me")
     public ApiResponse<UserProfileResponse> updateMyProfile(
-            Authentication authentication,
-            @RequestBody(required = false) Map<String, Object> body) {
+        Authentication authentication,
+        @RequestBody(required = false) Map<String, Object> body
+    ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         if (body == null) {
             throw new ValidationException("Request body must not be null");
@@ -50,21 +55,30 @@ public class UserController {
         UpdateProfileRequest request = UpdateProfileRequest.from(body);
         UpdateUserProfileCommand command = request.toCommand();
         User updated = updateUserProfileUseCase.updateProfile(userId, command);
-        return ApiResponse.success(UserProfileResponse.from(updated), "Profile updated successfully.");
+        return ApiResponse.success(
+            UserProfileResponse.from(updated),
+            "Profile updated successfully."
+        );
     }
 
     @PatchMapping("/me/password")
     public ApiResponse<Void> changeMyPassword(
-            Authentication authentication,
-            @Valid @RequestBody(required = false) ChangePasswordRequest request) {
+        Authentication authentication,
+        @Valid @RequestBody(required = false) ChangePasswordRequest request
+    ) {
         if (request == null) {
             throw new ValidationException("Request body must not be null");
         }
         UUID userId = SecurityContextUtils.extractUserId(authentication);
-        UUID currentSessionId = SecurityContextUtils.extractRequiredSessionId(
-                authentication, "Current session ID (sid) is required for password change");
+        UUID currentSessionId = SecurityContextUtils.extractSessionId(
+            authentication
+        );
         changeUserPasswordUseCase.changePassword(
-                userId, currentSessionId, request.currentPassword(), request.newPassword());
+            userId,
+            currentSessionId,
+            request.currentPassword(),
+            request.newPassword()
+        );
         return ApiResponse.success(null, "Password changed successfully.");
     }
 }

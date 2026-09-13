@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class OrganizationUserControllerDetailTest {
+class OrganizationControllerDetailTest {
 
     private MockMvc mockMvc;
     private GetOrganizationMemberUseCase getOrganizationMemberUseCase;
@@ -32,7 +32,7 @@ class OrganizationUserControllerDetailTest {
     @BeforeEach
     void setUp() {
         getOrganizationMemberUseCase = mock(GetOrganizationMemberUseCase.class);
-        OrganizationUserController controller = OrganizationUserControllerTestBuilder.builder()
+        OrganizationController controller = OrganizationControllerTestBuilder.builder()
                 .withGetOrganizationMemberUseCase(getOrganizationMemberUseCase)
                 .build();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -78,7 +78,7 @@ class OrganizationUserControllerDetailTest {
 
         when(getOrganizationMemberUseCase.execute(ORG_ID, TARGET_USER_ID)).thenReturn(member);
 
-        mockMvc.perform(get("/api/v1/organizations/users/{userId}", TARGET_USER_ID)
+        mockMvc.perform(get("/api/v1/admin/organizations/users/{userId}", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -103,7 +103,7 @@ class OrganizationUserControllerDetailTest {
         when(getOrganizationMemberUseCase.execute(ORG_ID, TARGET_USER_ID))
                 .thenThrow(new NotFoundException("Member not found in your organization."));
 
-        mockMvc.perform(get("/api/v1/organizations/users/{userId}", TARGET_USER_ID)
+        mockMvc.perform(get("/api/v1/admin/organizations/users/{userId}", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
@@ -113,7 +113,7 @@ class OrganizationUserControllerDetailTest {
 
     @Test
     void shouldReturn400_whenUserIdIsNotValidUuid() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users/{userId}", "not-a-uuid")
+        mockMvc.perform(get("/api/v1/admin/organizations/users/{userId}", "not-a-uuid")
                 .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -122,7 +122,7 @@ class OrganizationUserControllerDetailTest {
 
     @Test
     void shouldReturn401_whenUnauthenticated() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users/{userId}", TARGET_USER_ID))
+        mockMvc.perform(get("/api/v1/admin/organizations/users/{userId}", TARGET_USER_ID))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.type").value("urn:unihub:error:unauthorized"));
@@ -130,7 +130,7 @@ class OrganizationUserControllerDetailTest {
 
     @Test
     void shouldReturn403_whenRoleIsNotOrganizer() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users/{userId}", TARGET_USER_ID)
+        mockMvc.perform(get("/api/v1/admin/organizations/users/{userId}", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, ORG_ID, "STAFF")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
@@ -139,7 +139,7 @@ class OrganizationUserControllerDetailTest {
 
     @Test
     void shouldReturn403_whenOrgClaimIsMissing() throws Exception {
-        mockMvc.perform(get("/api/v1/organizations/users/{userId}", TARGET_USER_ID)
+        mockMvc.perform(get("/api/v1/admin/organizations/users/{userId}", TARGET_USER_ID)
                 .principal(createAuth(CALLER_ID, null, "ORGANIZER")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
