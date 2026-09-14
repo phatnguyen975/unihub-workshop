@@ -199,13 +199,21 @@ None.
 
 ## 4. Rate Limiting Behavior
 
-All three endpoints are non-registration endpoints and are governed by the platform's standard **Browsing Tier** Bucket4j Token Bucket filter backed by centralized Redis counters (per ADR-019 and the system's 2-tier rate limit configuration):
+All three endpoints are non-registration endpoints and are governed by the platform's standard **Default Tier** Bucket4j Token Bucket filter backed by centralized Redis counters (per ADR-019 and the system's multi-tier rate limit configuration):
 
-- **Tier Classification:** Browsing Tier (all endpoints under `/api/v1/auth/sessions`).
+- **Tier Classification:** Default Tier (all endpoints under `/api/v1/auth/sessions`).
 - **Bucket Keying:** Keyed by authenticated user identifier (`jwt.sub`).
-- **Bucket Configuration:** Configuration-driven via `rate-limit.browsing-tier` in `application.yml` (default: capacity 100 tokens, refill 100 tokens per 60 seconds).
+- **Bucket Configuration:** Configuration-driven via `rate-limit.default-tier` in `application.yml` (default: capacity 100 tokens, refill 100 tokens per 60 seconds).
 - **On Limit Exceeded:** Returns HTTP `429 Too Many Requests` with RFC 7807 problem type `urn:unihub:error:rate-limited`, standard response headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After`, and `Retry-After`.
 - **Fail-Open Policy:** If Redis is unavailable for rate limiting checks, the filter operates in fail-open mode, allowing the request through and emitting telemetry (ADR-010 / ADR-019). Note that this is strictly distinct from token blacklist validation and revocation, which operate in **fail-closed** mode.
+
+### Endpoint Routing Summary
+
+| Path                                | Auth | Role                      | Rate Limit Tier | Notes              |
+| :---------------------------------- | :--: | :------------------------ | :-------------- | :----------------- |
+| `GET /api/v1/auth/sessions`         | Yes  | Any (`STUDENT/ORG/STAFF`) | Default (100)   | Keyed by `jwt.sub` |
+| `DELETE /api/v1/auth/sessions/{id}` | Yes  | Any (`STUDENT/ORG/STAFF`) | Default (100)   | Keyed by `jwt.sub` |
+| `DELETE /api/v1/auth/sessions`      | Yes  | Any (`STUDENT/ORG/STAFF`) | Default (100)   | Keyed by `jwt.sub` |
 
 ## 5. Idempotency Behavior
 

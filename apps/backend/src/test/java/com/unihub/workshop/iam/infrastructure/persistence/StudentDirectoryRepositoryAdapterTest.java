@@ -1,20 +1,23 @@
 package com.unihub.workshop.iam.infrastructure.persistence;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.unihub.workshop.iam.domain.model.StudentDirectory;
-import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
 
 class StudentDirectoryRepositoryAdapterTest {
 
     @Test
     void shouldMapEntityToDomainWhenFound() {
-        StudentDirectoryJpaRepository jpaRepo = mock(StudentDirectoryJpaRepository.class);
-        StudentDirectoryRepositoryAdapter adapter = new StudentDirectoryRepositoryAdapter(jpaRepo);
+        StudentDirectoryJpaRepository jpaRepo = mock(
+            StudentDirectoryJpaRepository.class
+        );
+        StudentDirectoryRepositoryAdapter adapter =
+            new StudentDirectoryRepositoryAdapter(jpaRepo);
 
         UUID id = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
@@ -32,7 +35,9 @@ class StudentDirectoryRepositoryAdapterTest {
         entity.setImportedAt(now);
         entity.setCreatedAt(now);
 
-        when(jpaRepo.findByEmailAndStatus(email, "ACTIVE")).thenReturn(Optional.of(entity));
+        when(jpaRepo.findByEmailAndStatus(email, "ACTIVE")).thenReturn(
+            Optional.of(entity)
+        );
 
         Optional<StudentDirectory> result = adapter.findActiveByEmail(email);
 
@@ -46,12 +51,19 @@ class StudentDirectoryRepositoryAdapterTest {
 
     @Test
     void shouldReturnEmptyWhenNotFound() {
-        StudentDirectoryJpaRepository jpaRepo = mock(StudentDirectoryJpaRepository.class);
-        StudentDirectoryRepositoryAdapter adapter = new StudentDirectoryRepositoryAdapter(jpaRepo);
+        StudentDirectoryJpaRepository jpaRepo = mock(
+            StudentDirectoryJpaRepository.class
+        );
+        StudentDirectoryRepositoryAdapter adapter =
+            new StudentDirectoryRepositoryAdapter(jpaRepo);
 
-        when(jpaRepo.findByEmailAndStatus("unknown@test.com", "ACTIVE")).thenReturn(Optional.empty());
+        when(
+            jpaRepo.findByEmailAndStatus("unknown@test.com", "ACTIVE")
+        ).thenReturn(Optional.empty());
 
-        Optional<StudentDirectory> result = adapter.findActiveByEmail("unknown@test.com");
+        Optional<StudentDirectory> result = adapter.findActiveByEmail(
+            "unknown@test.com"
+        );
         assertThat(result.isEmpty()).isTrue();
     }
 }

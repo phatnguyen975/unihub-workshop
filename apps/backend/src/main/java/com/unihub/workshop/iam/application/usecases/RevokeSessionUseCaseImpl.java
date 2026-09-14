@@ -7,14 +7,13 @@ import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
@@ -25,10 +24,11 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
     private final MeterRegistry meterRegistry;
 
     public RevokeSessionUseCaseImpl(
-            RefreshTokenRepository refreshTokenRepository,
-            JtiBlacklistPort jtiBlacklistPort,
-            SessionTrackerPort sessionTrackerPort,
-            MeterRegistry meterRegistry) {
+        RefreshTokenRepository refreshTokenRepository,
+        JtiBlacklistPort jtiBlacklistPort,
+        SessionTrackerPort sessionTrackerPort,
+        MeterRegistry meterRegistry
+    ) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.jtiBlacklistPort = jtiBlacklistPort;
         this.sessionTrackerPort = sessionTrackerPort;
@@ -39,27 +39,35 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
     @Transactional(propagation = Propagation.NEVER)
     // Enforce fail-closed: Redis operations must succeed before any DB mutation
     public void revokeSession(
-            UUID userId,
-            UUID sessionIdToRevoke,
-            UUID currentSessionId,
-            String currentJti,
-            Instant currentTokenExpiresAt) {
-
+        UUID userId,
+        UUID sessionIdToRevoke,
+        UUID currentSessionId,
+        String currentJti,
+        Instant currentTokenExpiresAt
+    ) {
         if (userId == null || sessionIdToRevoke == null) {
-            throw new BadRequestException("User ID and session ID to revoke must not be null");
+            throw new BadRequestException(
+                "User ID and session ID to revoke must not be null"
+            );
         }
 
         Instant now = Instant.now();
 
         // 1. Verify session exists, belongs to caller, and is active
-        refreshTokenRepository.findActiveSessionByIdAndUserId(sessionIdToRevoke, userId, now)
-                .orElseThrow(() -> new NotFoundException("Session not found or already revoked"));
+        refreshTokenRepository
+            .findActiveSessionByIdAndUserId(sessionIdToRevoke, userId, now)
+            .orElseThrow(() ->
+                new NotFoundException("Session not found or already revoked")
+            );
 
-        boolean isCurrent = currentSessionId != null && sessionIdToRevoke.equals(currentSessionId);
+        boolean isCurrent =
+            currentSessionId != null &&
+            sessionIdToRevoke.equals(currentSessionId);
 
         // 2. Perform Redis operations BEFORE DB mutation
         if (isCurrent) {
-            Duration remainingTtl = currentTokenExpiresAt != null
+            Duration remainingTtl =
+                currentTokenExpiresAt != null
                     ? Duration.between(now, currentTokenExpiresAt)
                     : Duration.ZERO;
             if (remainingTtl.isNegative()) {
@@ -70,19 +78,34 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
             }
             sessionTrackerPort.removeSession(sessionIdToRevoke);
         } else {
-            Optional<String> remoteJti = sessionTrackerPort.getActiveJti(sessionIdToRevoke);
+            Optional<String> remoteJti = sessionTrackerPort.getActiveJti(
+                sessionIdToRevoke
+            );
             if (remoteJti.isPresent()) {
-                Duration remainingTtl = sessionTrackerPort.getRemainingTtl(sessionIdToRevoke);
+                Duration remainingTtl = sessionTrackerPort.getRemainingTtl(
+                    sessionIdToRevoke
+                );
                 jtiBlacklistPort.blacklistJti(remoteJti.get(), remainingTtl);
             }
             sessionTrackerPort.removeSession(sessionIdToRevoke);
         }
 
         // 3. Mark session revoked in Primary DB
-        refreshTokenRepository.revokeActiveSession(sessionIdToRevoke, userId, now);
+        refreshTokenRepository.revokeActiveSession(
+            sessionIdToRevoke,
+            userId,
+            now
+        );
 
         // 4. Record metric
-        meterRegistry.counter("auth.sessions.revoked", "outcome", "success", "target", isCurrent ? "current" : "single")
-                .increment();
+        meterRegistry
+            .counter(
+                "auth.sessions.revoked",
+                "outcome",
+                "success",
+                "target",
+                isCurrent ? "current" : "single"
+            )
+            .increment();
     }
 }

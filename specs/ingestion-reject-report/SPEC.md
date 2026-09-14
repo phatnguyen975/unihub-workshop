@@ -77,7 +77,7 @@ N/A — this feature does not introduce or modify any stateful entity. It is ent
 - **Performance:** The job history list query MUST execute via the composite index `(organization_id, completed_at DESC, id DESC)` and return results in O(1) keyset time independent of total record count. The pre-signed URL generation path MUST add at most one indexed primary-key lookup to the MinIO SDK call — no full table scans.
 - **Concurrency:** Both endpoints are read-only and stateless; concurrent requests from the same or different organizers do not require any locking or coordination.
 - **Idempotency:** GET requests are naturally idempotent. No `Idempotency-Key` is needed.
-- **Rate-limiting:** Subject to the standard per-user Token Bucket rate limiting already enforced by `shared/web/RateLimitFilter`. No feature-specific rate limit.
+- **Rate-limiting:** Both endpoints are subject to the standard **default-tier** Token Bucket rate limiter (implemented in `shared/ratelimit/RateLimitFilter` via `rate-limit.default-tier`: capacity 100 tokens, refill 100 tokens per 60 seconds, keyed by `jwt.sub` as `rate_limit:<sub UUID>`), operating fail-open on Redis unavailability (ADR-010, ADR-019). No feature-specific rate limit tier or custom pattern is required.
 - **Security:** JWT validation uses the RSA public key loaded at startup (from `resources/security/public.pem`). The JTI blacklist check against Redis MUST be fail-closed (see BR-08). The org-boundary check MUST happen before any MinIO operation. The pre-signed URL generation MUST use only server-retrieved artifact keys.
 - **Reliability / Failure modes:** MinIO SDK errors during pre-signed URL generation MUST return `500 Internal Server Error`. A non-existent or non-owned job returns `404`, not `403`, to avoid org-membership enumeration attacks. Redis unavailability on the JTI check returns `503 Service Unavailable`.
 - **Observability:** Requests MUST carry `X-Correlation-ID` (echoed in logs). Response includes `metadata.processedBy` and `metadata.traceId` per the standard success envelope. MinIO pre-sign latency SHOULD be instrumented via Micrometer.
@@ -246,5 +246,5 @@ _(Traces to: FR-14, BR-05)_
 - **ADR-010:** Redis fail-closed for JTI checks; fail-open for rate limiting.
 - **ADR-011:** MinIO/S3-compatible object storage; API returns pre-signed URLs, never raw object bytes.
 - **ADR-015:** Replica routing acceptable for non-critical read paths (job list). Primary DB required for pre-signed URL lookup (freshness guarantee on recently-written reports).
-- **ADR-019:** Token Bucket rate limiting via Bucket4j (existing `RateLimitFilter` already enforces this).
+- **ADR-019:** Token Bucket rate limiting via Bucket4j (`shared/ratelimit/RateLimitFilter` applies `default-tier` to all non-specialized endpoints).
 - **ADR-025:** Spring Batch artifacts (local reject staging uploaded to S3 on completion) — the keys stored in `ingestion_job_reports` reference these artifacts.

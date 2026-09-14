@@ -1,17 +1,16 @@
 package com.unihub.workshop.iam.application.utils;
 
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 @Component
 public class OtpService {
@@ -24,8 +23,9 @@ public class OtpService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public OtpService(
-            @Value("${app.otp.hmac-secret:}") String hmacSecret,
-            @Value("${app.otp.ttl-minutes:15}") int ttlMinutes) {
+        @Value("${app.otp.hmac-secret:}") String hmacSecret,
+        @Value("${app.otp.ttl-minutes:15}") int ttlMinutes
+    ) {
         this.hmacSecret = hmacSecret;
         this.ttlMinutes = ttlMinutes > 0 ? ttlMinutes : 15;
     }
@@ -34,11 +34,15 @@ public class OtpService {
     public void init() {
         if (hmacSecret == null || hmacSecret.trim().isEmpty()) {
             throw new IllegalStateException(
-                    "OTP HMAC secret must be configured via app.otp.hmac-secret and cannot be blank");
+                "OTP HMAC secret must be configured via app.otp.hmac-secret and cannot be blank"
+            );
         }
         if (hmacSecret.trim().length() < MIN_SECRET_LENGTH) {
             throw new IllegalStateException(
-                    "OTP HMAC secret must be at least " + MIN_SECRET_LENGTH + " characters long");
+                "OTP HMAC secret must be at least " +
+                    MIN_SECRET_LENGTH +
+                    " characters long"
+            );
         }
     }
 
@@ -57,13 +61,18 @@ public class OtpService {
         }
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            SecretKeySpec secretKeySpec = new SecretKeySpec(hmacSecret.getBytes(StandardCharsets.UTF_8),
-                    HMAC_ALGORITHM);
+            SecretKeySpec secretKeySpec = new SecretKeySpec(
+                hmacSecret.getBytes(StandardCharsets.UTF_8),
+                HMAC_ALGORITHM
+            );
             mac.init(secretKeySpec);
             byte[] rawHmac = mac.doFinal(otp.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(rawHmac);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to compute HMAC-SHA256 for OTP", e);
+            throw new IllegalStateException(
+                "Failed to compute HMAC-SHA256 for OTP",
+                e
+            );
         }
     }
 
@@ -76,7 +85,8 @@ public class OtpService {
             return false;
         }
         return MessageDigest.isEqual(
-                calculatedHash.getBytes(StandardCharsets.UTF_8),
-                expectedHash.getBytes(StandardCharsets.UTF_8));
+            calculatedHash.getBytes(StandardCharsets.UTF_8),
+            expectedHash.getBytes(StandardCharsets.UTF_8)
+        );
     }
 }

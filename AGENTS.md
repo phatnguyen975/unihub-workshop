@@ -78,26 +78,34 @@ Every feature in this repository **must** go through this pipeline, driven by fi
 The `/review` is not a terminal step. If it produces findings, the cycle is `/review → /fix → /review` until no blocking findings remain. This is **not an automated loop** — every arrow above is a separate, explicit human-invoked command. The agent does not chain commands on its own initiative — a human reviews the output of `/spec` and `/plan` and explicitly decides to proceed before the next command is run.
 
 > [!NOTE]
-> `specs/` and `docs/` are kept consistent _as part of_ `/build` itself, at the moment an improvement is proposed and approved — see section 4.4, "Mid-build improvement proposals." By the time a feature reaches `/review`, `specs/` and `docs/` are already expected to be accurate; `/review` and `/fix` exist to catch implementation defects, not specification drift.
+> `specs/` and `docs/` are kept consistent _as part of_ `/build` itself, at the moment an improvement is proposed and approved — see section 4.5, "Mid-build improvement proposals." By the time a feature reaches `/review`, `specs/` and `docs/` are already expected to be accurate; `/review` and `/fix` exist to catch implementation defects, not specification drift.
 
-### 4.1 Skills Catalog
+### 4.1 Feature Status Lifecycle
 
-| #   | Skill                                    | Phase        | Purpose                                                                                                |
-| :-- | :--------------------------------------- | :----------- | :----------------------------------------------------------------------------------------------------- |
-| 1   | `spec-driven-development`                | Spec         | Write FR/BR/AC-based spec before any code                                                              |
-| 2   | `api-contract-design`                    | Spec         | Design REST contract conformant to `docs/api-standards.md`                                             |
-| 3   | `task-planning-and-breakdown`            | Plan         | Break approved spec into vertical-slice tasks — one capability per task, spanning every layer it needs |
-| 4   | `test-driven-development`                | Build        | Red-Green-Refactor; 4-layer mock-based unit testing                                                    |
-| 5   | `incremental-implementation`             | Build        | Build one task's vertical slice layer by layer, innermost-to-outermost                                 |
-| 6   | `modular-boundary-enforcement`           | Build        | Keep cross-module access through `contracts/` only; run `ModulithArchitectureTest`                     |
-| 7   | `database-schema-evolution`              | Build        | Safe, additive-only schema migrations                                                                  |
-| 8   | `idempotency-and-exactly-once-design`    | Build        | Exactly-once semantics for retry-risk mutations                                                        |
-| 9   | `security-and-hardening`                 | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                                               |
-| 10  | `performance-and-efficiency-engineering` | Build/Review | N+1 queries, indexing, unbounded results, hot-path I/O, caching                                        |
-| 11  | `code-review-and-quality`                | Review       | Multi-axis review before merge                                                                         |
-| 12  | `debugging-and-root-cause-analysis`      | Fix/Build    | Reproduce → localize → hypothesize → fix root cause → regression test                                  |
+Every feature in `docs/feature-catalog.md` maintains an explicit status:
 
-### 4.2 `/spec <feature-name>`
+- **`DONE`**: The feature has completed all development stages (`/spec` → `/plan` → `/build` → `/review`), passed all tests and human verification, and is merged/active in production code.
+- **`READY`**: All prerequisite dependencies in `Appendix A: Feature Dependency Map` are `DONE` (or the feature has no dependencies). The feature is eligible for immediate `/spec` invocation.
+- **`BLOCKED`**: One or more prerequisite dependencies in `Appendix A: Feature Dependency Map` are not yet `DONE`. The feature cannot be started yet.
+
+### 4.2 Skills Catalog
+
+| #   | Skill                                    | Phase        | Purpose                                                                                                                         |
+| :-- | :--------------------------------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `spec-driven-development`                | Spec         | Write FR/BR/AC-based spec before any code                                                                                       |
+| 2   | `api-contract-design`                    | Spec         | Design REST contract conformant to `docs/api-standards.md`                                                                      |
+| 3   | `task-planning-and-breakdown`            | Plan         | Break approved spec into vertical-slice tasks — one capability per task, spanning every layer it needs                          |
+| 4   | `test-driven-development`                | Build        | Red-Green-Refactor; 4-layer mock-based unit testing                                                                             |
+| 5   | `incremental-implementation`             | Build        | Build one task's vertical slice layer by layer, innermost-to-outermost                                                          |
+| 6   | `modular-boundary-enforcement`           | Build        | Keep cross-module access through `api/` only; run `ModulithArchitectureTest` (backend) or `HexagonalArchitectureTest` (workers) |
+| 7   | `database-schema-evolution`              | Build        | Safe, additive-only schema migrations                                                                                           |
+| 8   | `idempotency-and-exactly-once-design`    | Build        | Exactly-once semantics for retry-risk mutations                                                                                 |
+| 9   | `security-and-hardening`                 | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                                                                        |
+| 10  | `performance-and-efficiency-engineering` | Build/Review | N+1 queries, indexing, unbounded results, hot-path I/O, caching                                                                 |
+| 11  | `code-review-and-quality`                | Review       | Multi-axis review before merge                                                                                                  |
+| 12  | `debugging-and-root-cause-analysis`      | Fix/Build    | Reproduce → localize → hypothesize → fix root cause → regression test                                                           |
+
+### 4.3 `/spec <feature-name>`
 
 **Skills invoked:**
 
@@ -106,6 +114,8 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 
 **Agent responsibility:** Read every relevant file in `docs/` (per the Documentation Map above) before drafting either artifact. This **must** include `docs/feature-catalog.md` to confirm the feature is listed, identify the correct module owner, and understand documented constraints and dependencies. Cross-reference every requirement against the actual flow described in `docs/system-design.md` — do not invent behavior that contradicts it.
 
+**Feature readiness check (mandatory):** Before drafting any spec or API contract, the agent **must** verify that `<feature-name>` has status `READY` in `docs/feature-catalog.md`. If the feature is `BLOCKED` (or already `DONE`), the agent must **stop immediately** and ask the human for confirmation before proceeding, explicitly listing which prerequisite dependencies from `Appendix A: Feature Dependency Map` are not yet `DONE`.
+
 **Human verification gate (mandatory, blocking):** The human reads `SPEC.md` (and `API_CONTRACT.md` if produced) and explicitly approves before `/plan` may be run. If acceptance criteria are not testable, or a requirement is ambiguous, the agent must stop and ask rather than guess.
 
 **Feature naming:** The agent does **not** choose feature names. The human supplies `<feature-name>`, which **must** exactly match one of the kebab-case feature names listed in `docs/feature-catalog.md`. If the supplied name does not match any catalogued feature, or if it is ambiguous (e.g., matches a bare module name like `registrations` instead of `free-workshop-registration`), the agent must ask for clarification and cite the relevant section of `docs/feature-catalog.md` rather than guessing scope.
@@ -113,7 +123,7 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 > [!NOTE]
 > The human must read and approve these artifacts first — this is a hard gate, not a suggestion. The agent does not self-approve its own spec. If the human approves, the spec becomes the contract for implementation, then you change the status to `APPROVED`. If the human rejects it, revise these artifacts with the human's feedback and fix them until approval is granted.
 
-### 4.3 `/plan <feature-name>`
+### 4.4 `/plan <feature-name>`
 
 **Skill invoked:**
 
@@ -121,7 +131,7 @@ The `/review` is not a terminal step. If it produces findings, the cycle is `/re
 
 **Human verification gate (mandatory, blocking):** The human reviews `tasks.md` for correct ordering, scope, and granularity (no task should span more than ~10 files) before `/build` may begin.
 
-### 4.4 `/build <feature-name> <task-id>`
+### 4.5 `/build <feature-name> <task-id>`
 
 Run once per task in `tasks.md`, in order.
 
@@ -143,7 +153,9 @@ Run once per task in `tasks.md`, in order.
 
 > [!NOTE]
 >
-> - `ModulithArchitectureTest` (see section 6) must pass as part of the full unit test suite run at the end of every `/build` task and again before `/review` — it is included in "the full unit test suite" referenced throughout this document, not a separate manual step.
+> - **Architecture regression tests** (see section 6) must pass as part of the unit test suite run at the end of every `/build` task and again before `/review`, scoped to the application being modified (no need to run both every time):
+>   - For **Core Backend** (`apps/backend/`): run `ModulithArchitectureTest` (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
+>   - For **Workers** (`apps/workers/`): run `HexagonalArchitectureTest` (`./gradlew test --tests "com.unihub.workshop.workers.HexagonalArchitectureTest"`).
 > - If a test fails unexpectedly during a task (not yet a formal review finding), the agent applies `debugging-and-root-cause-analysis` inline before continuing.
 
 > [!IMPORTANT]
@@ -166,7 +178,7 @@ Run once per task in `tasks.md`, in order.
 >
 > This is the **only** mechanism that keeps `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` consistent with each other and with the actual implementation.
 
-### 4.5 `/review <feature-name>`
+### 4.6 `/review <feature-name>`
 
 Run after all tasks for a feature are complete.
 
@@ -176,13 +188,19 @@ Run after all tasks for a feature are complete.
 - `security-and-hardening` — re-run in full-checklist mode if the feature touches auth, payments, webhooks, or RBAC.
 - `performance-and-efficiency-engineering` — invoked when the feature touched any database query, a loop over a collection, or a call to an external/slow dependency during `/build`. Re-checks specifically for N+1 query shapes, missing indexes, unbounded results, and unguarded hot-path I/O — independently of whatever was already checked during `/build`, since this category of defect is easy to miss once and obvious once flagged.
 
-**Scope:** By this point, `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` are assumed accurate — any legitimate deviation already went through the improvement-proposal flow in section 4.4. `/review` therefore checks the implementation **against** these artifacts; it does not re-open or re-question the artifacts themselves. If the agent believes it has found a genuine specification gap rather than an implementation defect, it must say so explicitly in `review-notes.md` and flag that the human may need to restart an improvement proposal retroactively — but `/review` itself never edits `specs/` or `docs/`.
+**Scope:** By this point, `SPEC.md`, `API_CONTRACT.md`, `tasks.md`, and `docs/` are assumed accurate — any legitimate deviation already went through the improvement-proposal flow in section 4.5. `/review` therefore checks the implementation **against** these artifacts; it does not re-open or re-question the artifacts themselves. If the agent believes it has found a genuine specification gap rather than an implementation defect, it must say so explicitly in `review-notes.md` and flag that the human may need to restart an improvement proposal retroactively — but `/review` itself never edits `specs/` or `docs/`.
 
 **Output:** `specs/<feature-name>/review-notes.md`, listing every finding found by the agent, classified by severity (Critical / Should-fix / Nit / FYI). The agent presents this summary and stops — it does not fix anything yet.
 
 **Human verification gate (mandatory, blocking):** The human reads `review-notes.md`, confirms or disputes each AI-found finding, and adds any additional findings the AI missed. The combined, human-confirmed list is the only valid input to `/fix`.
 
-### 4.6 `/fix <feature-name>`
+**Feature completion & dependency unblocking:** When `/review` passes with zero blocking findings (or after all findings from `/fix` have been verified and resolved) and the human explicitly confirms the feature is `DONE`:
+
+1. The agent updates `<feature-name>`'s status in `docs/feature-catalog.md` from `READY` to `DONE` (`> **Status:** DONE`).
+2. The agent inspects `Appendix A: Feature Dependency Map` in `docs/feature-catalog.md` to identify any downstream features that depend on this feature.
+3. For each dependent feature whose prerequisite dependencies are now all `DONE`, the agent automatically unblocks it by updating its status from `BLOCKED` to `READY` (`> **Status:** READY`).
+
+### 4.7 `/fix <feature-name>`
 
 Run whenever `/review` produced a human-confirmed list of findings.
 
@@ -190,7 +208,7 @@ Run whenever `/review` produced a human-confirmed list of findings.
 
 - `debugging-and-root-cause-analysis` — always runs, once per finding. **For each finding:** reproduce the minimal failing case → localize the cause → form a hypothesis → fix the root cause (not the symptom) → add a regression test that fails before the fix and passes after.
 
-**Rule:** `/fix` only ever changes code and tests to bring the implementation back into line with the already-approved `SPEC.md` / `API_CONTRACT.md` / `tasks.md`. It never edits `specs/` or `docs/` — those are only ever changed through the improvement-proposal flow in section 4.4. A fix is never applied without a regression test, even for findings that look trivial. This is the same Red-Green-Refactor discipline as `/build` — a review finding is not exempt from TDD.
+**Rule:** `/fix` only ever changes code and tests to bring the implementation back into line with the already-approved `SPEC.md` / `API_CONTRACT.md` / `tasks.md`. It never edits `specs/` or `docs/` — those are only ever changed through the improvement-proposal flow in section 4.5. A fix is never applied without a regression test, even for findings that look trivial. This is the same Red-Green-Refactor discipline as `/build` — a review finding is not exempt from TDD.
 
 **After all findings are fixed:** The agent reports completion and the human re-runs `/review` on the same feature. Repeat `/review → /fix → /review` until zero blocking findings remain. The feature is then considered complete.
 
@@ -209,11 +227,13 @@ If `/review → /fix` repeats more than twice for the same feature without conve
 
 ## 6. Module Boundaries (Modular Monolith)
 
-- Backend (`apps/backend/`) modules: `iam`, `workshops`, `registrations`, `payments`, `attendances`, `notifications`, `search` — each follows Clean Architecture (`domain/ → application/ → infrastructure/ → presentation/`), with `contracts/` as the only public surface other modules may depend on.
-- Cross-module calls must go through `contracts/` interfaces or domain events (via the Spring Modulith event publication registry) — never reach into another module's `domain/`, `application/`, or `infrastructure/` package directly.
-- Workers (`apps/workers/`) follow Hexagonal Architecture per pipeline (`inbound/ → core/ → outbound/`), with `core/` having zero outward dependencies.
+- Backend (`apps/backend/`) modules: `iam`, `workshops`, `registrations`, `payments`, `attendances`, `notifications`, `search` — each follows Clean Architecture (`domain/` → `application/` → `infrastructure/` → `presentation/`), with `api/` (Facade Pattern) as the only public surface other modules may depend on.
+- Cross-module calls must go through `api/` facade interfaces or domain events (via the Spring Modulith event publication registry) — never reach into another module's `domain/`, `application/`, or `infrastructure/` package directly.
+- Workers (`apps/workers/`) follow Hexagonal Architecture per pipeline (`inbound/` → `core/` → `outbound/`), with `core/` having zero outward dependencies.
 - See `docs/project-structure.md` for the full per-module directory layout and the `modular-boundary-enforcement` skill for enforcement workflow.
-- `modular-boundary-enforcement` is verified concretely via `apps/backend/src/test/java/com/unihub/workshop/ModulithArchitectureTest.java` — running `ApplicationModules.of(...).verify()` — which must pass before any feature touching module boundaries is considered complete. This is a static architecture check, not an integration test, and is always permitted under section 5.
+- `modular-boundary-enforcement` is verified concretely via static architecture checks (not integration tests, always permitted under section 5):
+  - **Core Backend (`apps/backend/`):** `apps/backend/src/test/java/com/unihub/workshop/ModulithArchitectureTest.java` — verifies Spring Modulith module encapsulation (`ApplicationModules.of(...).verify()`), Clean Architecture layer purity, and public `api/` facade boundaries. Run whenever modifying backend code.
+  - **Workers (`apps/workers/`):** `apps/workers/src/test/java/com/unihub/workshop/workers/HexagonalArchitectureTest.java` — verifies Hexagonal Architecture (Ports and Adapters) intra-module isolation, port interface contracts, and inter-worker-module decoupling. Run whenever modifying worker code.
 
 ## 7. Coding Conventions (Java & TypeScript)
 
@@ -222,11 +242,11 @@ These apply to all code regardless of which skill or command produced it.
 - **Design patterns over ad-hoc logic.** Where a well-known pattern fits (Strategy for pluggable notification channels, Factory for payment provider adapters, Builder for complex DTOs), use it explicitly rather than reinventing an equivalent structure inline.
 - **DRY, but not at the cost of layer purity.** Shared logic belongs in the appropriate shared kernel (`shared/` in backend, `core/` in workers) — never duplicated across modules, but also never pulled across a module boundary just to avoid duplication (see section 6).
 - **Minimize dependencies.** Before adding a library, check whether the existing stack (see section 2) already solves the problem. Do not introduce a new dependency for something one of the already-approved libraries covers.
-- **Low coupling, high cohesion.** A class should depend on abstractions (ports/interfaces) it owns or that are defined in `contracts/`, never on another module's concrete implementation.
+- **Low coupling, high cohesion.** A class should depend on abstractions (ports/interfaces) it owns or that are defined in `api/` facades, never on another module's concrete implementation.
 - **Clean code baseline.** Small functions with a single responsibility, intention-revealing names, no magic numbers/strings (use named constants or enums), no commented-out code committed.
 - **Optimize for maintainability over cleverness.** Prefer the obvious, slightly more verbose solution over a clever one-liner if it is easier for a future reader (human or agent) to understand without additional context.
 - **Immutability by default** (Java `record`/`final` fields for domain objects, TypeScript `readonly`/`const`) unless mutation is required and justified.
-- **Use Lombok to reduce boilerplate code.** Prefer standard Lombok annotations such as `@Getter`, `@Setter`, `@RequiredArgsConstructor`, and `@Builder` where they improve readability and maintainability. Avoid excessive or unnecessary Lombok usage when it makes the code harder to understand.
+- **Use Lombok to reduce boilerplate code.** Prefer standard Lombok annotations such as `@Getter`, `@Setter`, `@RequiredArgsConstructor` (not `@Autowired`), and `@Builder` where they improve readability and maintainability. Avoid excessive or unnecessary Lombok usage when it makes the code harder to understand.
 - **No framework leakage into the domain layer.** Domain classes never import Spring, JPA, or any TypeScript framework-specific type.
 - **TypeScript-specific (for `apps/web/` or `apps/mobile/`):** Strict mode enabled (`strict: true` in `tsconfig.json`), no `any` without an explicit justifying comment, prefer discriminated unions over optional-field-heavy types for state modeling.
 
@@ -239,5 +259,4 @@ These apply to all code regardless of which skill or command produced it.
 - **Never silently expand a task's scope.** If implementing a task reveals that the spec or plan is wrong or incomplete, stop and surface this rather than improvising beyond what was approved.
 - **Never invent business behavior not present in `docs/`.** If `docs/system-design.md` or `docs/adrs.md` doesn't specify a behavior, ask rather than assume.
 - **Fail-mode decisions (fail-open vs fail-closed)** must match what `docs/adrs.md` already specifies — do not change these without an explicit human decision.
-- Never apply a fix from `/fix` without the regression-test discipline described in section 4.6 — a review finding is never patched directly.
-- **Never let implementation silently diverge from the approved spec.** If a better approach is discovered mid-build, follow the two-gate improvement-proposal process in section 4.4 — record it, get it approved, update `specs/` and `docs/` together, get that update approved, then resume — never implement first and reconcile later.
+- **Never let implementation silently diverge from the approved spec.** If a better approach is discovered mid-build, follow the two-gate improvement-proposal process in section 4.5 — record it, get it approved, update `specs/` and `docs/` together, get that update approved, then resume — never implement first and reconcile later.

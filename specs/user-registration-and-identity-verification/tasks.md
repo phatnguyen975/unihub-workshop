@@ -30,33 +30,33 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files (new / refactored):**
-    - `iam/domain/model/UserVerificationToken.java` (replaces `PasswordResetToken.java`, includes `tokenType`)
-    - `iam/domain/model/StudentDirectory.java`
-    - `iam/domain/events/OtpRequestedEvent.java` (includes `purpose`)
-    - `iam/application/ports/in/RegisterUserUseCase.java`
-    - `iam/application/ports/out/UserVerificationTokenRepository.java` (replaces `PasswordResetTokenRepository.java`)
-    - `iam/application/ports/out/StudentDirectoryRepository.java`
-    - `iam/application/ports/out/UserRepository.java` (method `existsByEmail`)
-    - `iam/application/usecases/RegisterUserUseCaseImpl.java`
-    - `iam/application/utils/OtpService.java` (HMAC-SHA256, configurable TTL)
-    - `iam/infrastructure/persistence/UserVerificationTokenJpaEntity.java` (mapped to `user_verification_tokens`, with `tokenType`)
-    - `iam/infrastructure/persistence/UserVerificationTokenJpaRepository.java`
-    - `iam/infrastructure/persistence/UserVerificationTokenRepositoryAdapter.java`
-    - `iam/infrastructure/persistence/StudentDirectoryJpaEntity.java`
-    - `iam/infrastructure/persistence/StudentDirectoryJpaRepository.java`
-    - `iam/infrastructure/persistence/StudentDirectoryRepositoryAdapter.java`
-    - `iam/presentation/dto/RegisterRequest.java`
-    - `iam/presentation/dto/RegisterResponse.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/domain/model/UserVerificationToken.java` (replaces `PasswordResetToken.java`, includes `tokenType`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/domain/model/StudentDirectory.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/events/OtpRequestedEvent.java` (includes `purpose`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/RegisterUserUseCase.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/UserVerificationTokenRepository.java` (replaces `PasswordResetTokenRepository.java`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/StudentDirectoryRepository.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/UserRepository.java` (method `existsByEmail`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/RegisterUserUseCaseImpl.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/utils/OtpService.java` (HMAC-SHA256, configurable TTL)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserVerificationTokenJpaEntity.java` (mapped to `user_verification_tokens`, with `tokenType`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserVerificationTokenJpaRepository.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserVerificationTokenRepositoryAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/StudentDirectoryJpaEntity.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/StudentDirectoryJpaRepository.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/StudentDirectoryRepositoryAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/RegisterRequest.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/RegisterResponse.java`
   - **Files (modified):**
-    - `iam/domain/model/User.java` — ensure fields: `role`, `is_active = false`, `is_temporary_password = false`, `studentRecordId`, `organizationId`
-    - `iam/infrastructure/persistence/UserJpaEntity.java` — ensure fields match `docs/database-schema.md §users`
-    - `iam/infrastructure/persistence/UserRepositoryAdapter.java`
-    - `iam/presentation/controllers/AuthController.java` — endpoint `POST /api/v1/auth/register`
-    - `application.yml` / `application-test.yml` — configure `app.otp.ttl-minutes: 15`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/domain/model/User.java` — ensure fields: `role`, `is_active = false`, `is_temporary_password = false`, `studentRecordId`, `organizationId`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserJpaEntity.java` — ensure fields match `docs/database-schema.md §users`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserRepositoryAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/AuthController.java` — endpoint `POST /api/v1/auth/register`
+    - `apps/backend/src/main/resources/application.yml` / `apps/backend/src/test/resources/application-test.yml` — configure `app.otp.ttl-minutes: 15`
   - **Test files:**
-    - `iam/application/utils/OtpServiceTest.java`
-    - `iam/application/usecases/RegisterUserUseCaseImplTest.java`
-    - `iam/presentation/controllers/AuthControllerRegisterTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/utils/OtpServiceTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/RegisterUserUseCaseImplTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerRegisterTest.java`
   - **Acceptance Criteria:**
     - `POST /api/v1/auth/register` with valid payload and active student directory match → `201 Created`, returns `data.userId`, user has `role=STUDENT`, `is_active=false`, `is_temporary_password=false`, `password_hash` encoded with Argon2, `student_record_id` and `organization_id` set from directory, `user_verification_tokens` record created with `token_type='ACTIVATION_OTP'`, `used_at=NULL`, and `expires_at=now() + TTL`, `event_publication` record created for `OtpRequestedEvent`. _(FR-01, FR-02, FR-03, FR-04, FR-05, FR-09, FR-10; SPEC Scenario 1)_
     - `POST /api/v1/auth/register` with valid payload and no student directory match (or directory status `INACTIVE`) → `201 Created`, `student_record_id=NULL`, `organization_id=NULL`. _(FR-03; SPEC Scenario 2)_
@@ -78,15 +78,15 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files (new / modified):**
-    - `iam/application/ports/in/ActivateAccountUseCase.java`
-    - `iam/application/usecases/ActivateAccountUseCaseImpl.java`
-    - `iam/application/ports/out/UserVerificationTokenRepository.java` (query methods scoped to `ACTIVATION_OTP`)
-    - `iam/infrastructure/persistence/UserVerificationTokenRepositoryAdapter.java`
-    - `iam/presentation/dto/ActivateAccountRequest.java`
-    - `iam/presentation/controllers/AuthController.java` — endpoint `POST /api/v1/auth/activate`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/ActivateAccountUseCase.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/ActivateAccountUseCaseImpl.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/UserVerificationTokenRepository.java` (query methods scoped to `ACTIVATION_OTP`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserVerificationTokenRepositoryAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/ActivateAccountRequest.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/AuthController.java` — endpoint `POST /api/v1/auth/activate`
   - **Test files:**
-    - `iam/application/usecases/ActivateAccountUseCaseImplTest.java`
-    - `iam/presentation/controllers/AuthControllerActivateTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ActivateAccountUseCaseImplTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerActivateTest.java`
   - **Acceptance Criteria:**
     - `POST /api/v1/auth/activate` with valid OTP for inactive account → `200 OK` (`success: true`, message: `"Account activated successfully. You may now log in."`), `users.is_active = true`, token's `used_at = now()`. _(FR-11; SPEC Scenario 5)_
     - `POST /api/v1/auth/activate` with expired OTP (`expires_at < now()`) → `422 Unprocessable Content` (`urn:unihub:error:validation`, uniform message `"Invalid or expired activation code."`, with `validationErrors`). _(FR-12; SPEC Scenario 6)_
@@ -108,15 +108,15 @@ This plan delivers the three REST endpoints for Feature 1.1 as three sequential 
   - **Depends on:** T1, T2
   - **Layers touched:** Application, Infrastructure, Presentation
   - **Files (new / modified):**
-    - `iam/application/ports/in/ResendOtpUseCase.java`
-    - `iam/application/usecases/ResendOtpUseCaseImpl.java`
-    - `iam/application/ports/out/UserVerificationTokenRepository.java` (method `invalidateActiveTokens(UUID userId, String tokenType)`)
-    - `iam/infrastructure/persistence/UserVerificationTokenRepositoryAdapter.java`
-    - `iam/presentation/dto/ResendOtpRequest.java`
-    - `iam/presentation/controllers/AuthController.java` — endpoint `POST /api/v1/auth/otp/resend`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/ResendOtpUseCase.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/ResendOtpUseCaseImpl.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/out/UserVerificationTokenRepository.java` (method `invalidateActiveTokens(UUID userId, String tokenType)`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/UserVerificationTokenRepositoryAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/ResendOtpRequest.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/AuthController.java` — endpoint `POST /api/v1/auth/otp/resend`
   - **Test files:**
-    - `iam/application/usecases/ResendOtpUseCaseImplTest.java`
-    - `iam/presentation/controllers/AuthControllerResendOtpTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ResendOtpUseCaseImplTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerResendOtpTest.java`
   - **Acceptance Criteria:**
     - `POST /api/v1/auth/otp/resend` for inactive account (`is_active = false`) → `200 OK` (`"A verification code has been sent to your email."`), prior `ACTIVATION_OTP` tokens marked `used_at = now()`, new `ACTIVATION_OTP` token created with `used_at = NULL` and fresh `expires_at`, new `OtpRequestedEvent` (purpose: `ACTIVATION`) published. _(FR-15, FR-16; SPEC Scenario 8)_
     - `POST /api/v1/auth/otp/resend` for active account (`is_active = true`) → Flow left blank with comment for Feature 1.4. _(FR-15, FR-17; SPEC Scenario 9)_

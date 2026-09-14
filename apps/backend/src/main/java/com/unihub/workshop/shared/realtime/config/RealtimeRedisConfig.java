@@ -18,12 +18,24 @@ public class RealtimeRedisConfig {
     @Bean
     @ConditionalOnBean(RedisConnectionFactory.class)
     public RedisMessageListenerContainer realtimeRedisMessageListenerContainer(
-            RedisConnectionFactory connectionFactory,
-            RedisRealtimeSubscriber subscriber) {
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        RedisConnectionFactory connectionFactory,
+        RedisRealtimeSubscriber subscriber
+    ) {
+        RedisMessageListenerContainer container =
+            new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(subscriber, new PatternTopic(RedisRealtimePublisherAdapter.USER_CHANNEL_PREFIX + "*"));
-        container.addMessageListener(subscriber, new PatternTopic(RedisRealtimePublisherAdapter.WORKSHOP_CHANNEL_PREFIX + "*"));
+        container.addMessageListener(
+            subscriber,
+            new PatternTopic(
+                RedisRealtimePublisherAdapter.USER_CHANNEL_PREFIX + "*"
+            )
+        );
+        container.addMessageListener(
+            subscriber,
+            new PatternTopic(
+                RedisRealtimePublisherAdapter.WORKSHOP_CHANNEL_PREFIX + "*"
+            )
+        );
         return container;
     }
 }

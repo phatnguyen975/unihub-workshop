@@ -277,7 +277,22 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 - Persists a new refresh token record in `refresh_tokens` table and tracks the active session in Redis (`session:jti:{sessionId}`).
 - Emits audit log for successful first-time credential activation.
 
-## 4. UI/UX Workflow Mapping
+## 4. Rate Limiting Behavior
+
+All unauthenticated endpoints in this feature (`POST /api/v1/auth/otp/resend`, `POST /api/v1/auth/password/reset`, `POST /api/v1/auth/password/temporary`) are subject to the dedicated Bucket4j `auth-tier` Token Bucket rate limiter (capacity: 20 tokens, refill: 20 per 60 seconds per client IP) at the application filter layer:
+
+- Headers returned on every request: `X-RateLimit-Limit: 20`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After`.
+- Exceeding the rate limit returns HTTP `429 Too Many Requests` with RFC 7807 Problem Detail (`urn:unihub:error:rate-limited`).
+
+### Endpoint Routing Summary
+
+| Path                                   | Auth | Rate Limit Tier | Notes                        |
+| :------------------------------------- | :--: | :-------------- | :--------------------------- |
+| `POST /api/v1/auth/otp/resend`         |  No  | Auth (20/60s)   | Configured in `public-paths` |
+| `POST /api/v1/auth/password/reset`     |  No  | Auth (20/60s)   | Configured in `public-paths` |
+| `POST /api/v1/auth/password/temporary` |  No  | Auth (20/60s)   | Configured in `public-paths` |
+
+## 5. UI/UX Workflow Mapping
 
 ```mermaid
 sequenceDiagram

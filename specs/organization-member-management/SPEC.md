@@ -110,8 +110,8 @@ The state machine manages the `users.is_active` attribute for organization membe
 - **Concurrency:**
   - The ban operation must not span Redis and PostgreSQL in an open distributed transaction. Redis operations run first; PostgreSQL update follows upon success.
 - **Idempotency:**
-  - `POST /api/v1/organizations/users` enforces uniqueness via `users.email` index.
-  - `PATCH /api/v1/organizations/users/{userId}/status` is inherently idempotent.
+  - `POST /api/v1/admin/organizations/users` enforces uniqueness via `users.email` index.
+  - `PATCH /api/v1/admin/organizations/users/{userId}/status` is inherently idempotent.
 - **Rate-limiting:**
   - Standard authenticated rate limit applies via Bucket4j filter (`100 requests / minute / user`).
 - **Security:**
@@ -137,7 +137,7 @@ And organization "org-100" has members:
   | u-2 | Bob Organizer | ORGANIZER | true     |
   | u-3 | Charlie Stud  | STUDENT   | true     |
   | u-4 | Diana Staff   | STAFF     | false    |
-When the ORGANIZER calls GET /api/v1/organizations/users with no query parameters
+When the ORGANIZER calls GET /api/v1/admin/organizations/users with no query parameters
 Then the response status is 200 OK
 And the response envelope has success = true, message = "Organization members retrieved"
 And the data contains items for u-1, u-2, u-3, and u-4
@@ -149,7 +149,7 @@ And the pagination metadata contains cursor.hasMore = false
 
 ```gherkin
 Given the same ORGANIZER from Scenario 1
-When the ORGANIZER calls GET /api/v1/organizations/users?role=STUDENT&isActive=true
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?role=STUDENT&isActive=true
 Then the response status is 200 OK
 And the data items contain only u-3 ("Charlie Stud")
 And u-1, u-2, and u-4 are excluded
@@ -159,7 +159,7 @@ And u-1, u-2, and u-4 are excluded
 
 ```gherkin
 Given an active member with full_name = "Nguyen Van Binh" and email = "binh.nv@example.com"
-When the ORGANIZER calls GET /api/v1/organizations/users?search=van+binh
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?search=van+binh
 Then the response status is 200 OK
 And the data items include "Nguyen Van Binh"
 ```
@@ -168,12 +168,12 @@ And the data items include "Nguyen Van Binh"
 
 ```gherkin
 Given organization "org-100" has 25 members (excluding the caller)
-When the ORGANIZER calls GET /api/v1/organizations/users?limit=20
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?limit=20
 Then the response status is 200 OK
 And data.items contains exactly 20 items
 And data.cursor.hasMore is true
 And data.cursor.nextCursor is a valid non-empty Base64 string
-When the ORGANIZER calls GET /api/v1/organizations/users?limit=20&cursor=<nextCursor>
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?limit=20&cursor=<nextCursor>
 Then the response status is 200 OK
 And data.items contains the remaining 5 items
 And data.cursor.hasMore is false
@@ -183,7 +183,7 @@ And data.cursor.nextCursor is null
 ### Scenario 5: Reject invalid pagination limit
 
 ```gherkin
-When the ORGANIZER calls GET /api/v1/organizations/users?limit=150
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?limit=150
 Then the response status is 400 Bad Request
 And error.type is "urn:unihub:error:bad-request"
 ```
@@ -192,7 +192,7 @@ And error.type is "urn:unihub:error:bad-request"
 
 ```gherkin
 Given a STAFF member "u-1" in organization "org-100"
-When the ORGANIZER calls GET /api/v1/organizations/users/u-1
+When the ORGANIZER calls GET /api/v1/admin/organizations/users/u-1
 Then the response status is 200 OK
 And the response envelope has success = true, message = "Member details retrieved"
 And data.id is "u-1"
@@ -204,7 +204,7 @@ And data.organizationId is "org-100"
 
 ```gherkin
 Given a user "u-99" belonging to organization "org-200"
-When the ORGANIZER of "org-100" calls GET /api/v1/organizations/users/u-99
+When the ORGANIZER of "org-100" calls GET /api/v1/admin/organizations/users/u-99
 Then the response status is 404 Not Found
 And error.type is "urn:unihub:error:not-found"
 And the error response does not disclose that u-99 exists in another organization
@@ -214,7 +214,7 @@ And the error response does not disclose that u-99 exists in another organizatio
 
 ```gherkin
 Given an authenticated ORGANIZER of organization "org-100" with slug "tech-club"
-When the ORGANIZER calls POST /api/v1/organizations/users with body:
+When the ORGANIZER calls POST /api/v1/admin/organizations/users with body:
   """
   {
     "email": "staff.member@techclub.org",
@@ -236,7 +236,7 @@ And a UserProvisionedEvent is published to the transactional outbox with the pla
 ### Scenario 9: Reject provisioning with STUDENT role
 
 ```gherkin
-When the ORGANIZER calls POST /api/v1/organizations/users with role = "STUDENT"
+When the ORGANIZER calls POST /api/v1/admin/organizations/users with role = "STUDENT"
 Then the response status is 422 Unprocessable Content
 And error.type is "urn:unihub:error:student-provisioning-forbidden"
 And no user record is created
@@ -246,7 +246,7 @@ And no user record is created
 
 ```gherkin
 Given a user with email "existing@example.com" already exists in the system
-When the ORGANIZER calls POST /api/v1/organizations/users with email = "existing@example.com"
+When the ORGANIZER calls POST /api/v1/admin/organizations/users with email = "existing@example.com"
 Then the response status is 409 Conflict
 And error.type is "urn:unihub:error:conflict"
 And no new user record is created
@@ -256,7 +256,7 @@ And no new user record is created
 
 ```gherkin
 Given an active member "u-1" with 2 active JWT sessions
-When the ORGANIZER calls PATCH /api/v1/organizations/users/u-1/status with body:
+When the ORGANIZER calls PATCH /api/v1/admin/organizations/users/u-1/status with body:
   """
   { "isActive": false }
   """
@@ -274,7 +274,7 @@ And data.isActive is false
 
 ```gherkin
 Given Redis is unreachable
-When the ORGANIZER calls PATCH /api/v1/organizations/users/u-1/status with isActive = false
+When the ORGANIZER calls PATCH /api/v1/admin/organizations/users/u-1/status with isActive = false
 Then the response status is 503 Service Unavailable
 And error.type is "urn:unihub:error:service-unavailable"
 And Retry-After header is present
@@ -286,7 +286,7 @@ And refresh tokens for u-1 remain active
 
 ```gherkin
 Given the caller's user ID is "org-admin-1"
-When the ORGANIZER calls PATCH /api/v1/organizations/users/org-admin-1/status with isActive = false
+When the ORGANIZER calls PATCH /api/v1/admin/organizations/users/org-admin-1/status with isActive = false
 Then the response status is 403 Forbidden
 And error.type is "urn:unihub:error:self-status-modification-forbidden"
 ```
@@ -295,7 +295,7 @@ And error.type is "urn:unihub:error:self-status-modification-forbidden"
 
 ```gherkin
 Given an inactive member "u-4" with is_active = false
-When the ORGANIZER calls PATCH /api/v1/organizations/users/u-4/status with isActive = true
+When the ORGANIZER calls PATCH /api/v1/admin/organizations/users/u-4/status with isActive = true
 Then users.is_active is updated to true in PostgreSQL
 And no Redis operations are performed
 And the response status is 200 OK
@@ -306,7 +306,7 @@ And data.isActive is true
 
 ```gherkin
 Given an inactive member "u-4" with is_active = false
-When the ORGANIZER calls PATCH /api/v1/organizations/users/u-4/status with isActive = false
+When the ORGANIZER calls PATCH /api/v1/admin/organizations/users/u-4/status with isActive = false
 Then the response status is 200 OK
 And data.isActive is false
 And no database update or Redis operation is executed
@@ -315,7 +315,7 @@ And no database update or Redis operation is executed
 ### Scenario 16: Reject unauthenticated caller
 
 ```gherkin
-When any endpoint under /api/v1/organizations/users is requested without a valid Bearer token
+When any endpoint under /api/v1/admin/organizations/users is requested without a valid Bearer token
 Then the response status is 401 Unauthorized
 And error.type is "urn:unihub:error:unauthorized"
 ```
@@ -324,7 +324,7 @@ And error.type is "urn:unihub:error:unauthorized"
 
 ```gherkin
 Given an authenticated user with role "STAFF" or "STUDENT"
-When the user requests any endpoint under /api/v1/organizations/users
+When the user requests any endpoint under /api/v1/admin/organizations/users
 Then the response status is 403 Forbidden
 And error.type is "urn:unihub:error:forbidden"
 ```

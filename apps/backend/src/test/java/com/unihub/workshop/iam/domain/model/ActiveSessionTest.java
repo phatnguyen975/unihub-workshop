@@ -1,11 +1,10 @@
 package com.unihub.workshop.iam.domain.model;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class ActiveSessionTest {
 
@@ -13,7 +12,13 @@ class ActiveSessionTest {
     void shouldCreateActiveSessionAndCopyFlag() {
         UUID id = UUID.randomUUID();
         Instant now = Instant.now();
-        ActiveSession session = new ActiveSession(id, "Chrome 120", "127.0.0.1", now, false);
+        ActiveSession session = new ActiveSession(
+            id,
+            "Chrome 120",
+            "127.0.0.1",
+            now,
+            false
+        );
 
         assertThat(session.id()).isEqualTo(id);
         assertThat(session.deviceInfo()).isEqualTo("Chrome 120");

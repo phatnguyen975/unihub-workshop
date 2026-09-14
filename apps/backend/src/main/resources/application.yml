@@ -33,6 +33,7 @@ app:
     access-token-ttl-minutes: 60
     refresh-token-ttl-days: 7
     public-paths:
+      - "/error"
       - "/actuator/**"
       - "/swagger-ui.html"
       - "/swagger-ui/**"
@@ -44,6 +45,7 @@ app:
       - "/api/v1/auth/register"
       - "/api/v1/auth/activate"
       - "/api/v1/auth/otp/resend"
+      - "/api/v1/auth/password/**"
   otp:
     hmac-secret: ${APP_OTP_HMAC_SECRET:super-secret-hmac-key-for-otp-generation-and-verification-unihub}
     ttl-minutes: ${APP_OTP_TTL_MINUTES:15}
@@ -66,6 +68,11 @@ datasource:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_PRIMARY_HIKARI_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout-ms: 30000
+      idle-timeout-ms: 600000
+      max-lifetime-ms: 1800000
+      pool-name: primary-pool
   replica:
     url: ${SPRING_DATASOURCE_REPLICA_URL}
     username: ${SPRING_DATASOURCE_REPLICA_USERNAME}
@@ -73,6 +80,11 @@ datasource:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_REPLICA_HIKARI_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout-ms: 30000
+      idle-timeout-ms: 600000
+      max-lifetime-ms: 1800000
+      pool-name: replica-pool
 
 # =============================================================================
 # Actuator — Expose only prometheus and health; disable everything else
@@ -111,22 +123,34 @@ seed:
 # Rate Limit Configuration
 # =============================================================================
 rate-limit:
-  registration-path-patterns:
-    - "/api/v1/registrations/**"
-  registration-tier:
-    capacity: 5
-    refill-tokens: 5
-    refill-duration: 10s
-  browsing-tier:
+  default-tier:
     capacity: 100
     refill-tokens: 100
     refill-duration: 60s
-  stream-path-patterns:
-    - "/api/v1/stream/**"
-  stream-tier:
-    capacity: 10
-    refill-tokens: 10
-    refill-duration: 60s
+  tiers:
+    auth:
+      capacity: 20
+      refill-tokens: 20
+      refill-duration: 60s
+      path-patterns:
+        - "/api/v1/auth/login"
+        - "/api/v1/auth/register"
+        - "/api/v1/auth/activate"
+        - "/api/v1/auth/otp/**"
+        - "/api/v1/auth/password/**"
+        - "/api/v1/auth/refresh"
+    stream:
+      capacity: 10
+      refill-tokens: 10
+      refill-duration: 60s
+      path-patterns:
+        - "/api/v1/stream/**"
+    registration:
+      capacity: 5
+      refill-tokens: 5
+      refill-duration: 10s
+      path-patterns:
+        - "/api/v1/registrations/**"
 
 # =============================================================================
 # Resilience4j Configuration
@@ -135,13 +159,13 @@ resilience4j:
   circuitbreaker:
     configs:
       default:
-        sliding-window-type: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_SLIDING_WINDOW_TYPE:COUNT_BASED}
-        sliding-window-size: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_SLIDING_WINDOW_SIZE:10}
-        minimum-number-of-calls: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_MINIMUM_NUMBER_OF_CALLS:5}
-        failure-rate-threshold: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_FAILURE_RATE_THRESHOLD:50}
-        slow-call-rate-threshold: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_SLOW_CALL_RATE_THRESHOLD:50}
-        slow-call-duration-threshold: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_SLOW_CALL_DURATION_THRESHOLD:2s}
-        wait-duration-in-open-state: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_WAIT_DURATION_IN_OPEN_STATE:10s}
-        permitted-number-of-calls-in-half-open-state: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_PERMITTED_CALLS_IN_HALF_OPEN:3}
-        register-health-indicator: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_REGISTER_HEALTH_INDICATOR:true}
-        automatic-transition-from-open-to-half-open-enabled: ${RESILIENCE4J_CIRCUITBREAKER_DEFAULT_AUTO_HALF_OPEN:true}
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+        automatic-transition-from-open-to-half-open-enabled: true

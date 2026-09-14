@@ -1,5 +1,10 @@
 package com.unihub.workshop.shared.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+
+import jakarta.servlet.http.HttpServlet;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -7,14 +12,6 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-
-/**
- * Unit tests for {@link RequestLoggingFilter}.
- */
 class RequestLoggingFilterTest {
 
     private static final String NODE_ID = "test-node";
@@ -28,9 +25,13 @@ class RequestLoggingFilterTest {
     }
 
     @Test
-    void shouldPopulateMdcWithRequiredKeys_duringChainExecution() throws Exception {
+    void shouldPopulateMdcWithRequiredKeys_duringChainExecution()
+        throws Exception {
         // Arrange
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET",
+            "/test"
+        );
         request.addHeader("X-Correlation-ID", "corr-abc");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -41,16 +42,16 @@ class RequestLoggingFilterTest {
         AtomicReference<String> capturedUserAgent = new AtomicReference<>();
 
         MockFilterChain chain = new MockFilterChain(
-                new jakarta.servlet.http.HttpServlet() {
-                },
-                (req, resp, filterChain) -> {
-                    capturedTraceId.set(MDC.get("traceId"));
-                    capturedCorrelationId.set(MDC.get("correlationId"));
-                    capturedProcessedBy.set(MDC.get("processedBy"));
-                    capturedClientIp.set(MDC.get("clientIp"));
-                    capturedUserAgent.set(MDC.get("userAgent"));
-                    filterChain.doFilter(req, resp);
-                });
+            new HttpServlet() {},
+            (req, resp, filterChain) -> {
+                capturedTraceId.set(MDC.get("traceId"));
+                capturedCorrelationId.set(MDC.get("correlationId"));
+                capturedProcessedBy.set(MDC.get("processedBy"));
+                capturedClientIp.set(MDC.get("clientIp"));
+                capturedUserAgent.set(MDC.get("userAgent"));
+                filterChain.doFilter(req, resp);
+            }
+        );
 
         // Act
         filter.doFilterInternal(request, response, chain);
@@ -66,7 +67,10 @@ class RequestLoggingFilterTest {
     @Test
     void shouldClearMdc_afterFilterCompletes() throws Exception {
         // Arrange
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET",
+            "/test"
+        );
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
@@ -92,19 +96,22 @@ class RequestLoggingFilterTest {
     @Test
     void shouldSetCorrelationIdToEmpty_whenHeaderIsMissing() throws Exception {
         // Arrange
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET",
+            "/test"
+        );
         // No X-Correlation-ID header
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         AtomicReference<String> capturedCorrelationId = new AtomicReference<>();
 
         MockFilterChain chain = new MockFilterChain(
-                new jakarta.servlet.http.HttpServlet() {
-                },
-                (req, resp, filterChain) -> {
-                    capturedCorrelationId.set(MDC.get("correlationId"));
-                    filterChain.doFilter(req, resp);
-                });
+            new HttpServlet() {},
+            (req, resp, filterChain) -> {
+                capturedCorrelationId.set(MDC.get("correlationId"));
+                filterChain.doFilter(req, resp);
+            }
+        );
 
         // Act
         filter.doFilterInternal(request, response, chain);
@@ -116,20 +123,25 @@ class RequestLoggingFilterTest {
     @Test
     void shouldClearMdc_evenWhenChainThrows() {
         // Arrange
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET",
+            "/test"
+        );
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         MockFilterChain throwingChain = new MockFilterChain(
-                new jakarta.servlet.http.HttpServlet() {
-                },
-                (req, resp, filterChain) -> {
-                    throw new RuntimeException("downstream error");
-                });
+            new HttpServlet() {},
+            (req, resp, filterChain) -> {
+                throw new RuntimeException("downstream error");
+            }
+        );
 
         // Act & Assert: the filter should propagate the exception but still clear MDC
-        assertThatCode(() -> filter.doFilterInternal(request, response, throwingChain))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("downstream error");
+        assertThatCode(() ->
+            filter.doFilterInternal(request, response, throwingChain)
+        )
+            .isInstanceOf(RuntimeException.class)
+            .hasMessage("downstream error");
 
         assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
     }

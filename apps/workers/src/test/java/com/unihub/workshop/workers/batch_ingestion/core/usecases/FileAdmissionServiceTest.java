@@ -1,24 +1,23 @@
 package com.unihub.workshop.workers.batch_ingestion.core.usecases;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.unihub.workshop.workers.batch_ingestion.core.models.IngestionJobReport;
 import com.unihub.workshop.workers.batch_ingestion.core.models.SourceFile;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionEventPublisher;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionJobReportWriter;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionObjectStore;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.OrganizationDirectory;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class FileAdmissionServiceTest {
 
@@ -35,22 +34,37 @@ class FileAdmissionServiceTest {
         reportWriter = mock(IngestionJobReportWriter.class);
         eventPublisher = mock(IngestionEventPublisher.class);
         service = new FileAdmissionService(
-                objectStore,
-                organizationDirectory,
-                reportWriter,
-                eventPublisher,
-                Set.of("Information Technology", "Chemistry"),
-                100 * 1024 * 1024L);
+            objectStore,
+            organizationDirectory,
+            reportWriter,
+            eventPublisher,
+            Set.of("Information Technology", "Chemistry"),
+            100 * 1024 * 1024L
+        );
     }
 
     @Test
     void shouldAdmitValidFileAndKeepItInInbox() {
         // Arrange
         var orgId = UUID.randomUUID();
-        when(objectStore.listInboxFiles()).thenReturn(List.of(
-                new SourceFile("inbox/it/file1.csv", "it", 1024L, Instant.parse("2026-08-31T00:00:00Z"))));
-        when(organizationDirectory.findBySlug("it")).thenReturn(
-                Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
+        when(objectStore.listInboxFiles()).thenReturn(
+            List.of(
+                new SourceFile(
+                    "inbox/it/file1.csv",
+                    "it",
+                    1024L,
+                    Instant.parse("2026-08-31T00:00:00Z")
+                )
+            )
+        );
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
+            Optional.of(
+                new OrganizationDirectory.OrganizationInfo(
+                    orgId,
+                    "Information Technology"
+                )
+            )
+        );
         when(objectStore.hasValidHeader("inbox/it/file1.csv")).thenReturn(true);
 
         // Act
@@ -67,12 +81,27 @@ class FileAdmissionServiceTest {
         // Arrange
         var orgId = UUID.randomUUID();
         var fileKey = "inbox/it/huge.csv";
-        when(objectStore.listInboxFiles()).thenReturn(List.of(
-                new SourceFile(fileKey, "it", 104857601L, Instant.parse("2026-08-31T00:00:00Z")) // > 100MB
-        ));
-        when(organizationDirectory.findBySlug("it")).thenReturn(
-                Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
-        when(objectStore.moveToRejected(fileKey, "it")).thenReturn("rejected/it/source-files/huge.csv");
+        when(objectStore.listInboxFiles()).thenReturn(
+            List.of(
+                new SourceFile(
+                    fileKey,
+                    "it",
+                    104857601L,
+                    Instant.parse("2026-08-31T00:00:00Z")
+                ) // > 100MB
+            )
+        );
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
+            Optional.of(
+                new OrganizationDirectory.OrganizationInfo(
+                    orgId,
+                    "Information Technology"
+                )
+            )
+        );
+        when(objectStore.moveToRejected(fileKey, "it")).thenReturn(
+            "rejected/it/source-files/huge.csv"
+        );
 
         // Act
         service.admitFiles();
@@ -84,10 +113,14 @@ class FileAdmissionServiceTest {
         var reportCaptor = ArgumentCaptor.forClass(IngestionJobReport.class);
         verify(reportWriter).save(reportCaptor.capture());
         var report = reportCaptor.getValue();
-        assertThat(report.outcome()).isEqualTo(IngestionJobReport.Outcome.FILE_REJECTED);
+        assertThat(report.outcome()).isEqualTo(
+            IngestionJobReport.Outcome.FILE_REJECTED
+        );
         assertThat(report.organizationId()).isEqualTo(orgId);
         assertThat(report.sourceFileKey()).isEqualTo(fileKey);
-        assertThat(report.fileRejectionSourceKey()).isEqualTo("rejected/it/source-files/huge.csv");
+        assertThat(report.fileRejectionSourceKey()).isEqualTo(
+            "rejected/it/source-files/huge.csv"
+        );
         assertThat(report.rejectArtifactKey()).isNull();
         assertThat(report.processedRowCount()).isZero();
         assertThat(report.rejectedRowCount()).isZero();
@@ -98,12 +131,28 @@ class FileAdmissionServiceTest {
         // Arrange
         var orgId = UUID.randomUUID();
         var fileKey = "inbox/it/bad_header.csv";
-        when(objectStore.listInboxFiles()).thenReturn(List.of(
-                new SourceFile(fileKey, "it", 1024L, Instant.parse("2026-08-31T00:00:00Z"))));
-        when(organizationDirectory.findBySlug("it")).thenReturn(
-                Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
+        when(objectStore.listInboxFiles()).thenReturn(
+            List.of(
+                new SourceFile(
+                    fileKey,
+                    "it",
+                    1024L,
+                    Instant.parse("2026-08-31T00:00:00Z")
+                )
+            )
+        );
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
+            Optional.of(
+                new OrganizationDirectory.OrganizationInfo(
+                    orgId,
+                    "Information Technology"
+                )
+            )
+        );
         when(objectStore.hasValidHeader(fileKey)).thenReturn(false);
-        when(objectStore.moveToRejected(fileKey, "it")).thenReturn("rejected/it/source-files/bad_header.csv");
+        when(objectStore.moveToRejected(fileKey, "it")).thenReturn(
+            "rejected/it/source-files/bad_header.csv"
+        );
 
         // Act
         service.admitFiles();
@@ -115,7 +164,9 @@ class FileAdmissionServiceTest {
         var reportCaptor = ArgumentCaptor.forClass(IngestionJobReport.class);
         verify(reportWriter).save(reportCaptor.capture());
         var report = reportCaptor.getValue();
-        assertThat(report.outcome()).isEqualTo(IngestionJobReport.Outcome.FILE_REJECTED);
+        assertThat(report.outcome()).isEqualTo(
+            IngestionJobReport.Outcome.FILE_REJECTED
+        );
         assertThat(report.organizationId()).isEqualTo(orgId);
     }
 
@@ -123,10 +174,22 @@ class FileAdmissionServiceTest {
     void shouldRejectFileWhenOrganizationSlugIsUnknown() {
         // Arrange
         var fileKey = "inbox/unknown/file.csv";
-        when(objectStore.listInboxFiles()).thenReturn(List.of(
-                new SourceFile(fileKey, "unknown", 1024L, Instant.parse("2026-08-31T00:00:00Z"))));
-        when(organizationDirectory.findBySlug("unknown")).thenReturn(Optional.empty());
-        when(objectStore.moveToRejected(fileKey, "unknown")).thenReturn("rejected/unknown/source-files/file.csv");
+        when(objectStore.listInboxFiles()).thenReturn(
+            List.of(
+                new SourceFile(
+                    fileKey,
+                    "unknown",
+                    1024L,
+                    Instant.parse("2026-08-31T00:00:00Z")
+                )
+            )
+        );
+        when(organizationDirectory.findActiveBySlug("unknown")).thenReturn(
+            Optional.empty()
+        );
+        when(objectStore.moveToRejected(fileKey, "unknown")).thenReturn(
+            "rejected/unknown/source-files/file.csv"
+        );
 
         // Act
         service.admitFiles();
@@ -142,11 +205,27 @@ class FileAdmissionServiceTest {
         // Arrange
         var orgId = UUID.randomUUID();
         var fileKey = "inbox/unallowed/file.csv";
-        when(objectStore.listInboxFiles()).thenReturn(List.of(
-                new SourceFile(fileKey, "unallowed", 1024L, Instant.parse("2026-08-31T00:00:00Z"))));
-        when(organizationDirectory.findBySlug("unallowed")).thenReturn(
-                Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Not In Allow List")));
-        when(objectStore.moveToRejected(fileKey, "unallowed")).thenReturn("rejected/unallowed/source-files/file.csv");
+        when(objectStore.listInboxFiles()).thenReturn(
+            List.of(
+                new SourceFile(
+                    fileKey,
+                    "unallowed",
+                    1024L,
+                    Instant.parse("2026-08-31T00:00:00Z")
+                )
+            )
+        );
+        when(organizationDirectory.findActiveBySlug("unallowed")).thenReturn(
+            Optional.of(
+                new OrganizationDirectory.OrganizationInfo(
+                    orgId,
+                    "Not In Allow List"
+                )
+            )
+        );
+        when(objectStore.moveToRejected(fileKey, "unallowed")).thenReturn(
+            "rejected/unallowed/source-files/file.csv"
+        );
 
         // Act
         service.admitFiles();
@@ -160,11 +239,27 @@ class FileAdmissionServiceTest {
     void shouldProcessFilesInCreationTimeOrder() {
         // Arrange
         var orgId = UUID.randomUUID();
-        when(organizationDirectory.findBySlug("it")).thenReturn(
-                Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
+            Optional.of(
+                new OrganizationDirectory.OrganizationInfo(
+                    orgId,
+                    "Information Technology"
+                )
+            )
+        );
 
-        var file2 = new SourceFile("inbox/it/file2.csv", "it", 105000000L, Instant.parse("2026-08-31T02:00:00Z")); // >100MB
-        var file1 = new SourceFile("inbox/it/file1.csv", "it", 105000000L, Instant.parse("2026-08-31T01:00:00Z")); // >100MB
+        var file2 = new SourceFile(
+            "inbox/it/file2.csv",
+            "it",
+            105000000L,
+            Instant.parse("2026-08-31T02:00:00Z")
+        ); // >100MB
+        var file1 = new SourceFile(
+            "inbox/it/file1.csv",
+            "it",
+            105000000L,
+            Instant.parse("2026-08-31T01:00:00Z")
+        ); // >100MB
 
         when(objectStore.listInboxFiles()).thenReturn(List.of(file2, file1)); // Returned out of order
 

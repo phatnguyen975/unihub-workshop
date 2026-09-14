@@ -50,6 +50,7 @@ The **Real-Time Event Streaming Hub** provides the centralized, cross-cutting in
   - `id: <uuid>` (unique identifier for client-side deduplication)
   - `event: <event_name>` (the catalog event type)
   - `data: <json_string>` (the serialized JSON payload conforming to the event contract)
+  - `retry: 3000` (reconnection interval in milliseconds)
   - Followed by a trailing blank line delimiter (`\n\n`).
 - **FR-16:** The system SHALL multiplex all supported platform event types over this single stream:
   - `notification.new`
@@ -183,6 +184,7 @@ And the student client receives:
   id: <uuid>
   event: notification.new
   data: {"eventId":"...","eventType":"notification.new","timestamp":"...","payload":{...}}
+  retry: 3000
 
   """
 ```
@@ -223,6 +225,7 @@ Then Session B receives:
   id: <uuid>
   event: notification.read
   data: {"eventId":"...","eventType":"notification.read","timestamp":"...","payload":{"id":"...","all":false,"unreadCount":3,"readAt":"..."}}
+  retry: 3000
 
   """
 And the Mobile app immediately decrements its unread badge without polling

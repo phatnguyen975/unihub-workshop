@@ -35,6 +35,7 @@
                 <providers>
                     <timestamp>
                         <fieldName>@timestamp</fieldName>
+                        <timeZone>UTC</timeZone>
                     </timestamp>
                     <logLevel>
                         <fieldName>level</fieldName>

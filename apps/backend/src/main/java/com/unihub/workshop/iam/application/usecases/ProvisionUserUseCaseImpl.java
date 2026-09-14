@@ -10,11 +10,10 @@ import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.seed.PasswordGenerator;
+import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class ProvisionUserUseCaseImpl implements ProvisionUserUseCase {
@@ -24,9 +23,10 @@ public class ProvisionUserUseCaseImpl implements ProvisionUserUseCase {
     private final ApplicationEventPublisher eventPublisher;
 
     public ProvisionUserUseCaseImpl(
-            UserRepository userRepository,
-            PasswordGenerator passwordGenerator,
-            ApplicationEventPublisher eventPublisher) {
+        UserRepository userRepository,
+        PasswordGenerator passwordGenerator,
+        ApplicationEventPublisher eventPublisher
+    ) {
         this.userRepository = userRepository;
         this.passwordGenerator = passwordGenerator;
         this.eventPublisher = eventPublisher;
@@ -46,52 +46,68 @@ public class ProvisionUserUseCaseImpl implements ProvisionUserUseCase {
         }
         if (command.role() == UserRole.STUDENT) {
             throw new ValidationException(
-                    "urn:unihub:error:student-provisioning-forbidden",
-                    "The STUDENT role cannot be provisioned by an organization. Students must self-register.",
-                    List.of("role: STUDENT role cannot be provisioned"));
+                "urn:unihub:error:student-provisioning-forbidden",
+                "The STUDENT role cannot be provisioned by an organization. Students must self-register.",
+                List.of("role: STUDENT role cannot be provisioned")
+            );
         }
 
-        String email = command.email() != null ? command.email().trim().toLowerCase() : null;
+        String email =
+            command.email() != null
+                ? command.email().trim().toLowerCase()
+                : null;
         if (email == null || email.isBlank()) {
             throw new ValidationException("email", "Email must not be blank");
         }
 
-        String fullName = command.fullName() != null ? command.fullName().trim() : null;
+        String fullName =
+            command.fullName() != null ? command.fullName().trim() : null;
         if (fullName == null || fullName.isBlank()) {
-            throw new ValidationException("fullName", "Full name must not be blank");
+            throw new ValidationException(
+                "fullName",
+                "Full name must not be blank"
+            );
         }
 
         if (userRepository.existsByEmail(email)) {
-            throw new ConflictException("An account with this email already exists.");
+            throw new ConflictException(
+                "An account with this email already exists."
+            );
         }
 
-        String phoneNumber = command.phoneNumber() != null ? command.phoneNumber().trim() : null;
+        String phoneNumber =
+            command.phoneNumber() != null ? command.phoneNumber().trim() : null;
         if (phoneNumber != null && phoneNumber.isEmpty()) {
             phoneNumber = null;
         }
 
-        PasswordGenerator.GeneratedPassword generatedPassword = passwordGenerator.generate();
+        PasswordGenerator.GeneratedPassword generatedPassword =
+            passwordGenerator.generate();
 
         User user = User.provisionMember(
-                null,
-                command.organizationId(),
-                command.role(),
-                email,
-                phoneNumber,
-                generatedPassword.hash(),
-                fullName,
-                command.callerId());
+            null,
+            command.organizationId(),
+            command.role(),
+            email,
+            phoneNumber,
+            generatedPassword.hash(),
+            fullName,
+            command.callerId()
+        );
 
         User saved = userRepository.save(user);
 
-        eventPublisher.publishEvent(new UserProvisionedEvent(
+        eventPublisher.publishEvent(
+            new UserProvisionedEvent(
                 saved.id(),
                 saved.organizationId(),
                 null,
                 saved.email(),
                 saved.fullName(),
                 saved.role().name(),
-                generatedPassword.plaintext()));
+                generatedPassword.plaintext()
+            )
+        );
 
         return saved;
     }

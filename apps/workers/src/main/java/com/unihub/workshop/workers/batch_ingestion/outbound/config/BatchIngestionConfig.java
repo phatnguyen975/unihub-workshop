@@ -13,17 +13,19 @@ public class BatchIngestionConfig {
 
     @Bean
     public FileAdmissionService fileAdmissionService(
-            IngestionObjectStore objectStore,
-            OrganizationDirectory organizationDirectory,
-            IngestionJobReportWriter reportWriter,
-            IngestionEventPublisher eventPublisher,
-            BatchIngestionProperties properties) {
+        IngestionObjectStore objectStore,
+        OrganizationDirectory organizationDirectory,
+        IngestionJobReportWriter reportWriter,
+        IngestionEventPublisher eventPublisher,
+        BatchIngestionProperties properties
+    ) {
         return new FileAdmissionService(
-                objectStore,
-                organizationDirectory,
-                reportWriter,
-                eventPublisher,
-                properties.getExpectedFaculties(),
-                properties.getMaxFileSize());
+            objectStore,
+            organizationDirectory,
+            reportWriter,
+            eventPublisher,
+            properties.getExpectedFaculties(),
+            properties.getMaxFileSize()
+        );
     }
 }

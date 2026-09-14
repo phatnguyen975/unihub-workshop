@@ -1,15 +1,17 @@
 package com.unihub.workshop.iam.application.utils;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Instant;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class OtpServiceTest {
 
     private OtpService otpService;
-    private final String testSecret = "my-super-secret-hmac-key-for-testing-1234567890";
+    private final String testSecret =
+        "my-super-secret-hmac-key-for-testing-1234567890";
 
     @BeforeEach
     void setUp() {
@@ -50,16 +52,19 @@ class OtpServiceTest {
     void initShouldFailWhenSecretIsBlankOrNull() {
         OtpService invalidService = new OtpService("   ", 15);
         assertThatThrownBy(invalidService::init)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("OTP HMAC secret");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("OTP HMAC secret");
     }
 
     @Test
     void initShouldFailWhenSecretIsShorterThan32Characters() {
-        OtpService shortSecretService = new OtpService("too-short-secret-12345", 15);
+        OtpService shortSecretService = new OtpService(
+            "too-short-secret-12345",
+            15
+        );
         assertThatThrownBy(shortSecretService::init)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("at least 32 characters long");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("at least 32 characters long");
     }
 
     @Test
@@ -67,9 +72,9 @@ class OtpServiceTest {
         OtpService customTtlService = new OtpService(testSecret, 30);
         customTtlService.init();
 
-        java.time.Instant before = java.time.Instant.now();
-        java.time.Instant expiry = customTtlService.calculateExpiryInstant();
-        java.time.Instant after = java.time.Instant.now();
+        Instant before = Instant.now();
+        Instant expiry = customTtlService.calculateExpiryInstant();
+        Instant after = Instant.now();
 
         assertThat(expiry).isAfterOrEqualTo(before.plusSeconds(30 * 60 - 2));
         assertThat(expiry).isBeforeOrEqualTo(after.plusSeconds(30 * 60 + 2));

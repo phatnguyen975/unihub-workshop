@@ -4,17 +4,15 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.util.UUID;
-
 /**
- * Servlet filter that produces one structured log entry per inbound HTTP
- * request.
+ * Servlet filter that produces one structured log entry per inbound HTTP request.
  *
  * <p>
  * For every request, this filter:
@@ -38,21 +36,22 @@ import java.util.UUID;
  */
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
-    private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
+    private static final Logger log = LoggerFactory.getLogger(
+        RequestLoggingFilter.class
+    );
 
-    static final String MDC_TRACE_ID = "traceId";
-    static final String MDC_CORRELATION_ID = "correlationId";
-    static final String MDC_PROCESSED_BY = "processedBy";
-    static final String MDC_HTTP_METHOD = "http.method";
-    static final String MDC_HTTP_URI = "http.uri";
-    static final String MDC_HTTP_STATUS = "http.status";
-    static final String MDC_DURATION_MS = "duration_ms";
-    static final String MDC_CLIENT_IP = "clientIp";
-    static final String MDC_USER_AGENT = "userAgent";
+    public static final String MDC_TRACE_ID = "traceId";
+    public static final String MDC_CORRELATION_ID = "correlationId";
+    public static final String MDC_PROCESSED_BY = "processedBy";
+    public static final String MDC_HTTP_METHOD = "http.method";
+    public static final String MDC_HTTP_URI = "http.uri";
+    public static final String MDC_HTTP_STATUS = "http.status";
+    public static final String MDC_DURATION_MS = "duration_ms";
+    public static final String MDC_CLIENT_IP = "clientIp";
+    public static final String MDC_USER_AGENT = "userAgent";
 
     private static final String CORRELATION_HEADER = "X-Correlation-ID";
     private static final String USER_AGENT_HEADER = "User-Agent";
-    private static final String X_FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
     private final String nodeId;
 
@@ -66,12 +65,32 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         this.nodeId = nodeId;
     }
 
+    /**
+     * Retrieves the current {@code traceId} from MDC.
+     *
+     * @return current traceId, or {@code "unknown"} if absent
+     */
+    public static String getCurrentTraceId() {
+        String traceId = MDC.get(MDC_TRACE_ID);
+        return traceId != null ? traceId : "unknown";
+    }
+
+    /**
+     * Retrieves the current {@code processedBy} node ID from MDC.
+     *
+     * @return current node ID, or {@code "unknown"} if absent
+     */
+    public static String getCurrentProcessedBy() {
+        String processedBy = MDC.get(MDC_PROCESSED_BY);
+        return processedBy != null ? processedBy : "unknown";
+    }
+
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain chain) throws ServletException, IOException {
-
+        HttpServletRequest request,
+        HttpServletResponse response,
+        FilterChain chain
+    ) throws ServletException, IOException {
         long startNanos = System.nanoTime();
 
         // Populate MDC before delegating to the chain
@@ -83,22 +102,26 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         MDC.put(MDC_PROCESSED_BY, nodeId);
         MDC.put(MDC_HTTP_METHOD, request.getMethod());
         MDC.put(MDC_HTTP_URI, request.getRequestURI());
-        MDC.put(MDC_CLIENT_IP, getClientIp(request));
+        MDC.put(MDC_CLIENT_IP, ClientIpExtractor.extractIp(request));
         MDC.put(MDC_USER_AGENT, headerOrEmpty(request, USER_AGENT_HEADER));
 
         try {
             chain.doFilter(request, response);
         } finally {
-            long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
-            int status = response.getStatus();
+            try {
+                long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+                int status = response.getStatus();
 
-            MDC.put(MDC_HTTP_STATUS, String.valueOf(status));
-            MDC.put(MDC_DURATION_MS, String.valueOf(durationMs));
+                MDC.put(MDC_HTTP_STATUS, String.valueOf(status));
+                MDC.put(MDC_DURATION_MS, String.valueOf(durationMs));
 
-            writeLog(status);
-
-            // Clear MDC unconditionally so no context bleeds into the next request
-            MDC.clear();
+                writeLog(status);
+            } catch (Exception ex) {
+                log.warn("Failed to write request log: {}", ex.getMessage());
+            } finally {
+                // Clear MDC unconditionally so no context bleeds into the next request
+                MDC.clear();
+            }
         }
     }
 
@@ -132,36 +155,16 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
      * @return one of {@code "INFO"}, {@code "WARN"}, or {@code "ERROR"}
      */
     String resolveLogLevel(int status) {
-        if (status >= 500)
-            return "ERROR";
-        if (status >= 400)
-            return "WARN";
+        if (status >= 500) return "ERROR";
+        if (status >= 400) return "WARN";
         return "INFO";
     }
 
-    private static String headerOrEmpty(HttpServletRequest request, String headerName) {
+    private static String headerOrEmpty(
+        HttpServletRequest request,
+        String headerName
+    ) {
         String value = request.getHeader(headerName);
         return value != null ? value : "";
-    }
-
-    private static String getClientIp(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        
-        // Trust X-Forwarded-For only if the request comes from an internal Docker network
-        boolean isInternal = remoteAddr != null && (
-                remoteAddr.startsWith("10.") || 
-                remoteAddr.startsWith("172.") || 
-                remoteAddr.startsWith("192.168.") || 
-                remoteAddr.equals("127.0.0.1") || 
-                remoteAddr.equals("0:0:0:0:0:0:0:1")
-        );
-        
-        if (isInternal) {
-            String xForwardedFor = request.getHeader(X_FORWARDED_FOR_HEADER);
-            if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-                return xForwardedFor.split(",")[0].trim();
-            }
-        }
-        return remoteAddr != null ? remoteAddr : "";
     }
 }

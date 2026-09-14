@@ -1,7 +1,7 @@
 package com.unihub.workshop.shared.exception;
 
-import org.springframework.http.HttpStatus;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 
 public class BadRequestException extends AppException {
 
@@ -13,7 +13,11 @@ public class BadRequestException extends AppException {
         super(HttpStatus.BAD_REQUEST, type, message);
     }
 
-    public BadRequestException(String type, String message, Map<String, Object> properties) {
+    public BadRequestException(
+        String type,
+        String message,
+        Map<String, Object> properties
+    ) {
         super(HttpStatus.BAD_REQUEST, type, message, properties);
     }
 }

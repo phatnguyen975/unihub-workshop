@@ -6,11 +6,11 @@
 
 ## 1. Overview
 
-This contract defines the four REST endpoints for Feature 1.5 (`organization-member-management`) within the `iam` module. All endpoints reside under the `/api/v1/organizations/users` resource path. The contract enables an authenticated `ORGANIZER` to list organization members across all roles (`ORGANIZER`, `STAFF`, `STUDENT`), retrieve member details, provision new staff or organizer accounts, and update member active status with immediate session invalidation upon deactivation.
+This contract defines the four REST endpoints for Feature 1.5 (`organization-member-management`) within the `iam` module. All endpoints reside under the `/api/v1/admin/organizations/users` resource path. The contract enables an authenticated `ORGANIZER` to list organization members across all roles (`ORGANIZER`, `STAFF`, `STUDENT`), retrieve member details, provision new staff or organizer accounts, and update member active status with immediate session invalidation upon deactivation.
 
 ## 2. Global Standards Applied
 
-- **URI structure / versioning:** `/api/v1/organizations/users` conforming to `docs/api-standards.md §Versioning Strategy`.
+- **URI structure / versioning:** `/api/v1/admin/organizations/users` conforming to `docs/api-standards.md §Versioning Strategy`.
 - **Success response shape:** Standard JSON envelope (`success: true`, `message: string`, `data: object`, `metadata: { processedBy, traceId }`). Null properties are omitted via `@JsonInclude(NON_NULL)`.
 - **Collection / Pagination envelope:** Cursor-based pagination inside `data` (`data: { items: [...], cursor: { nextCursor: string | null, hasMore: boolean } }`), conforming to `docs/api-standards.md §Success Response (List / Pagination)`.
 - **Error response format:** RFC 7807 Problem Details wrapped in the standard envelope (`success: false`, `error: { type, title, status, detail, instance, validationErrors? }`, `metadata: { processedBy, traceId }`), conforming to `docs/api-standards.md §Error Response (4xx, 5xx)`.
@@ -26,7 +26,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 ## 3. Endpoints
 
-### 3.1. GET /api/v1/organizations/users
+### 3.1. GET /api/v1/admin/organizations/users
 
 **Description:** Retrieves a cursor-paginated list of members belonging to the caller's organization, with optional filters for role, active status, and search keyword. Excludes the authenticated caller from the results.  
 **Required Role / Auth:** `ORGANIZER`  
@@ -45,13 +45,13 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 **Query Parameters:**
 
-| Parameter  | Type    | Required | Default | Constraints                                  | Description                                                                 |
-| :--------- | :------ | :------: | :-----: | :------------------------------------------- | :-------------------------------------------------------------------------- |
-| `cursor`   | string  |    No    |  none   | Base64 JSON `{"createdAt":"...","id":"..."}` | Opaque cursor returned from previous page. Absent on initial request.       |
-| `limit`    | integer |    No    |  `20`   | Min 1, Max 100                               | Number of items to return per page. Values > 100 rejected with 400.         |
-| `role`     | string  |    No    |  none   | `ORGANIZER`, `STAFF`, or `STUDENT`           | Filter by member role. Other values rejected with 400.                      |
-| `isActive` | boolean |    No    |  none   | `true` or `false`                            | Filter by active status. Non-boolean values rejected with 400.              |
-| `search`   | string  |    No    |  none   | Max 200 chars                                | Case-insensitive partial match across `full_name`, `email`, `phone_number`. |
+| Parameter  | Type    | Required | Default | Constraints                                  | Description                                                                  |
+| :--------- | :------ | :------: | :-----: | :------------------------------------------- | :--------------------------------------------------------------------------- |
+| `cursor`   | string  |    No    |  none   | Base64 JSON `{"createdAt":"...","id":"..."}` | Opaque cursor returned from previous page. Absent on initial request.        |
+| `limit`    | integer |    No    |   20    | Min: 1, Max: 100                             | Number of items per page. Defaults to 20 if omitted.                         |
+| `role`     | string  |    No    |  none   | Enum: `ORGANIZER`, `STAFF`, `STUDENT`        | Filters members by platform role. Case-insensitive.                          |
+| `isActive` | boolean |    No    |  none   | `true` or `false`                            | Filters members by active/banned status.                                     |
+| `search`   | string  |    No    |  none   | Max 200 characters                           | Partial keyword match against `fullName`, `email`, or `phoneNumber` (ILIKE). |
 
 #### Response
 
@@ -77,10 +77,10 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
       },
       {
         "id": "550e8400-e29b-41d4-a716-446655440002",
-        "email": "charlie.student@techclub.org",
-        "fullName": "Charlie Student",
-        "role": "STUDENT",
-        "phoneNumber": "+84909876543",
+        "email": "bob.org@techclub.org",
+        "fullName": "Bob Tran",
+        "role": "ORGANIZER",
+        "phoneNumber": null,
         "avatarUrl": null,
         "isActive": true,
         "isTemporaryPassword": false,
@@ -102,13 +102,12 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                                    |
-| :----: | :------------------------------ | :-------------------- | :--------------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | `limit` > 100, invalid `cursor` string, or invalid `role`/`isActive` values. |
-| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, malformed, or blacklisted Bearer token.                    |
-| `403`  | `urn:unihub:error:forbidden`    | Forbidden             | Caller role is not `ORGANIZER`, or caller account is inactive.               |
-| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded.                                                         |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                                 |
+| Status | Error Type (`error.type`)       | Title                 | Condition                                                               |
+| :----: | :------------------------------ | :-------------------- | :---------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | `limit < 1`, `limit > 100`, malformed `cursor`, or invalid `role` enum. |
+| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, malformed, or blacklisted Bearer token.               |
+| `403`  | `urn:unihub:error:forbidden`    | Forbidden             | Caller role is not `ORGANIZER`, or caller is inactive.                  |
+| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                            |
 
 **Error Response Example (400 Bad Request):**
 
@@ -120,7 +119,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
     "title": "Bad Request",
     "status": 400,
     "detail": "Page limit must not exceed 100.",
-    "instance": "/api/v1/organizations/users"
+    "instance": "/api/v1/admin/organizations/users"
   },
   "metadata": {
     "processedBy": "unihub-app-1",
@@ -137,7 +136,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 - **Satisfies:** FR-01 through FR-08, FR-25, FR-26, FR-27, Scenarios 1–5, 16, 17.
 
-### 3.2. GET /api/v1/organizations/users/{userId}
+### 3.2. GET /api/v1/admin/organizations/users/{userId}
 
 **Description:** Retrieves the detailed profile of a specific organization member by user ID.  
 **Required Role / Auth:** `ORGANIZER`  
@@ -209,7 +208,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
     "title": "Not Found",
     "status": 404,
     "detail": "Member not found in your organization.",
-    "instance": "/api/v1/organizations/users/550e8400-e29b-41d4-a716-446655440099"
+    "instance": "/api/v1/admin/organizations/users/550e8400-e29b-41d4-a716-446655440099"
   },
   "metadata": {
     "processedBy": "unihub-app-1",
@@ -226,7 +225,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 - **Satisfies:** FR-09 through FR-11, FR-25, FR-26, FR-27, FR-28, Scenarios 6, 7, 16, 17.
 
-### 3.3. POST /api/v1/organizations/users
+### 3.3. POST /api/v1/admin/organizations/users
 
 **Description:** Provisions a new member account with role `STAFF` or `ORGANIZER` in the caller's organization. Generates a secure temporary password, hashes it with Argon2id, and publishes a transactional outbox notification event with the plaintext password.  
 **Required Role / Auth:** `ORGANIZER`  
@@ -305,7 +304,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
     "title": "Conflict",
     "status": 409,
     "detail": "An account with this email already exists.",
-    "instance": "/api/v1/organizations/users"
+    "instance": "/api/v1/admin/organizations/users"
   },
   "metadata": {
     "processedBy": "unihub-app-1",
@@ -324,7 +323,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
     "title": "Unprocessable Content",
     "status": 422,
     "detail": "The STUDENT role cannot be provisioned by an organization. Students must self-register.",
-    "instance": "/api/v1/organizations/users",
+    "instance": "/api/v1/admin/organizations/users",
     "validationErrors": ["role: STUDENT role cannot be provisioned"]
   },
   "metadata": {
@@ -343,7 +342,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 - **Satisfies:** FR-12 through FR-18, FR-25, FR-26, FR-27, Scenarios 8–10, 16, 17.
 
-### 3.4. PATCH /api/v1/organizations/users/{userId}/status
+### 3.4. PATCH /api/v1/admin/organizations/users/{userId}/status
 
 **Description:** Updates the active status of an organization member (`true` to unban, `false` to ban). When banning a member, invalidates active JWT sessions in Redis before updating database records. Self-ban is strictly forbidden.  
 **Required Role / Auth:** `ORGANIZER`  
@@ -421,7 +420,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
     "title": "Forbidden",
     "status": 403,
     "detail": "Organizers cannot modify their own active status.",
-    "instance": "/api/v1/organizations/users/org-admin-1/status"
+    "instance": "/api/v1/admin/organizations/users/org-admin-1/status"
   },
   "metadata": {
     "processedBy": "unihub-app-1",
@@ -440,7 +439,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
     "title": "Service Unavailable",
     "status": 503,
     "detail": "Session revocation service is temporarily unavailable. Member status was not changed.",
-    "instance": "/api/v1/organizations/users/550e8400-e29b-41d4-a716-446655440001/status"
+    "instance": "/api/v1/admin/organizations/users/550e8400-e29b-41d4-a716-446655440001/status"
   },
   "metadata": {
     "processedBy": "unihub-app-1",
@@ -472,20 +471,29 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 All endpoints in this contract are authenticated and protected by the platform's distributed rate limiting filter (`RateLimitFilter`) via Bucket4j and Redis:
 
-- **Bucket Tier:** `AUTHENTICATED` user tier.
+- **Tier Classification:** Default Tier (all endpoints under `/api/v1/admin/organizations/users`).
 - **Capacity & Refill:** 100 requests per minute per user ID (`jwt.sub`).
 - **Standard Headers Returned:**
   - `X-RateLimit-Limit: 100`
   - `X-RateLimit-Remaining: <count>`
-  - `X-RateLimit-Reset: <epoch-seconds>`
+  - `X-RateLimit-Retry-After: <seconds>`
 - **Breach Behavior:** HTTP `429 Too Many Requests` (`urn:unihub:error:rate-limited`) with `Retry-After` header.
+
+### Endpoint Routing Summary
+
+| Path                                                      | Auth | Role        | Rate Limit Tier | Notes                  |
+| :-------------------------------------------------------- | :--: | :---------- | :-------------- | :--------------------- |
+| `POST /api/v1/admin/organizations/users`                  | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
+| `PATCH /api/v1/admin/organizations/users/{userId}/status` | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
+| `GET /api/v1/admin/organizations/users/{userId}`          | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
+| `GET /api/v1/admin/organizations/users`                   | Yes  | `ORGANIZER` | Default (100)   | Scoped to caller's org |
 
 ## 5. Idempotency Behavior
 
 Endpoints in Feature 1.5 rely on natural idempotency:
 
-1. **`POST /api/v1/organizations/users`:** Guaranteed idempotent by database uniqueness constraint on `users.email`. Immediate retries or duplicated submissions will encounter a conflict check and safely fail with `409 Conflict` (`urn:unihub:error:conflict`), preventing duplicate account creation.
-2. **`PATCH /api/v1/organizations/users/{userId}/status`:** Inherently idempotent state assignment. Re-applying the same status value is recognized as a no-op, executing zero writes and returning `200 OK`.
+1. **`POST /api/v1/admin/organizations/users`:** Guaranteed idempotent by database uniqueness constraint on `users.email`. Immediate retries or duplicated submissions will encounter a conflict check and safely fail with `409 Conflict` (`urn:unihub:error:conflict`), preventing duplicate account creation.
+2. **`PATCH /api/v1/admin/organizations/users/{userId}/status`:** Inherently idempotent state assignment. Re-applying the same status value is recognized as a no-op, executing zero writes and returning `200 OK`.
 3. **`GET` endpoints:** Inherently safe and idempotent per HTTP specifications.
 
 ## 6. Cross-Endpoint Consistency Notes

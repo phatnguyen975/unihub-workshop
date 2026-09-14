@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ListOrganizationMembersUseCaseImpl implements ListOrganizationMembersUseCase {
+public class ListOrganizationMembersUseCaseImpl
+    implements ListOrganizationMembersUseCase
+{
 
     private final UserRepository userRepository;
 
@@ -45,12 +47,13 @@ public class ListOrganizationMembersUseCaseImpl implements ListOrganizationMembe
         }
 
         return userRepository.findMembersByOrganizationId(
-                query.organizationId(),
-                query.callerId(),
-                query.role(),
-                query.isActive(),
-                search,
-                query.cursor(),
-                limit);
+            query.organizationId(),
+            query.callerId(),
+            query.role(),
+            query.isActive(),
+            search,
+            query.cursor(),
+            limit
+        );
     }
 }

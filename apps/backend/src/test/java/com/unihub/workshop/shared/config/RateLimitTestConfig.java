@@ -9,10 +9,11 @@ import org.springframework.context.annotation.Primary;
 @AutoConfiguration
 public class RateLimitTestConfig {
 
+    private interface ByteArrayProxyManager extends ProxyManager<byte[]> {}
+
     @Bean
     @Primary
-    @SuppressWarnings("unchecked")
     public ProxyManager<byte[]> mockBucket4jProxyManager() {
-        return Mockito.mock(ProxyManager.class);
+        return Mockito.mock(ByteArrayProxyManager.class);
     }
 }

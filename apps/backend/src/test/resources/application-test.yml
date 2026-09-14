@@ -1,40 +1,64 @@
 # =============================================================================
-# Spring Boot Application Configuration
+# Spring Boot Application Configuration — Test Profile (Backend)
 # =============================================================================
 spring:
   data:
     redis:
       password: ${SPRING_DATA_REDIS_PASSWORD}
 
+datasource:
+  primary:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      pool-name: primary-pool
+  replica:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      pool-name: replica-pool
+
 app:
   otp:
     hmac-secret: test-secret-key-must-be-long-enough-for-hmac-sha256-testing
     ttl-minutes: 15
 
-# =============================================================================
-# RSA Key Configuration
-# =============================================================================
 rsa:
   private-key: classpath:security/valid-private.pem
   public-key: classpath:security/valid-public.pem
 
-# =============================================================================
-# Rate Limit Configuration
-# =============================================================================
 rate-limit:
-  registration-path-patterns:
-    - "/api/v1/registrations/**"
-  registration-tier:
-    capacity: 5
-    refill-tokens: 5
-    refill-duration: 10s
-  browsing-tier:
+  default-tier:
     capacity: 100
     refill-tokens: 100
     refill-duration: 60s
-  stream-path-patterns:
-    - "/api/v1/stream/**"
-  stream-tier:
-    capacity: 10
-    refill-tokens: 10
-    refill-duration: 60s
+  tiers:
+    auth:
+      capacity: 20
+      refill-tokens: 20
+      refill-duration: 60s
+      path-patterns:
+        - "/api/v1/auth/login"
+        - "/api/v1/auth/register"
+        - "/api/v1/auth/activate"
+        - "/api/v1/auth/otp/**"
+        - "/api/v1/auth/password/**"
+        - "/api/v1/auth/refresh"
+    stream:
+      capacity: 10
+      refill-tokens: 10
+      refill-duration: 60s
+      path-patterns:
+        - "/api/v1/stream/**"
+    registration:
+      capacity: 5
+      refill-tokens: 5
+      refill-duration: 10s
+      path-patterns:
+        - "/api/v1/registrations/**"

@@ -2,18 +2,16 @@ package com.unihub.workshop.shared.realtime.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.unihub.workshop.shared.realtime.contracts.RealtimeEventPublisher;
-import com.unihub.workshop.shared.realtime.domain.RealtimeEvent;
+import com.unihub.workshop.shared.realtime.api.RealtimeEvent;
+import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 /**
- * Redis Pub/Sub adapter broadcasting typed realtime events across distributed
- * instances.
+ * Redis Pub/Sub adapter broadcasting typed realtime events across distributed instances.
  */
 @Component
 @RequiredArgsConstructor
@@ -21,10 +19,13 @@ import java.util.UUID;
 public class RedisRealtimePublisherAdapter implements RealtimeEventPublisher {
 
     public static final String USER_CHANNEL_PREFIX = "unihub:stream:user:";
-    public static final String WORKSHOP_CHANNEL_PREFIX = "unihub:stream:workshop:";
+    public static final String WORKSHOP_CHANNEL_PREFIX =
+        "unihub:stream:workshop:";
 
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(
+        new JavaTimeModule()
+    );
 
     @Override
     public void publishToUser(UUID userId, RealtimeEvent<?> event) {
@@ -33,8 +34,11 @@ public class RedisRealtimePublisherAdapter implements RealtimeEventPublisher {
             return;
         }
         if (redisTemplate == null) {
-            log.warn("StringRedisTemplate is not available; cannot publish realtime event {} to user {}",
-                    event.eventType(), userId);
+            log.warn(
+                "StringRedisTemplate is not available; cannot publish realtime event {} to user {}",
+                event.eventType(),
+                userId
+            );
             return;
         }
         String channel = USER_CHANNEL_PREFIX + userId;
@@ -44,12 +48,17 @@ public class RedisRealtimePublisherAdapter implements RealtimeEventPublisher {
     @Override
     public void publishToWorkshop(UUID workshopId, RealtimeEvent<?> event) {
         if (workshopId == null || event == null) {
-            log.warn("Cannot publish realtime event: workshopId or event is null");
+            log.warn(
+                "Cannot publish realtime event: workshopId or event is null"
+            );
             return;
         }
         if (redisTemplate == null) {
-            log.warn("StringRedisTemplate is not available; cannot publish realtime event {} to workshop {}",
-                    event.eventType(), workshopId);
+            log.warn(
+                "StringRedisTemplate is not available; cannot publish realtime event {} to workshop {}",
+                event.eventType(),
+                workshopId
+            );
             return;
         }
         String channel = WORKSHOP_CHANNEL_PREFIX + workshopId;
@@ -60,10 +69,18 @@ public class RedisRealtimePublisherAdapter implements RealtimeEventPublisher {
         try {
             String jsonPayload = objectMapper.writeValueAsString(event);
             redisTemplate.convertAndSend(channel, jsonPayload);
-            log.debug("Published event {} to Redis channel {}", event.eventType(), channel);
+            log.debug(
+                "Published event {} to Redis channel {}",
+                event.eventType(),
+                channel
+            );
         } catch (Exception ex) {
-            log.error("Failed to publish event {} to Redis channel {}: {}", event.eventType(), channel,
-                    ex.getMessage());
+            log.error(
+                "Failed to publish event {} to Redis channel {}: {}",
+                event.eventType(),
+                channel,
+                ex.getMessage()
+            );
         }
     }
 }

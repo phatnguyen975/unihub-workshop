@@ -6,6 +6,8 @@ useDefault = true
 [allowlist]
 description = "Ignore dummy secrets in test fixtures and documentation specs"
 paths = [
-    '''apps/backend/src/test/resources/security/.*\.pem''',
-    '''specs/.*'''
+    '''apps/backend/src/test/resources/.*''',
+    '''apps/workers/src/test/resources/.*''',
+    '''specs/.*''',
+    '''docs/.*'''
 ]

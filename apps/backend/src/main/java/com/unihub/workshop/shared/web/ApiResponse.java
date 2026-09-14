@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
+
     private final boolean success;
     private final String message;
     private final T data;
@@ -51,6 +52,7 @@ public class ApiResponse<T> {
     }
 
     public static class Metadata {
+
         private final String processedBy;
         private final String traceId;
 

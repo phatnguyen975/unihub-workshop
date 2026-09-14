@@ -1,20 +1,17 @@
 package com.unihub.workshop.shared.realtime.infrastructure;
 
-import com.unihub.workshop.shared.realtime.domain.SseEmitterRegistry;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-@DisplayName("RealtimeMetrics Unit Tests")
 class RealtimeMetricsTest {
 
     private MeterRegistry meterRegistry;
@@ -29,9 +26,13 @@ class RealtimeMetricsTest {
     }
 
     @Test
-    @DisplayName("active_connections gauge should track in-memory registry connections dynamically")
+    @DisplayName(
+        "active_connections gauge should track in-memory registry connections dynamically"
+    )
     void activeConnectionsGauge_shouldReflectRegistryCount() {
-        Gauge gauge = meterRegistry.find("realtime.sse.active_connections").gauge();
+        Gauge gauge = meterRegistry
+            .find("realtime.sse.active_connections")
+            .gauge();
         assertThat(gauge).isNotNull();
         assertThat(gauge.value()).isEqualTo(0.0);
 
@@ -46,48 +47,57 @@ class RealtimeMetricsTest {
     }
 
     @Test
-    @DisplayName("incrementEventsPushed should increment counter tagged with event_type")
+    @DisplayName(
+        "incrementEventsPushed should increment counter tagged with event_type"
+    )
     void incrementEventsPushed_shouldIncrementTaggedCounter() {
         metrics.incrementEventsPushed("notification.new");
         metrics.incrementEventsPushed("notification.new");
         metrics.incrementEventsPushed("attendance.updated");
 
-        Counter notifCounter = meterRegistry.find("realtime.events.pushed.total")
-                .tag("event_type", "notification.new")
-                .counter();
+        Counter notifCounter = meterRegistry
+            .find("realtime.events.pushed.total")
+            .tag("event_type", "notification.new")
+            .counter();
         assertThat(notifCounter).isNotNull();
         assertThat(notifCounter.count()).isEqualTo(2.0);
 
-        Counter attendCounter = meterRegistry.find("realtime.events.pushed.total")
-                .tag("event_type", "attendance.updated")
-                .counter();
+        Counter attendCounter = meterRegistry
+            .find("realtime.events.pushed.total")
+            .tag("event_type", "attendance.updated")
+            .counter();
         assertThat(attendCounter).isNotNull();
         assertThat(attendCounter.count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("incrementDisconnects should increment counter tagged with reason")
+    @DisplayName(
+        "incrementDisconnects should increment counter tagged with reason"
+    )
     void incrementDisconnects_shouldIncrementTaggedCounter() {
         metrics.incrementDisconnects("client_abort");
         metrics.incrementDisconnects("timeout");
         metrics.incrementDisconnects("error");
         metrics.incrementDisconnects("error");
 
-        Counter abortCounter = meterRegistry.find("realtime.sse.disconnects.total")
-                .tag("reason", "client_abort")
-                .counter();
+        Counter abortCounter = meterRegistry
+            .find("realtime.sse.disconnects.total")
+            .tag("reason", "client_abort")
+            .counter();
         assertThat(abortCounter).isNotNull();
         assertThat(abortCounter.count()).isEqualTo(1.0);
 
-        Counter timeoutCounter = meterRegistry.find("realtime.sse.disconnects.total")
-                .tag("reason", "timeout")
-                .counter();
+        Counter timeoutCounter = meterRegistry
+            .find("realtime.sse.disconnects.total")
+            .tag("reason", "timeout")
+            .counter();
         assertThat(timeoutCounter).isNotNull();
         assertThat(timeoutCounter.count()).isEqualTo(1.0);
 
-        Counter errorCounter = meterRegistry.find("realtime.sse.disconnects.total")
-                .tag("reason", "error")
-                .counter();
+        Counter errorCounter = meterRegistry
+            .find("realtime.sse.disconnects.total")
+            .tag("reason", "error")
+            .counter();
         assertThat(errorCounter).isNotNull();
         assertThat(errorCounter.count()).isEqualTo(2.0);
     }

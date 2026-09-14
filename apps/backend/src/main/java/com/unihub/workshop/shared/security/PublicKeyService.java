@@ -1,14 +1,13 @@
 package com.unihub.workshop.shared.security;
 
 import com.unihub.workshop.shared.exception.InternalServerException;
-import org.springframework.stereotype.Service;
-
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import org.springframework.stereotype.Service;
 
 @Service
 public class PublicKeyService {
@@ -24,8 +23,13 @@ public class PublicKeyService {
         byte[] encoded = publicKey.getEncoded();
 
         // Precompute PEM
-        String base64 = Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(encoded);
-        this.publicKeyPem = "-----BEGIN PUBLIC KEY-----\n" + base64 + "\n-----END PUBLIC KEY-----";
+        String base64 = Base64.getMimeEncoder(64, new byte[] {
+            '\n',
+        }).encodeToString(encoded);
+        this.publicKeyPem =
+            "-----BEGIN PUBLIC KEY-----\n" +
+            base64 +
+            "\n-----END PUBLIC KEY-----";
 
         // Precompute Key ID
         try {
@@ -33,7 +37,10 @@ public class PublicKeyService {
             byte[] hash = digest.digest(encoded);
             this.keyId = HexFormat.of().withLowerCase().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 algorithm not available", e);
+            throw new IllegalStateException(
+                "SHA-256 algorithm not available",
+                e
+            );
         }
     }
 

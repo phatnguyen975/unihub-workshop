@@ -8,16 +8,15 @@ import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.shared.exception.BadRequestException;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class UserRepositoryAdapter implements UserRepository {
@@ -28,8 +27,8 @@ public class UserRepositoryAdapter implements UserRepository {
     public UserRepositoryAdapter(UserJpaRepository repository) {
         this.repository = repository;
         this.objectMapper = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     @Override
@@ -39,8 +38,13 @@ public class UserRepositoryAdapter implements UserRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<User> findByIdAndOrganizationId(UUID id, UUID organizationId) {
-        return repository.findByIdAndOrganizationId(id, organizationId).map(this::toDomain);
+    public Optional<User> findByIdAndOrganizationId(
+        UUID id,
+        UUID organizationId
+    ) {
+        return repository
+            .findByIdAndOrganizationId(id, organizationId)
+            .map(this::toDomain);
     }
 
     @Override
@@ -71,34 +75,61 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
-    public boolean updateTemporaryPassword(UUID userId, String newPasswordHash, Instant loginTime) {
-        return repository.updateTemporaryPassword(userId, newPasswordHash, loginTime) > 0;
+    public boolean updateTemporaryPassword(
+        UUID userId,
+        String newPasswordHash,
+        Instant loginTime
+    ) {
+        return (
+            repository.updateTemporaryPassword(
+                userId,
+                newPasswordHash,
+                loginTime
+            ) > 0
+        );
     }
 
     @Override
     @Transactional
-    public void updateIsActive(UUID userId, UUID organizationId, boolean isActive) {
-        repository.updateIsActive(userId, organizationId, isActive, Instant.now());
+    public void updateIsActive(
+        UUID userId,
+        UUID organizationId,
+        boolean isActive
+    ) {
+        repository.updateIsActive(
+            userId,
+            organizationId,
+            isActive,
+            Instant.now()
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public CursorPage<User> findMembersByOrganizationId(
-            UUID organizationId,
-            UUID callerId,
-            UserRole role,
-            Boolean isActive,
-            String search,
-            String cursor,
-            int limit) {
+        UUID organizationId,
+        UUID callerId,
+        UserRole role,
+        Boolean isActive,
+        String search,
+        String cursor,
+        int limit
+    ) {
         Instant cursorTime = null;
         UUID cursorId = null;
 
         if (cursor != null && !cursor.isBlank()) {
             try {
                 String decoded = new String(Base64.getDecoder().decode(cursor));
-                CursorData cursorData = objectMapper.readValue(decoded, CursorData.class);
-                if (cursorData == null || cursorData.createdAt() == null || cursorData.id() == null) {
+                CursorData cursorData = objectMapper.readValue(
+                    decoded,
+                    CursorData.class
+                );
+                if (
+                    cursorData == null ||
+                    cursorData.createdAt() == null ||
+                    cursorData.id() == null
+                ) {
                     throw new BadRequestException("Invalid cursor format");
                 }
                 cursorTime = cursorData.createdAt();
@@ -114,29 +145,38 @@ public class UserRepositoryAdapter implements UserRepository {
         String roleStr = role != null ? role.name() : null;
         String sanitizedSearch = sanitizeSearch(search);
         List<UserJpaEntity> entities = repository.findMembers(
-                organizationId,
-                callerId,
-                roleStr,
-                isActive,
-                sanitizedSearch,
-                cursorTime,
-                cursorId,
-                PageRequest.of(0, limit + 1));
+            organizationId,
+            callerId,
+            roleStr,
+            isActive,
+            sanitizedSearch,
+            cursorTime,
+            cursorId,
+            PageRequest.of(0, limit + 1)
+        );
 
         boolean hasMore = entities.size() > limit;
-        List<UserJpaEntity> pageEntities = hasMore ? entities.subList(0, limit) : entities;
+        List<UserJpaEntity> pageEntities = hasMore
+            ? entities.subList(0, limit)
+            : entities;
 
-        List<User> items = pageEntities.stream()
-                .map(this::toDomain)
-                .collect(Collectors.toList());
+        List<User> items = pageEntities
+            .stream()
+            .map(this::toDomain)
+            .collect(Collectors.toList());
 
         String nextCursor = null;
         if (hasMore && !pageEntities.isEmpty()) {
             UserJpaEntity lastItem = pageEntities.get(pageEntities.size() - 1);
             try {
-                CursorData nextCursorData = new CursorData(lastItem.getCreatedAt(), lastItem.getId());
+                CursorData nextCursorData = new CursorData(
+                    lastItem.getCreatedAt(),
+                    lastItem.getId()
+                );
                 String json = objectMapper.writeValueAsString(nextCursorData);
-                nextCursor = Base64.getEncoder().encodeToString(json.getBytes());
+                nextCursor = Base64.getEncoder().encodeToString(
+                    json.getBytes()
+                );
             } catch (Exception e) {
                 throw new RuntimeException("Failed to encode next cursor", e);
             }
@@ -145,27 +185,27 @@ public class UserRepositoryAdapter implements UserRepository {
         return new CursorPage<>(items, nextCursor, hasMore);
     }
 
-    private record CursorData(Instant createdAt, UUID id) {
-    }
+    private record CursorData(Instant createdAt, UUID id) {}
 
     private User toDomain(UserJpaEntity entity) {
         return new User(
-                entity.getId(),
-                entity.getOrganizationId(),
-                UserRole.valueOf(entity.getRole()),
-                entity.getEmail(),
-                entity.getPhoneNumber(),
-                entity.getPasswordHash(),
-                entity.getFullName(),
-                entity.getAvatarUrl(),
-                entity.isActive(),
-                entity.isTemporaryPassword(),
-                entity.getLastLoginAt(),
-                entity.getStudentRecordId(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt(),
-                entity.getCreatedBy(),
-                entity.getUpdatedBy());
+            entity.getId(),
+            entity.getOrganizationId(),
+            UserRole.valueOf(entity.getRole()),
+            entity.getEmail(),
+            entity.getPhoneNumber(),
+            entity.getPasswordHash(),
+            entity.getFullName(),
+            entity.getAvatarUrl(),
+            entity.isActive(),
+            entity.isTemporaryPassword(),
+            entity.getLastLoginAt(),
+            entity.getStudentRecordId(),
+            entity.getCreatedAt(),
+            entity.getUpdatedAt(),
+            entity.getCreatedBy(),
+            entity.getUpdatedBy()
+        );
     }
 
     private UserJpaEntity toEntity(User user) {
@@ -182,8 +222,12 @@ public class UserRepositoryAdapter implements UserRepository {
         entity.setTemporaryPassword(user.isTemporaryPassword());
         entity.setLastLoginAt(user.lastLoginAt());
         entity.setStudentRecordId(user.studentRecordId());
-        entity.setCreatedAt(user.createdAt() != null ? user.createdAt() : Instant.now());
-        entity.setUpdatedAt(user.updatedAt() != null ? user.updatedAt() : Instant.now());
+        entity.setCreatedAt(
+            user.createdAt() != null ? user.createdAt() : Instant.now()
+        );
+        entity.setUpdatedAt(
+            user.updatedAt() != null ? user.updatedAt() : Instant.now()
+        );
         entity.setCreatedBy(user.createdBy());
         entity.setUpdatedBy(user.updatedBy());
         return entity;
@@ -194,8 +238,8 @@ public class UserRepositoryAdapter implements UserRepository {
             return null;
         }
         return search
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
     }
 }

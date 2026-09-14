@@ -32,11 +32,13 @@ No REST endpoints are introduced. Every task is verified through unit tests that
     - `apps/backend/src/main/java/com/unihub/workshop/shared/database/TransactionAwareRoutingDataSource.java` — `AbstractRoutingDataSource` subclass; `determineCurrentLookupKey()` reads `TransactionSynchronizationManager.isCurrentTransactionReadOnly()`; returns `"replica"` when `true`, `"primary"` otherwise
     - `apps/backend/src/main/java/com/unihub/workshop/shared/database/DataSourceRoutingConfig.java` — `@Configuration`; defines `primaryDataSource()` and `replicaDataSource()` as `HikariDataSource` beans; defines `routingDataSource()` as `@Primary DataSource` targeting both
     - `apps/backend/src/test/java/com/unihub/workshop/shared/database/DataSourceRoutingConfigTest.java` — unit tests: routing bean is `TransactionAwareRoutingDataSource`; `readOnly=true` transaction → key `"replica"`; `readOnly=false` transaction → key `"primary"`; no active transaction → key `"primary"`
+    - `apps/backend/src/test/resources/application-test.yml` — in-memory H2 primary & replica datasource configuration for test profile
     - `apps/workers/src/main/resources/application.yml` — same YAML restructuring as backend; add `spring.flyway.enabled: false`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/database/DataSourceProperties.java` — `@ConfigurationProperties` record (workers package)
     - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/database/TransactionAwareRoutingDataSource.java` — mirrors backend routing logic (workers package)
     - `apps/workers/src/main/java/com/unihub/workshop/workers/shared/database/DataSourceRoutingConfig.java` — mirrors backend config (workers package)
     - `apps/workers/src/test/java/com/unihub/workshop/workers/shared/database/DataSourceRoutingConfigTest.java` — mirrors backend routing tests (workers package)
+    - `apps/workers/src/test/resources/application-test.yml` — in-memory H2 primary & replica datasource configuration for test profile
   - **Acceptance Criteria:**
     - The backend application context exposes a `@Primary DataSource` bean that is an instance of `TransactionAwareRoutingDataSource` (FR-10, AC-13).
     - The workers application context exposes the same type as the `@Primary DataSource` bean (AC-15, FR-10).
@@ -51,6 +53,7 @@ No REST endpoints are introduced. Every task is verified through unit tests that
 - [x] `DataSourceRoutingConfigTest` passes in both `apps/backend` and `apps/workers`.
 - [x] Neither `application.yml` contains `spring.datasource.url`; both contain `datasource.primary.*` and `datasource.replica.*`.
 - [x] `spring.flyway.enabled: false` is present in the workers `application.yml`.
+- [x] Both `application-test.yml` files configure H2 in-memory primary and replica datasources for isolated test execution.
 - [x] Full unit test suite passes in both apps (including `ModulithArchitectureTest` in backend).
 - [x] Build is clean (`./gradlew test` green for both apps).
 
@@ -105,7 +108,8 @@ No REST endpoints are introduced. Every task is verified through unit tests that
     - `apps/backend/src/main/java/com/unihub/workshop/shared/events/UserProvisionedEvent.java` — domain event record annotated with `@Externalized("unihub.events::notifications")` for downstream email delivery of temporary credentials
     - `apps/backend/src/main/java/com/unihub/workshop/shared/seed/SeedRunner.java` — `ApplicationRunner`; (1) parses `SEED_ORGANIZATIONS` JSON; for each: `INSERT INTO organizations … ON CONFLICT (slug) DO NOTHING` via `JdbcTemplate`; logs INFO on insert / DEBUG on skip; (2) parses `SEED_ROOT_ORGANIZERS` JSON; for each: checks `SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)` first — if user already exists, logs DEBUG and skips without hashing (satisfies NFR-03: no Argon2 cost on restart for existing users); if user does not exist: resolves `organization_id` by slug (fail-fast `IllegalStateException` if absent); generates Argon2 hash; inserts `users` row with `role='ORGANIZER'`, `is_temporary_password=true`, via `ON CONFLICT (email) DO NOTHING`; queries user id; publishes `UserProvisionedEvent`; logs plaintext at INFO; (3) queries `COUNT(*) FROM organizations`; logs WARN if zero; throws `IllegalStateException("Failed to parse seed JSON")` on malformed JSON input
     - `apps/backend/src/test/java/com/unihub/workshop/shared/events/UserProvisionedEventTest.java` — unit test verifying `UserProvisionedEvent` fields and `@Externalized` annotation
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/config/SeedRunnerTest.java` — unit tests (mocked `JdbcTemplate`): org seeded on first run; organizer seeded on first run (existence check returns false, event published); organizer skipped on restart without hashing (existence check returns true, `passwordGenerator.generate()` never called, no event); unknown `orgSlug` → `IllegalStateException`; malformed JSON → `IllegalStateException("Failed to parse seed JSON")`; empty arrays → zero inserts, WARN logged; single org with no organizers inserts org and validates zero inserts, WARN logged; concurrent run simulation — second identical insert does not raise exception
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/seed/PasswordGeneratorTest.java` — unit test verifying 24-character password generation and Argon2 hashing delegation
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/seed/SeedRunnerTest.java` — unit tests (mocked `JdbcTemplate`): org seeded on first run; organizer seeded on first run (existence check returns false, event published); organizer skipped on restart without hashing (existence check returns true, `passwordGenerator.generate()` never called, no event); unknown `orgSlug` → `IllegalStateException`; malformed JSON → `IllegalStateException("Failed to parse seed JSON")`; empty arrays → zero inserts, WARN logged; single org with no organizers inserts org and validates zero inserts, WARN logged; concurrent run simulation — second identical insert does not raise exception
   - **Acceptance Criteria:**
     - First startup with `SEED_ORGANIZATIONS=[{"name":"Engineering","slug":"engineering"}]` inserts one row and logs `"Seeded organization: engineering"` at INFO (AC-03, FR-03).
     - Restart with same env produces no new row and logs a DEBUG skip message; no exception (AC-04, FR-03).

@@ -1,4 +1,4 @@
-package com.unihub.workshop.shared.realtime.domain;
+package com.unihub.workshop.shared.realtime.api;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
@@ -36,6 +36,8 @@ public enum RealtimeEventType {
                 return type;
             }
         }
-        throw new IllegalArgumentException("Unknown realtime event type: " + value);
+        throw new IllegalArgumentException(
+            "Unknown realtime event type: " + value
+        );
     }
 }

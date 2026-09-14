@@ -1,17 +1,15 @@
-package com.unihub.workshop.shared.realtime.domain;
+package com.unihub.workshop.shared.realtime.infrastructure;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-@DisplayName("SseEmitterRegistry Unit Tests")
 class SseEmitterRegistryTest {
 
     private SseEmitterRegistry registry;
@@ -36,7 +34,9 @@ class SseEmitterRegistryTest {
     }
 
     @Test
-    @DisplayName("should support multiple concurrent emitters for same user (e.g. multiple tabs)")
+    @DisplayName(
+        "should support multiple concurrent emitters for same user (e.g. multiple tabs)"
+    )
     void shouldSupportMultipleEmittersForSameUser() {
         UUID userId = UUID.randomUUID();
         SseEmitter emitter1 = new SseEmitter(60_000L);
@@ -99,7 +99,11 @@ class SseEmitterRegistryTest {
 
         List<SseEmitter> allEmitters = registry.getAllEmitters();
 
-        assertThat(allEmitters).containsExactlyInAnyOrder(emitter1, emitter2, emitter3);
+        assertThat(allEmitters).containsExactlyInAnyOrder(
+            emitter1,
+            emitter2,
+            emitter3
+        );
         assertThat(registry.getActiveConnectionCount()).isEqualTo(3);
     }
 

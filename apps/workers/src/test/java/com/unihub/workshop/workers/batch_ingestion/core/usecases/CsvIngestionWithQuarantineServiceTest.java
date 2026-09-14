@@ -1,5 +1,8 @@
 package com.unihub.workshop.workers.batch_ingestion.core.usecases;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.unihub.workshop.workers.batch_ingestion.core.models.IngestionJobReport;
 import com.unihub.workshop.workers.batch_ingestion.core.models.IngestionMetrics;
 import com.unihub.workshop.workers.batch_ingestion.core.models.SourceFile;
@@ -9,16 +12,12 @@ import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionJobRe
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionObjectStore;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.OrganizationDirectory;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.RejectArtifactStore;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class CsvIngestionWithQuarantineServiceTest {
 
@@ -40,8 +39,14 @@ class CsvIngestionWithQuarantineServiceTest {
         organizationDirectory = mock(OrganizationDirectory.class);
         rejectArtifactStore = mock(RejectArtifactStore.class);
 
-        service = new CsvIngestionWithQuarantineService(checkpointStore, objectStore, reportWriter, eventPublisher,
-                organizationDirectory, rejectArtifactStore);
+        service = new CsvIngestionWithQuarantineService(
+            checkpointStore,
+            objectStore,
+            reportWriter,
+            eventPublisher,
+            organizationDirectory,
+            rejectArtifactStore
+        );
     }
 
     @Test
@@ -50,20 +55,45 @@ class CsvIngestionWithQuarantineServiceTest {
         String fileKey = "inbox/it/students.csv";
         SourceFile file = new SourceFile(fileKey, "it", 1000L, Instant.now());
 
-        when(organizationDirectory.findBySlug("it"))
-                .thenReturn(Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
-        when(checkpointStore.startIngestionJob(fileKey, orgId, "it", "Information Technology")).thenReturn(123L);
-        when(checkpointStore.getMetrics(123L)).thenReturn(new IngestionMetrics(50, 0));
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
+            Optional.of(
+                new OrganizationDirectory.OrganizationInfo(
+                    orgId,
+                    "Information Technology"
+                )
+            )
+        );
+        when(
+            checkpointStore.startIngestionJob(
+                fileKey,
+                orgId,
+                "it",
+                "Information Technology"
+            )
+        ).thenReturn(123L);
+        when(checkpointStore.getMetrics(123L)).thenReturn(
+            new IngestionMetrics(50, 0)
+        );
 
         service.ingest(file);
 
-        verify(checkpointStore).startIngestionJob(fileKey, orgId, "it", "Information Technology");
+        verify(checkpointStore).startIngestionJob(
+            fileKey,
+            orgId,
+            "it",
+            "Information Technology"
+        );
         verify(checkpointStore).getMetrics(123L);
-        verify(rejectArtifactStore, never()).uploadAndCleanUp(anyLong(), anyString(), anyString());
+        verify(rejectArtifactStore, never()).uploadAndCleanUp(
+            anyLong(),
+            anyString(),
+            anyString()
+        );
         verify(objectStore).moveToArchive(fileKey, "it");
         verify(eventPublisher).publishFileCompletedEvent(orgId, fileKey);
 
-        ArgumentCaptor<IngestionJobReport> reportCaptor = ArgumentCaptor.forClass(IngestionJobReport.class);
+        ArgumentCaptor<IngestionJobReport> reportCaptor =
+            ArgumentCaptor.forClass(IngestionJobReport.class);
         verify(reportWriter).save(reportCaptor.capture());
 
         IngestionJobReport saved = reportCaptor.getValue();
@@ -76,12 +106,28 @@ class CsvIngestionWithQuarantineServiceTest {
         String fileKey = "inbox/it/students.csv";
         SourceFile file = new SourceFile(fileKey, "it", 1000L, Instant.now());
 
-        when(organizationDirectory.findBySlug("it"))
-                .thenReturn(Optional.of(new OrganizationDirectory.OrganizationInfo(orgId, "Information Technology")));
-        when(checkpointStore.startIngestionJob(fileKey, orgId, "it", "Information Technology")).thenReturn(123L);
-        when(checkpointStore.getMetrics(123L)).thenReturn(new IngestionMetrics(40, 10));
-        when(rejectArtifactStore.uploadAndCleanUp(123L, "it", fileKey))
-                .thenReturn("rejected/it/row-reports/students-quarantine.csv");
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
+            Optional.of(
+                new OrganizationDirectory.OrganizationInfo(
+                    orgId,
+                    "Information Technology"
+                )
+            )
+        );
+        when(
+            checkpointStore.startIngestionJob(
+                fileKey,
+                orgId,
+                "it",
+                "Information Technology"
+            )
+        ).thenReturn(123L);
+        when(checkpointStore.getMetrics(123L)).thenReturn(
+            new IngestionMetrics(40, 10)
+        );
+        when(
+            rejectArtifactStore.uploadAndCleanUp(123L, "it", fileKey)
+        ).thenReturn("rejected/it/row-reports/students-quarantine-123.csv");
 
         service.ingest(file);
 
@@ -89,10 +135,13 @@ class CsvIngestionWithQuarantineServiceTest {
         verify(objectStore).moveToArchive(fileKey, "it");
         verify(eventPublisher).publishFileCompletedEvent(orgId, fileKey);
 
-        ArgumentCaptor<IngestionJobReport> reportCaptor = ArgumentCaptor.forClass(IngestionJobReport.class);
+        ArgumentCaptor<IngestionJobReport> reportCaptor =
+            ArgumentCaptor.forClass(IngestionJobReport.class);
         verify(reportWriter).save(reportCaptor.capture());
 
         IngestionJobReport saved = reportCaptor.getValue();
-        assertThat(saved.rejectArtifactKey()).isEqualTo("rejected/it/row-reports/students-quarantine.csv");
+        assertThat(saved.rejectArtifactKey()).isEqualTo(
+            "rejected/it/row-reports/students-quarantine-123.csv"
+        );
     }
 }

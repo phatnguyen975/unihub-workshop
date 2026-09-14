@@ -1,8 +1,8 @@
 package com.unihub.workshop;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Baseline sanity test for the backend application entry point.

@@ -3,9 +3,10 @@ package com.unihub.workshop.shared.seed;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.unihub.workshop.shared.events.UserProvisionedEvent;
-
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -16,13 +17,15 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
-import java.util.UUID;
-
 @Component
-@ConditionalOnProperty(prefix = "spring.flyway", name = "enabled", matchIfMissing = true)
+@ConditionalOnProperty(
+    prefix = "spring.flyway",
+    name = "enabled",
+    matchIfMissing = true
+)
 @EnableConfigurationProperties(SeedProperties.class)
 @Order(10)
 public class SeedRunner implements ApplicationRunner {
@@ -36,23 +39,41 @@ public class SeedRunner implements ApplicationRunner {
     private final ApplicationEventPublisher eventPublisher;
 
     public SeedRunner(
-            SeedProperties seedProperties,
-            JdbcTemplate jdbcTemplate,
-            PasswordGenerator passwordGenerator,
-            ApplicationEventPublisher eventPublisher) {
-        this.seedProperties = seedProperties;
-        this.jdbcTemplate = jdbcTemplate;
+        SeedProperties seedProperties,
+        JdbcTemplate jdbcTemplate,
+        PasswordGenerator passwordGenerator,
+        ApplicationEventPublisher eventPublisher
+    ) {
+        this.seedProperties = Objects.requireNonNull(
+            seedProperties,
+            "seedProperties must not be null"
+        );
+        this.jdbcTemplate = Objects.requireNonNull(
+            jdbcTemplate,
+            "jdbcTemplate must not be null"
+        );
         this.objectMapper = new ObjectMapper();
-        this.passwordGenerator = passwordGenerator;
-        this.eventPublisher = eventPublisher;
+        this.passwordGenerator = Objects.requireNonNull(
+            passwordGenerator,
+            "passwordGenerator must not be null"
+        );
+        this.eventPublisher = Objects.requireNonNull(
+            eventPublisher,
+            "eventPublisher must not be null"
+        );
     }
 
     @Override
+    @Transactional
     public void run(ApplicationArguments args) {
-        List<OrganizationSeedEntry> organizations = parseJson(seedProperties.organizations(), new TypeReference<>() {
-        });
-        List<OrganizerSeedEntry> organizers = parseJson(seedProperties.rootOrganizers(), new TypeReference<>() {
-        });
+        List<OrganizationSeedEntry> organizations = parseJson(
+            seedProperties.organizations(),
+            new TypeReference<>() {}
+        );
+        List<OrganizerSeedEntry> organizers = parseJson(
+            seedProperties.rootOrganizers(),
+            new TypeReference<>() {}
+        );
 
         seedOrganizations(organizations);
         seedOrganizers(organizers);
@@ -62,7 +83,8 @@ public class SeedRunner implements ApplicationRunner {
 
     private void seedOrganizations(List<OrganizationSeedEntry> organizations) {
         for (OrganizationSeedEntry org : organizations) {
-            String sql = "INSERT INTO organizations (name, slug) VALUES (?, ?) ON CONFLICT (slug) DO NOTHING";
+            String sql =
+                "INSERT INTO organizations (name, slug) VALUES (?, ?) ON CONFLICT (slug) DO NOTHING";
             int rowsAffected = jdbcTemplate.update(sql, org.name(), org.slug());
 
             if (rowsAffected > 0) {
@@ -76,61 +98,98 @@ public class SeedRunner implements ApplicationRunner {
     private void seedOrganizers(List<OrganizerSeedEntry> organizers) {
         for (OrganizerSeedEntry organizer : organizers) {
             Boolean exists = jdbcTemplate.queryForObject(
-                    "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", Boolean.class, organizer.email());
+                "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)",
+                Boolean.class,
+                organizer.email()
+            );
             if (Boolean.TRUE.equals(exists)) {
-                log.debug("Skipped existing root organizer: {}", organizer.email());
+                log.debug(
+                    "Skipped existing root organizer: {}",
+                    organizer.email()
+                );
                 continue;
             }
 
             UUID orgId = resolveOrganizationId(organizer.orgSlug());
-            PasswordGenerator.GeneratedPassword generatedPassword = passwordGenerator.generate();
+            PasswordGenerator.GeneratedPassword generatedPassword =
+                passwordGenerator.generate();
 
-            String sql = "INSERT INTO users (organization_id, role, email, password_hash, full_name, is_temporary_password) "
-                    + "VALUES (?, 'ORGANIZER', ?, ?, ?, true) ON CONFLICT (email) DO NOTHING";
-            int rowsAffected = jdbcTemplate.update(sql, orgId, organizer.email(), generatedPassword.hash(),
-                    organizer.displayName());
+            String sql =
+                "INSERT INTO users (organization_id, role, email, password_hash, full_name, is_temporary_password) " +
+                "VALUES (?, 'ORGANIZER', ?, ?, ?, true) ON CONFLICT (email) DO NOTHING";
+            int rowsAffected = jdbcTemplate.update(
+                sql,
+                orgId,
+                organizer.email(),
+                generatedPassword.hash(),
+                organizer.displayName()
+            );
 
             if (rowsAffected > 0) {
                 UUID userId = jdbcTemplate.queryForObject(
-                        "SELECT id FROM users WHERE email = ?", UUID.class, organizer.email());
+                    "SELECT id FROM users WHERE email = ?",
+                    UUID.class,
+                    organizer.email()
+                );
 
-                eventPublisher.publishEvent(new UserProvisionedEvent(
+                eventPublisher.publishEvent(
+                    new UserProvisionedEvent(
                         userId,
                         orgId,
                         organizer.orgSlug(),
                         organizer.email(),
                         organizer.displayName(),
                         "ORGANIZER",
-                        generatedPassword.plaintext()));
+                        generatedPassword.plaintext()
+                    )
+                );
 
                 // NOTE: Log kept temporarily for local inspection until notifications worker is implemented
-                log.info("Seeded root organizer: {} with temporary password: {}", organizer.email(),
-                        generatedPassword.plaintext());
+                log.info(
+                    "Seeded root organizer: {} with temporary password: {}",
+                    organizer.email(),
+                    generatedPassword.plaintext()
+                );
             } else {
-                log.debug("Skipped existing root organizer: {}", organizer.email());
+                log.debug(
+                    "Skipped existing root organizer: {}",
+                    organizer.email()
+                );
             }
         }
     }
 
     private UUID resolveOrganizationId(String slug) {
-        List<UUID> ids = jdbcTemplate.query("SELECT id FROM organizations WHERE slug = ?",
-                (rs, rowNum) -> rs.getObject("id", UUID.class),
-                slug);
+        List<UUID> ids = jdbcTemplate.query(
+            "SELECT id FROM organizations WHERE slug = ?",
+            (rs, rowNum) -> rs.getObject("id", UUID.class),
+            slug
+        );
 
         if (ids.isEmpty()) {
-            throw new IllegalStateException("Cannot seed organizer: unknown org_slug '" + slug + "'");
+            throw new IllegalStateException(
+                "Cannot seed organizer: unknown org_slug '" + slug + "'"
+            );
         }
         return ids.get(0);
     }
 
     private void validateOrganizationsExist() {
-        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM organizations", Integer.class);
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM organizations",
+            Integer.class
+        );
         if (count == null || count == 0) {
-            log.warn("System started with zero organizations. Features requiring tenants will fail.");
+            log.warn(
+                "System started with zero organizations. Features requiring tenants will fail."
+            );
         }
     }
 
-    private <T> List<T> parseJson(String json, TypeReference<List<T>> typeReference) {
+    private <T> List<T> parseJson(
+        String json,
+        TypeReference<List<T>> typeReference
+    ) {
         if (!StringUtils.hasText(json)) {
             return List.of();
         }

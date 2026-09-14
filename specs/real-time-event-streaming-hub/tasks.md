@@ -24,11 +24,17 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/SseConnection.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/SseEmitterRegistry.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/ports/out/EmitterRegistryPort.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/ports/out/UserStatusPort.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/ports/out/WorkshopAuthorizationPort.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/SseEmitterRegistry.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/JdbcUserStatusAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/JdbcWorkshopAuthorizationAdapter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/application/StreamSubscriptionService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/presentation/StreamController.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/domain/SseEmitterRegistryTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/application/StreamSubscriptionServiceTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/infrastructure/SseEmitterRegistryTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/infrastructure/JdbcWorkshopAuthorizationAdapterTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/shared/realtime/presentation/StreamControllerTest.java`
   - **Acceptance Criteria:**
     - An authenticated user connecting to `GET /api/v1/stream/events` receives HTTP 200 with headers `Content-Type: text/event-stream; charset=UTF-8`, `Cache-Control: no-cache, no-transform`, and `X-Accel-Buffering: no` (FR-01, FR-06, Scenario 1).
@@ -63,9 +69,9 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/contracts/RealtimeEventPublisher.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/RealtimeEvent.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/domain/RealtimeEventType.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/api/RealtimeEventPublisher.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/api/RealtimeEvent.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/api/RealtimeEventType.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/RedisRealtimePublisherAdapter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/infrastructure/RedisRealtimeSubscriber.java`
     - `apps/backend/src/main/java/com/unihub/workshop/shared/realtime/config/RealtimeRedisConfig.java`
@@ -94,7 +100,7 @@ This implementation plan decomposes the `real-time-event-streaming-hub` feature 
     - Micrometer gauge `realtime.sse.active_connections` accurately tracks the number of open SSE connections in memory across connect/disconnect events (NFR Observability).
     - Micrometer counter `realtime.events.pushed.total` increments tagged by `event_type` upon each event sent to an emitter socket (NFR Observability).
     - Micrometer counter `realtime.sse.disconnects.total` tracks connection termination reasons (`client_abort`, `timeout`, `error`) (NFR Observability).
-    - Rate limiter configures a dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`) mapped to `/api/v1/stream/**`, protecting against socket flood DoS while isolating general browsing quota (FR-05).
+    - Rate limiter configures a dedicated `streamTier` (`capacity: 10`, `refill-tokens: 10`, `refill-duration: 60s`) mapped to `/api/v1/stream/**`, protecting against socket flood DoS while isolating default-tier quota (FR-05).
     - Handshake rate-limit rejection returns HTTP `429 Too Many Requests` with type `urn:unihub:error:rate-limited` wrapped in the standard `ApiResponse` envelope (`{"success": false, "error": {...}, "metadata": {...}}`) with `X-RateLimit-*` headers (API Contract).
     - All existing rate limit tests in F-10.2 continue to pass without regression.
     - `ModulithArchitectureTest` verifies that `com.unihub.workshop.shared.realtime` respects module boundaries as an open shared module without package encapsulation violations.

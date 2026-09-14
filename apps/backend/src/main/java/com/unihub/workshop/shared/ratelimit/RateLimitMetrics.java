@@ -13,6 +13,8 @@ public class RateLimitMetrics {
     }
 
     public void incrementRedisUnavailable(String tier) {
-        meterRegistry.counter("rate_limiter.redis_unavailable", "tier", tier).increment();
+        meterRegistry
+            .counter("rate_limiter.redis_unavailable", "tier", tier)
+            .increment();
     }
 }

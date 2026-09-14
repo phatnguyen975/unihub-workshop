@@ -1,8 +1,16 @@
 package com.unihub.workshop.iam.infrastructure.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,15 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-
-import java.time.Duration;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RedisSessionTrackerAdapterTest {
@@ -87,11 +86,13 @@ class RedisSessionTrackerAdapterTest {
 
     @Test
     void shouldThrowServiceUnavailableException_whenRedisThrowsOnTrack() {
-        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("Redis down"));
+        when(redisTemplate.opsForValue()).thenThrow(
+            new RedisConnectionFailureException("Redis down")
+        );
 
         assertThatThrownBy(() -> adapter.trackSession(sessionId, jti, ttl))
-                .isInstanceOf(ServiceUnavailableException.class)
-                .hasMessageContaining("Redis is unavailable");
+            .isInstanceOf(ServiceUnavailableException.class)
+            .hasMessageContaining("Redis is unavailable");
 
         verify(meterRegistry).counter("auth.blacklist.redis_unavailable");
         verify(counter).increment();
@@ -99,11 +100,13 @@ class RedisSessionTrackerAdapterTest {
 
     @Test
     void shouldThrowServiceUnavailableException_whenRedisThrowsOnGet() {
-        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("Redis down"));
+        when(redisTemplate.opsForValue()).thenThrow(
+            new RedisConnectionFailureException("Redis down")
+        );
 
         assertThatThrownBy(() -> adapter.getActiveJti(sessionId))
-                .isInstanceOf(ServiceUnavailableException.class)
-                .hasMessageContaining("Redis is unavailable");
+            .isInstanceOf(ServiceUnavailableException.class)
+            .hasMessageContaining("Redis is unavailable");
 
         verify(meterRegistry).counter("auth.blacklist.redis_unavailable");
         verify(counter).increment();
@@ -111,11 +114,13 @@ class RedisSessionTrackerAdapterTest {
 
     @Test
     void shouldThrowServiceUnavailableException_whenRedisThrowsOnRemove() {
-        doThrow(new RedisConnectionFailureException("Redis down")).when(redisTemplate).delete(expectedKey);
+        doThrow(new RedisConnectionFailureException("Redis down"))
+            .when(redisTemplate)
+            .delete(expectedKey);
 
         assertThatThrownBy(() -> adapter.removeSession(sessionId))
-                .isInstanceOf(ServiceUnavailableException.class)
-                .hasMessageContaining("Redis is unavailable");
+            .isInstanceOf(ServiceUnavailableException.class)
+            .hasMessageContaining("Redis is unavailable");
 
         verify(meterRegistry).counter("auth.blacklist.redis_unavailable");
         verify(counter).increment();

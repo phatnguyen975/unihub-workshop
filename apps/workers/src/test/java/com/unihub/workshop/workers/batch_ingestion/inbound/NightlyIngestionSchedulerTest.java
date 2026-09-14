@@ -1,15 +1,14 @@
 package com.unihub.workshop.workers.batch_ingestion.inbound;
 
+import static org.mockito.Mockito.*;
+
 import com.unihub.workshop.workers.batch_ingestion.core.models.SourceFile;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.in.IngestStudentCsv;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.in.RunFileAdmission;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionObjectStore;
-import org.junit.jupiter.api.Test;
-
 import java.time.Instant;
 import java.util.List;
-
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
 
 class NightlyIngestionSchedulerTest {
 
@@ -19,11 +18,19 @@ class NightlyIngestionSchedulerTest {
         IngestionObjectStore objectStore = mock(IngestionObjectStore.class);
         IngestStudentCsv ingestStudentCsv = mock(IngestStudentCsv.class);
 
-        SourceFile validFile = new SourceFile("inbox/it/f1.csv", "it", 1024L, Instant.now());
+        SourceFile validFile = new SourceFile(
+            "inbox/it/f1.csv",
+            "it",
+            1024L,
+            Instant.now()
+        );
         when(objectStore.listInboxFiles()).thenReturn(List.of(validFile));
 
-        NightlyIngestionScheduler scheduler = new NightlyIngestionScheduler(runFileAdmission, objectStore,
-                ingestStudentCsv);
+        NightlyIngestionScheduler scheduler = new NightlyIngestionScheduler(
+            runFileAdmission,
+            objectStore,
+            ingestStudentCsv
+        );
 
         scheduler.runNightlyIngestion();
 

@@ -22,16 +22,21 @@ public interface UserRepository {
 
     void activate(UUID userId);
 
-    boolean updateTemporaryPassword(UUID userId, String newPasswordHash, Instant loginTime);
+    boolean updateTemporaryPassword(
+        UUID userId,
+        String newPasswordHash,
+        Instant loginTime
+    );
 
     CursorPage<User> findMembersByOrganizationId(
-            UUID organizationId,
-            UUID callerId,
-            UserRole role,
-            Boolean isActive,
-            String search,
-            String cursor,
-            int limit);
+        UUID organizationId,
+        UUID callerId,
+        UserRole role,
+        Boolean isActive,
+        String search,
+        String cursor,
+        int limit
+    );
 
     void updateIsActive(UUID userId, UUID organizationId, boolean isActive);
 }

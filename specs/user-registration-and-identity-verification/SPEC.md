@@ -110,7 +110,7 @@ This is the **only** self-service account-creation path; all other account types
 
 - **Performance:** Registration, OTP activation, and resend operations must complete primary database writes within standard latency (< 100ms). Asynchronous email notification is offloaded to RabbitMQ via the outbox pattern and does not block HTTP responses.
 - **Concurrency & Atomicity:** Database unique constraint on `users.email` (`CITEXT`) protects against race conditions during concurrent registrations. If outbox event publication fails, the entire transaction rolls back atomically.
-- **Rate Limiting:** All three endpoints are public (unauthenticated) and must be protected by the global Bucket4j Token Bucket rate limiter (returning `429 Too Many Requests` with `X-RateLimit-*` headers when exceeded) to prevent brute-forcing OTPs and spam registrations.
+- **Rate Limiting:** All three endpoints are public (unauthenticated) and must be protected by the dedicated Bucket4j `auth-tier` Token Bucket rate limiter (default: capacity 20 tokens, refill 20 tokens per 60s per client IP, returning `429 Too Many Requests` with `X-RateLimit-*` headers when exceeded) to prevent brute-forcing OTPs, Argon2 CPU exhaustion, and spam registrations.
 - **Security & Anti-Enumeration:**
   - Passwords and plain-text OTPs must never appear in application logs or HTTP responses.
   - OTP verification error responses use a uniform message (`"Invalid or expired activation code."`) across all failure causes (wrong code, expired, already consumed, user not found) to prevent timing and enumeration attacks.

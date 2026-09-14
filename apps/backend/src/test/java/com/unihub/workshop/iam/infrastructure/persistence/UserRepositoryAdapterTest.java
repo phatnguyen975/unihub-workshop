@@ -1,24 +1,23 @@
 package com.unihub.workshop.iam.infrastructure.persistence;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.unihub.workshop.iam.domain.model.CursorPage;
-import com.unihub.workshop.iam.domain.model.User;
-import com.unihub.workshop.iam.domain.model.UserRole;
-import com.unihub.workshop.shared.exception.BadRequestException;
-
-import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.PageRequest;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.unihub.workshop.iam.domain.model.CursorPage;
+import com.unihub.workshop.iam.domain.model.User;
+import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.shared.exception.BadRequestException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 
 class UserRepositoryAdapterTest {
 
@@ -37,7 +36,9 @@ class UserRepositoryAdapterTest {
         entity.setCreatedAt(Instant.now());
         entity.setUpdatedAt(Instant.now());
 
-        when(jpaRepo.findByEmail("student@test.com")).thenReturn(Optional.of(entity));
+        when(jpaRepo.findByEmail("student@test.com")).thenReturn(
+            Optional.of(entity)
+        );
 
         Optional<User> result = adapter.findByEmail("student@test.com");
 
@@ -64,9 +65,14 @@ class UserRepositoryAdapterTest {
         entity.setCreatedAt(Instant.now());
         entity.setUpdatedAt(Instant.now());
 
-        when(jpaRepo.findByIdAndOrganizationId(userId, orgId)).thenReturn(Optional.of(entity));
+        when(jpaRepo.findByIdAndOrganizationId(userId, orgId)).thenReturn(
+            Optional.of(entity)
+        );
 
-        Optional<User> result = adapter.findByIdAndOrganizationId(userId, orgId);
+        Optional<User> result = adapter.findByIdAndOrganizationId(
+            userId,
+            orgId
+        );
 
         assertThat(result).isPresent();
         assertThat(result.get().id()).isEqualTo(userId);
@@ -100,16 +106,50 @@ class UserRepositoryAdapterTest {
         Instant t2 = Instant.parse("2026-09-04T09:00:00Z");
         Instant t3 = Instant.parse("2026-09-04T08:00:00Z");
 
-        UserJpaEntity e1 = createMemberEntity(id1, orgId, "STAFF", "staff1@test.org", t1);
-        UserJpaEntity e2 = createMemberEntity(id2, orgId, "STUDENT", "student1@test.org", t2);
-        UserJpaEntity e3 = createMemberEntity(id3, orgId, "STAFF", "staff2@test.org", t3);
+        UserJpaEntity e1 = createMemberEntity(
+            id1,
+            orgId,
+            "STAFF",
+            "staff1@test.org",
+            t1
+        );
+        UserJpaEntity e2 = createMemberEntity(
+            id2,
+            orgId,
+            "STUDENT",
+            "student1@test.org",
+            t2
+        );
+        UserJpaEntity e3 = createMemberEntity(
+            id3,
+            orgId,
+            "STAFF",
+            "staff2@test.org",
+            t3
+        );
 
-        when(jpaRepo.findMembers(eq(orgId), eq(callerId), isNull(), isNull(), isNull(), isNull(), isNull(),
-                eq(PageRequest.of(0, 3))))
-                .thenReturn(List.of(e1, e2, e3));
+        when(
+            jpaRepo.findMembers(
+                eq(orgId),
+                eq(callerId),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(PageRequest.of(0, 3))
+            )
+        ).thenReturn(List.of(e1, e2, e3));
 
         CursorPage<User> page = adapter.findMembersByOrganizationId(
-                orgId, callerId, null, null, null, null, 2);
+            orgId,
+            callerId,
+            null,
+            null,
+            null,
+            null,
+            2
+        );
 
         assertThat(page.items()).hasSize(2);
         assertThat(page.items().get(0).id()).isEqualTo(id1);
@@ -117,12 +157,15 @@ class UserRepositoryAdapterTest {
         assertThat(page.hasMore()).isTrue();
         assertThat(page.nextCursor()).isNotNull();
 
-        String decoded = new String(java.util.Base64.getDecoder().decode(page.nextCursor()));
+        String decoded = new String(
+            java.util.Base64.getDecoder().decode(page.nextCursor())
+        );
         assertThat(decoded).contains(id2.toString());
     }
 
     @Test
-    void shouldFindMembersByOrganizationId_withValidCursor_decodesAndQueriesRepository() throws Exception {
+    void shouldFindMembersByOrganizationId_withValidCursor_decodesAndQueriesRepository()
+        throws Exception {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
         UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
 
@@ -131,22 +174,48 @@ class UserRepositoryAdapterTest {
         UUID cursorId = UUID.randomUUID();
         Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
 
-        ObjectMapper mapper = new ObjectMapper()
-                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        String cursorJson = mapper.writeValueAsString(new CursorData(cursorTime, cursorId));
-        String cursor = java.util.Base64.getEncoder().encodeToString(cursorJson.getBytes());
+        ObjectMapper mapper = new ObjectMapper().registerModule(
+            new JavaTimeModule()
+        );
+        String cursorJson = mapper.writeValueAsString(
+            new CursorData(cursorTime, cursorId)
+        );
+        String cursor = java.util.Base64.getEncoder().encodeToString(
+            cursorJson.getBytes()
+        );
 
         UUID id3 = UUID.randomUUID();
         Instant t3 = Instant.parse("2026-09-04T08:00:00Z");
-        UserJpaEntity e3 = createMemberEntity(id3, orgId, "STAFF", "staff2@test.org", t3);
+        UserJpaEntity e3 = createMemberEntity(
+            id3,
+            orgId,
+            "STAFF",
+            "staff2@test.org",
+            t3
+        );
 
-        when(jpaRepo.findMembers(eq(orgId), eq(callerId), eq("STAFF"), eq(true), eq("staff"), eq(cursorTime),
+        when(
+            jpaRepo.findMembers(
+                eq(orgId),
+                eq(callerId),
+                eq("STAFF"),
+                eq(true),
+                eq("staff"),
+                eq(cursorTime),
                 eq(cursorId),
-                eq(PageRequest.of(0, 3))))
-                .thenReturn(List.of(e3));
+                eq(PageRequest.of(0, 3))
+            )
+        ).thenReturn(List.of(e3));
 
         CursorPage<User> page = adapter.findMembersByOrganizationId(
-                orgId, callerId, UserRole.STAFF, true, "staff", cursor, 2);
+            orgId,
+            callerId,
+            UserRole.STAFF,
+            true,
+            "staff",
+            cursor,
+            2
+        );
 
         assertThat(page.items()).hasSize(1);
         assertThat(page.items().get(0).id()).isEqualTo(id3);
@@ -162,10 +231,19 @@ class UserRepositoryAdapterTest {
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
 
-        assertThatThrownBy(
-                () -> adapter.findMembersByOrganizationId(orgId, callerId, null, null, null, "invalid-base64", 20))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("Invalid cursor format");
+        assertThatThrownBy(() ->
+            adapter.findMembersByOrganizationId(
+                orgId,
+                callerId,
+                null,
+                null,
+                null,
+                "invalid-base64",
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
     }
 
     @Test
@@ -176,18 +254,48 @@ class UserRepositoryAdapterTest {
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
 
-        when(jpaRepo.findMembers(eq(orgId), eq(callerId), isNull(), isNull(), eq("100\\%\\_test\\\\user"), isNull(),
-                isNull(), eq(PageRequest.of(0, 21))))
-                .thenReturn(List.of());
+        when(
+            jpaRepo.findMembers(
+                eq(orgId),
+                eq(callerId),
+                isNull(),
+                isNull(),
+                eq("100\\%\\_test\\\\user"),
+                isNull(),
+                isNull(),
+                eq(PageRequest.of(0, 21))
+            )
+        ).thenReturn(List.of());
 
         adapter.findMembersByOrganizationId(
-                orgId, callerId, null, null, "100%_test\\user", null, 20);
+            orgId,
+            callerId,
+            null,
+            null,
+            "100%_test\\user",
+            null,
+            20
+        );
 
-        verify(jpaRepo).findMembers(eq(orgId), eq(callerId), isNull(), isNull(), eq("100\\%\\_test\\\\user"), isNull(),
-                isNull(), eq(PageRequest.of(0, 21)));
+        verify(jpaRepo).findMembers(
+            eq(orgId),
+            eq(callerId),
+            isNull(),
+            isNull(),
+            eq("100\\%\\_test\\\\user"),
+            isNull(),
+            isNull(),
+            eq(PageRequest.of(0, 21))
+        );
     }
 
-    private UserJpaEntity createMemberEntity(UUID id, UUID orgId, String role, String email, Instant createdAt) {
+    private UserJpaEntity createMemberEntity(
+        UUID id,
+        UUID orgId,
+        String role,
+        String email,
+        Instant createdAt
+    ) {
         UserJpaEntity entity = new UserJpaEntity();
         entity.setId(id);
         entity.setOrganizationId(orgId);
@@ -202,6 +310,5 @@ class UserRepositoryAdapterTest {
         return entity;
     }
 
-    private record CursorData(Instant createdAt, UUID id) {
-    }
+    private record CursorData(Instant createdAt, UUID id) {}
 }

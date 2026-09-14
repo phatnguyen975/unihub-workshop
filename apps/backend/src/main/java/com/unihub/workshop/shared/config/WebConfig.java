@@ -29,15 +29,18 @@ public class WebConfig {
      * or unauthorized requests still produce a log entry.
      *
      * @param nodeId the identifier of this backend node, sourced from
-     *               {@code HOSTNAME} environment variable (falls back to
-     *               {@code "unknown"} if absent)
+     *               {@code management.metrics.tags.host} or {@code HOSTNAME} environment variable
+     *               (falls back to {@code "unknown"} if absent)
      * @return the configured filter registration
      */
     @Bean
     public FilterRegistrationBean<RequestLoggingFilter> requestLoggingFilterRegistration(
-            @Value("${HOSTNAME:unknown}") String nodeId) {
-
-        FilterRegistrationBean<RequestLoggingFilter> registration = new FilterRegistrationBean<>();
+        @Value(
+            "${management.metrics.tags.host:${HOSTNAME:unknown}}"
+        ) String nodeId
+    ) {
+        FilterRegistrationBean<RequestLoggingFilter> registration =
+            new FilterRegistrationBean<>();
         registration.setFilter(new RequestLoggingFilter(nodeId));
         registration.addUrlPatterns("/*");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);

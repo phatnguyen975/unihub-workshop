@@ -253,14 +253,14 @@ Every event emitted over the stream conforms to standard SSE formatting:
 ```text
 id: <uuid>
 event: <event_name>
-data: {"success": true, "data": { ... }, "timestamp": "2026-09-09T08:30:00Z"}
+data: {"eventId": "<uuid>", "eventType": "<event_name>", "timestamp": "2026-09-09T08:30:00Z", "payload": { ... }}
 retry: 3000
 <blank line>
 ```
 
 - `id`: Unique event ID (UUIDv4) allowing client auto-reconnection via `Last-Event-ID`.
-- `event`: Name of the domain event defining the schema of `data`.
-- `data`: Serialized JSON payload containing the event data and timestamp.
+- `event`: Name of the domain event defining the catalog event type.
+- `data`: Serialized JSON event envelope (`{"eventId": string, "eventType": string, "timestamp": string, "payload": object}`) wrapping the domain data.
 - `retry`: Recommended reconnection interval in milliseconds (default: 3000ms).
 - `<blank line>`: Mandatory terminating empty line (`\n\n`) per the W3C SSE specification. Client parsers only commit and dispatch the event buffer upon receiving this blank line.
 
@@ -278,9 +278,9 @@ To prevent intermediary proxies (Nginx, cloud load balancers, corporate firewall
 
 ### Unified Event Catalog
 
-All real-time events are multiplexed over this single user connection. The client dispatches handling based on the `event` field:
+All real-time events are multiplexed over this single user connection. The client dispatches handling based on the `event` field. The inner `payload` object within `data` conforms to the domain-specific contract:
 
-| Event Name             | Module Owner    | Trigger Condition                                                              | Payload `data` Contract                                                                                                                 |
+| Event Name             | Module Owner    | Trigger Condition                                                              | Domain Payload (`payload`) Contract                                                                                                     |
 | :--------------------- | :-------------- | :----------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
 | `notification.new`     | `notifications` | A new in-app notification is persisted                                         | `{ id: string, title: string, type: string, linkUrl?: string, createdAt: string }`                                                      |
 | `notification.read`    | `notifications` | Notification(s) marked as read via PATCH API (multi-device badge sync)         | `{ id?: string, all: boolean, unreadCount: number, readAt: string }`                                                                    |

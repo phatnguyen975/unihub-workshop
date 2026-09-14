@@ -118,14 +118,14 @@ This contract defines the two REST endpoints exposed by the `workshops` module i
 
 **Error Responses:**
 
-| Status | Error Identifier                       | Title                 | Condition                                                                                     |
-| :----- | :------------------------------------- | :-------------------- | :-------------------------------------------------------------------------------------------- |
-| 400    | `urn:unihub:error:bad-request`         | Bad Request           | `size` is out of `[1, 100]` range, or `cursor` is malformed.                                  |
-| 401    | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing or invalid JWT Bearer token.                                                          |
-| 403    | `urn:unihub:error:forbidden`           | Forbidden             | Authenticated, but `jwt.role` is not `ORGANIZER`.                                             |
-| 429    | `urn:unihub:error:rate-limited`        | Too Many Requests     | Per-user Token Bucket exhausted (existing `RateLimitFilter`). Includes `Retry-After` header.  |
-| 500    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled backend error (e.g., database unreachable).                                         |
-| 503    | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis JTI blacklist unavailable (fail-closed per ADR-010). Includes `Retry-After: 30` header. |
+| Status | Error Identifier                       | Title                 | Condition                                                                                      |
+| :----- | :------------------------------------- | :-------------------- | :--------------------------------------------------------------------------------------------- |
+| 400    | `urn:unihub:error:bad-request`         | Bad Request           | `size` is out of `[1, 100]` range, or `cursor` is malformed.                                   |
+| 401    | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing or invalid JWT Bearer token.                                                           |
+| 403    | `urn:unihub:error:forbidden`           | Forbidden             | Authenticated, but `jwt.role` is not `ORGANIZER`.                                              |
+| 429    | `urn:unihub:error:rate-limited`        | Too Many Requests     | Per-user Token Bucket exhausted (default-tier: 100 tokens/60s). Includes `Retry-After` header. |
+| 500    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled backend error (e.g., database unreachable).                                          |
+| 503    | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis JTI blacklist unavailable (fail-closed per ADR-010). Includes `Retry-After: 30` header.  |
 
 #### Side Effects
 
@@ -203,7 +203,7 @@ None. This endpoint is read-only.
 | 401    | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing or invalid JWT Bearer token.                                                                                                   |
 | 403    | `urn:unihub:error:forbidden`           | Forbidden             | Authenticated, but `jwt.role` is not `ORGANIZER`.                                                                                      |
 | 404    | `urn:unihub:error:not-found`           | Not Found             | The `jobId` does not exist, belongs to a different organization, or the job has no applicable artifact (clean run or no artifact key). |
-| 429    | `urn:unihub:error:rate-limited`        | Too Many Requests     | Per-user Token Bucket exhausted (existing `RateLimitFilter`). Includes `Retry-After` header.                                           |
+| 429    | `urn:unihub:error:rate-limited`        | Too Many Requests     | Per-user Token Bucket exhausted (default-tier: 100 tokens/60s). Includes `Retry-After` header.                                         |
 | 500    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled backend error, including MinIO SDK failure during pre-signed URL generation.                                                 |
 | 503    | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis JTI blacklist unavailable (fail-closed per ADR-010). Includes `Retry-After: 30` header.                                          |
 
@@ -220,7 +220,9 @@ None. A pre-signed URL is generated but no object is read, written, or modified.
 
 ## 4. Rate Limiting Behavior
 
-Both endpoints are subject to the standard per-user Token Bucket rate limiting already implemented in `shared/web/RateLimitFilter`. No feature-specific rate limit configuration is needed. On limit exhaustion, the filter returns `429 Too Many Requests` with `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Retry-After` headers per `docs/api-standards.md §Standard Response Headers`.
+Both endpoints are authenticated organizer endpoints and are governed by the platform's standard **default-tier** Token Bucket rate limiter (implemented in `shared/ratelimit/RateLimitFilter` and configured via `rate-limit.default-tier` in `application.yml`: capacity 100 tokens, refill 100 tokens per 60 seconds, keyed by authenticated user ID `jwt.sub` as `rate_limit:<sub UUID>`). No specialized tier or custom path patterns are needed as they fall through to the default tier.
+
+On limit exhaustion, the filter returns `429 Too Many Requests` with `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Retry-After` headers per `docs/api-standards.md §Standard Response Headers`. If Redis is temporarily unavailable, the filter operates in fail-open mode per ADR-010, allowing the request through and incrementing the `rate_limiter.redis_unavailable` metric with tag `default`.
 
 ## 5. Idempotency Behavior
 
