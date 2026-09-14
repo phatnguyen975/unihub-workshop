@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.shared.events.UserProvisionedEvent;
 import java.util.List;
 import java.util.UUID;
@@ -37,8 +36,6 @@ class SeedRunnerTest {
     @Mock
     private ApplicationArguments args;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
     @Test
     void run_insertsOrganizationAndOrganizer_onFirstStartup() {
         SeedProperties props = new SeedProperties(
@@ -48,7 +45,6 @@ class SeedRunnerTest {
         SeedRunner runner = new SeedRunner(
             props,
             jdbcTemplate,
-            objectMapper,
             passwordGenerator,
             eventPublisher
         );
@@ -144,7 +140,6 @@ class SeedRunnerTest {
         SeedRunner runner = new SeedRunner(
             props,
             jdbcTemplate,
-            objectMapper,
             passwordGenerator,
             eventPublisher
         );
@@ -197,7 +192,6 @@ class SeedRunnerTest {
         SeedRunner runner = new SeedRunner(
             props,
             jdbcTemplate,
-            objectMapper,
             passwordGenerator,
             eventPublisher
         );
@@ -230,7 +224,6 @@ class SeedRunnerTest {
         SeedRunner runner = new SeedRunner(
             props,
             jdbcTemplate,
-            objectMapper,
             passwordGenerator,
             eventPublisher
         );
@@ -254,7 +247,6 @@ class SeedRunnerTest {
         SeedRunner runner = new SeedRunner(
             props,
             jdbcTemplate,
-            objectMapper,
             passwordGenerator,
             eventPublisher
         );
@@ -286,7 +278,6 @@ class SeedRunnerTest {
         SeedRunner runner = new SeedRunner(
             props,
             jdbcTemplate,
-            objectMapper,
             passwordGenerator,
             eventPublisher
         );

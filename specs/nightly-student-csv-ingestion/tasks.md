@@ -62,7 +62,7 @@ This plan delivers the worker in three independently verifiable capabilities: sa
   - **Acceptance Criteria:**
     - Blank required fields, student identifiers outside the `23` plus six-digit format, emails not exactly matching `<student_number>@student.hcmus.edu.vn`, overlength fields, and faculty values that do not match the resolved expected faculty are quarantined with reasons while valid rows from the same file are synchronized. _(FR-09–FR-12, FR-19; Scenarios 6–7)_
     - Within one chunk, the first duplicate row is retained and every later duplicate is quarantined with a duplicate reason. _(FR-13, FR-19; Scenario 8)_
-    - When at least one row is quarantined, the worker uploads one row report at `rejected/<organization-slug>/row-reports/<job-execution-id>.csv` before archiving the source, then persists and publishes an organization-scoped summary containing that key and outcome metrics. _(FR-20–FR-23, FR-26; Scenarios 10–11)_
+    - When at least one row is quarantined, the worker uploads one row report at `rejected/<organization-slug>/row-reports/<original-file-name>-quarantine-<job-execution-id>.csv` before archiving the source, then persists and publishes an organization-scoped summary containing that key and outcome metrics. _(FR-20–FR-23, FR-26; Scenarios 10–11)_
     - The completion event identifies the organization for the future notifications worker’s in-app/email broadcast; the publisher contains the documented deferred-fan-out code comment and does not directly deliver either channel. _(FR-25, BR-13; Scenario 13)_
 
 #### Checkpoint: Quarantine and Organizer Reporting

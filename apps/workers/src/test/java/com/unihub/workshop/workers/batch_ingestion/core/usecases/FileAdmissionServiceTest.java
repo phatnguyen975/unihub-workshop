@@ -57,7 +57,7 @@ class FileAdmissionServiceTest {
                 )
             )
         );
-        when(organizationDirectory.findBySlug("it")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
             Optional.of(
                 new OrganizationDirectory.OrganizationInfo(
                     orgId,
@@ -91,7 +91,7 @@ class FileAdmissionServiceTest {
                 ) // > 100MB
             )
         );
-        when(organizationDirectory.findBySlug("it")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
             Optional.of(
                 new OrganizationDirectory.OrganizationInfo(
                     orgId,
@@ -141,7 +141,7 @@ class FileAdmissionServiceTest {
                 )
             )
         );
-        when(organizationDirectory.findBySlug("it")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
             Optional.of(
                 new OrganizationDirectory.OrganizationInfo(
                     orgId,
@@ -184,7 +184,7 @@ class FileAdmissionServiceTest {
                 )
             )
         );
-        when(organizationDirectory.findBySlug("unknown")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("unknown")).thenReturn(
             Optional.empty()
         );
         when(objectStore.moveToRejected(fileKey, "unknown")).thenReturn(
@@ -215,7 +215,7 @@ class FileAdmissionServiceTest {
                 )
             )
         );
-        when(organizationDirectory.findBySlug("unallowed")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("unallowed")).thenReturn(
             Optional.of(
                 new OrganizationDirectory.OrganizationInfo(
                     orgId,
@@ -239,7 +239,7 @@ class FileAdmissionServiceTest {
     void shouldProcessFilesInCreationTimeOrder() {
         // Arrange
         var orgId = UUID.randomUUID();
-        when(organizationDirectory.findBySlug("it")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
             Optional.of(
                 new OrganizationDirectory.OrganizationInfo(
                     orgId,

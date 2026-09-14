@@ -139,4 +139,54 @@ class StudentRowValidatorTest {
             "Faculty does not match expected faculty"
         );
     }
+
+    @Test
+    void shouldRejectWhenFullNameExceeds200Characters() {
+        String longName = "A".repeat(201);
+        StudentDirectoryRow row = new StudentDirectoryRow(
+            UUID.randomUUID(),
+            "23120001",
+            "23120001@student.hcmus.edu.vn",
+            longName,
+            "Information Technology"
+        );
+        StudentDirectoryRow result = validator.process(row);
+
+        assertThat(result).isNull();
+        ArgumentCaptor<RejectedStudentRow> captor = ArgumentCaptor.forClass(
+            RejectedStudentRow.class
+        );
+        verify(rejectArtifactStore).append(
+            eq(jobExecutionId),
+            captor.capture()
+        );
+        assertThat(captor.getValue().rejectReason()).isEqualTo(
+            "Overlength fields"
+        );
+    }
+
+    @Test
+    void shouldRejectWhenFacultyExceeds200Characters() {
+        String longFaculty = "F".repeat(201);
+        StudentDirectoryRow row = new StudentDirectoryRow(
+            UUID.randomUUID(),
+            "23120001",
+            "23120001@student.hcmus.edu.vn",
+            "John Doe",
+            longFaculty
+        );
+        StudentDirectoryRow result = validator.process(row);
+
+        assertThat(result).isNull();
+        ArgumentCaptor<RejectedStudentRow> captor = ArgumentCaptor.forClass(
+            RejectedStudentRow.class
+        );
+        verify(rejectArtifactStore).append(
+            eq(jobExecutionId),
+            captor.capture()
+        );
+        assertThat(captor.getValue().rejectReason()).isEqualTo(
+            "Overlength fields"
+        );
+    }
 }

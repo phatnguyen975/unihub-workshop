@@ -9,5 +9,8 @@ import org.springframework.stereotype.Repository;
 public interface OrganizationRepository
     extends JpaRepository<OrganizationEntity, UUID>
 {
-    Optional<OrganizationEntity> findBySlug(String slug);
+    Optional<OrganizationEntity> findBySlugAndStatus(
+        String slug,
+        String status
+    );
 }

@@ -1,6 +1,7 @@
 package com.unihub.workshop.workers.maintenance.outbound.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,5 +32,36 @@ class PostgresTtlCleanupAdapterTest {
 
         assertThat(result).isEqualTo(42);
         verify(jdbcTemplate).update(eq(expectedSql));
+    }
+
+    @Test
+    void purgeExpiredRows_withDisallowedTable_throwsIllegalArgumentException() {
+        assertThatThrownBy(() -> adapter.purgeExpiredRows("users", 500))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Disallowed table for TTL cleanup: users");
+
+        assertThatThrownBy(() ->
+            adapter.purgeExpiredRows(
+                "idempotency_keys; DROP TABLE users; --",
+                500
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Disallowed table for TTL cleanup");
+    }
+
+    @Test
+    void purgeExpiredRows_withNonPositiveBatchSize_throwsIllegalArgumentException() {
+        assertThatThrownBy(() ->
+            adapter.purgeExpiredRows("idempotency_keys", 0)
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("batchSize must be positive: 0");
+
+        assertThatThrownBy(() ->
+            adapter.purgeExpiredRows("idempotency_keys", -10)
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("batchSize must be positive: -10");
     }
 }

@@ -44,7 +44,7 @@ public class CsvIngestionWithQuarantineService implements IngestStudentCsv {
     @Override
     public void ingest(SourceFile file) {
         Optional<OrganizationDirectory.OrganizationInfo> orgInfoOpt =
-            organizationDirectory.findBySlug(file.organizationSlug());
+            organizationDirectory.findActiveBySlug(file.organizationSlug());
 
         if (orgInfoOpt.isEmpty()) {
             return;

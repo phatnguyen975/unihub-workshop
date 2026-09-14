@@ -5,6 +5,7 @@ import com.unihub.workshop.workers.batch_ingestion.core.ports.out.RejectArtifact
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,11 +41,20 @@ public class S3RejectArtifactStore implements RejectArtifactStore {
                 if (!Files.exists(dir)) {
                     Files.createDirectories(dir);
                 }
+
                 File file = dir.resolve("rejected_" + id + ".csv").toFile();
-                try (FileWriter writer = new FileWriter(file, true)) {
-                    writer.write(
-                        "student_number,email,full_name,faculty,reject_reason\n"
-                    );
+                boolean isNew = !file.exists();
+                if (isNew) {
+                    try (
+                        FileWriter writer = new FileWriter(
+                            file,
+                            StandardCharsets.UTF_8
+                        )
+                    ) {
+                        writer.write(
+                            "student_number,email,full_name,faculty,reject_reason\n"
+                        );
+                    }
                 }
                 return file;
             } catch (IOException e) {
@@ -59,7 +69,13 @@ public class S3RejectArtifactStore implements RejectArtifactStore {
     @Override
     public void append(long jobExecutionId, RejectedStudentRow row) {
         File file = getFile(jobExecutionId);
-        try (FileWriter writer = new FileWriter(file, true)) {
+        try (
+            FileWriter writer = new FileWriter(
+                file,
+                StandardCharsets.UTF_8,
+                true
+            )
+        ) {
             writer.write(
                 String.format(
                     "%s,%s,%s,%s,%s\n",
@@ -96,9 +112,10 @@ public class S3RejectArtifactStore implements RejectArtifactStore {
                 );
             }
             String objectKey = String.format(
-                "rejected/%s/row-reports/%s-quarantine.csv",
+                "rejected/%s/row-reports/%s-quarantine-%d.csv",
                 organizationSlug,
-                originalFileName
+                originalFileName,
+                jobExecutionId
             );
 
             PutObjectRequest putRequest = PutObjectRequest.builder()

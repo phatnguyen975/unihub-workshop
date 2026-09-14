@@ -51,7 +51,7 @@ public class FileAdmissionService implements RunFileAdmission {
 
     private void processFile(SourceFile file) {
         Optional<OrganizationDirectory.OrganizationInfo> orgInfoOpt =
-            organizationDirectory.findBySlug(file.organizationSlug());
+            organizationDirectory.findActiveBySlug(file.organizationSlug());
 
         if (orgInfoOpt.isEmpty()) {
             objectStore.moveToRejected(file.key(), file.organizationSlug());

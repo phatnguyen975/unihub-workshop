@@ -17,6 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Component
@@ -40,7 +41,6 @@ public class SeedRunner implements ApplicationRunner {
     public SeedRunner(
         SeedProperties seedProperties,
         JdbcTemplate jdbcTemplate,
-        ObjectMapper objectMapper,
         PasswordGenerator passwordGenerator,
         ApplicationEventPublisher eventPublisher
     ) {
@@ -52,10 +52,7 @@ public class SeedRunner implements ApplicationRunner {
             jdbcTemplate,
             "jdbcTemplate must not be null"
         );
-        this.objectMapper = Objects.requireNonNull(
-            objectMapper,
-            "objectMapper must not be null"
-        );
+        this.objectMapper = new ObjectMapper();
         this.passwordGenerator = Objects.requireNonNull(
             passwordGenerator,
             "passwordGenerator must not be null"
@@ -67,6 +64,7 @@ public class SeedRunner implements ApplicationRunner {
     }
 
     @Override
+    @Transactional
     public void run(ApplicationArguments args) {
         List<OrganizationSeedEntry> organizations = parseJson(
             seedProperties.organizations(),

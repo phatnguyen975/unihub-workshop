@@ -103,6 +103,7 @@ public class S3IngestionObjectStore implements IngestionObjectStore {
             String firstLine = head.split("\\r?\\n")[0];
             Set<String> headers = Arrays.stream(firstLine.split(","))
                 .map(String::trim)
+                .map(h -> h.replaceAll("^\"|\"$", ""))
                 .collect(Collectors.toSet());
 
             return (

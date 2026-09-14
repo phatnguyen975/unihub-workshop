@@ -12,9 +12,9 @@ public class PostgresOrganizationDirectory implements OrganizationDirectory {
     private final OrganizationRepository repository;
 
     @Override
-    public Optional<OrganizationInfo> findBySlug(String slug) {
+    public Optional<OrganizationInfo> findActiveBySlug(String slug) {
         return repository
-            .findBySlug(slug)
+            .findBySlugAndStatus(slug, "ACTIVE")
             .map(entity ->
                 new OrganizationInfo(entity.getId(), entity.getName())
             );

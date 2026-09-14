@@ -55,7 +55,7 @@ class CsvIngestionWithQuarantineServiceTest {
         String fileKey = "inbox/it/students.csv";
         SourceFile file = new SourceFile(fileKey, "it", 1000L, Instant.now());
 
-        when(organizationDirectory.findBySlug("it")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
             Optional.of(
                 new OrganizationDirectory.OrganizationInfo(
                     orgId,
@@ -106,7 +106,7 @@ class CsvIngestionWithQuarantineServiceTest {
         String fileKey = "inbox/it/students.csv";
         SourceFile file = new SourceFile(fileKey, "it", 1000L, Instant.now());
 
-        when(organizationDirectory.findBySlug("it")).thenReturn(
+        when(organizationDirectory.findActiveBySlug("it")).thenReturn(
             Optional.of(
                 new OrganizationDirectory.OrganizationInfo(
                     orgId,
@@ -127,7 +127,7 @@ class CsvIngestionWithQuarantineServiceTest {
         );
         when(
             rejectArtifactStore.uploadAndCleanUp(123L, "it", fileKey)
-        ).thenReturn("rejected/it/row-reports/students-quarantine.csv");
+        ).thenReturn("rejected/it/row-reports/students-quarantine-123.csv");
 
         service.ingest(file);
 
@@ -141,7 +141,7 @@ class CsvIngestionWithQuarantineServiceTest {
 
         IngestionJobReport saved = reportCaptor.getValue();
         assertThat(saved.rejectArtifactKey()).isEqualTo(
-            "rejected/it/row-reports/students-quarantine.csv"
+            "rejected/it/row-reports/students-quarantine-123.csv"
         );
     }
 }

@@ -51,7 +51,7 @@ class S3RejectArtifactStoreTest {
         PutObjectRequest request = putCaptor.getValue();
         assertThat(request.bucket()).isEqualTo("unihub-csv-drops");
         assertThat(request.key()).isEqualTo(
-            "rejected/it/row-reports/students-quarantine.csv"
+            "rejected/it/row-reports/students-quarantine-999.csv"
         );
 
         // Path should have been deleted, but we can check the path captured

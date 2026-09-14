@@ -18,4 +18,5 @@ public class OrganizationEntity {
 
     private String name;
     private String slug;
+    private String status;
 }

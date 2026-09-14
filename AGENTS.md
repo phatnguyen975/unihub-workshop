@@ -90,20 +90,20 @@ Every feature in `docs/feature-catalog.md` maintains an explicit status:
 
 ### 4.2 Skills Catalog
 
-| #   | Skill                                    | Phase        | Purpose                                                                                                |
-| :-- | :--------------------------------------- | :----------- | :----------------------------------------------------------------------------------------------------- |
-| 1   | `spec-driven-development`                | Spec         | Write FR/BR/AC-based spec before any code                                                              |
-| 2   | `api-contract-design`                    | Spec         | Design REST contract conformant to `docs/api-standards.md`                                             |
-| 3   | `task-planning-and-breakdown`            | Plan         | Break approved spec into vertical-slice tasks — one capability per task, spanning every layer it needs |
-| 4   | `test-driven-development`                | Build        | Red-Green-Refactor; 4-layer mock-based unit testing                                                    |
-| 5   | `incremental-implementation`             | Build        | Build one task's vertical slice layer by layer, innermost-to-outermost                                 |
-| 6   | `modular-boundary-enforcement`           | Build        | Keep cross-module access through `api/` only; run `ModulithArchitectureTest`                           |
-| 7   | `database-schema-evolution`              | Build        | Safe, additive-only schema migrations                                                                  |
-| 8   | `idempotency-and-exactly-once-design`    | Build        | Exactly-once semantics for retry-risk mutations                                                        |
-| 9   | `security-and-hardening`                 | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                                               |
-| 10  | `performance-and-efficiency-engineering` | Build/Review | N+1 queries, indexing, unbounded results, hot-path I/O, caching                                        |
-| 11  | `code-review-and-quality`                | Review       | Multi-axis review before merge                                                                         |
-| 12  | `debugging-and-root-cause-analysis`      | Fix/Build    | Reproduce → localize → hypothesize → fix root cause → regression test                                  |
+| #   | Skill                                    | Phase        | Purpose                                                                                                                         |
+| :-- | :--------------------------------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `spec-driven-development`                | Spec         | Write FR/BR/AC-based spec before any code                                                                                       |
+| 2   | `api-contract-design`                    | Spec         | Design REST contract conformant to `docs/api-standards.md`                                                                      |
+| 3   | `task-planning-and-breakdown`            | Plan         | Break approved spec into vertical-slice tasks — one capability per task, spanning every layer it needs                          |
+| 4   | `test-driven-development`                | Build        | Red-Green-Refactor; 4-layer mock-based unit testing                                                                             |
+| 5   | `incremental-implementation`             | Build        | Build one task's vertical slice layer by layer, innermost-to-outermost                                                          |
+| 6   | `modular-boundary-enforcement`           | Build        | Keep cross-module access through `api/` only; run `ModulithArchitectureTest` (backend) or `HexagonalArchitectureTest` (workers) |
+| 7   | `database-schema-evolution`              | Build        | Safe, additive-only schema migrations                                                                                           |
+| 8   | `idempotency-and-exactly-once-design`    | Build        | Exactly-once semantics for retry-risk mutations                                                                                 |
+| 9   | `security-and-hardening`                 | Build/Review | OWASP/STRIDE checklist for auth, payment, webhook, input                                                                        |
+| 10  | `performance-and-efficiency-engineering` | Build/Review | N+1 queries, indexing, unbounded results, hot-path I/O, caching                                                                 |
+| 11  | `code-review-and-quality`                | Review       | Multi-axis review before merge                                                                                                  |
+| 12  | `debugging-and-root-cause-analysis`      | Fix/Build    | Reproduce → localize → hypothesize → fix root cause → regression test                                                           |
 
 ### 4.3 `/spec <feature-name>`
 
@@ -153,7 +153,9 @@ Run once per task in `tasks.md`, in order.
 
 > [!NOTE]
 >
-> - `ModulithArchitectureTest` (see section 6) must pass as part of the full unit test suite run at the end of every `/build` task and again before `/review` — it is included in "the full unit test suite" referenced throughout this document, not a separate manual step.
+> - **Architecture regression tests** (see section 6) must pass as part of the unit test suite run at the end of every `/build` task and again before `/review`, scoped to the application being modified (no need to run both every time):
+>   - For **Core Backend** (`apps/backend/`): run `ModulithArchitectureTest` (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
+>   - For **Workers** (`apps/workers/`): run `HexagonalArchitectureTest` (`./gradlew test --tests "com.unihub.workshop.workers.HexagonalArchitectureTest"`).
 > - If a test fails unexpectedly during a task (not yet a formal review finding), the agent applies `debugging-and-root-cause-analysis` inline before continuing.
 
 > [!IMPORTANT]
@@ -229,7 +231,9 @@ If `/review → /fix` repeats more than twice for the same feature without conve
 - Cross-module calls must go through `api/` facade interfaces or domain events (via the Spring Modulith event publication registry) — never reach into another module's `domain/`, `application/`, or `infrastructure/` package directly.
 - Workers (`apps/workers/`) follow Hexagonal Architecture per pipeline (`inbound/` → `core/` → `outbound/`), with `core/` having zero outward dependencies.
 - See `docs/project-structure.md` for the full per-module directory layout and the `modular-boundary-enforcement` skill for enforcement workflow.
-- `modular-boundary-enforcement` is verified concretely via `apps/backend/src/test/java/com/unihub/workshop/ModulithArchitectureTest.java` — running `ApplicationModules.of(...).verify()` — which must pass before any feature touching module boundaries is considered complete. This is a static architecture check, not an integration test, and is always permitted under section 5.
+- `modular-boundary-enforcement` is verified concretely via static architecture checks (not integration tests, always permitted under section 5):
+  - **Core Backend (`apps/backend/`):** `apps/backend/src/test/java/com/unihub/workshop/ModulithArchitectureTest.java` — verifies Spring Modulith module encapsulation (`ApplicationModules.of(...).verify()`), Clean Architecture layer purity, and public `api/` facade boundaries. Run whenever modifying backend code.
+  - **Workers (`apps/workers/`):** `apps/workers/src/test/java/com/unihub/workshop/workers/HexagonalArchitectureTest.java` — verifies Hexagonal Architecture (Ports and Adapters) intra-module isolation, port interface contracts, and inter-worker-module decoupling. Run whenever modifying worker code.
 
 ## 7. Coding Conventions (Java & TypeScript)
 

@@ -67,8 +67,8 @@ public class StudentRowValidator
         }
 
         if (
-            item.fullName().length() > 255 ||
-            item.faculty().length() > 255 ||
+            item.fullName().length() > 200 ||
+            item.faculty().length() > 200 ||
             item.studentNumber().length() > 50 ||
             item.email().length() > 255
         ) {

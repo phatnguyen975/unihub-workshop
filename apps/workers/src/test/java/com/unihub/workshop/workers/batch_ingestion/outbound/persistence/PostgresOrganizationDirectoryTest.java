@@ -23,10 +23,12 @@ class PostgresOrganizationDirectoryTest {
         entity.setName("Information Technology");
         entity.setSlug("it");
 
-        when(repository.findBySlug("it")).thenReturn(Optional.of(entity));
+        when(repository.findBySlugAndStatus("it", "ACTIVE")).thenReturn(
+            Optional.of(entity)
+        );
 
         Optional<OrganizationDirectory.OrganizationInfo> result =
-            directory.findBySlug("it");
+            directory.findActiveBySlug("it");
 
         assertThat(result).isPresent();
         assertThat(result.get().id()).isEqualTo(orgId);
@@ -39,10 +41,28 @@ class PostgresOrganizationDirectoryTest {
         PostgresOrganizationDirectory directory =
             new PostgresOrganizationDirectory(repository);
 
-        when(repository.findBySlug("unknown")).thenReturn(Optional.empty());
+        when(repository.findBySlugAndStatus("unknown", "ACTIVE")).thenReturn(
+            Optional.empty()
+        );
 
         Optional<OrganizationDirectory.OrganizationInfo> result =
-            directory.findBySlug("unknown");
+            directory.findActiveBySlug("unknown");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldReturnEmptyWhenOrganizationIsInactive() {
+        OrganizationRepository repository = mock(OrganizationRepository.class);
+        PostgresOrganizationDirectory directory =
+            new PostgresOrganizationDirectory(repository);
+
+        when(
+            repository.findBySlugAndStatus("inactive-org", "ACTIVE")
+        ).thenReturn(Optional.empty());
+
+        Optional<OrganizationDirectory.OrganizationInfo> result =
+            directory.findActiveBySlug("inactive-org");
 
         assertThat(result).isEmpty();
     }

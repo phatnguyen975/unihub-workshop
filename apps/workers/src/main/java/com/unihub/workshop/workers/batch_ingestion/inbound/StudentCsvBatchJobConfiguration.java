@@ -14,8 +14,10 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.infrastructure.item.ExecutionContext;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.batch.infrastructure.item.ItemReader;
+import org.springframework.batch.infrastructure.item.ItemStreamReader;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.support.CompositeItemProcessor;
 import org.springframework.beans.factory.annotation.Value;
@@ -77,21 +79,42 @@ public class StudentCsvBatchJobConfiguration {
 
     @Bean
     @StepScope
-    public ItemReader<StudentDirectoryRow> studentCsvItemReader(
+    public ItemStreamReader<StudentDirectoryRow> studentCsvItemReader(
         StreamingStudentCsvReader streamingReader,
         @Value("#{jobParameters['sourceFileKey']}") String sourceFileKey,
         @Value("#{jobParameters['organizationId']}") String orgId
     ) {
-        return new ItemReader<>() {
+        return new ItemStreamReader<>() {
             private boolean opened = false;
 
             @Override
-            public StudentDirectoryRow read() throws Exception {
+            public void open(ExecutionContext executionContext) {
                 if (!opened) {
                     streamingReader.open(sourceFileKey, UUID.fromString(orgId));
                     opened = true;
                 }
-                return streamingReader.readRow();
+            }
+
+            @Override
+            public void update(ExecutionContext executionContext) {}
+
+            @Override
+            public void close() {
+                try {
+                    streamingReader.close();
+                } catch (Exception ignored) {}
+            }
+
+            @Override
+            public StudentDirectoryRow read() throws Exception {
+                if (!opened) {
+                    open(new ExecutionContext());
+                }
+                StudentDirectoryRow row = streamingReader.readRow();
+                if (row == null) {
+                    close();
+                }
+                return row;
             }
         };
     }

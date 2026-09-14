@@ -134,4 +134,29 @@ class S3IngestionObjectStoreTest {
 
         assertThat(store.hasValidHeader("inbox/it/f1.csv")).isFalse();
     }
+
+    @Test
+    void shouldReturnTrueWhenHeaderIsValidWithQuotes() {
+        String validQuotedHeader =
+            "\"student_number\",\"email\",\"full_name\",\"faculty\"\n231234,a@b,c,d";
+
+        when(
+            s3Client.getObject(
+                any(GetObjectRequest.class),
+                ArgumentMatchers.<
+                    ResponseTransformer<
+                        GetObjectResponse,
+                        ResponseBytes<GetObjectResponse>
+                    >
+                >any()
+            )
+        ).thenReturn(
+            ResponseBytes.fromByteArray(
+                GetObjectResponse.builder().build(),
+                validQuotedHeader.getBytes(StandardCharsets.UTF_8)
+            )
+        );
+
+        assertThat(store.hasValidHeader("inbox/it/f1.csv")).isTrue();
+    }
 }
