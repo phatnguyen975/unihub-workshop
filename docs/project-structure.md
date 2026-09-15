@@ -173,11 +173,13 @@ apps/backend/
 │   │   │       │   │       └── out/          # Outbound port contracts (Repositories, external adapters)
 │   │   │       │   ├── infrastructure/       # Technical adapters, persistence, and external clients
 │   │   │       │   │   ├── persistence/      # Spring Data JPA repositories, JPA entities, database adapters
+│   │   │       │   │   │   └── mapper/       # MapStruct mappers (JPA Entity ↔ Domain Model)
 │   │   │       │   │   ├── security/         # Redis token blacklist, active session tracker adapters
 │   │   │       │   │   └── config/           # Module-specific Spring configuration beans
 │   │   │       │   └── presentation/         # External REST HTTP interface
 │   │   │       │       ├── controllers/      # Spring @RestController classes
-│   │   │       │       └── dto/              # REST request/response DTOs and validation constraints
+│   │   │       │       ├── dto/              # REST request/response DTOs and validation constraints
+│   │   │       │       └── mapper/           # MapStruct mappers (Domain Model / UseCase Result ↔ REST Response DTOs)
 │   │   │       ├── workshops/                # Workshops, assignments, brochures (follows identical iam template above)
 │   │   │       ├── registrations/            # Registrations lifecycle and idempotency (follows identical iam template above)
 │   │   │       ├── payments/                 # Stripe payments and checkout (follows identical iam template above)
@@ -330,6 +332,7 @@ apps/workers/
 │   │   │       │   └── database/             # Read/write replica-routing data source and configuration
 │   │   │       ├── batch_ingestion/          # Nightly CSV ingestion worker (concrete Hexagonal reference template)
 │   │   │       │   ├── inbound/              # Schedulers and Spring Batch job configurations
+│   │   │       │   │   └── mapper/           # MapStruct mappers (Job/External DTO ↔ Core Command/Model)
 │   │   │       │   ├── core/                 # Pure domain models, pipeline logic, and port interfaces
 │   │   │       │   │   ├── models/           # Domain records
 │   │   │       │   │   ├── pipeline/         # Streaming CSV reader, row validator, chunk duplicate resolver
@@ -339,6 +342,7 @@ apps/workers/
 │   │   │       │   │   └── usecases/         # Job orchestration services
 │   │   │       │   └── outbound/             # Technology-specific outbound adapters
 │   │   │       │       ├── persistence/      # Spring Data JPA repositories & Postgres adapters
+│   │   │       │       │   └── mapper/       # MapStruct mappers (JPA Entity ↔ Core Domain Model)
 │   │   │       │       ├── storage/          # MinIO S3 object store, reject artifact store, Redis checkpoint store
 │   │   │       │       ├── ai_providers/     # External AI API adapters
 │   │   │       │       ├── messaging/        # RabbitMQ AMQP event publisher

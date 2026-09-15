@@ -13,7 +13,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class FileAdmissionService implements RunFileAdmission {
 
     private final IngestionObjectStore objectStore;
@@ -22,22 +24,6 @@ public class FileAdmissionService implements RunFileAdmission {
     private final IngestionEventPublisher eventPublisher;
     private final Set<String> expectedFaculties;
     private final long maxFileSizeBytes;
-
-    public FileAdmissionService(
-        IngestionObjectStore objectStore,
-        OrganizationDirectory organizationDirectory,
-        IngestionJobReportWriter reportWriter,
-        IngestionEventPublisher eventPublisher,
-        Set<String> expectedFaculties,
-        long maxFileSizeBytes
-    ) {
-        this.objectStore = objectStore;
-        this.organizationDirectory = organizationDirectory;
-        this.reportWriter = reportWriter;
-        this.eventPublisher = eventPublisher;
-        this.expectedFaculties = expectedFaculties;
-        this.maxFileSizeBytes = maxFileSizeBytes;
-    }
 
     @Override
     public void admitFiles() {

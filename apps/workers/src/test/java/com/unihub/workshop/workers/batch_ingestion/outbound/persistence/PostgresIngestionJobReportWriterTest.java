@@ -5,9 +5,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.unihub.workshop.workers.batch_ingestion.core.models.IngestionJobReport;
+import com.unihub.workshop.workers.batch_ingestion.outbound.persistence.mapper.IngestionJobReportPersistenceMapper;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 
 class PostgresIngestionJobReportWriterTest {
@@ -17,8 +19,11 @@ class PostgresIngestionJobReportWriterTest {
         IngestionJobReportRepository repository = mock(
             IngestionJobReportRepository.class
         );
+        IngestionJobReportPersistenceMapper mapper = Mappers.getMapper(
+            IngestionJobReportPersistenceMapper.class
+        );
         PostgresIngestionJobReportWriter writer =
-            new PostgresIngestionJobReportWriter(repository);
+            new PostgresIngestionJobReportWriter(repository, mapper);
 
         Instant now = Instant.now();
         UUID orgId = UUID.randomUUID();

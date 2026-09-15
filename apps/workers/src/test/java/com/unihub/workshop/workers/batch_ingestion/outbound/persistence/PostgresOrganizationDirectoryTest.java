@@ -5,17 +5,23 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.OrganizationDirectory;
+import com.unihub.workshop.workers.batch_ingestion.outbound.persistence.mapper.OrganizationPersistenceMapper;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 class PostgresOrganizationDirectoryTest {
+
+    private final OrganizationPersistenceMapper mapper = Mappers.getMapper(
+        OrganizationPersistenceMapper.class
+    );
 
     @Test
     void shouldFindAndMapOrganization() {
         OrganizationRepository repository = mock(OrganizationRepository.class);
         PostgresOrganizationDirectory directory =
-            new PostgresOrganizationDirectory(repository);
+            new PostgresOrganizationDirectory(repository, mapper);
 
         UUID orgId = UUID.randomUUID();
         OrganizationEntity entity = new OrganizationEntity();
@@ -39,7 +45,7 @@ class PostgresOrganizationDirectoryTest {
     void shouldReturnEmptyWhenNotFound() {
         OrganizationRepository repository = mock(OrganizationRepository.class);
         PostgresOrganizationDirectory directory =
-            new PostgresOrganizationDirectory(repository);
+            new PostgresOrganizationDirectory(repository, mapper);
 
         when(repository.findBySlugAndStatus("unknown", "ACTIVE")).thenReturn(
             Optional.empty()
@@ -55,7 +61,7 @@ class PostgresOrganizationDirectoryTest {
     void shouldReturnEmptyWhenOrganizationIsInactive() {
         OrganizationRepository repository = mock(OrganizationRepository.class);
         PostgresOrganizationDirectory directory =
-            new PostgresOrganizationDirectory(repository);
+            new PostgresOrganizationDirectory(repository, mapper);
 
         when(
             repository.findBySlugAndStatus("inactive-org", "ACTIVE")

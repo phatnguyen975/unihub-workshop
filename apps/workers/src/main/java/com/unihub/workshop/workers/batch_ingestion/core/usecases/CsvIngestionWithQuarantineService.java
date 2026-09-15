@@ -13,9 +13,11 @@ import com.unihub.workshop.workers.batch_ingestion.core.ports.out.RejectArtifact
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class CsvIngestionWithQuarantineService implements IngestStudentCsv {
 
     private final IngestionCheckpointStore checkpointStore;
@@ -24,22 +26,6 @@ public class CsvIngestionWithQuarantineService implements IngestStudentCsv {
     private final IngestionEventPublisher eventPublisher;
     private final OrganizationDirectory organizationDirectory;
     private final RejectArtifactStore rejectArtifactStore;
-
-    public CsvIngestionWithQuarantineService(
-        IngestionCheckpointStore checkpointStore,
-        IngestionObjectStore objectStore,
-        IngestionJobReportWriter reportWriter,
-        IngestionEventPublisher eventPublisher,
-        OrganizationDirectory organizationDirectory,
-        RejectArtifactStore rejectArtifactStore
-    ) {
-        this.checkpointStore = checkpointStore;
-        this.objectStore = objectStore;
-        this.reportWriter = reportWriter;
-        this.eventPublisher = eventPublisher;
-        this.organizationDirectory = organizationDirectory;
-        this.rejectArtifactStore = rejectArtifactStore;
-    }
 
     @Override
     public void ingest(SourceFile file) {

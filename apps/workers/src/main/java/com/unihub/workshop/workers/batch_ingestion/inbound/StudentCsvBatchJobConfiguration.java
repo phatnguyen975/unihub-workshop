@@ -125,12 +125,7 @@ public class StudentCsvBatchJobConfiguration {
         StudentDirectoryWriter writer,
         @Value("#{jobParameters['sourceFileKey']}") String sourceFileKey
     ) {
-        return chunk -> {
-            List<StudentDirectoryRow> rows = new ArrayList<>();
-            for (Object item : chunk.getItems()) {
-                rows.add((StudentDirectoryRow) item);
-            }
-            writer.bulkUpsert(rows, sourceFileKey);
-        };
+        return chunk ->
+            writer.bulkUpsert(new ArrayList<>(chunk.getItems()), sourceFileKey);
     }
 }
