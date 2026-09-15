@@ -82,12 +82,12 @@ class IngestionJobControllerRejectArtifactTest {
 
     @Test
     void getRejectArtifactUrl_Success() throws Exception {
-        RejectArtifactUrlResult result = new RejectArtifactUrlResult(
-            JOB_ID,
-            "SOURCE_FILE",
-            "https://minio/artifact",
-            Instant.parse("2026-08-31T02:30:00Z")
-        );
+        RejectArtifactUrlResult result = RejectArtifactUrlResult.builder()
+            .jobId(JOB_ID)
+            .artifactType("SOURCE_FILE")
+            .downloadUrl("https://minio/artifact")
+            .expiresAt(Instant.parse("2026-08-31T02:30:00Z"))
+            .build();
 
         when(getRejectArtifactUrlUseCase.execute(JOB_ID, ORG_ID)).thenReturn(
             result

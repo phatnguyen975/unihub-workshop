@@ -2,7 +2,9 @@ package com.unihub.workshop.iam.domain.model;
 
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record UserVerificationToken(
     UUID id,
     UUID userId,
@@ -24,18 +26,15 @@ public record UserVerificationToken(
         Instant expiresAt
     ) {
         Instant now = Instant.now();
-        return new UserVerificationToken(
-            UUID.randomUUID(),
-            userId,
-            TYPE_ACTIVATION_OTP,
-            tokenHash,
-            expiresAt,
-            null,
-            now,
-            now,
-            null,
-            null
-        );
+        return UserVerificationToken.builder()
+            .id(UUID.randomUUID())
+            .userId(userId)
+            .tokenType(TYPE_ACTIVATION_OTP)
+            .tokenHash(tokenHash)
+            .expiresAt(expiresAt)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
     }
 
     public static UserVerificationToken createPasswordResetOtp(
@@ -44,18 +43,15 @@ public record UserVerificationToken(
         Instant expiresAt
     ) {
         Instant now = Instant.now();
-        return new UserVerificationToken(
-            UUID.randomUUID(),
-            userId,
-            TYPE_PASSWORD_RESET_OTP,
-            tokenHash,
-            expiresAt,
-            null,
-            now,
-            now,
-            null,
-            null
-        );
+        return UserVerificationToken.builder()
+            .id(UUID.randomUUID())
+            .userId(userId)
+            .tokenType(TYPE_PASSWORD_RESET_OTP)
+            .tokenHash(tokenHash)
+            .expiresAt(expiresAt)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
     }
 
     public boolean isExpired() {

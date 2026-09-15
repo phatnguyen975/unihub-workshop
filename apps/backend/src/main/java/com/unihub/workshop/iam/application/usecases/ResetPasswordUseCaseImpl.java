@@ -9,12 +9,15 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ValidationException;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
 
     private final UserRepository userRepository;
@@ -23,23 +26,21 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
     private final MeterRegistry meterRegistry;
-    private final String dummyTokenHash;
 
-    public ResetPasswordUseCaseImpl(
-        UserRepository userRepository,
-        UserVerificationTokenRepository userVerificationTokenRepository,
-        RefreshTokenRepository refreshTokenRepository,
-        OtpService otpService,
-        PasswordEncoder passwordEncoder,
-        MeterRegistry meterRegistry
-    ) {
-        this.userRepository = userRepository;
-        this.userVerificationTokenRepository = userVerificationTokenRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.otpService = otpService;
-        this.passwordEncoder = passwordEncoder;
-        this.meterRegistry = meterRegistry;
-        this.dummyTokenHash = otpService.hashOtp("000000");
+    private volatile String dummyTokenHash;
+
+    @PostConstruct
+    void init() {
+        if (dummyTokenHash == null) {
+            dummyTokenHash = otpService.hashOtp("000000");
+        }
+    }
+
+    private String getDummyTokenHash() {
+        if (dummyTokenHash == null) {
+            dummyTokenHash = otpService.hashOtp("000000");
+        }
+        return dummyTokenHash;
     }
 
     @Override
@@ -50,13 +51,13 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
         User user = userRepository.findByEmail(normalizedEmail).orElse(null);
 
         if (user == null) {
-            otpService.verifyOtp(otp, dummyTokenHash);
+            otpService.verifyOtp(otp, getDummyTokenHash());
             recordFailure("user_not_found");
             throw invalidOtp();
         }
 
         if (!user.isActive()) {
-            otpService.verifyOtp(otp, dummyTokenHash);
+            otpService.verifyOtp(otp, getDummyTokenHash());
             recordFailure("inactive_user");
             throw invalidOtp();
         }
@@ -69,13 +70,13 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
             .orElse(null);
 
         if (token == null) {
-            otpService.verifyOtp(otp, dummyTokenHash);
+            otpService.verifyOtp(otp, getDummyTokenHash());
             recordFailure("token_not_found");
             throw invalidOtp();
         }
 
         if (token.isConsumed() || token.isExpired()) {
-            otpService.verifyOtp(otp, dummyTokenHash);
+            otpService.verifyOtp(otp, getDummyTokenHash());
             recordFailure(
                 token.isConsumed() ? "already_consumed" : "expired_otp"
             );

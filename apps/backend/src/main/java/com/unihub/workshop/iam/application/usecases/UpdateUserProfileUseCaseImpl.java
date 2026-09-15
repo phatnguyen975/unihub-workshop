@@ -7,17 +7,15 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class UpdateUserProfileUseCaseImpl implements UpdateUserProfileUseCase {
 
     private final UserRepository userRepository;
-
-    public UpdateUserProfileUseCaseImpl(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     @Override
     @Transactional

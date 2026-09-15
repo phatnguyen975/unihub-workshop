@@ -7,6 +7,7 @@ import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisClient;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContextException;
 import org.springframework.context.annotation.Bean;
@@ -17,13 +18,10 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 
 @Configuration
 @EnableConfigurationProperties(RateLimitProperties.class)
+@RequiredArgsConstructor
 public class RateLimitConfig {
 
     private final RateLimitProperties properties;
-
-    public RateLimitConfig(RateLimitProperties properties) {
-        this.properties = properties;
-    }
 
     @PostConstruct
     public void validateTiers() {

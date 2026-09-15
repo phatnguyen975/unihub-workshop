@@ -10,12 +10,14 @@ import com.unihub.workshop.shared.exception.ValidationException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ChangeUserPasswordUseCaseImpl
     implements ChangeUserPasswordUseCase
 {
@@ -28,18 +30,6 @@ public class ChangeUserPasswordUseCaseImpl
     private final RevokeAllOtherSessionsUseCase revokeAllOtherSessionsUseCase;
     private final PasswordEncoder passwordEncoder;
     private final MeterRegistry meterRegistry;
-
-    public ChangeUserPasswordUseCaseImpl(
-        UserRepository userRepository,
-        RevokeAllOtherSessionsUseCase revokeAllOtherSessionsUseCase,
-        PasswordEncoder passwordEncoder,
-        MeterRegistry meterRegistry
-    ) {
-        this.userRepository = userRepository;
-        this.revokeAllOtherSessionsUseCase = revokeAllOtherSessionsUseCase;
-        this.passwordEncoder = passwordEncoder;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Override
     @Transactional(propagation = Propagation.NEVER)

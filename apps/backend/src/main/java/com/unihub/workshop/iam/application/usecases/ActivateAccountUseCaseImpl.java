@@ -8,25 +8,17 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ValidationException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
 
     private final UserRepository userRepository;
     private final UserVerificationTokenRepository userVerificationTokenRepository;
     private final OtpService otpService;
-
-    public ActivateAccountUseCaseImpl(
-        UserRepository userRepository,
-        UserVerificationTokenRepository userVerificationTokenRepository,
-        OtpService otpService
-    ) {
-        this.userRepository = userRepository;
-        this.userVerificationTokenRepository = userVerificationTokenRepository;
-        this.otpService = otpService;
-    }
 
     @Override
     @Transactional

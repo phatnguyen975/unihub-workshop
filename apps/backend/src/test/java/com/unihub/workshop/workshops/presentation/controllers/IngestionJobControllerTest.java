@@ -87,20 +87,18 @@ class IngestionJobControllerTest {
             createMockJwt("ORGANIZER", orgId)
         );
 
-        IngestionJobReport report = new IngestionJobReport(
-            UUID.randomUUID(),
-            1L,
-            orgId,
-            "file.csv",
-            IngestionJobOutcome.COMPLETED,
-            100,
-            0,
-            null,
-            null,
-            Instant.now(),
-            Instant.now(),
-            Instant.now()
-        );
+        IngestionJobReport report = IngestionJobReport.builder()
+            .id(UUID.randomUUID())
+            .jobExecutionId(1L)
+            .organizationId(orgId)
+            .sourceFileKey("file.csv")
+            .outcome(IngestionJobOutcome.COMPLETED)
+            .processedRowCount(100)
+            .rejectedRowCount(0)
+            .completedAt(Instant.now())
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .build();
         CursorPage<IngestionJobReport> page = new CursorPage<>(
             List.of(report),
             "next-cursor",
@@ -163,20 +161,18 @@ class IngestionJobControllerTest {
             createMockJwt("ORGANIZER", orgId)
         );
 
-        IngestionJobReport report = new IngestionJobReport(
-            UUID.randomUUID(),
-            1L,
-            orgId,
-            "file.csv",
-            IngestionJobOutcome.COMPLETED,
-            100,
-            0,
-            null,
-            null,
-            Instant.now(),
-            Instant.now(),
-            Instant.now()
-        );
+        IngestionJobReport report = IngestionJobReport.builder()
+            .id(UUID.randomUUID())
+            .jobExecutionId(1L)
+            .organizationId(orgId)
+            .sourceFileKey("file.csv")
+            .outcome(IngestionJobOutcome.COMPLETED)
+            .processedRowCount(100)
+            .rejectedRowCount(0)
+            .completedAt(Instant.now())
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .build();
         CursorPage<IngestionJobReport> page = new CursorPage<>(
             List.of(report),
             null,

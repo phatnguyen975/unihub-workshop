@@ -17,12 +17,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class UpdateMemberStatusUseCaseImpl
     implements UpdateMemberStatusUseCase
 {
@@ -32,20 +34,6 @@ public class UpdateMemberStatusUseCaseImpl
     private final JtiBlacklistPort jtiBlacklistPort;
     private final SessionTrackerPort sessionTrackerPort;
     private final ApplicationEventPublisher eventPublisher;
-
-    public UpdateMemberStatusUseCaseImpl(
-        UserRepository userRepository,
-        RefreshTokenRepository refreshTokenRepository,
-        JtiBlacklistPort jtiBlacklistPort,
-        SessionTrackerPort sessionTrackerPort,
-        ApplicationEventPublisher eventPublisher
-    ) {
-        this.userRepository = userRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.jtiBlacklistPort = jtiBlacklistPort;
-        this.sessionTrackerPort = sessionTrackerPort;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Override
     @Transactional(propagation = Propagation.NEVER)

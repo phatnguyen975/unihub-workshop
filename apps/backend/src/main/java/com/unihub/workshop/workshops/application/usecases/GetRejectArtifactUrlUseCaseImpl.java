@@ -1,6 +1,7 @@
 package com.unihub.workshop.workshops.application.usecases;
 
 import com.unihub.workshop.shared.exception.NotFoundException;
+import com.unihub.workshop.shared.security.SecurityProperties;
 import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
 import com.unihub.workshop.workshops.application.ports.out.ArtifactPresignPort;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
@@ -10,27 +11,18 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class GetRejectArtifactUrlUseCaseImpl
     implements GetRejectArtifactUrlUseCase
 {
 
     private final IngestionJobReportRepository repository;
     private final ArtifactPresignPort presignPort;
-    private final long presignTtlMinutes;
-
-    public GetRejectArtifactUrlUseCaseImpl(
-        IngestionJobReportRepository repository,
-        ArtifactPresignPort presignPort,
-        @Value("${app.security.presign-ttl-minutes:15}") long presignTtlMinutes
-    ) {
-        this.repository = repository;
-        this.presignPort = presignPort;
-        this.presignTtlMinutes = presignTtlMinutes;
-    }
+    private final SecurityProperties securityProperties;
 
     public RejectArtifactUrlResult execute(UUID jobId, UUID organizationId) {
         // Must use primary data source to prevent replication lag
@@ -62,7 +54,9 @@ public class GetRejectArtifactUrlUseCaseImpl
             );
         }
 
-        Duration ttl = Duration.ofMinutes(presignTtlMinutes);
+        Duration ttl = Duration.ofMinutes(
+            securityProperties.presignTtlMinutes()
+        );
         Instant now = Instant.now();
         Instant expiresAt = now.plus(ttl);
 

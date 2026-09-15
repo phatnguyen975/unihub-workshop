@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.iam.domain.model.StudentDirectory;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.StudentDirectoryPersistenceMapper;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.StudentDirectoryPersistenceMapperImpl;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,13 +13,16 @@ import org.junit.jupiter.api.Test;
 
 class StudentDirectoryRepositoryAdapterTest {
 
+    private final StudentDirectoryPersistenceMapper mapper =
+        new StudentDirectoryPersistenceMapperImpl();
+
     @Test
     void shouldMapEntityToDomainWhenFound() {
         StudentDirectoryJpaRepository jpaRepo = mock(
             StudentDirectoryJpaRepository.class
         );
         StudentDirectoryRepositoryAdapter adapter =
-            new StudentDirectoryRepositoryAdapter(jpaRepo);
+            new StudentDirectoryRepositoryAdapter(jpaRepo, mapper);
 
         UUID id = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
@@ -55,7 +60,7 @@ class StudentDirectoryRepositoryAdapterTest {
             StudentDirectoryJpaRepository.class
         );
         StudentDirectoryRepositoryAdapter adapter =
-            new StudentDirectoryRepositoryAdapter(jpaRepo);
+            new StudentDirectoryRepositoryAdapter(jpaRepo, mapper);
 
         when(
             jpaRepo.findByEmailAndStatus("unknown@test.com", "ACTIVE")

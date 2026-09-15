@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserVerificationTokenPersistenceMapper;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserVerificationTokenPersistenceMapperImpl;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +17,9 @@ import org.mockito.ArgumentCaptor;
 
 class UserVerificationTokenRepositoryAdapterTest {
 
+    private final UserVerificationTokenPersistenceMapper mapper =
+        new UserVerificationTokenPersistenceMapperImpl();
+
     @Test
     @DisplayName("should save UserVerificationToken and map to entity and back")
     void shouldSaveUserVerificationToken() {
@@ -22,7 +27,7 @@ class UserVerificationTokenRepositoryAdapterTest {
             UserVerificationTokenJpaRepository.class
         );
         UserVerificationTokenRepositoryAdapter adapter =
-            new UserVerificationTokenRepositoryAdapter(jpaRepo);
+            new UserVerificationTokenRepositoryAdapter(jpaRepo, mapper);
 
         UUID userId = UUID.randomUUID();
         Instant expiresAt = Instant.now().plusSeconds(900);
@@ -61,7 +66,7 @@ class UserVerificationTokenRepositoryAdapterTest {
             UserVerificationTokenJpaRepository.class
         );
         UserVerificationTokenRepositoryAdapter adapter =
-            new UserVerificationTokenRepositoryAdapter(jpaRepo);
+            new UserVerificationTokenRepositoryAdapter(jpaRepo, mapper);
 
         UUID userId = UUID.randomUUID();
         UserVerificationTokenJpaEntity entity =
@@ -98,7 +103,7 @@ class UserVerificationTokenRepositoryAdapterTest {
             UserVerificationTokenJpaRepository.class
         );
         UserVerificationTokenRepositoryAdapter adapter =
-            new UserVerificationTokenRepositoryAdapter(jpaRepo);
+            new UserVerificationTokenRepositoryAdapter(jpaRepo, mapper);
 
         UUID tokenId = UUID.randomUUID();
         when(jpaRepo.markConsumed(eq(tokenId), any(Instant.class))).thenReturn(
@@ -118,7 +123,7 @@ class UserVerificationTokenRepositoryAdapterTest {
             UserVerificationTokenJpaRepository.class
         );
         UserVerificationTokenRepositoryAdapter adapter =
-            new UserVerificationTokenRepositoryAdapter(jpaRepo);
+            new UserVerificationTokenRepositoryAdapter(jpaRepo, mapper);
 
         UUID userId = UUID.randomUUID();
         adapter.invalidateActiveTokens(

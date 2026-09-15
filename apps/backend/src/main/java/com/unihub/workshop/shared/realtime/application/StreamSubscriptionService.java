@@ -6,6 +6,7 @@ import com.unihub.workshop.shared.realtime.application.ports.out.RealtimeMetrics
 import com.unihub.workshop.shared.realtime.application.ports.out.UserStatusPort;
 import com.unihub.workshop.shared.realtime.config.RealtimeProperties;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -15,6 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * of authenticated Server-Sent Events streams.
  */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class StreamSubscriptionService {
 
@@ -22,21 +24,6 @@ public class StreamSubscriptionService {
     private final UserStatusPort userStatusPort;
     private final RealtimeMetricsPort realtimeMetrics;
     private final RealtimeProperties realtimeProperties;
-
-    public StreamSubscriptionService(
-        EmitterRegistryPort registry,
-        UserStatusPort userStatusPort,
-        RealtimeMetricsPort realtimeMetrics,
-        RealtimeProperties realtimeProperties
-    ) {
-        this.registry = registry;
-        this.userStatusPort = userStatusPort;
-        this.realtimeMetrics = realtimeMetrics;
-        this.realtimeProperties =
-            realtimeProperties != null
-                ? realtimeProperties
-                : new RealtimeProperties(15, 1800000L);
-    }
 
     /**
      * Subscribes an authenticated user to the real-time event stream.
@@ -58,9 +45,11 @@ public class StreamSubscriptionService {
             );
         }
 
-        SseEmitter emitter = new SseEmitter(
-            realtimeProperties.streamTimeoutMs()
-        );
+        long timeoutMs =
+            realtimeProperties != null
+                ? realtimeProperties.streamTimeoutMs()
+                : 1800000L;
+        SseEmitter emitter = new SseEmitter(timeoutMs);
 
         emitter.onCompletion(() ->
             handleDisconnect(userId, emitter, "client_abort")

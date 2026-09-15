@@ -1,10 +1,11 @@
 package com.unihub.workshop.iam.presentation.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.unihub.workshop.iam.domain.model.User;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MemberDetailResponse(
     UUID id,
@@ -20,25 +21,4 @@ public record MemberDetailResponse(
     Instant lastLoginAt,
     Instant createdAt,
     Instant updatedAt
-) {
-    public static MemberDetailResponse from(User user) {
-        if (user == null) {
-            return null;
-        }
-        return new MemberDetailResponse(
-            user.id(),
-            user.organizationId(),
-            user.email(),
-            user.fullName(),
-            user.role() != null ? user.role().name() : null,
-            user.phoneNumber(),
-            user.avatarUrl(),
-            user.isActive(),
-            user.isTemporaryPassword(),
-            user.studentRecordId(),
-            user.lastLoginAt(),
-            user.createdAt(),
-            user.updatedAt()
-        );
-    }
-}
+) {}

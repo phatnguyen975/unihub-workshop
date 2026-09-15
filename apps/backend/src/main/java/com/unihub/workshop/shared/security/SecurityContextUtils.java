@@ -5,13 +5,13 @@ import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.NoArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
+@NoArgsConstructor
 public final class SecurityContextUtils {
-
-    private SecurityContextUtils() {}
 
     public static UUID extractUserId(Authentication authentication) {
         validateAuthentication(authentication);

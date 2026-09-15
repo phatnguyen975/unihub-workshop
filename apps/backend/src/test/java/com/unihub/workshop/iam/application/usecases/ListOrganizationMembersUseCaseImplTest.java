@@ -153,16 +153,16 @@ class ListOrganizationMembersUseCaseImplTest {
             15
         );
 
-        User member = new User(
-            UUID.randomUUID(),
-            ORG_ID,
-            UserRole.STAFF,
-            "alice@test.org",
-            null,
-            true,
-            false,
-            Instant.now()
-        );
+        User member = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(ORG_ID)
+            .role(UserRole.STAFF)
+            .email("alice@test.org")
+            .passwordHash(null)
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(Instant.now())
+            .build();
         when(
             userRepository.findMembersByOrganizationId(
                 ORG_ID,

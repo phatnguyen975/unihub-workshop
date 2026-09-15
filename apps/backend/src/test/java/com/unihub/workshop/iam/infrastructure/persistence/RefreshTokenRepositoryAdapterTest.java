@@ -10,6 +10,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapper;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import java.time.Instant;
 import java.util.Base64;
@@ -23,12 +25,14 @@ import org.springframework.data.domain.PageRequest;
 class RefreshTokenRepositoryAdapterTest {
 
     private RefreshTokenJpaRepository repository;
+    private RefreshTokenPersistenceMapper tokenMapper;
     private RefreshTokenRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
         repository = mock(RefreshTokenJpaRepository.class);
-        adapter = new RefreshTokenRepositoryAdapter(repository);
+        tokenMapper = new RefreshTokenPersistenceMapperImpl();
+        adapter = new RefreshTokenRepositoryAdapter(repository, tokenMapper);
     }
 
     @Test

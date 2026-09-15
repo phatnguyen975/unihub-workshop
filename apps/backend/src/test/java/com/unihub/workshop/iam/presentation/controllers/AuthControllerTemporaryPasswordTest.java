@@ -37,7 +37,7 @@ class AuthControllerTemporaryPasswordTest {
             .build();
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
             .setControllerAdvice(
-                new GlobalExceptionHandler(null),
+                new GlobalExceptionHandler(),
                 new GlobalResponseBodyAdvice()
             )
             .build();
@@ -47,16 +47,16 @@ class AuthControllerTemporaryPasswordTest {
     void shouldReturn200OnSuccessfulTemporaryPasswordChange() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
-        User user = new User(
-            userId,
-            orgId,
-            UserRole.STAFF,
-            "staff.bob@unihub.edu",
-            "encodedHash",
-            true,
-            false,
-            Instant.now()
-        );
+        User user = User.builder()
+            .id(userId)
+            .organizationId(orgId)
+            .role(UserRole.STAFF)
+            .email("staff.bob@unihub.edu")
+            .passwordHash("encodedHash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(Instant.now())
+            .build();
 
         ChangeTemporaryPasswordUseCase.ChangeTemporaryPasswordResult result =
             new ChangeTemporaryPasswordUseCase.ChangeTemporaryPasswordResult(

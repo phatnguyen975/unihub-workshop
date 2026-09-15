@@ -8,23 +8,16 @@ import com.unihub.workshop.shared.exception.BadRequestException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final MeterRegistry meterRegistry;
-
-    public GetActiveSessionsUseCaseImpl(
-        RefreshTokenRepository refreshTokenRepository,
-        MeterRegistry meterRegistry
-    ) {
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Override
     @Transactional(readOnly = true)
@@ -50,12 +43,15 @@ public class GetActiveSessionsUseCaseImpl implements GetActiveSessionsUseCase {
             .items()
             .stream()
             .map(session ->
-                session.withCurrentSession(
-                    currentSessionId != null &&
-                        session.id().equals(currentSessionId)
-                )
+                session
+                    .toBuilder()
+                    .isCurrentSession(
+                        currentSessionId != null &&
+                            session.id().equals(currentSessionId)
+                    )
+                    .build()
             )
-            .collect(Collectors.toList());
+            .toList();
 
         meterRegistry
             .counter("auth.sessions.listed", "outcome", "success")

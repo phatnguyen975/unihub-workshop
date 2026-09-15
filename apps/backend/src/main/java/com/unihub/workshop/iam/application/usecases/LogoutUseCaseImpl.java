@@ -9,26 +9,18 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class LogoutUseCaseImpl implements LogoutUseCase {
 
     private final JtiBlacklistPort jtiBlacklistPort;
     private final RefreshTokenRepository refreshTokenRepository;
     private final MeterRegistry meterRegistry;
-
-    public LogoutUseCaseImpl(
-        JtiBlacklistPort jtiBlacklistPort,
-        RefreshTokenRepository refreshTokenRepository,
-        MeterRegistry meterRegistry
-    ) {
-        this.jtiBlacklistPort = jtiBlacklistPort;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Override
     @Transactional(propagation = Propagation.NEVER)
@@ -56,15 +48,10 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
                 .findByTokenHash(tokenHash)
                 .ifPresent(token -> {
                     if (token.userId().equals(userId)) {
-                        RefreshToken revoked = new RefreshToken(
-                            token.id(),
-                            token.userId(),
-                            token.tokenHash(),
-                            token.deviceInfo(),
-                            token.ipAddress(),
-                            token.expiresAt(),
-                            now
-                        );
+                        RefreshToken revoked = token
+                            .toBuilder()
+                            .revokedAt(now)
+                            .build();
                         refreshTokenRepository.save(revoked);
                     }
                 });

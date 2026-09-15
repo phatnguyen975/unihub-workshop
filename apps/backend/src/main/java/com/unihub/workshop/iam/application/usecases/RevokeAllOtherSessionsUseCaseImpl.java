@@ -12,11 +12,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RevokeAllOtherSessionsUseCaseImpl
     implements RevokeAllOtherSessionsUseCase
 {
@@ -25,18 +27,6 @@ public class RevokeAllOtherSessionsUseCaseImpl
     private final JtiBlacklistPort jtiBlacklistPort;
     private final SessionTrackerPort sessionTrackerPort;
     private final MeterRegistry meterRegistry;
-
-    public RevokeAllOtherSessionsUseCaseImpl(
-        RefreshTokenRepository refreshTokenRepository,
-        JtiBlacklistPort jtiBlacklistPort,
-        SessionTrackerPort sessionTrackerPort,
-        MeterRegistry meterRegistry
-    ) {
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.jtiBlacklistPort = jtiBlacklistPort;
-        this.sessionTrackerPort = sessionTrackerPort;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Override
     @Transactional(propagation = Propagation.NEVER)

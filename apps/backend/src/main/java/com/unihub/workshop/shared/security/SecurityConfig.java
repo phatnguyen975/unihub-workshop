@@ -1,5 +1,6 @@
 package com.unihub.workshop.shared.security;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -24,24 +25,13 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @EnableWebSecurity
 @EnableMethodSecurity
 @EnableConfigurationProperties(SecurityProperties.class)
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final SecurityProperties properties;
     private final RsaKeyProperties rsaKeyProperties;
     private final HandlerExceptionResolver handlerExceptionResolver;
     private final RedisJtiValidator redisJtiValidator;
-
-    public SecurityConfig(
-        SecurityProperties properties,
-        RsaKeyProperties rsaKeyProperties,
-        HandlerExceptionResolver handlerExceptionResolver,
-        RedisJtiValidator redisJtiValidator
-    ) {
-        this.properties = properties;
-        this.rsaKeyProperties = rsaKeyProperties;
-        this.handlerExceptionResolver = handlerExceptionResolver;
-        this.redisJtiValidator = redisJtiValidator;
-    }
 
     @Bean
     public JwtDecoder jwtDecoder() {

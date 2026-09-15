@@ -6,6 +6,7 @@ import com.unihub.workshop.WorkshopApplication;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
+import com.unihub.workshop.workshops.infrastructure.persistence.mapper.IngestionJobReportPersistenceMapperImpl;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -27,7 +28,10 @@ import org.springframework.test.context.TestConstructor;
         "datasource.replica.driver-class-name=org.h2.Driver",
     }
 )
-@Import(IngestionJobReportRepositoryAdapter.class)
+@Import({
+    IngestionJobReportRepositoryAdapter.class,
+    IngestionJobReportPersistenceMapperImpl.class,
+})
 @ActiveProfiles("test")
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @RequiredArgsConstructor
@@ -129,20 +133,21 @@ class IngestionJobReportRepositoryAdapterTest {
     }
 
     private IngestionJobReportJpaEntity createEntity(UUID orgId, Instant time) {
-        IngestionJobReportJpaEntity entity = new IngestionJobReportJpaEntity(
-            UUID.randomUUID(),
-            null,
-            orgId,
-            "file.csv",
-            "COMPLETED",
-            100,
-            0,
-            null,
-            null,
-            time,
-            time,
-            time
-        );
+        IngestionJobReportJpaEntity entity =
+            IngestionJobReportJpaEntity.builder()
+                .id(UUID.randomUUID())
+                .jobExecutionId(null)
+                .organizationId(orgId)
+                .sourceFileKey("file.csv")
+                .outcome("COMPLETED")
+                .processedRowCount(100)
+                .rejectedRowCount(0)
+                .fileRejectionSourceKey(null)
+                .rejectArtifactKey(null)
+                .completedAt(time)
+                .createdAt(time)
+                .updatedAt(time)
+                .build();
         return jpaRepository.save(entity);
     }
 }

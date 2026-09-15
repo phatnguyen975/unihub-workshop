@@ -16,6 +16,7 @@ import com.unihub.workshop.iam.presentation.dto.ProvisionUserRequest;
 import com.unihub.workshop.iam.presentation.dto.ProvisionUserResponse;
 import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusRequest;
 import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusResponse;
+import com.unihub.workshop.iam.presentation.mapper.OrganizationPresentationMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
@@ -47,6 +48,7 @@ public class OrganizationController {
     private final GetOrganizationMemberUseCase getOrganizationMemberUseCase;
     private final ProvisionUserUseCase provisionUserUseCase;
     private final UpdateMemberStatusUseCase updateMemberStatusUseCase;
+    private final OrganizationPresentationMapper organizationMapper;
 
     @PostMapping("/users")
     @ResponseStatus(HttpStatus.CREATED)
@@ -78,7 +80,7 @@ public class OrganizationController {
 
         User user = provisionUserUseCase.execute(command);
         return ApiResponse.success(
-            ProvisionUserResponse.from(user),
+            organizationMapper.toProvisionResponse(user),
             "User provisioned successfully. Temporary credentials sent via email."
         );
     }
@@ -102,7 +104,7 @@ public class OrganizationController {
         );
 
         return ApiResponse.success(
-            UpdateMemberStatusResponse.from(user),
+            organizationMapper.toStatusResponse(user),
             "Member account status updated successfully."
         );
     }
@@ -118,7 +120,7 @@ public class OrganizationController {
             userId
         );
         return ApiResponse.success(
-            MemberDetailResponse.from(user),
+            organizationMapper.toDetailResponse(user),
             "Member details retrieved"
         );
     }
@@ -168,11 +170,8 @@ public class OrganizationController {
 
         CursorPage<User> page = listOrganizationMembersUseCase.execute(query);
 
-        List<MemberSummaryResponse> items = page
-            .items()
-            .stream()
-            .map(MemberSummaryResponse::from)
-            .toList();
+        List<MemberSummaryResponse> items =
+            organizationMapper.toSummaryResponseList(page.items());
 
         MemberSummaryResponse.Page response = new MemberSummaryResponse.Page(
             items,

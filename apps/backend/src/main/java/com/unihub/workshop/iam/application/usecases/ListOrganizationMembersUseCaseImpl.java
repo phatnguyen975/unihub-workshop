@@ -6,19 +6,17 @@ import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ListOrganizationMembersUseCaseImpl
     implements ListOrganizationMembersUseCase
 {
 
     private final UserRepository userRepository;
-
-    public ListOrganizationMembersUseCaseImpl(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     @Override
     @Transactional(readOnly = true)

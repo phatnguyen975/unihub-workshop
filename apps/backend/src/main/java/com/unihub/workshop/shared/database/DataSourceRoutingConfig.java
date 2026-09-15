@@ -3,6 +3,7 @@ package com.unihub.workshop.shared.database;
 import com.zaxxer.hikari.HikariDataSource;
 import java.util.Objects;
 import javax.sql.DataSource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -11,19 +12,13 @@ import org.springframework.context.annotation.Primary;
 
 @Configuration
 @EnableConfigurationProperties(DataSourceProperties.class)
+@RequiredArgsConstructor
 public class DataSourceRoutingConfig {
 
     public static final String DEFAULT_PRIMARY_POOL_NAME = "primary-pool";
     public static final String DEFAULT_REPLICA_POOL_NAME = "replica-pool";
 
     private final DataSourceProperties properties;
-
-    public DataSourceRoutingConfig(DataSourceProperties properties) {
-        this.properties = Objects.requireNonNull(
-            properties,
-            "DataSourceProperties must not be null"
-        );
-    }
 
     @Bean
     public DataSource primaryDataSource() {

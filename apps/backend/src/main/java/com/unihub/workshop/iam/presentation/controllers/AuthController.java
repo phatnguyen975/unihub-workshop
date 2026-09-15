@@ -27,6 +27,7 @@ import com.unihub.workshop.iam.presentation.dto.ResendOtpRequest;
 import com.unihub.workshop.iam.presentation.dto.ResetPasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.SessionCursor;
 import com.unihub.workshop.iam.presentation.dto.SessionResponse;
+import com.unihub.workshop.iam.presentation.mapper.AuthPresentationMapper;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
@@ -67,6 +68,7 @@ public class AuthController {
     private final GetActiveSessionsUseCase getActiveSessionsUseCase;
     private final RevokeSessionUseCase revokeSessionUseCase;
     private final RevokeAllOtherSessionsUseCase revokeAllOtherSessionsUseCase;
+    private final AuthPresentationMapper authMapper;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -136,7 +138,7 @@ public class AuthController {
             );
 
         return ApiResponse.success(
-            LoginResponse.from(result),
+            authMapper.toLoginResponse(result),
             "Password updated successfully. Welcome to UniHub!"
         );
     }
@@ -154,7 +156,7 @@ public class AuthController {
         );
 
         return ApiResponse.success(
-            LoginResponse.from(result),
+            authMapper.toLoginResponse(result),
             "Login successful"
         );
     }
@@ -171,7 +173,7 @@ public class AuthController {
         );
 
         return ApiResponse.success(
-            RefreshTokenResponse.from(result),
+            authMapper.toRefreshTokenResponse(result),
             "Token refreshed"
         );
     }
@@ -180,7 +182,7 @@ public class AuthController {
     @PreAuthorize("hasRole('STAFF')")
     public ApiResponse<PublicKeyResponse> getPublicKey() {
         return ApiResponse.success(
-            PublicKeyResponse.from(publicKeyService),
+            authMapper.toPublicKeyResponse(publicKeyService),
             "Public key retrieved successfully"
         );
     }
@@ -220,19 +222,9 @@ public class AuthController {
                 size
             );
 
-        List<SessionResponse.SessionItem> items = page
-            .items()
-            .stream()
-            .map(s ->
-                new SessionResponse.SessionItem(
-                    s.id(),
-                    s.deviceInfo(),
-                    s.ipAddress(),
-                    s.createdAt(),
-                    s.isCurrentSession()
-                )
-            )
-            .toList();
+        List<SessionResponse.SessionItem> items = authMapper.toSessionItemList(
+            page.items()
+        );
 
         SessionResponse response = new SessionResponse(
             items,

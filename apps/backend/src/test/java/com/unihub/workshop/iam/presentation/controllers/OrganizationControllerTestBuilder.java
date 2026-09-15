@@ -6,6 +6,8 @@ import com.unihub.workshop.iam.application.ports.in.GetOrganizationMemberUseCase
 import com.unihub.workshop.iam.application.ports.in.ListOrganizationMembersUseCase;
 import com.unihub.workshop.iam.application.ports.in.ProvisionUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.UpdateMemberStatusUseCase;
+import com.unihub.workshop.iam.presentation.mapper.OrganizationPresentationMapper;
+import com.unihub.workshop.iam.presentation.mapper.OrganizationPresentationMapperImpl;
 
 public class OrganizationControllerTestBuilder {
 
@@ -20,6 +22,8 @@ public class OrganizationControllerTestBuilder {
     private UpdateMemberStatusUseCase updateMemberStatusUseCase = mock(
         UpdateMemberStatusUseCase.class
     );
+    private OrganizationPresentationMapper organizationMapper =
+        new OrganizationPresentationMapperImpl();
 
     public static OrganizationControllerTestBuilder builder() {
         return new OrganizationControllerTestBuilder();
@@ -53,12 +57,20 @@ public class OrganizationControllerTestBuilder {
         return this;
     }
 
+    public OrganizationControllerTestBuilder withOrganizationMapper(
+        OrganizationPresentationMapper organizationMapper
+    ) {
+        this.organizationMapper = organizationMapper;
+        return this;
+    }
+
     public OrganizationController build() {
         return new OrganizationController(
             listOrganizationMembersUseCase,
             getOrganizationMemberUseCase,
             provisionUserUseCase,
-            updateMemberStatusUseCase
+            updateMemberStatusUseCase,
+            organizationMapper
         );
     }
 }

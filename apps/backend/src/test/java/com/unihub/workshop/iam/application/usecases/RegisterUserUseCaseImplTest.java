@@ -181,4 +181,38 @@ class RegisterUserUseCaseImplTest {
         verify(userVerificationTokenRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
+
+    @Test
+    void shouldNormalizeEmailToLowerCaseAndTrimBeforeCheckingAndSaving() {
+        String rawEmail = "  Alice.Smith@University.EDU  ";
+        String expectedNormalized = "alice.smith@university.edu";
+
+        when(userRepository.existsByEmail(expectedNormalized)).thenReturn(
+            false
+        );
+        when(
+            studentDirectoryRepository.findActiveByEmail(expectedNormalized)
+        ).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(any())).thenReturn("hashedPass");
+        when(userRepository.save(any(User.class))).thenAnswer(inv ->
+            inv.getArgument(0)
+        );
+        when(otpService.generateOtp()).thenReturn("123456");
+        when(otpService.hashOtp("123456")).thenReturn("hash123456");
+        when(otpService.calculateExpiryInstant()).thenReturn(
+            Instant.now().plus(Duration.ofMinutes(15))
+        );
+
+        UUID userId = useCase.register(rawEmail, "Str0ng!Pass", "Alice Smith");
+
+        verify(userRepository).existsByEmail(expectedNormalized);
+        verify(studentDirectoryRepository).findActiveByEmail(
+            expectedNormalized
+        );
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().email()).isEqualTo(expectedNormalized);
+        assertThat(userCaptor.getValue().id()).isEqualTo(userId);
+    }
 }

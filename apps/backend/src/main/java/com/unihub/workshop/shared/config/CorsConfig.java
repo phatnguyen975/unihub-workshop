@@ -1,6 +1,7 @@
 package com.unihub.workshop.shared.config;
 
 import java.util.Arrays;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,13 +11,10 @@ import org.springframework.web.filter.CorsFilter;
 
 @Configuration
 @EnableConfigurationProperties(CorsProperties.class)
+@RequiredArgsConstructor
 public class CorsConfig {
 
     private final CorsProperties properties;
-
-    public CorsConfig(CorsProperties properties) {
-        this.properties = properties;
-    }
 
     @Bean
     public CorsFilter corsFilter() {

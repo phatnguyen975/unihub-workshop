@@ -48,16 +48,16 @@ class ResendOtpUseCaseImplTest {
     void shouldResendOtpSuccessfullyWhenAccountInactive() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(
             Optional.of(inactiveUser)
@@ -127,16 +127,16 @@ class ResendOtpUseCaseImplTest {
     void shouldResendPasswordResetOtpSuccessfullyWhenAccountActive() {
         String email = "active@university.edu";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            true,
-            false,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(
             Optional.of(activeUser)

@@ -1,16 +1,14 @@
 package com.unihub.workshop.shared.ratelimit;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class RateLimitMetrics {
 
     private final MeterRegistry meterRegistry;
-
-    public RateLimitMetrics(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-    }
 
     public void incrementRedisUnavailable(String tier) {
         meterRegistry

@@ -75,16 +75,16 @@ class RefreshTokenUseCaseImplTest {
             meterRegistry
         );
 
-        activeUser = new User(
-            userId,
-            orgId,
-            UserRole.STUDENT,
-            "student@test.com",
-            "hash",
-            true,
-            false,
-            null
-        );
+        activeUser = User.builder()
+            .id(userId)
+            .organizationId(orgId)
+            .role(UserRole.STUDENT)
+            .email("student@test.com")
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         String rawToken = "raw-refresh-token";
         String tokenHash = TokenUtils.hash(rawToken);
@@ -179,16 +179,16 @@ class RefreshTokenUseCaseImplTest {
 
     @Test
     void shouldRefreshSuccessfullyWithNullOrganizationId() {
-        User studentUserWithoutOrg = new User(
-            userId,
-            null,
-            UserRole.STUDENT,
-            "student@test.com",
-            "hash",
-            true,
-            false,
-            null
-        );
+        User studentUserWithoutOrg = User.builder()
+            .id(userId)
+            .organizationId(null)
+            .role(UserRole.STUDENT)
+            .email("student@test.com")
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         when(
             refreshTokenRepository.findByTokenHash(
                 TokenUtils.hash("raw-refresh-token")
@@ -348,16 +348,16 @@ class RefreshTokenUseCaseImplTest {
 
     @Test
     void shouldThrowUnauthorized_WhenUserDisabled() {
-        User disabledUser = new User(
-            userId,
-            orgId,
-            UserRole.STUDENT,
-            "student@test.com",
-            "hash",
-            false,
-            false,
-            null
-        );
+        User disabledUser = User.builder()
+            .id(userId)
+            .organizationId(orgId)
+            .role(UserRole.STUDENT)
+            .email("student@test.com")
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         when(
             refreshTokenRepository.findByTokenHash(TokenUtils.hash("raw"))
         ).thenReturn(Optional.of(validToken));

@@ -39,7 +39,7 @@ class AuthControllerRevokeAllOtherSessionsTest {
             .build();
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(
-                new GlobalExceptionHandler(null),
+                new GlobalExceptionHandler(),
                 new GlobalResponseBodyAdvice()
             )
             .build();

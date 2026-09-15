@@ -35,7 +35,7 @@ class AuthControllerLoginTest {
             .build();
         mockMvc = MockMvcBuilders.standaloneSetup(authController)
             .setControllerAdvice(
-                new GlobalExceptionHandler(null),
+                new GlobalExceptionHandler(),
                 new GlobalResponseBodyAdvice()
             )
             .build();
@@ -45,16 +45,16 @@ class AuthControllerLoginTest {
     void shouldReturn200OnSuccessfulLogin() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
-        User mockUser = new User(
-            userId,
-            orgId,
-            UserRole.STUDENT,
-            "test@example.com",
-            "hash",
-            true,
-            false,
-            null
-        );
+        User mockUser = User.builder()
+            .id(userId)
+            .organizationId(orgId)
+            .role(UserRole.STUDENT)
+            .email("test@example.com")
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         when(
             loginUseCase.login(
