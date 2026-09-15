@@ -2,7 +2,9 @@ package com.unihub.workshop.iam.domain.model;
 
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder(toBuilder = true)
 public record User(
     UUID id,
     UUID organizationId,
@@ -21,37 +23,6 @@ public record User(
     UUID createdBy,
     UUID updatedBy
 ) {
-    // Backward-compatible constructor for existing callers and tests
-    public User(
-        UUID id,
-        UUID organizationId,
-        UserRole role,
-        String email,
-        String passwordHash,
-        boolean isActive,
-        boolean isTemporaryPassword,
-        Instant lastLoginAt
-    ) {
-        this(
-            id,
-            organizationId,
-            role,
-            email,
-            null,
-            passwordHash,
-            null,
-            null,
-            isActive,
-            isTemporaryPassword,
-            lastLoginAt,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
-    }
-
     public static User createStudent(
         UUID id,
         String email,
@@ -61,24 +32,19 @@ public record User(
         UUID organizationId
     ) {
         Instant now = Instant.now();
-        return new User(
-            id != null ? id : UUID.randomUUID(),
-            organizationId,
-            UserRole.STUDENT,
-            email,
-            null,
-            passwordHash,
-            fullName,
-            null,
-            false,
-            false,
-            null,
-            studentRecordId,
-            now,
-            now,
-            null,
-            null
-        );
+        return User.builder()
+            .id(id != null ? id : UUID.randomUUID())
+            .organizationId(organizationId)
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash(passwordHash)
+            .fullName(fullName)
+            .studentRecordId(studentRecordId)
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
     }
 
     public static User provisionMember(
@@ -92,69 +58,42 @@ public record User(
         UUID createdBy
     ) {
         Instant now = Instant.now();
-        return new User(
-            id != null ? id : UUID.randomUUID(),
-            organizationId,
-            role,
-            email,
-            phoneNumber,
-            passwordHash,
-            fullName,
-            null,
-            true,
-            true,
-            null,
-            null,
-            now,
-            now,
-            createdBy,
-            createdBy
-        );
+        return User.builder()
+            .id(id != null ? id : UUID.randomUUID())
+            .organizationId(organizationId)
+            .role(role)
+            .email(email)
+            .phoneNumber(phoneNumber)
+            .passwordHash(passwordHash)
+            .fullName(fullName)
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .createdAt(now)
+            .updatedAt(now)
+            .createdBy(createdBy)
+            .updatedBy(createdBy)
+            .build();
     }
 
     public User updatePassword(String newPasswordHash) {
-        return new User(
-            id,
-            organizationId,
-            role,
-            email,
-            phoneNumber,
-            newPasswordHash,
-            fullName,
-            avatarUrl,
-            isActive,
-            false,
-            lastLoginAt,
-            studentRecordId,
-            createdAt,
-            Instant.now(),
-            createdBy,
-            id
-        );
+        return toBuilder()
+            .passwordHash(newPasswordHash)
+            .isTemporaryPassword(false)
+            .updatedAt(Instant.now())
+            .updatedBy(id)
+            .build();
     }
 
     public User changeTemporaryPassword(
         String newPasswordHash,
         Instant loginTime
     ) {
-        return new User(
-            id,
-            organizationId,
-            role,
-            email,
-            phoneNumber,
-            newPasswordHash,
-            fullName,
-            avatarUrl,
-            isActive,
-            false,
-            loginTime,
-            studentRecordId,
-            createdAt,
-            loginTime,
-            createdBy,
-            updatedBy
-        );
+        return toBuilder()
+            .passwordHash(newPasswordHash)
+            .isTemporaryPassword(false)
+            .lastLoginAt(loginTime)
+            .updatedAt(loginTime)
+            .build();
     }
 
     public User updateProfile(
@@ -162,44 +101,20 @@ public record User(
         String newPhoneNumber,
         String newAvatarUrl
     ) {
-        return new User(
-            id,
-            organizationId,
-            role,
-            email,
-            newPhoneNumber,
-            passwordHash,
-            newFullName != null ? newFullName : fullName,
-            newAvatarUrl,
-            isActive,
-            isTemporaryPassword,
-            lastLoginAt,
-            studentRecordId,
-            createdAt,
-            Instant.now(),
-            createdBy,
-            id
-        );
+        return toBuilder()
+            .fullName(newFullName != null ? newFullName : fullName)
+            .phoneNumber(newPhoneNumber)
+            .avatarUrl(newAvatarUrl)
+            .updatedAt(Instant.now())
+            .updatedBy(id)
+            .build();
     }
 
     public User updateActiveStatus(boolean newIsActive, UUID updatedBy) {
-        return new User(
-            id,
-            organizationId,
-            role,
-            email,
-            phoneNumber,
-            passwordHash,
-            fullName,
-            avatarUrl,
-            newIsActive,
-            isTemporaryPassword,
-            lastLoginAt,
-            studentRecordId,
-            createdAt,
-            Instant.now(),
-            createdBy,
-            updatedBy
-        );
+        return toBuilder()
+            .isActive(newIsActive)
+            .updatedAt(Instant.now())
+            .updatedBy(updatedBy)
+            .build();
     }
 }

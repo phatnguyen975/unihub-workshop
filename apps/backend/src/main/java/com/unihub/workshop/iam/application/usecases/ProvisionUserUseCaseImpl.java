@@ -11,26 +11,18 @@ import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.seed.PasswordGenerator;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ProvisionUserUseCaseImpl implements ProvisionUserUseCase {
 
     private final UserRepository userRepository;
     private final PasswordGenerator passwordGenerator;
     private final ApplicationEventPublisher eventPublisher;
-
-    public ProvisionUserUseCaseImpl(
-        UserRepository userRepository,
-        PasswordGenerator passwordGenerator,
-        ApplicationEventPublisher eventPublisher
-    ) {
-        this.userRepository = userRepository;
-        this.passwordGenerator = passwordGenerator;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Override
     @Transactional

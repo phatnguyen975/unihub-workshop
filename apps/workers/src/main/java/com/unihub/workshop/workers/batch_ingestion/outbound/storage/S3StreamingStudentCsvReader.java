@@ -7,9 +7,7 @@ import java.util.UUID;
 import org.springframework.batch.infrastructure.item.ExecutionContext;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
 import org.springframework.batch.infrastructure.item.file.mapping.DefaultLineMapper;
-import org.springframework.batch.infrastructure.item.file.mapping.FieldSetMapper;
 import org.springframework.batch.infrastructure.item.file.transform.DelimitedLineTokenizer;
-import org.springframework.batch.infrastructure.item.file.transform.FieldSet;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Component;
@@ -51,20 +49,14 @@ public class S3StreamingStudentCsvReader implements StreamingStudentCsvReader {
         DefaultLineMapper<StudentDirectoryRow> lineMapper =
             new DefaultLineMapper<>();
         lineMapper.setLineTokenizer(tokenizer);
-
-        lineMapper.setFieldSetMapper(
-            new FieldSetMapper<StudentDirectoryRow>() {
-                @Override
-                public StudentDirectoryRow mapFieldSet(FieldSet fieldSet) {
-                    return new StudentDirectoryRow(
-                        organizationId,
-                        fieldSet.readString("student_number"),
-                        fieldSet.readString("email"),
-                        fieldSet.readString("full_name"),
-                        fieldSet.readString("faculty")
-                    );
-                }
-            }
+        lineMapper.setFieldSetMapper(fieldSet ->
+            new StudentDirectoryRow(
+                organizationId,
+                fieldSet.readString("student_number"),
+                fieldSet.readString("email"),
+                fieldSet.readString("full_name"),
+                fieldSet.readString("faculty")
+            )
         );
 
         delegate = new FlatFileItemReader<>(

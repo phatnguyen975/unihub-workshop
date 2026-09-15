@@ -1,8 +1,10 @@
 package com.unihub.workshop.shared.exception;
 
 import java.util.Map;
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public class AppException extends RuntimeException {
 
     private final HttpStatus status;
@@ -38,17 +40,5 @@ public class AppException extends RuntimeException {
         this.status = status;
         this.type = type;
         this.properties = properties;
-    }
-
-    public HttpStatus getStatus() {
-        return status;
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public Map<String, Object> getProperties() {
-        return properties;
     }
 }

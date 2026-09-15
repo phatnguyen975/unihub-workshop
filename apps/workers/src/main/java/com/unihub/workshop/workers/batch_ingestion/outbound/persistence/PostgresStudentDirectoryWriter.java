@@ -6,17 +6,15 @@ import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@RequiredArgsConstructor
 public class PostgresStudentDirectoryWriter implements StudentDirectoryWriter {
 
     private final JdbcTemplate jdbcTemplate;
-
-    public PostgresStudentDirectoryWriter(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
 
     @Override
     public void bulkUpsert(

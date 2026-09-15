@@ -10,7 +10,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -30,7 +29,6 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 @RestControllerAdvice
 @Slf4j
-@RequiredArgsConstructor
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @Value("${app.http.retry-after-seconds:30}")
@@ -42,6 +40,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private Duration circuitBreakerWaitDuration = Duration.ofSeconds(10);
 
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+
+    public GlobalExceptionHandler() {
+        this(CircuitBreakerRegistry.ofDefaults());
+    }
+
+    public GlobalExceptionHandler(
+        CircuitBreakerRegistry circuitBreakerRegistry
+    ) {
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
+    }
+
+    public static GlobalExceptionHandler forTesting() {
+        return new GlobalExceptionHandler(CircuitBreakerRegistry.ofDefaults());
+    }
 
     void setDefaultRetryAfterSeconds(int defaultRetryAfterSeconds) {
         this.defaultRetryAfterSeconds = defaultRetryAfterSeconds;

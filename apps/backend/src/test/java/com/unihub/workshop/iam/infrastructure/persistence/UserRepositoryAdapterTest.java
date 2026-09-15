@@ -11,6 +11,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapper;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import java.time.Instant;
 import java.util.List;
@@ -21,10 +23,16 @@ import org.springframework.data.domain.PageRequest;
 
 class UserRepositoryAdapterTest {
 
+    private final UserPersistenceMapper userMapper =
+        new UserPersistenceMapperImpl();
+
     @Test
     void shouldFindUserByEmail() {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
+            jpaRepo,
+            userMapper
+        );
 
         UUID userId = UUID.randomUUID();
         UserJpaEntity entity = new UserJpaEntity();
@@ -51,7 +59,10 @@ class UserRepositoryAdapterTest {
     @Test
     void shouldFindByIdAndOrganizationId() {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
+            jpaRepo,
+            userMapper
+        );
 
         UUID userId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
@@ -83,7 +94,10 @@ class UserRepositoryAdapterTest {
     @Test
     void shouldActivateUser() {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
+            jpaRepo,
+            userMapper
+        );
 
         UUID userId = UUID.randomUUID();
         adapter.activate(userId);
@@ -94,7 +108,10 @@ class UserRepositoryAdapterTest {
     @Test
     void shouldFindMembersByOrganizationId_withoutCursor_returnsItemsAndNextCursorWhenHasMore() {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
+            jpaRepo,
+            userMapper
+        );
 
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
@@ -167,7 +184,10 @@ class UserRepositoryAdapterTest {
     void shouldFindMembersByOrganizationId_withValidCursor_decodesAndQueriesRepository()
         throws Exception {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
+            jpaRepo,
+            userMapper
+        );
 
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
@@ -226,7 +246,10 @@ class UserRepositoryAdapterTest {
     @Test
     void shouldThrowBadRequestException_whenCursorIsMalformed() {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
+            jpaRepo,
+            userMapper
+        );
 
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
@@ -249,7 +272,10 @@ class UserRepositoryAdapterTest {
     @Test
     void shouldFindMembersByOrganizationId_escapesWildcardCharactersInSearch() {
         UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(jpaRepo);
+        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
+            jpaRepo,
+            userMapper
+        );
 
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();

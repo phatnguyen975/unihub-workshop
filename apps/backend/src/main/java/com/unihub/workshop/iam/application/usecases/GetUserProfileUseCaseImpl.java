@@ -5,17 +5,15 @@ import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GetUserProfileUseCaseImpl implements GetUserProfileUseCase {
 
     private final UserRepository userRepository;
-
-    public GetUserProfileUseCaseImpl(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     @Override
     @Transactional

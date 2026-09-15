@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.shared.exception.NotFoundException;
+import com.unihub.workshop.shared.security.SecurityProperties;
 import com.unihub.workshop.workshops.application.ports.out.ArtifactPresignPort;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
@@ -11,12 +12,13 @@ import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import java.net.MalformedURLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class GetRejectArtifactUrlUseCaseImplImplTest {
+class GetRejectArtifactUrlUseCaseImplTest {
 
     private IngestionJobReportRepository repository;
     private ArtifactPresignPort presignPort;
@@ -33,30 +35,37 @@ class GetRejectArtifactUrlUseCaseImplImplTest {
     void setUp() {
         repository = mock(IngestionJobReportRepository.class);
         presignPort = mock(ArtifactPresignPort.class);
+        SecurityProperties securityProperties = new SecurityProperties(
+            List.of(),
+            (int) TTL_MINUTES,
+            60,
+            7
+        );
         useCase = new GetRejectArtifactUrlUseCaseImpl(
             repository,
             presignPort,
-            TTL_MINUTES
+            securityProperties
         );
+    }
+
+    private IngestionJobReport.IngestionJobReportBuilder baseReportBuilder() {
+        return IngestionJobReport.builder()
+            .id(JOB_ID)
+            .jobExecutionId(123L)
+            .organizationId(ORG_ID)
+            .sourceFileKey("source.csv")
+            .completedAt(FIXED_NOW)
+            .createdAt(FIXED_NOW)
+            .updatedAt(FIXED_NOW);
     }
 
     @Test
     void execute_WhenFileRejected_ReturnsSourceFileUrl()
         throws MalformedURLException {
-        IngestionJobReport report = new IngestionJobReport(
-            JOB_ID,
-            123L,
-            ORG_ID,
-            "source.csv",
-            IngestionJobOutcome.FILE_REJECTED,
-            0,
-            0,
-            "rejected_source.csv",
-            null,
-            FIXED_NOW,
-            FIXED_NOW,
-            FIXED_NOW
-        );
+        IngestionJobReport report = baseReportBuilder()
+            .outcome(IngestionJobOutcome.FILE_REJECTED)
+            .fileRejectionSourceKey("rejected_source.csv")
+            .build();
 
         when(
             repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)
@@ -88,20 +97,12 @@ class GetRejectArtifactUrlUseCaseImplImplTest {
     @Test
     void execute_WhenCompletedWithRejects_ReturnsRowReportUrl()
         throws MalformedURLException {
-        IngestionJobReport report = new IngestionJobReport(
-            JOB_ID,
-            123L,
-            ORG_ID,
-            "source.csv",
-            IngestionJobOutcome.COMPLETED,
-            100,
-            5,
-            null,
-            "reject_artifact.csv",
-            FIXED_NOW,
-            FIXED_NOW,
-            FIXED_NOW
-        );
+        IngestionJobReport report = baseReportBuilder()
+            .outcome(IngestionJobOutcome.COMPLETED)
+            .processedRowCount(100)
+            .rejectedRowCount(5)
+            .rejectArtifactKey("reject_artifact.csv")
+            .build();
 
         when(
             repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)
@@ -132,20 +133,11 @@ class GetRejectArtifactUrlUseCaseImplImplTest {
 
     @Test
     void execute_WhenCompletedCleanRun_ThrowsException() {
-        IngestionJobReport report = new IngestionJobReport(
-            JOB_ID,
-            123L,
-            ORG_ID,
-            "source.csv",
-            IngestionJobOutcome.COMPLETED,
-            100,
-            0,
-            null,
-            null,
-            FIXED_NOW,
-            FIXED_NOW,
-            FIXED_NOW
-        );
+        IngestionJobReport report = baseReportBuilder()
+            .outcome(IngestionJobOutcome.COMPLETED)
+            .processedRowCount(100)
+            .rejectedRowCount(0)
+            .build();
 
         when(
             repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)
@@ -163,20 +155,9 @@ class GetRejectArtifactUrlUseCaseImplImplTest {
 
     @Test
     void execute_WhenFileRejectedButNoKey_ThrowsException() {
-        IngestionJobReport report = new IngestionJobReport(
-            JOB_ID,
-            123L,
-            ORG_ID,
-            "source.csv",
-            IngestionJobOutcome.FILE_REJECTED,
-            0,
-            0,
-            null,
-            null,
-            FIXED_NOW,
-            FIXED_NOW,
-            FIXED_NOW
-        );
+        IngestionJobReport report = baseReportBuilder()
+            .outcome(IngestionJobOutcome.FILE_REJECTED)
+            .build();
 
         when(
             repository.findByIdAndOrganizationIdFromPrimary(JOB_ID, ORG_ID)

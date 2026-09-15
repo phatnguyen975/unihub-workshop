@@ -3,6 +3,8 @@ package com.unihub.workshop.iam.presentation.controllers;
 import static org.mockito.Mockito.mock;
 
 import com.unihub.workshop.iam.application.ports.in.*;
+import com.unihub.workshop.iam.presentation.mapper.AuthPresentationMapper;
+import com.unihub.workshop.iam.presentation.mapper.AuthPresentationMapperImpl;
 import com.unihub.workshop.shared.security.PublicKeyService;
 
 public class AuthControllerTestBuilder {
@@ -34,6 +36,8 @@ public class AuthControllerTestBuilder {
     private RevokeAllOtherSessionsUseCase revokeAllOtherSessionsUseCase = mock(
         RevokeAllOtherSessionsUseCase.class
     );
+    private AuthPresentationMapper authMapper =
+        new AuthPresentationMapperImpl();
 
     public static AuthControllerTestBuilder builder() {
         return new AuthControllerTestBuilder();
@@ -123,6 +127,13 @@ public class AuthControllerTestBuilder {
         return this;
     }
 
+    public AuthControllerTestBuilder withAuthMapper(
+        AuthPresentationMapper authMapper
+    ) {
+        this.authMapper = authMapper;
+        return this;
+    }
+
     public AuthController build() {
         return new AuthController(
             loginUseCase,
@@ -136,7 +147,8 @@ public class AuthControllerTestBuilder {
             changeTemporaryPasswordUseCase,
             getActiveSessionsUseCase,
             revokeSessionUseCase,
-            revokeAllOtherSessionsUseCase
+            revokeAllOtherSessionsUseCase,
+            authMapper
         );
     }
 }

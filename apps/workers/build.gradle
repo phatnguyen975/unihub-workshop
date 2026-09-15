@@ -18,14 +18,10 @@ java {
     }
 }
 
-// Required by Spring for parameter-name discovery without debug info
-compileJava.options.compilerArgs += ['-parameters']
-
-configurations {
-    compileOnly {
-        extendsFrom annotationProcessor
-    }
-}
+compileJava.options.compilerArgs += [
+    '-parameters',
+    '-Amapstruct.defaultInjectionStrategy=constructor'
+]
 
 repositories {
     mavenCentral()
@@ -85,16 +81,17 @@ dependencies {
     // --- LOGGING ---
     implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
 
-    // --- BOILERPLATE ---
+    // --- BOILERPLATE & MAPPING ---
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    testCompileOnly 'org.projectlombok:lombok'
-    testAnnotationProcessor 'org.projectlombok:lombok'
-
-    // --- MAPPING ---
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
     implementation 'org.mapstruct:mapstruct:1.6.3'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
-    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    testAnnotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
 
     // --- TESTING ---
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

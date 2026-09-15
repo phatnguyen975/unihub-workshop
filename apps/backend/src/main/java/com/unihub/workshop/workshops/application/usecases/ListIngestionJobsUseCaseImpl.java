@@ -6,18 +6,14 @@ import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRep
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class ListIngestionJobsUseCaseImpl implements ListIngestionJobsUseCase {
 
     private final IngestionJobReportRepository repository;
-
-    public ListIngestionJobsUseCaseImpl(
-        IngestionJobReportRepository repository
-    ) {
-        this.repository = repository;
-    }
 
     public CursorPage<IngestionJobReport> execute(
         UUID organizationId,

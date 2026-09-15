@@ -13,13 +13,14 @@ import com.unihub.workshop.shared.exception.ConflictException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
+@RequiredArgsConstructor
 public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
     private final UserRepository userRepository;
@@ -29,26 +30,10 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
 
-    public RegisterUserUseCaseImpl(
-        UserRepository userRepository,
-        StudentDirectoryRepository studentDirectoryRepository,
-        UserVerificationTokenRepository userVerificationTokenRepository,
-        OtpService otpService,
-        PasswordEncoder passwordEncoder,
-        ApplicationEventPublisher eventPublisher
-    ) {
-        this.userRepository = userRepository;
-        this.studentDirectoryRepository = studentDirectoryRepository;
-        this.userVerificationTokenRepository = userVerificationTokenRepository;
-        this.otpService = otpService;
-        this.passwordEncoder = passwordEncoder;
-        this.eventPublisher = eventPublisher;
-    }
-
     @Override
+    @Transactional
     public UUID register(String email, String password, String fullName) {
-        String normalizedEmail =
-            email != null ? email.trim().toLowerCase() : "";
+        String normalizedEmail = email.trim().toLowerCase();
 
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new ConflictException(

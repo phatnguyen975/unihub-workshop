@@ -11,29 +11,19 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JtiBlacklistPort jtiBlacklistPort;
     private final SessionTrackerPort sessionTrackerPort;
     private final MeterRegistry meterRegistry;
-
-    public RevokeSessionUseCaseImpl(
-        RefreshTokenRepository refreshTokenRepository,
-        JtiBlacklistPort jtiBlacklistPort,
-        SessionTrackerPort sessionTrackerPort,
-        MeterRegistry meterRegistry
-    ) {
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.jtiBlacklistPort = jtiBlacklistPort;
-        this.sessionTrackerPort = sessionTrackerPort;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Override
     @Transactional(propagation = Propagation.NEVER)
@@ -76,7 +66,6 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
             if (currentJti != null && !currentJti.isBlank()) {
                 jtiBlacklistPort.blacklistJti(currentJti, remainingTtl);
             }
-            sessionTrackerPort.removeSession(sessionIdToRevoke);
         } else {
             Optional<String> remoteJti = sessionTrackerPort.getActiveJti(
                 sessionIdToRevoke
@@ -87,8 +76,8 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
                 );
                 jtiBlacklistPort.blacklistJti(remoteJti.get(), remainingTtl);
             }
-            sessionTrackerPort.removeSession(sessionIdToRevoke);
         }
+        sessionTrackerPort.removeSession(sessionIdToRevoke);
 
         // 3. Mark session revoked in Primary DB
         refreshTokenRepository.revokeActiveSession(

@@ -7,9 +7,11 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import lombok.Getter;
 import org.springframework.stereotype.Service;
 
 @Service
+@Getter
 public class PublicKeyService {
 
     private final String publicKeyPem;
@@ -42,14 +44,6 @@ public class PublicKeyService {
                 e
             );
         }
-    }
-
-    public String getPublicKeyPem() {
-        return publicKeyPem;
-    }
-
-    public String getKeyId() {
-        return keyId;
     }
 
     public Instant getIssuedAt() {

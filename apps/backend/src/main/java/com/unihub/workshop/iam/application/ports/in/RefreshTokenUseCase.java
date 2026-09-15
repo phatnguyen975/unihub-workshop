@@ -1,5 +1,7 @@
 package com.unihub.workshop.iam.application.ports.in;
 
+import lombok.Builder;
+
 public interface RefreshTokenUseCase {
     RefreshResult refresh(
         String refreshTokenString,
@@ -7,6 +9,7 @@ public interface RefreshTokenUseCase {
         String ipAddress
     );
 
+    @Builder
     record RefreshResult(
         String accessToken,
         String refreshToken,

@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -18,24 +19,13 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtDecoder jwtDecoder;
     private final JwtClaimsExtractor claimsExtractor;
     private final RedisJtiValidator jtiValidator;
     private final HandlerExceptionResolver exceptionResolver;
-
-    public JwtAuthenticationFilter(
-        JwtDecoder jwtDecoder,
-        JwtClaimsExtractor claimsExtractor,
-        RedisJtiValidator jtiValidator,
-        HandlerExceptionResolver exceptionResolver
-    ) {
-        this.jwtDecoder = jwtDecoder;
-        this.claimsExtractor = claimsExtractor;
-        this.jtiValidator = jtiValidator;
-        this.exceptionResolver = exceptionResolver;
-    }
 
     @Override
     protected void doFilterInternal(

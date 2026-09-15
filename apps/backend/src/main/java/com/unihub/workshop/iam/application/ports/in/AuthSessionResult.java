@@ -4,4 +4,8 @@ import com.unihub.workshop.iam.domain.model.User;
 
 public interface AuthSessionResult extends TokenResult {
     User user();
+
+    default User getUser() {
+        return user();
+    }
 }

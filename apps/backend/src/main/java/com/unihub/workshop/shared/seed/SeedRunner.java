@@ -5,10 +5,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.shared.events.UserProvisionedEvent;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,40 +27,15 @@ import org.springframework.util.StringUtils;
 )
 @EnableConfigurationProperties(SeedProperties.class)
 @Order(10)
+@RequiredArgsConstructor
+@Slf4j
 public class SeedRunner implements ApplicationRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(SeedRunner.class);
 
     private final SeedProperties seedProperties;
     private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
     private final PasswordGenerator passwordGenerator;
     private final ApplicationEventPublisher eventPublisher;
-
-    public SeedRunner(
-        SeedProperties seedProperties,
-        JdbcTemplate jdbcTemplate,
-        PasswordGenerator passwordGenerator,
-        ApplicationEventPublisher eventPublisher
-    ) {
-        this.seedProperties = Objects.requireNonNull(
-            seedProperties,
-            "seedProperties must not be null"
-        );
-        this.jdbcTemplate = Objects.requireNonNull(
-            jdbcTemplate,
-            "jdbcTemplate must not be null"
-        );
-        this.objectMapper = new ObjectMapper();
-        this.passwordGenerator = Objects.requireNonNull(
-            passwordGenerator,
-            "passwordGenerator must not be null"
-        );
-        this.eventPublisher = Objects.requireNonNull(
-            eventPublisher,
-            "eventPublisher must not be null"
-        );
-    }
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional

@@ -1,7 +1,9 @@
 package com.unihub.workshop.iam.presentation.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import lombok.Builder;
 
+@Builder
 public record ChangePasswordRequest(
     @NotBlank(message = "Current password is required") String currentPassword,
     @NotBlank(message = "New password is required") String newPassword

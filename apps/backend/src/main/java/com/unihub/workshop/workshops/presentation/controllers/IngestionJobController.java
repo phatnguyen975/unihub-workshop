@@ -11,9 +11,9 @@ import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.CursorResponse;
 import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.IngestionJobItem;
 import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
+import com.unihub.workshop.workshops.presentation.mapper.IngestionJobPresentationMapper;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -27,6 +27,7 @@ public class IngestionJobController {
 
     private final ListIngestionJobsUseCase listUseCase;
     private final GetRejectArtifactUrlUseCase getRejectArtifactUrlUseCase;
+    private final IngestionJobPresentationMapper presentationMapper;
 
     @GetMapping
     public ApiResponse<IngestionJobListResponse> getIngestionJobs(
@@ -42,26 +43,14 @@ public class IngestionJobController {
             size
         );
 
-        List<IngestionJobItem> items = page
-            .items()
-            .stream()
-            .map(report ->
-                new IngestionJobItem(
-                    report.id(),
-                    report.sourceFileKey(),
-                    report.outcome().name(),
-                    report.processedRowCount(),
-                    report.rejectedRowCount(),
-                    report.completedAt(),
-                    report.isArtifactAvailable()
-                )
-            )
-            .collect(Collectors.toList());
-
+        List<IngestionJobItem> items = presentationMapper.toItemList(
+            page.items()
+        );
         CursorResponse cursorResponse = new CursorResponse(
             page.nextCursor(),
             page.hasMore()
         );
+
         return ApiResponse.success(
             new IngestionJobListResponse(items, cursorResponse),
             "Ingestion job reports retrieved"
@@ -83,12 +72,8 @@ public class IngestionJobController {
         UUID orgId = SecurityContextUtils.extractOrganizationId(authentication);
 
         var result = getRejectArtifactUrlUseCase.execute(jobUuid, orgId);
-        RejectArtifactUrlResponse responseDto = new RejectArtifactUrlResponse(
-            result.jobId(),
-            result.artifactType(),
-            result.downloadUrl(),
-            result.expiresAt()
-        );
+        RejectArtifactUrlResponse responseDto =
+            presentationMapper.toRejectArtifactUrlResponse(result);
         return ApiResponse.success(
             responseDto,
             "Pre-signed download URL generated"

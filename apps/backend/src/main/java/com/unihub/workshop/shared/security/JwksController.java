@@ -26,14 +26,14 @@ public class JwksController {
             .algorithm(JWSAlgorithm.RS256)
             .build();
 
-        JwksResponse.Jwk jwk = new JwksResponse.Jwk(
-            rsaKey.getKeyType().getValue(),
-            rsaKey.getPublicExponent().toString(),
-            rsaKey.getKeyUse().identifier(),
-            rsaKey.getModulus().toString(),
-            rsaKey.getAlgorithm().getName()
-        );
+        JwksResponse.Jwk jwk = JwksResponse.Jwk.builder()
+            .kty(rsaKey.getKeyType().getValue())
+            .e(rsaKey.getPublicExponent().toString())
+            .use(rsaKey.getKeyUse().identifier())
+            .n(rsaKey.getModulus().toString())
+            .alg(rsaKey.getAlgorithm().getName())
+            .build();
 
-        return new JwksResponse(List.of(jwk));
+        return JwksResponse.builder().keys(List.of(jwk)).build();
     }
 }

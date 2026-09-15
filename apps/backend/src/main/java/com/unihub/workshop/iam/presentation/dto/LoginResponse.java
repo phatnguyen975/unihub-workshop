@@ -1,8 +1,9 @@
 package com.unihub.workshop.iam.presentation.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.unihub.workshop.iam.application.ports.in.AuthSessionResult;
+import lombok.Builder;
 
+@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LoginResponse(
     String accessToken,
@@ -10,17 +11,4 @@ public record LoginResponse(
     String tokenType,
     long expiresIn,
     UserProfileResponse user
-) {
-    public static LoginResponse from(AuthSessionResult result) {
-        if (result == null) {
-            return null;
-        }
-        return new LoginResponse(
-            result.accessToken(),
-            result.refreshToken(),
-            result.tokenType(),
-            result.expiresIn(),
-            UserProfileResponse.from(result.user())
-        );
-    }
-}
+) {}

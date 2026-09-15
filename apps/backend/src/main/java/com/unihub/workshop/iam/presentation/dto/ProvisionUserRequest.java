@@ -5,7 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 
+@Builder
 public record ProvisionUserRequest(
     @NotBlank(message = "Email must not be blank")
     @Email(message = "Email must be a valid email address")

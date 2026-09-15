@@ -70,16 +70,16 @@ class LoginUseCaseImplTest {
         String password = "password123";
         String encodedPassword = passwordEncoder.encode(password);
 
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            encodedPassword,
-            true,
-            false,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash(encodedPassword)
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         when(
             jwtTokenIssuer.issueToken(
@@ -142,16 +142,16 @@ class LoginUseCaseImplTest {
         String encodedPassword = passwordEncoder.encode(password);
 
         // Student with organizationId = null
-        User user = new User(
-            UUID.randomUUID(),
-            null,
-            UserRole.STUDENT,
-            email,
-            encodedPassword,
-            true,
-            false,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(null)
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash(encodedPassword)
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         when(
             jwtTokenIssuer.issueToken(
@@ -213,16 +213,16 @@ class LoginUseCaseImplTest {
     void shouldThrowInvalidCredentialsOnWrongPassword() {
         String email = "test@example.com";
         String encodedPassword = passwordEncoder.encode("correct-password");
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            encodedPassword,
-            true,
-            false,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash(encodedPassword)
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() ->
@@ -248,16 +248,16 @@ class LoginUseCaseImplTest {
     void shouldThrowAccountDisabledException() {
         String email = "test@example.com";
         String encodedPassword = passwordEncoder.encode("password");
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            encodedPassword,
-            false,
-            false,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash(encodedPassword)
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() ->
@@ -283,16 +283,16 @@ class LoginUseCaseImplTest {
     void shouldThrowTemporaryPasswordException() {
         String email = "test@example.com";
         String encodedPassword = passwordEncoder.encode("password");
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            encodedPassword,
-            true,
-            true,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash(encodedPassword)
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() ->

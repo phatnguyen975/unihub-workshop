@@ -64,16 +64,16 @@ class ResetPasswordUseCaseImplTest {
         String otp = "849201";
         String newPassword = "BrandNewSecurePassword2026!";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "oldHash",
-            true,
-            true,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("oldHash")
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
 
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(15));
         UserVerificationToken token = new UserVerificationToken(
@@ -131,16 +131,16 @@ class ResetPasswordUseCaseImplTest {
         String otp = "849201";
         String newPassword = "BrandNewSecurePassword2026!";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "oldHash",
-            true,
-            true,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("oldHash")
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
 
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(15));
         UserVerificationToken token = new UserVerificationToken(
@@ -227,16 +227,16 @@ class ResetPasswordUseCaseImplTest {
     void shouldThrowValidationExceptionWhenUserInactive() {
         String email = "inactive@university.edu";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            null,
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(null)
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         when(userRepository.findByEmail(email)).thenReturn(
             Optional.of(inactiveUser)
         );
@@ -267,16 +267,16 @@ class ResetPasswordUseCaseImplTest {
     void shouldThrowValidationExceptionWhenTokenNotFound() {
         String email = "active@university.edu";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            null,
-            UserRole.STUDENT,
-            email,
-            "hash",
-            true,
-            false,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(null)
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(
             Optional.of(activeUser)
@@ -301,16 +301,16 @@ class ResetPasswordUseCaseImplTest {
     void shouldThrowValidationExceptionWhenTokenAlreadyConsumed() {
         String email = "active@university.edu";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            null,
-            UserRole.STUDENT,
-            email,
-            "hash",
-            true,
-            false,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(null)
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         UserVerificationToken consumedToken = new UserVerificationToken(
             UUID.randomUUID(),
@@ -348,16 +348,16 @@ class ResetPasswordUseCaseImplTest {
     void shouldThrowValidationExceptionWhenTokenExpired() {
         String email = "active@university.edu";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            null,
-            UserRole.STUDENT,
-            email,
-            "hash",
-            true,
-            false,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(null)
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         UserVerificationToken expiredToken = new UserVerificationToken(
             UUID.randomUUID(),
@@ -395,16 +395,16 @@ class ResetPasswordUseCaseImplTest {
     void shouldThrowValidationExceptionWhenOtpMismatch() {
         String email = "active@university.edu";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            null,
-            UserRole.STUDENT,
-            email,
-            "hash",
-            true,
-            false,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(null)
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         UserVerificationToken token = new UserVerificationToken(
             UUID.randomUUID(),

@@ -7,65 +7,37 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
+import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@RequiredArgsConstructor
 public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
 
     private final RefreshTokenJpaRepository repository;
-    private final ObjectMapper objectMapper;
-
-    public RefreshTokenRepositoryAdapter(RefreshTokenJpaRepository repository) {
-        this.repository = repository;
-        this.objectMapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-    }
+    private final RefreshTokenPersistenceMapper tokenMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
     public void save(RefreshToken refreshToken) {
-        RefreshTokenJpaEntity entity = repository
-            .findById(refreshToken.id())
-            .orElseGet(RefreshTokenJpaEntity::new);
-        entity.setId(refreshToken.id());
-        entity.setUserId(refreshToken.userId());
-        entity.setTokenHash(refreshToken.tokenHash());
-        entity.setDeviceInfo(refreshToken.deviceInfo());
-        entity.setIpAddress(refreshToken.ipAddress());
-        entity.setExpiresAt(refreshToken.expiresAt());
-        entity.setRevokedAt(refreshToken.revokedAt());
-
-        if (entity.getCreatedAt() == null) {
-            entity.setCreatedAt(Instant.now());
-        }
-
+        RefreshTokenJpaEntity entity = tokenMapper.toEntity(refreshToken);
         repository.save(entity);
     }
 
     @Override
     public Optional<RefreshToken> findByTokenHash(String tokenHash) {
-        return repository.findByTokenHash(tokenHash).map(this::mapToDomain);
-    }
-
-    private RefreshToken mapToDomain(RefreshTokenJpaEntity entity) {
-        return new RefreshToken(
-            entity.getId(),
-            entity.getUserId(),
-            entity.getTokenHash(),
-            entity.getDeviceInfo(),
-            entity.getIpAddress(),
-            entity.getExpiresAt(),
-            entity.getRevokedAt()
-        );
+        return repository.findByTokenHash(tokenHash).map(tokenMapper::toDomain);
     }
 
     @Override
@@ -121,10 +93,9 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
             ? entities.subList(0, limit)
             : entities;
 
-        List<ActiveSession> items = pageEntities
-            .stream()
-            .map(this::mapToActiveSession)
-            .collect(Collectors.toList());
+        List<ActiveSession> items = tokenMapper.toActiveSessionList(
+            pageEntities
+        );
 
         String nextCursor = null;
         if (hasMore && !pageEntities.isEmpty()) {
@@ -157,7 +128,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     ) {
         return repository
             .findActiveSessionByIdAndUserId(id, userId, now)
-            .map(this::mapToDomain);
+            .map(tokenMapper::toDomain);
     }
 
     @Override
@@ -182,7 +153,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         return repository
             .findActiveRemoteSessions(userId, currentSessionId, now)
             .stream()
-            .map(this::mapToDomain)
+            .map(tokenMapper::toDomain)
             .toList();
     }
 
@@ -210,18 +181,8 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         return repository
             .findAllActiveSessionsForUser(userId, now)
             .stream()
-            .map(this::mapToDomain)
+            .map(tokenMapper::toDomain)
             .toList();
-    }
-
-    private ActiveSession mapToActiveSession(RefreshTokenJpaEntity entity) {
-        return new ActiveSession(
-            entity.getId(),
-            entity.getDeviceInfo(),
-            entity.getIpAddress(),
-            entity.getCreatedAt(),
-            false
-        );
     }
 
     private record CursorData(Instant createdAt, UUID id) {}

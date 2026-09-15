@@ -4,22 +4,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionEventPublisher;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class RabbitMqIngestionEventPublisher
     implements IngestionEventPublisher
 {
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    public RabbitMqIngestionEventPublisher(RabbitTemplate rabbitTemplate) {
-        this.rabbitTemplate = rabbitTemplate;
-    }
 
     @Override
     public void publishFileRejectedEvent(

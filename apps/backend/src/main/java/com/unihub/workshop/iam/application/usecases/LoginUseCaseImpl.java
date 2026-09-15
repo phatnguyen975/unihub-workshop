@@ -13,16 +13,19 @@ import com.unihub.workshop.shared.security.IssuedToken;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class LoginUseCaseImpl implements LoginUseCase {
 
     private final UserRepository userRepository;
@@ -32,25 +35,21 @@ public class LoginUseCaseImpl implements LoginUseCase {
     private final PasswordEncoder passwordEncoder;
     private final SecurityProperties securityProperties;
     private final MeterRegistry meterRegistry;
-    private final String dummyPasswordHash;
 
-    public LoginUseCaseImpl(
-        UserRepository userRepository,
-        RefreshTokenRepository refreshTokenRepository,
-        SessionTrackerPort sessionTrackerPort,
-        JwtTokenIssuer jwtTokenIssuer,
-        PasswordEncoder passwordEncoder,
-        SecurityProperties securityProperties,
-        MeterRegistry meterRegistry
-    ) {
-        this.userRepository = userRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.sessionTrackerPort = sessionTrackerPort;
-        this.jwtTokenIssuer = jwtTokenIssuer;
-        this.passwordEncoder = passwordEncoder;
-        this.securityProperties = securityProperties;
-        this.meterRegistry = meterRegistry;
-        this.dummyPasswordHash = passwordEncoder.encode("dummy-password-hash");
+    private volatile String dummyPasswordHash;
+
+    @PostConstruct
+    void init() {
+        if (dummyPasswordHash == null) {
+            dummyPasswordHash = passwordEncoder.encode("dummy-password-hash");
+        }
+    }
+
+    private String getDummyPasswordHash() {
+        if (dummyPasswordHash == null) {
+            dummyPasswordHash = passwordEncoder.encode("dummy-password-hash");
+        }
+        return dummyPasswordHash;
     }
 
     @Override
@@ -65,7 +64,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
 
         if (optionalUser.isEmpty()) {
             // Anti-enumeration: perform dummy hash check
-            passwordEncoder.matches(password, dummyPasswordHash);
+            passwordEncoder.matches(password, getDummyPasswordHash());
             meterRegistry
                 .counter(
                     "auth.login.attempts",
@@ -136,15 +135,16 @@ public class LoginUseCaseImpl implements LoginUseCase {
         );
 
         UUID sessionId = UUID.randomUUID();
-        RefreshToken refreshToken = new RefreshToken(
-            sessionId,
-            user.id(),
-            tokenHash,
-            deviceInfo,
-            ipAddress,
-            expiresAt,
-            null
-        );
+        RefreshToken refreshToken = RefreshToken.builder()
+            .id(sessionId)
+            .userId(user.id())
+            .tokenHash(tokenHash)
+            .deviceInfo(deviceInfo)
+            .ipAddress(ipAddress)
+            .expiresAt(expiresAt)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
         refreshTokenRepository.save(refreshToken);
 
         String orgId =

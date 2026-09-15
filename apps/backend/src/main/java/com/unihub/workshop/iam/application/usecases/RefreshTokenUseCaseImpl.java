@@ -16,10 +16,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
     private final RefreshTokenRepository refreshTokenRepository;
@@ -28,22 +30,6 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
     private final JwtTokenIssuer jwtTokenIssuer;
     private final SecurityProperties securityProperties;
     private final MeterRegistry meterRegistry;
-
-    public RefreshTokenUseCaseImpl(
-        RefreshTokenRepository refreshTokenRepository,
-        UserRepository userRepository,
-        SessionTrackerPort sessionTrackerPort,
-        JwtTokenIssuer jwtTokenIssuer,
-        SecurityProperties securityProperties,
-        MeterRegistry meterRegistry
-    ) {
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.userRepository = userRepository;
-        this.sessionTrackerPort = sessionTrackerPort;
-        this.jwtTokenIssuer = jwtTokenIssuer;
-        this.securityProperties = securityProperties;
-        this.meterRegistry = meterRegistry;
-    }
 
     @Override
     @Transactional
@@ -125,15 +111,7 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
             throw new UnauthorizedException("Invalid refresh token");
         }
 
-        RefreshToken revokedToken = new RefreshToken(
-            oldToken.id(),
-            oldToken.userId(),
-            oldToken.tokenHash(),
-            oldToken.deviceInfo(),
-            oldToken.ipAddress(),
-            oldToken.expiresAt(),
-            now
-        );
+        RefreshToken revokedToken = oldToken.toBuilder().revokedAt(now).build();
         refreshTokenRepository.save(revokedToken);
         sessionTrackerPort.removeSession(oldToken.id());
 
@@ -150,15 +128,16 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
         );
 
         UUID newSessionId = UUID.randomUUID();
-        RefreshToken newRefreshToken = new RefreshToken(
-            newSessionId,
-            user.id(),
-            newTokenHash,
-            userAgent,
-            ipAddress,
-            newExpiresAt,
-            null
-        );
+        RefreshToken newRefreshToken = RefreshToken.builder()
+            .id(newSessionId)
+            .userId(user.id())
+            .tokenHash(newTokenHash)
+            .deviceInfo(userAgent)
+            .ipAddress(ipAddress)
+            .expiresAt(newExpiresAt)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
         refreshTokenRepository.save(newRefreshToken);
 
         IssuedToken issuedToken = jwtTokenIssuer.issueToken(

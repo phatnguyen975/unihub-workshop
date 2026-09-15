@@ -8,29 +8,19 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.events.OtpRequestedEvent;
 import com.unihub.workshop.shared.exception.NotFoundException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ResendOtpUseCaseImpl implements ResendOtpUseCase {
 
     private final UserRepository userRepository;
     private final UserVerificationTokenRepository userVerificationTokenRepository;
     private final OtpService otpService;
     private final ApplicationEventPublisher eventPublisher;
-
-    public ResendOtpUseCaseImpl(
-        UserRepository userRepository,
-        UserVerificationTokenRepository userVerificationTokenRepository,
-        OtpService otpService,
-        ApplicationEventPublisher eventPublisher
-    ) {
-        this.userRepository = userRepository;
-        this.userVerificationTokenRepository = userVerificationTokenRepository;
-        this.otpService = otpService;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Override
     @Transactional

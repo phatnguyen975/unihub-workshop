@@ -5,34 +5,29 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
-import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
+import com.unihub.workshop.workshops.infrastructure.persistence.mapper.IngestionJobReportPersistenceMapper;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@RequiredArgsConstructor
 public class IngestionJobReportRepositoryAdapter
     implements IngestionJobReportRepository
 {
 
     private final IngestionJobReportJpaRepository repository;
-    private final ObjectMapper objectMapper;
-
-    public IngestionJobReportRepositoryAdapter(
-        IngestionJobReportJpaRepository repository
-    ) {
-        this.repository = repository;
-        this.objectMapper = new ObjectMapper().registerModule(
-            new JavaTimeModule()
-        );
-    }
+    private final IngestionJobReportPersistenceMapper mapper;
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(
+        new JavaTimeModule()
+    );
 
     @Override
     @Transactional(readOnly = true)
@@ -71,10 +66,7 @@ public class IngestionJobReportRepositoryAdapter
             ? entities.subList(0, limit)
             : entities;
 
-        List<IngestionJobReport> items = pageEntities
-            .stream()
-            .map(this::toDomain)
-            .collect(Collectors.toList());
+        List<IngestionJobReport> items = mapper.toDomainList(pageEntities);
 
         String nextCursor = null;
         if (hasMore) {
@@ -106,23 +98,6 @@ public class IngestionJobReportRepositoryAdapter
     ) {
         return repository
             .findByIdAndOrganizationId(id, organizationId)
-            .map(this::toDomain);
-    }
-
-    private IngestionJobReport toDomain(IngestionJobReportJpaEntity entity) {
-        return new IngestionJobReport(
-            entity.getId(),
-            entity.getJobExecutionId(),
-            entity.getOrganizationId(),
-            entity.getSourceFileKey(),
-            IngestionJobOutcome.valueOf(entity.getOutcome()),
-            entity.getProcessedRowCount(),
-            entity.getRejectedRowCount(),
-            entity.getFileRejectionSourceKey(),
-            entity.getRejectArtifactKey(),
-            entity.getCompletedAt(),
-            entity.getCreatedAt(),
-            entity.getUpdatedAt()
-        );
+            .map(mapper::toDomain);
     }
 }

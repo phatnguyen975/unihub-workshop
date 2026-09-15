@@ -8,6 +8,7 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.presentation.dto.ChangePasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.UpdateProfileRequest;
 import com.unihub.workshop.iam.presentation.dto.UserProfileResponse;
+import com.unihub.workshop.iam.presentation.mapper.UserPresentationMapper;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
@@ -30,6 +31,7 @@ public class UserController {
     private final GetUserProfileUseCase getUserProfileUseCase;
     private final UpdateUserProfileUseCase updateUserProfileUseCase;
     private final ChangeUserPasswordUseCase changeUserPasswordUseCase;
+    private final UserPresentationMapper userMapper;
 
     @GetMapping("/me")
     public ApiResponse<UserProfileResponse> getMyProfile(
@@ -38,7 +40,7 @@ public class UserController {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         User user = getUserProfileUseCase.getProfile(userId);
         return ApiResponse.success(
-            UserProfileResponse.from(user),
+            userMapper.toProfileResponse(user),
             "Profile retrieved successfully."
         );
     }
@@ -56,7 +58,7 @@ public class UserController {
         UpdateUserProfileCommand command = request.toCommand();
         User updated = updateUserProfileUseCase.updateProfile(userId, command);
         return ApiResponse.success(
-            UserProfileResponse.from(updated),
+            userMapper.toProfileResponse(updated),
             "Profile updated successfully."
         );
     }

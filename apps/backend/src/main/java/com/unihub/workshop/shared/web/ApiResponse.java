@@ -1,7 +1,14 @@
 package com.unihub.workshop.shared.web;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Builder
+@AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
 
@@ -9,14 +16,12 @@ public class ApiResponse<T> {
     private final String message;
     private final T data;
     private final Object error;
+
+    @Setter
     private Metadata metadata;
 
     private ApiResponse(boolean success, String message, T data, Object error) {
-        this.success = success;
-        this.message = message;
-        this.data = data;
-        this.error = error;
-        this.metadata = null;
+        this(success, message, data, error, null);
     }
 
     public static <T> ApiResponse<T> success(T data, String message) {
@@ -27,46 +32,12 @@ public class ApiResponse<T> {
         return new ApiResponse<>(false, null, null, errorObject);
     }
 
-    public boolean isSuccess() {
-        return success;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public T getData() {
-        return data;
-    }
-
-    public Object getError() {
-        return error;
-    }
-
-    public Metadata getMetadata() {
-        return metadata;
-    }
-
-    public void setMetadata(Metadata metadata) {
-        this.metadata = metadata;
-    }
-
+    @Getter
+    @Builder
+    @AllArgsConstructor
     public static class Metadata {
 
-        private final String processedBy;
         private final String traceId;
-
-        public Metadata(String traceId, String processedBy) {
-            this.traceId = traceId;
-            this.processedBy = processedBy;
-        }
-
-        public String getProcessedBy() {
-            return processedBy;
-        }
-
-        public String getTraceId() {
-            return traceId;
-        }
+        private final String processedBy;
     }
 }

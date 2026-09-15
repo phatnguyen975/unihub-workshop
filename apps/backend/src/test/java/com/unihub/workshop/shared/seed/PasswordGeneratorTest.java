@@ -1,7 +1,6 @@
 package com.unihub.workshop.shared.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,13 +16,6 @@ class PasswordGeneratorTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
-
-    @Test
-    void constructor_throwsNullPointerException_whenEncoderIsNull() {
-        assertThatThrownBy(() -> new PasswordGenerator(null))
-            .isInstanceOf(NullPointerException.class)
-            .hasMessageContaining("PasswordEncoder must not be null");
-    }
 
     @Test
     void generate_creates24CharacterPassword_andHashesWithEncoder() {

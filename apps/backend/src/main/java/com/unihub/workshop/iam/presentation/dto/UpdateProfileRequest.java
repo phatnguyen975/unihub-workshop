@@ -8,7 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
 
+@Getter
+@Builder
+@AllArgsConstructor
 public class UpdateProfileRequest {
 
     private static final Pattern PHONE_PATTERN = Pattern.compile(
@@ -26,22 +32,6 @@ public class UpdateProfileRequest {
     private final boolean phoneNumberPresent;
     private final String avatarUrl;
     private final boolean avatarUrlPresent;
-
-    public UpdateProfileRequest(
-        String fullName,
-        boolean fullNamePresent,
-        String phoneNumber,
-        boolean phoneNumberPresent,
-        String avatarUrl,
-        boolean avatarUrlPresent
-    ) {
-        this.fullName = fullName;
-        this.fullNamePresent = fullNamePresent;
-        this.phoneNumber = phoneNumber;
-        this.phoneNumberPresent = phoneNumberPresent;
-        this.avatarUrl = avatarUrl;
-        this.avatarUrlPresent = avatarUrlPresent;
-    }
 
     public static UpdateProfileRequest from(Map<String, Object> body) {
         if (body == null) {

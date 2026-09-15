@@ -73,16 +73,16 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         String newPassword = "MyOfficialSecurePassword2026!";
         String encodedTempPassword = passwordEncoder.encode(currentPassword);
 
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STAFF,
-            email,
-            encodedTempPassword,
-            true,
-            true,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STAFF)
+            .email(email)
+            .passwordHash(encodedTempPassword)
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         when(
@@ -150,16 +150,16 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         String newPassword = "MyOfficialSecurePassword2026!";
         String encodedTempPassword = passwordEncoder.encode(currentPassword);
 
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STAFF,
-            email,
-            encodedTempPassword,
-            true,
-            true,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STAFF)
+            .email(email)
+            .passwordHash(encodedTempPassword)
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
         when(
@@ -231,16 +231,16 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         String currentPassword = "TempPassword123!";
         String encodedTempPassword = passwordEncoder.encode(currentPassword);
 
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STAFF,
-            email,
-            encodedTempPassword,
-            false,
-            true,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STAFF)
+            .email(email)
+            .passwordHash(encodedTempPassword)
+            .isActive(false)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
@@ -267,16 +267,16 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         String wrongPassword = "WrongPassword123!";
         String encodedTempPassword = passwordEncoder.encode(currentPassword);
 
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STAFF,
-            email,
-            encodedTempPassword,
-            true,
-            true,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STAFF)
+            .email(email)
+            .passwordHash(encodedTempPassword)
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
@@ -313,16 +313,16 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         String currentPassword = "PermanentPassword123!";
         String encodedPassword = passwordEncoder.encode(currentPassword);
 
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STAFF,
-            email,
-            encodedPassword,
-            true,
-            false,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STAFF)
+            .email(email)
+            .passwordHash(encodedPassword)
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 
@@ -348,16 +348,16 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         String currentPassword = "TempPassword123!";
         String encodedTempPassword = passwordEncoder.encode(currentPassword);
 
-        User user = new User(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UserRole.STAFF,
-            email,
-            encodedTempPassword,
-            true,
-            true,
-            null
-        );
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STAFF)
+            .email(email)
+            .passwordHash(encodedTempPassword)
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
 

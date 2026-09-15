@@ -45,16 +45,16 @@ class ActivateAccountUseCaseImplTest {
         String email = "student@university.edu";
         String otp = "123456";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         UserVerificationToken token = UserVerificationToken.createActivationOtp(
             userId,
             "tokenHash",
@@ -86,16 +86,16 @@ class ActivateAccountUseCaseImplTest {
         String email = "student@university.edu";
         String otp = "123456";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         UserVerificationToken token = UserVerificationToken.createActivationOtp(
             userId,
             "tokenHash",
@@ -140,16 +140,16 @@ class ActivateAccountUseCaseImplTest {
     void shouldThrowConflictExceptionWhenAccountAlreadyActive() {
         String email = "active@university.edu";
         UUID userId = UUID.randomUUID();
-        User activeUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            true,
-            false,
-            null
-        );
+        User activeUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(
             Optional.of(activeUser)
@@ -167,16 +167,16 @@ class ActivateAccountUseCaseImplTest {
     void shouldThrowValidationExceptionWhenNoActiveTokenFound() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
 
         when(userRepository.findByEmail(email)).thenReturn(
             Optional.of(inactiveUser)
@@ -199,16 +199,16 @@ class ActivateAccountUseCaseImplTest {
     void shouldThrowValidationExceptionWhenTokenExpired() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         UserVerificationToken expiredToken =
             UserVerificationToken.createActivationOtp(
                 userId,
@@ -238,16 +238,16 @@ class ActivateAccountUseCaseImplTest {
     void shouldThrowValidationExceptionWhenTokenAlreadyConsumed() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         UserVerificationToken token = new UserVerificationToken(
             UUID.randomUUID(),
             userId,
@@ -283,16 +283,16 @@ class ActivateAccountUseCaseImplTest {
     void shouldThrowValidationExceptionWhenOtpMismatch() {
         String email = "student@university.edu";
         UUID userId = UUID.randomUUID();
-        User inactiveUser = new User(
-            userId,
-            UUID.randomUUID(),
-            UserRole.STUDENT,
-            email,
-            "hash",
-            false,
-            false,
-            null
-        );
+        User inactiveUser = User.builder()
+            .id(userId)
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(email)
+            .passwordHash("hash")
+            .isActive(false)
+            .isTemporaryPassword(false)
+            .lastLoginAt(null)
+            .build();
         UserVerificationToken token = UserVerificationToken.createActivationOtp(
             userId,
             "tokenHash",

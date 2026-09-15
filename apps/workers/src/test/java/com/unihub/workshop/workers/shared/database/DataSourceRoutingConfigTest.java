@@ -53,13 +53,6 @@ class DataSourceRoutingConfigTest {
     }
 
     @Test
-    void configConstructor_throwsNullPointerExceptionWhenPropertiesNull() {
-        assertThatThrownBy(() -> new DataSourceRoutingConfig(null))
-            .isInstanceOf(NullPointerException.class)
-            .hasMessageContaining("DataSourceProperties must not be null");
-    }
-
-    @Test
     void primaryDataSource_createsHikariDataSourceWithDefaultPoolNameAndSettings() {
         DataSourceProperties.Hikari hikari = new DataSourceProperties.Hikari(
             15,

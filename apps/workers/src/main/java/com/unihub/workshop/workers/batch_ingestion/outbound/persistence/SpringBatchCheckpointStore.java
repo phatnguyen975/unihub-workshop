@@ -3,6 +3,7 @@ package com.unihub.workshop.workers.batch_ingestion.outbound.persistence;
 import com.unihub.workshop.workers.batch_ingestion.core.models.IngestionMetrics;
 import com.unihub.workshop.workers.batch_ingestion.core.ports.out.IngestionCheckpointStore;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.parameters.JobParameters;
@@ -13,21 +14,12 @@ import org.springframework.batch.core.step.StepExecution;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class SpringBatchCheckpointStore implements IngestionCheckpointStore {
 
     private final JobOperator jobOperator;
     private final Job cleanCsvIngestionJob;
     private final JobRepository jobRepository;
-
-    public SpringBatchCheckpointStore(
-        JobOperator jobOperator,
-        Job cleanCsvIngestionJob,
-        JobRepository jobRepository
-    ) {
-        this.jobOperator = jobOperator;
-        this.cleanCsvIngestionJob = cleanCsvIngestionJob;
-        this.jobRepository = jobRepository;
-    }
 
     @Override
     public long startIngestionJob(

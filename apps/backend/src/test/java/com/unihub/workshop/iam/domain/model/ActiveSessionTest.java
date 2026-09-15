@@ -26,7 +26,10 @@ class ActiveSessionTest {
         assertThat(session.createdAt()).isEqualTo(now);
         assertThat(session.isCurrentSession()).isFalse();
 
-        ActiveSession updated = session.withCurrentSession(true);
+        ActiveSession updated = session
+            .toBuilder()
+            .isCurrentSession(true)
+            .build();
         assertThat(updated.isCurrentSession()).isTrue();
         assertThat(updated.id()).isEqualTo(id);
         assertThat(updated.deviceInfo()).isEqualTo("Chrome 120");

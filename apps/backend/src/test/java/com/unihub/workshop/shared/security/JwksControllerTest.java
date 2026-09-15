@@ -42,7 +42,7 @@ class JwksControllerTest {
         JwksController jwksController = new JwksController(rsaKeyProperties);
         mockMvc = MockMvcBuilders.standaloneSetup(jwksController)
             .setControllerAdvice(
-                new GlobalExceptionHandler(null),
+                new GlobalExceptionHandler(),
                 new GlobalResponseBodyAdvice()
             )
             .build();

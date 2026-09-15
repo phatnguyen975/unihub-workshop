@@ -4,6 +4,7 @@ import com.unihub.workshop.shared.realtime.application.StreamSubscriptionService
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -16,14 +17,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * REST controller exposing the Server-Sent Events handshake endpoint.
  */
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/v1/stream")
 public class StreamController {
 
     private final StreamSubscriptionService subscriptionService;
-
-    public StreamController(StreamSubscriptionService subscriptionService) {
-        this.subscriptionService = subscriptionService;
-    }
 
     /**
      * Establishes a real-time event streaming connection for the authenticated client.

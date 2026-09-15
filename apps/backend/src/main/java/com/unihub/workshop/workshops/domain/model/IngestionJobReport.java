@@ -2,7 +2,9 @@ package com.unihub.workshop.workshops.domain.model;
 
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record IngestionJobReport(
     UUID id,
     Long jobExecutionId,
