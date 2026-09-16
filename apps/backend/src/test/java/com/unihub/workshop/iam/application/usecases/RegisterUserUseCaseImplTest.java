@@ -22,6 +22,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -120,7 +121,21 @@ class RegisterUserUseCaseImplTest {
         ArgumentCaptor<OtpRequestedEvent> eventCaptor = ArgumentCaptor.forClass(
             OtpRequestedEvent.class
         );
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+        InOrder inOrder = inOrder(
+            userRepository,
+            studentDirectoryRepository,
+            userVerificationTokenRepository,
+            eventPublisher
+        );
+        inOrder.verify(userRepository).existsByEmail(email);
+        inOrder.verify(studentDirectoryRepository).findActiveByEmail(email);
+        inOrder.verify(userRepository).save(any(User.class));
+        inOrder
+            .verify(userVerificationTokenRepository)
+            .save(any(UserVerificationToken.class));
+        inOrder.verify(eventPublisher).publishEvent(eventCaptor.capture());
+
         OtpRequestedEvent event = eventCaptor.getValue();
         assertThat(event.userId()).isEqualTo(userId);
         assertThat(event.email()).isEqualTo(email);
@@ -164,6 +179,22 @@ class RegisterUserUseCaseImplTest {
         assertThat(savedToken.tokenType()).isEqualTo(
             UserVerificationToken.TYPE_ACTIVATION_OTP
         );
+
+        InOrder inOrder = inOrder(
+            userRepository,
+            studentDirectoryRepository,
+            userVerificationTokenRepository,
+            eventPublisher
+        );
+        inOrder.verify(userRepository).existsByEmail(email);
+        inOrder.verify(studentDirectoryRepository).findActiveByEmail(email);
+        inOrder.verify(userRepository).save(any(User.class));
+        inOrder
+            .verify(userVerificationTokenRepository)
+            .save(any(UserVerificationToken.class));
+        inOrder
+            .verify(eventPublisher)
+            .publishEvent(any(OtpRequestedEvent.class));
     }
 
     @Test

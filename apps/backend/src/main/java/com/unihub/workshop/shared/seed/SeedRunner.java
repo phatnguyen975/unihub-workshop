@@ -118,7 +118,7 @@ public class SeedRunner implements ApplicationRunner {
                     )
                 );
 
-                // NOTE: Log kept temporarily for local inspection until notifications worker is implemented
+                // TODO: Remove temporary password logging before production deployment once notifications worker is fully active.
                 log.info(
                     "Seeded root organizer: {} with temporary password: {}",
                     organizer.email(),

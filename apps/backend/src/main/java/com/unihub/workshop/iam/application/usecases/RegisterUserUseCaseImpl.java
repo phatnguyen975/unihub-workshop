@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
     private final UserRepository userRepository;
@@ -65,6 +67,14 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
         String otp = otpService.generateOtp();
         String otpHash = otpService.hashOtp(otp);
         Instant expiresAt = otpService.calculateExpiryInstant();
+
+        // TODO: Remove OTP logging before production deployment once notifications worker is fully active.
+        log.info(
+            "Generated activation OTP for user {} (email: {}): {}",
+            savedUser.id(),
+            savedUser.email(),
+            otp
+        );
 
         UserVerificationToken token = UserVerificationToken.createActivationOtp(
             savedUser.id(),

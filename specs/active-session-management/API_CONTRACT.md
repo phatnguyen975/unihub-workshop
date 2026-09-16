@@ -108,7 +108,7 @@ None.
 
 ### DELETE /api/v1/auth/sessions/{id}
 
-**Description:** Terminates a specific active session belonging to the authenticated caller and immediately blacklists its active access token.  
+**Description:** Terminates a specific active session belonging to the authenticated caller and immediately blacklists its active access token. The caller **may** target their own current session (`{id} == sid` claim); in this case the caller's current access token is blacklisted and subsequent requests with that token are rejected with `401 Unauthorized` (force-logout). Revoking any session — including the current one — always returns `204 No Content` on success.  
 **Required Role / Auth:** Authenticated (`STUDENT`, `STAFF`, or `ORGANIZER`)  
 **Idempotency Requirement:** Not Required — Standard REST resource deletion semantics.
 

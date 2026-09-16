@@ -1,5 +1,6 @@
 package com.unihub.workshop.iam.application.utils;
 
+import com.unihub.workshop.shared.exception.InternalServerException;
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -69,8 +70,8 @@ public class OtpService {
             byte[] rawHmac = mac.doFinal(otp.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(rawHmac);
         } catch (Exception e) {
-            throw new IllegalStateException(
-                "Failed to compute HMAC-SHA256 for OTP",
+            throw new InternalServerException(
+                "Failed to process verification code",
                 e
             );
         }

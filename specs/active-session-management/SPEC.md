@@ -87,15 +87,16 @@ This feature provides authenticated users across all roles (`STUDENT`, `STAFF`, 
 
 ### Transition Matrix
 
-| Current State | Trigger / Event                             | Target State | Valid? | Rejection Behavior                                                                            |
-| :------------ | :------------------------------------------ | :----------- | :----: | :-------------------------------------------------------------------------------------------- |
-| `ACTIVE`      | Query active sessions (`GET`)               | `ACTIVE`     |  Yes   | Returned in paginated response with `isCurrentSession` flag.                                  |
-| `ACTIVE`      | Revoke single session (`DELETE /{id}`)      | `REVOKED`    |  Yes   | `revoked_at` set to `NOW()`, `jti` added to blacklist, returns `204 No Content`.              |
-| `ACTIVE`      | Revoke other sessions (`DELETE`)            | `REVOKED`    |  Yes   | Remote sessions become `REVOKED`, current session remains `ACTIVE`, returns `204 No Content`. |
-| `ACTIVE`      | Natural time passage (`expires_at < NOW()`) | `EXPIRED`    |  Yes   | Omitted from active sessions query; purged by TTL cleanup job.                                |
-| `REVOKED`     | Query active sessions (`GET`)               | `REVOKED`    |   No   | Excluded from results by query filter (`revoked_at IS NULL`).                                 |
-| `REVOKED`     | Revoke single session (`DELETE /{id}`)      | `REVOKED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                 |
-| `EXPIRED`     | Revoke single session (`DELETE /{id}`)      | `EXPIRED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                 |
+| Current State | Trigger / Event                                          | Target State | Valid? | Rejection Behavior                                                                                                                          |
+| :------------ | :------------------------------------------------------- | :----------- | :----: | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ACTIVE`      | Query active sessions (`GET`)                            | `ACTIVE`     |  Yes   | Returned in paginated response with `isCurrentSession` flag.                                                                                |
+| `ACTIVE`      | Revoke remote session (`DELETE /{id}`, `id != sid`)      | `REVOKED`    |  Yes   | `revoked_at` set to `NOW()`, remote `jti` blacklisted via Redis mapping, returns `204 No Content`.                                          |
+| `ACTIVE`      | Revoke own current session (`DELETE /{id}`, `id == sid`) | `REVOKED`    |  Yes   | `revoked_at` set to `NOW()`, current `jti` blacklisted; caller is force-logged-out (subsequent requests → `401`). Returns `204 No Content`. |
+| `ACTIVE`      | Revoke other sessions (`DELETE`)                         | `REVOKED`    |  Yes   | Remote sessions become `REVOKED`, current session remains `ACTIVE`, returns `204 No Content`.                                               |
+| `ACTIVE`      | Natural time passage (`expires_at < NOW()`)              | `EXPIRED`    |  Yes   | Omitted from active sessions query; purged by TTL cleanup job.                                                                              |
+| `REVOKED`     | Query active sessions (`GET`)                            | `REVOKED`    |   No   | Excluded from results by query filter (`revoked_at IS NULL`).                                                                               |
+| `REVOKED`     | Revoke single session (`DELETE /{id}`)                   | `REVOKED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                                                               |
+| `EXPIRED`     | Revoke single session (`DELETE /{id}`)                   | `EXPIRED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                                                               |
 
 ## 6. Non-Functional Requirements
 

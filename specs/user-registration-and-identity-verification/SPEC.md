@@ -38,35 +38,35 @@ This is the **only** self-service account-creation path; all other account types
 - **FR-04:** The system SHALL generate a cryptographically secure 6-digit numeric OTP (`[0-9]{6}`), hash it using HMAC-SHA256 with a server-side secret key, and persist the hash in `user_verification_tokens` with `token_type = 'ACTIVATION_OTP'`, a configurable TTL (default: 15 minutes), and a foreign key reference to the new user.
 - **FR-05:** The system SHALL publish an `OtpRequestedEvent` (carrying `userId`, `email`, plain-text `otp`, and `purpose = 'ACTIVATION'`) to Spring Modulith's transactional outbox table (`event_publication`) externalized to RabbitMQ exchange `unihub.events::notifications`.
 - **FR-06:** The system SHALL reject registration with a `409 Conflict` error when the submitted email already exists in the `users` table, regardless of the existing account's `is_active` status.
-- **FR-07:** The system SHALL reject registration with a `422 Unprocessable Content` validation error when the submitted payload fails field constraints (e.g. missing fields, blank name, invalid email format per RFC 5321, or email length > 254 chars).
+- **FR-07:** The system SHALL reject registration with a `422 Unprocessable Content` validation error when the submitted payload fails field constraints (e.g. missing fields, blank name, invalid email format per RFC 5321 after trimming surrounding whitespace, or email length > 254 chars).
 - **FR-08:** The system SHALL reject registration with a `422 Unprocessable Content` validation error when the password does not satisfy complexity requirements (min 8 chars, max 255 chars, at least one uppercase letter, one lowercase letter, one digit, and one special character).
 - **FR-09:** The system SHALL hash user passwords using **Argon2** (`Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()`). Plain-text passwords must never be logged, persisted, or leaked.
-- **FR-10:** Registration requests with malformed JSON syntax or unreadable body SHALL be rejected with `400 Bad Request`.
+- **FR-10:** Registration requests with malformed JSON syntax or unreadable body SHALL be rejected with `400 Bad Request`. Requests with unsupported payload Content-Type SHALL be rejected with `415 Unsupported Media Type`.
 
 ### 3.2 Account Activation via OTP
 
 - **FR-11:** The system SHALL set `is_active = true` and mark the OTP token consumed (`used_at = now()`, `updated_at = now()`) in `user_verification_tokens` when a valid, unexpired, unconsumed OTP of `token_type = 'ACTIVATION_OTP'` is submitted for an inactive account.
-- **FR-12:** The system SHALL reject OTP verification with a `422 Unprocessable Content` error (`urn:unihub:error:validation`, including `validationErrors: ["otp: Invalid or expired activation code."]`) using a **uniform error detail message** (`"Invalid or expired activation code."`) whenever:
+- **FR-12:** The system SHALL reject OTP verification with `404 Not Found` (`urn:unihub:error:not-found`) when no user record exists for the submitted email address.
+- **FR-13:** The system SHALL reject OTP verification with a `422 Unprocessable Content` error (`urn:unihub:error:validation`, including `validationErrors: ["otp: Invalid or expired activation code."]`) using a **uniform error detail message** (`"Invalid or expired activation code."`) whenever:
   - The submitted OTP does not match the stored HMAC-SHA256 hash.
   - The active OTP has expired (`expires_at < now()`).
   - The OTP has already been consumed (`used_at IS NOT NULL`).
-  - No user record exists for the submitted email.
-- **FR-13:** The system SHALL reject OTP verification with `409 Conflict` (`urn:unihub:error:conflict`) when the user account is already active (`is_active = true`).
-- **FR-14:** The system SHALL reject OTP verification with `422 Unprocessable Content` (`urn:unihub:error:validation`, with `validationErrors`) when the request payload fails validation (e.g. invalid email format or OTP string not conforming to `^[0-9]{6}$`).
+- **FR-14:** The system SHALL reject OTP verification with `409 Conflict` (`urn:unihub:error:conflict`) when the user account is already active (`is_active = true`).
+- **FR-15:** The system SHALL reject OTP verification with `422 Unprocessable Content` (`urn:unihub:error:validation`, with `validationErrors`) when the request payload fails validation (e.g. invalid email format or OTP string not conforming to `^[0-9]{6}$`).
 
 ### 3.3 Shared OTP Resend
 
-- **FR-15:** The system SHALL provide a shared resend endpoint (`POST /api/v1/auth/otp/resend`) accepting `{ "email": "..." }`.
-- **FR-16:** When the submitted email belongs to an inactive account (`users.is_active = false`):
+- **FR-16:** The system SHALL provide a shared resend endpoint (`POST /api/v1/auth/otp/resend`) accepting `{ "email": "..." }`.
+- **FR-17:** When the submitted email belongs to an inactive account (`users.is_active = false`):
   - The system SHALL invalidate all existing unconsumed OTP tokens for that user **scoped to `token_type = 'ACTIVATION_OTP'`** (by setting `used_at = now()`).
   - The system SHALL generate a fresh 6-digit numeric OTP, persist its HMAC-SHA256 hash in `user_verification_tokens` with `token_type = 'ACTIVATION_OTP'` and the configured TTL.
   - The system SHALL publish an `OtpRequestedEvent` with `purpose = 'ACTIVATION'` to the transactional outbox.
-- **FR-17:** When the submitted email belongs to an active account (`users.is_active = true`):
+- **FR-18:** When the submitted email belongs to an active account (`users.is_active = true`):
   - The system SHALL invalidate all existing unconsumed OTP tokens for that user **scoped to `token_type = 'PASSWORD_RESET_OTP'`** (by setting `used_at = now()`).
   - The system SHALL generate a fresh 6-digit numeric OTP, persist its HMAC-SHA256 hash in `user_verification_tokens` with `token_type = 'PASSWORD_RESET_OTP'` and the configured TTL.
   - The system SHALL publish an `OtpRequestedEvent` with `purpose = 'PASSWORD_RESET'` to the transactional outbox.
-- **FR-18:** The system SHALL reject the resend request with `404 Not Found` (`urn:unihub:error:not-found`) when no user account exists with the submitted email.
-- **FR-19:** The system SHALL reject the resend request with `422 Unprocessable Content` (`urn:unihub:error:validation`) when the email is missing or malformed.
+- **FR-19:** The system SHALL reject the resend request with `404 Not Found` (`urn:unihub:error:not-found`) when no user account exists with the submitted email.
+- **FR-20:** The system SHALL reject the resend request with `422 Unprocessable Content` (`urn:unihub:error:validation`) when the email is missing or malformed.
 
 ## 4. Business Rules
 
@@ -113,7 +113,7 @@ This is the **only** self-service account-creation path; all other account types
 - **Rate Limiting:** All three endpoints are public (unauthenticated) and must be protected by the dedicated Bucket4j `auth-tier` Token Bucket rate limiter (default: capacity 20 tokens, refill 20 tokens per 60s per client IP, returning `429 Too Many Requests` with `X-RateLimit-*` headers when exceeded) to prevent brute-forcing OTPs, Argon2 CPU exhaustion, and spam registrations.
 - **Security & Anti-Enumeration:**
   - Passwords and plain-text OTPs must never appear in application logs or HTTP responses.
-  - OTP verification error responses use a uniform message (`"Invalid or expired activation code."`) across all failure causes (wrong code, expired, already consumed, user not found) to prevent timing and enumeration attacks.
+  - OTP verification error responses use a uniform message (`"Invalid or expired activation code."`) across all OTP-level failure causes (wrong code, expired, already consumed) to prevent timing attacks and OTP brute-forcing. User-not-found on `/activate` intentionally returns `404 Not Found` to surface a clear error path without leaking OTP state.
   - OTP hashing uses HMAC-SHA256 with a server-side secret key.
 - **Observability:** Structured JSON logging compatible with ELK/Prometheus emitting `traceId`, `http.method`, `http.uri`, `http.status`, and `duration_ms` without logging sensitive credentials or emails.
 
