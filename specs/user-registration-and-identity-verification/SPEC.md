@@ -52,7 +52,7 @@ This is the **only** self-service account-creation path; all other account types
   - The active OTP has expired (`expires_at < now()`).
   - The OTP has already been consumed (`used_at IS NOT NULL`).
 - **FR-14:** The system SHALL reject OTP verification with `409 Conflict` (`urn:unihub:error:conflict`) when the user account is already active (`is_active = true`).
-- **FR-15:** The system SHALL reject OTP verification with `422 Unprocessable Content` (`urn:unihub:error:validation`, with `validationErrors`) when the request payload fails validation (e.g. invalid email format or OTP string not conforming to `^[0-9]{6}$`).
+- **FR-15:** The system SHALL reject OTP verification with `422 Unprocessable Content` (`urn:unihub:error:validation`, with `validationErrors`) when the request payload fails validation (e.g. invalid email format or OTP string not conforming to `^[0-9]{6}$` after trimming surrounding whitespace). Requests with malformed JSON syntax SHALL be rejected with `400 Bad Request`. Requests with unsupported payload Content-Type SHALL be rejected with `415 Unsupported Media Type`.
 
 ### 3.3 Shared OTP Resend
 
@@ -66,7 +66,7 @@ This is the **only** self-service account-creation path; all other account types
   - The system SHALL generate a fresh 6-digit numeric OTP, persist its HMAC-SHA256 hash in `user_verification_tokens` with `token_type = 'PASSWORD_RESET_OTP'` and the configured TTL.
   - The system SHALL publish an `OtpRequestedEvent` with `purpose = 'PASSWORD_RESET'` to the transactional outbox.
 - **FR-19:** The system SHALL reject the resend request with `404 Not Found` (`urn:unihub:error:not-found`) when no user account exists with the submitted email.
-- **FR-20:** The system SHALL reject the resend request with `422 Unprocessable Content` (`urn:unihub:error:validation`) when the email is missing or malformed.
+- **FR-20:** The system SHALL reject the resend request with `422 Unprocessable Content` (`urn:unihub:error:validation`) when the email is missing or malformed (after trimming surrounding whitespace). Requests with malformed JSON syntax SHALL be rejected with `400 Bad Request`. Requests with unsupported payload Content-Type SHALL be rejected with `415 Unsupported Media Type`.
 
 ## 4. Business Rules
 

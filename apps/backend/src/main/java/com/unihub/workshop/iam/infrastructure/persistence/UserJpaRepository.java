@@ -21,18 +21,32 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     boolean existsByEmail(String email);
 
     @Modifying
-    @Query("UPDATE UserJpaEntity u SET u.lastLoginAt = :time WHERE u.id = :id")
+    @Query(
+        """
+        UPDATE UserJpaEntity u
+        SET u.lastLoginAt = :time
+        WHERE u.id = :id
+        """
+    )
     void updateLastLoginAt(@Param("id") UUID id, @Param("time") Instant time);
 
     @Modifying
     @Query(
-        "UPDATE UserJpaEntity u SET u.isActive = true, u.updatedAt = :now WHERE u.id = :id"
+        """
+        UPDATE UserJpaEntity u
+        SET u.isActive = true, u.updatedAt = :now
+        WHERE u.id = :id
+        """
     )
     void activateUser(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying
     @Query(
-        "UPDATE UserJpaEntity u SET u.isActive = :isActive, u.updatedAt = :now WHERE u.id = :id AND u.organizationId = :organizationId"
+        """
+        UPDATE UserJpaEntity u
+        SET u.isActive = :isActive, u.updatedAt = :now
+        WHERE u.id = :id AND u.organizationId = :organizationId
+        """
     )
     int updateIsActive(
         @Param("id") UUID id,

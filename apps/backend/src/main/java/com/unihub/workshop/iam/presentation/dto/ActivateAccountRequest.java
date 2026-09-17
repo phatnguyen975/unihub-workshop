@@ -4,9 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.Builder;
 
-@Builder
 public record ActivateAccountRequest(
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
@@ -15,4 +13,9 @@ public record ActivateAccountRequest(
     @NotBlank(message = "OTP is required")
     @Pattern(regexp = "^[0-9]{6}$", message = "OTP must be exactly 6 digits")
     String otp
-) {}
+) {
+    public ActivateAccountRequest {
+        email = email != null ? email.trim() : null;
+        otp = otp != null ? otp.trim() : null;
+    }
+}

@@ -22,7 +22,11 @@ public interface RefreshTokenJpaRepository
     @Transactional
     @Modifying
     @Query(
-        "UPDATE RefreshTokenJpaEntity r SET r.revokedAt = :revokedAt WHERE r.userId = :userId AND r.revokedAt IS NULL"
+        """
+        UPDATE RefreshTokenJpaEntity r
+        SET r.revokedAt = :revokedAt
+        WHERE r.userId = :userId AND r.revokedAt IS NULL
+        """
     )
     int revokeAllActiveTokensForUser(
         @Param("userId") UUID userId,

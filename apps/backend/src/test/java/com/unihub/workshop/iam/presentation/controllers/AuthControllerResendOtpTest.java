@@ -133,4 +133,72 @@ class AuthControllerResendOtpTest {
             )
             .andExpect(jsonPath("$.error.validationErrors[0]").exists());
     }
+
+    @Test
+    void shouldTrimWhitespaceFromEmailOnResend() throws Exception {
+        String requestBody = """
+        {
+            "email": "   student@university.edu   "
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/otp/resend")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        verify(resendOtpUseCase).resendOtp("student@university.edu");
+    }
+
+    @Test
+    void shouldReturn400OnMalformedJson() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/otp/resend")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{ malformed json }")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn422WhenEmailFieldMissing() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/otp/resend")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            )
+            .andExpect(jsonPath("$.error.validationErrors[0]").exists());
+    }
+
+    @Test
+    void shouldReturn415OnUnsupportedMediaType() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/otp/resend")
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .content("student@university.edu")
+            )
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value(
+                    "urn:unihub:error:unsupported-media-type"
+                )
+            );
+    }
 }

@@ -26,11 +26,7 @@ public record RegisterRequest(
     String fullName
 ) {
     public RegisterRequest {
-        if (email != null) {
-            email = email.trim();
-        }
-        if (fullName != null) {
-            fullName = fullName.trim();
-        }
+        email = email != null ? email.trim() : null;
+        fullName = fullName != null ? fullName.trim() : null;
     }
 }
