@@ -333,4 +333,113 @@ class AuthControllerTemporaryPasswordTest {
             any()
         );
     }
+
+    @Test
+    void shouldTrimWhitespaceFromEmailOnTemporaryPasswordChange()
+        throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID orgId = UUID.randomUUID();
+        User user = User.builder()
+            .id(userId)
+            .organizationId(orgId)
+            .role(UserRole.STAFF)
+            .email("staff.bob@unihub.edu")
+            .passwordHash("encodedHash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .lastLoginAt(Instant.now())
+            .build();
+
+        ChangeTemporaryPasswordUseCase.ChangeTemporaryPasswordResult result =
+            new ChangeTemporaryPasswordUseCase.ChangeTemporaryPasswordResult(
+                "mock-access-token",
+                "mock-refresh-token",
+                "Bearer",
+                3600L,
+                user
+            );
+
+        when(
+            changeTemporaryPasswordUseCase.changeTemporaryPassword(
+                eq("staff.bob@unihub.edu"),
+                eq("TempPassword123!"),
+                eq("MyOfficialSecurePassword2026!"),
+                any(),
+                any()
+            )
+        ).thenReturn(result);
+
+        String requestBody = """
+        {
+            "email": "   staff.bob@unihub.edu   ",
+            "currentPassword": "TempPassword123!",
+            "newPassword": "MyOfficialSecurePassword2026!"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/temporary")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        verify(changeTemporaryPasswordUseCase).changeTemporaryPassword(
+            eq("staff.bob@unihub.edu"),
+            eq("TempPassword123!"),
+            eq("MyOfficialSecurePassword2026!"),
+            any(),
+            any()
+        );
+    }
+
+    @Test
+    void shouldReturn400OnMalformedJson() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/temporary")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{ malformed json }")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn415OnUnsupportedMediaType() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/temporary")
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .content("raw plain text body")
+            )
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value(
+                    "urn:unihub:error:unsupported-media-type"
+                )
+            );
+    }
+
+    @Test
+    void shouldReturn422WhenRequiredFieldsMissing() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/temporary")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            )
+            .andExpect(jsonPath("$.error.validationErrors[0]").exists());
+    }
 }

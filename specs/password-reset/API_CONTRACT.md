@@ -135,8 +135,8 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`)._
 
 **Validation Rules:**
 
-- `email`: Required, valid email format, max 254 characters.
-- `otp`: Required, exactly 6 numeric digits matching `^[0-9]{6}$`.
+- `email`: Required, valid email format, max 254 characters (automatically trimmed of whitespace).
+- `otp`: Required, exactly 6 numeric digits matching `^[0-9]{6}$` (automatically trimmed of whitespace).
 - `newPassword`: Required, length 8 to 255 characters, contains at least 1 uppercase letter, 1 lowercase letter, 1 digit, and 1 special character (`[!@#$%^&*(),.?":{}|<>]`).
 
 #### Response
@@ -158,12 +158,33 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                                                                           |
-| :----: | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON payload syntax.                                                                                                                                                                                      |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Payload format validation failure (`@Valid`), OR uniform error when the OTP is invalid, expired, consumed, or no account exists for the email (`validationErrors: ["otp: Invalid or expired verification code."]`). |
-| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (header `Retry-After` present).                                                                                                                                                                 |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                                                                                                                                                                                            |
+| Status | Error Type (`error.type`)                 | Title                  | Condition                                                                                                     |
+| :----: | :---------------------------------------- | :--------------------- | :------------------------------------------------------------------------------------------------------------ |
+| `400`  | `urn:unihub:error:bad-request`            | Bad Request            | Malformed JSON payload syntax.                                                                                |
+| `404`  | `urn:unihub:error:not-found`              | Not Found              | No account exists for the submitted email.                                                                    |
+| `415`  | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Request `Content-Type` is not `application/json`.                                                             |
+| `422`  | `urn:unihub:error:validation`             | Unprocessable Content  | Payload format validation failure (`@Valid`), OR uniform error when the OTP is invalid, expired, or consumed. |
+| `429`  | `urn:unihub:error:rate-limited`           | Too Many Requests      | Rate limit exceeded (header `Retry-After` present).                                                           |
+| `500`  | `urn:unihub:error:internal`               | Internal Server Error  | Unexpected server error.                                                                                      |
+
+**Error Response Example (404 Not Found):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:not-found",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "No account found for this email.",
+    "instance": "/api/v1/auth/password/reset"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 **Error Response Example (422 Invalid or Expired OTP):**
 
@@ -222,7 +243,7 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 
 **Validation Rules:**
 
-- `email`: Required, valid email format, max 254 characters.
+- `email`: Required, valid email format, max 254 characters (surrounding whitespace is trimmed automatically).
 - `currentPassword`: Required, non-blank string.
 - `newPassword`: Required, length 8 to 255 characters, contains at least 1 uppercase letter, 1 lowercase letter, 1 digit, and 1 special character (`[!@#$%^&*(),.?":{}|<>]`). Must not be equal to `currentPassword`.
 
@@ -260,13 +281,93 @@ _(Note: `data` is omitted/null per `@JsonInclude(NON_NULL)`. The user is instruc
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                                |
-| :----: | :------------------------------ | :-------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | The account does not have a temporary password (`is_temporary_password = false`), or malformed JSON syntax.                                                              |
-| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | User not found, inactive, or `currentPassword` does not match current password hash.                                                                                     |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Password policy violation, or `newPassword` equals `currentPassword` (`validationErrors: ["newPassword: New password must be different from the temporary password."]`). |
-| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (header `Retry-After` present).                                                                                                                      |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                                                                                                                                                 |
+| Status | Error Type (`error.type`)                 | Title                  | Condition                                                                                                           |
+| :----: | :---------------------------------------- | :--------------------- | :------------------------------------------------------------------------------------------------------------------ |
+| `400`  | `urn:unihub:error:bad-request`            | Bad Request            | Account does not have a temporary password (`is_temporary_password = false`), OR malformed JSON payload syntax.     |
+| `401`  | `urn:unihub:error:unauthorized`           | Unauthorized           | Non-existent user, inactive account, or `currentPassword` does not match current password hash.                     |
+| `415`  | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Request `Content-Type` header is not `application/json`.                                                            |
+| `422`  | `urn:unihub:error:validation`             | Unprocessable Content  | Payload validation failure (missing required fields, format violations), or `newPassword` equals `currentPassword`. |
+| `429`  | `urn:unihub:error:rate-limited`           | Too Many Requests      | Rate limit exceeded (header `Retry-After` present).                                                                 |
+| `500`  | `urn:unihub:error:internal`               | Internal Server Error  | Unexpected server error.                                                                                            |
+
+**Error Response Example (400 Bad Request — Not a Temporary Password):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:bad-request",
+    "title": "Bad Request",
+    "status": 400,
+    "detail": "Account does not have a temporary password.",
+    "instance": "/api/v1/auth/password/temporary"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**Error Response Example (401 Unauthorized — Invalid Credentials):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:unauthorized",
+    "title": "Unauthorized",
+    "status": 401,
+    "detail": "Invalid email or current password",
+    "instance": "/api/v1/auth/password/temporary"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**Error Response Example (415 Unsupported Media Type):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:unsupported-media-type",
+    "title": "Unsupported Media Type",
+    "status": 415,
+    "detail": "Content-Type must be application/json",
+    "instance": "/api/v1/auth/password/temporary"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**Error Response Example (422 Unprocessable Content — Identical Password):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:validation",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "detail": "Validation failed for one or more fields.",
+    "instance": "/api/v1/auth/password/temporary",
+    "validationErrors": [
+      "newPassword: New password must be different from the temporary password."
+    ]
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 **Side Effects:**
 

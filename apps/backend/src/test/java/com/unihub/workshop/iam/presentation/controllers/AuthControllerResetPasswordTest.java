@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -191,5 +192,111 @@ class AuthControllerResetPasswordTest {
             any(),
             any()
         );
+    }
+
+    @Test
+    void shouldReturn404WhenEmailNotFound() throws Exception {
+        doThrow(new NotFoundException("No account found for this email."))
+            .when(resetPasswordUseCase)
+            .resetPassword(any(), any(), any());
+
+        String requestBody = """
+        {
+            "email": "unknown@university.edu",
+            "otp": "849201",
+            "newPassword": "BrandNewSecurePassword2026!"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/reset")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:not-found")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "No account found for this email."
+                )
+            );
+    }
+
+    @Test
+    void shouldTrimWhitespaceFromEmailAndOtpOnResetPassword() throws Exception {
+        String requestBody = """
+        {
+            "email": "   student@university.edu   ",
+            "otp": "   849201   ",
+            "newPassword": "BrandNewSecurePassword2026!"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/reset")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        verify(resetPasswordUseCase).resetPassword(
+            "student@university.edu",
+            "849201",
+            "BrandNewSecurePassword2026!"
+        );
+    }
+
+    @Test
+    void shouldReturn400OnMalformedJson() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/reset")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{ malformed json }")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn415OnUnsupportedMediaType() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/reset")
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .content("raw plain text body")
+            )
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value(
+                    "urn:unihub:error:unsupported-media-type"
+                )
+            );
+    }
+
+    @Test
+    void shouldReturn422WhenRequiredFieldsMissing() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/password/reset")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            )
+            .andExpect(jsonPath("$.error.validationErrors[0]").exists());
     }
 }

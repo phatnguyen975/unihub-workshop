@@ -30,6 +30,7 @@ public class UserRepositoryAdapter implements UserRepository {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
+    @Transactional
     public Optional<User> findById(UUID id) {
         return repository.findById(id).map(userMapper::toDomain);
     }
@@ -46,16 +47,19 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional
     public Optional<User> findByEmail(String email) {
         return repository.findByEmail(email).map(userMapper::toDomain);
     }
 
     @Override
+    @Transactional
     public boolean existsByEmail(String email) {
         return repository.existsByEmail(email);
     }
 
     @Override
+    @Transactional
     public User save(User user) {
         UserJpaEntity entity = userMapper.toEntity(user);
         UserJpaEntity saved = repository.save(entity);
@@ -63,16 +67,19 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional
     public void updateLastLoginAt(UUID userId, Instant lastLoginAt) {
         repository.updateLastLoginAt(userId, lastLoginAt);
     }
 
     @Override
+    @Transactional
     public void activate(UUID userId) {
         repository.activateUser(userId, Instant.now());
     }
 
     @Override
+    @Transactional
     public boolean updateTemporaryPassword(
         UUID userId,
         String newPasswordHash,

@@ -30,17 +30,20 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
+    @Transactional
     public void save(RefreshToken refreshToken) {
         RefreshTokenJpaEntity entity = tokenMapper.toEntity(refreshToken);
         repository.save(entity);
     }
 
     @Override
+    @Transactional
     public Optional<RefreshToken> findByTokenHash(String tokenHash) {
         return repository.findByTokenHash(tokenHash).map(tokenMapper::toDomain);
     }
 
     @Override
+    @Transactional
     public void revokeAllActiveTokensForUser(UUID userId, Instant revokedAt) {
         repository.revokeAllActiveTokensForUser(userId, revokedAt);
     }
@@ -120,7 +123,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public Optional<RefreshToken> findActiveSessionByIdAndUserId(
         UUID id,
         UUID userId,
@@ -144,7 +147,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<RefreshToken> findActiveRemoteSessions(
         UUID userId,
         UUID currentSessionId,
@@ -173,7 +176,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<RefreshToken> findAllActiveSessionsForUser(
         UUID userId,
         Instant now

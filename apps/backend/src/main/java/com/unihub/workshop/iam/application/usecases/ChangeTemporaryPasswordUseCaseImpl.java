@@ -13,8 +13,6 @@ import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.IssuedToken;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
-import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -37,23 +35,6 @@ public class ChangeTemporaryPasswordUseCaseImpl
     private final JwtTokenIssuer jwtTokenIssuer;
     private final PasswordEncoder passwordEncoder;
     private final SecurityProperties securityProperties;
-    private final MeterRegistry meterRegistry;
-
-    private volatile String dummyPasswordHash;
-
-    @PostConstruct
-    void init() {
-        if (dummyPasswordHash == null) {
-            dummyPasswordHash = passwordEncoder.encode("dummy-password-hash");
-        }
-    }
-
-    private String getDummyPasswordHash() {
-        if (dummyPasswordHash == null) {
-            dummyPasswordHash = passwordEncoder.encode("dummy-password-hash");
-        }
-        return dummyPasswordHash;
-    }
 
     @Override
     @Transactional
@@ -66,68 +47,30 @@ public class ChangeTemporaryPasswordUseCaseImpl
     ) {
         String normalizedEmail =
             email != null ? email.toLowerCase().trim() : "";
+
         Optional<User> optionalUser = userRepository.findByEmail(
             normalizedEmail
         );
-
         if (optionalUser.isEmpty()) {
-            passwordEncoder.matches(currentPassword, getDummyPasswordHash());
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .increment();
             throw new UnauthorizedException(
                 "Invalid email or current password"
             );
         }
 
         User user = optionalUser.get();
-
         if (!user.isActive()) {
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .increment();
             throw new UnauthorizedException(
                 "Invalid email or current password"
             );
         }
 
         if (!passwordEncoder.matches(currentPassword, user.passwordHash())) {
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .increment();
             throw new UnauthorizedException(
                 "Invalid email or current password"
             );
         }
 
         if (!user.isTemporaryPassword()) {
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "not_temporary_password"
-                )
-                .increment();
             throw new BadRequestException(
                 "Account does not have a temporary password."
             );
@@ -149,15 +92,6 @@ public class ChangeTemporaryPasswordUseCaseImpl
             now
         );
         if (!updated) {
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "not_temporary_password"
-                )
-                .increment();
             throw new BadRequestException(
                 "Account does not have a temporary password."
             );
@@ -201,10 +135,6 @@ public class ChangeTemporaryPasswordUseCaseImpl
             issuedToken.jti(),
             Duration.ofMinutes(securityProperties.accessTokenTtlMinutes())
         );
-
-        meterRegistry
-            .counter("auth.password.temporary.attempts", "outcome", "success")
-            .increment();
 
         return new ChangeTemporaryPasswordResult(
             issuedToken.token(),

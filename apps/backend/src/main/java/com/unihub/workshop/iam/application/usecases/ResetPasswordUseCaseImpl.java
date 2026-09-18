@@ -1,16 +1,21 @@
 package com.unihub.workshop.iam.application.usecases;
 
 import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
+import com.unihub.workshop.iam.application.ports.out.JtiBlacklistPort;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.application.ports.out.UserVerificationTokenRepository;
 import com.unihub.workshop.iam.application.utils.OtpService;
+import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
-import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,42 +28,24 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
     private final UserRepository userRepository;
     private final UserVerificationTokenRepository userVerificationTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final SessionTrackerPort sessionTrackerPort;
+    private final JtiBlacklistPort jtiBlacklistPort;
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
-    private final MeterRegistry meterRegistry;
-
-    private volatile String dummyTokenHash;
-
-    @PostConstruct
-    void init() {
-        if (dummyTokenHash == null) {
-            dummyTokenHash = otpService.hashOtp("000000");
-        }
-    }
-
-    private String getDummyTokenHash() {
-        if (dummyTokenHash == null) {
-            dummyTokenHash = otpService.hashOtp("000000");
-        }
-        return dummyTokenHash;
-    }
 
     @Override
     @Transactional
     public void resetPassword(String email, String otp, String newPassword) {
         String normalizedEmail =
             email != null ? email.toLowerCase().trim() : "";
-        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
 
-        if (user == null) {
-            otpService.verifyOtp(otp, getDummyTokenHash());
-            recordFailure("user_not_found");
-            throw invalidOtp();
-        }
+        User user = userRepository
+            .findByEmail(normalizedEmail)
+            .orElseThrow(() ->
+                new NotFoundException("No account found for this email.")
+            );
 
         if (!user.isActive()) {
-            otpService.verifyOtp(otp, getDummyTokenHash());
-            recordFailure("inactive_user");
             throw invalidOtp();
         }
 
@@ -67,24 +54,13 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
                 user.id(),
                 UserVerificationToken.TYPE_PASSWORD_RESET_OTP
             )
-            .orElse(null);
-
-        if (token == null) {
-            otpService.verifyOtp(otp, getDummyTokenHash());
-            recordFailure("token_not_found");
-            throw invalidOtp();
-        }
+            .orElseThrow(this::invalidOtp);
 
         if (token.isConsumed() || token.isExpired()) {
-            otpService.verifyOtp(otp, getDummyTokenHash());
-            recordFailure(
-                token.isConsumed() ? "already_consumed" : "expired_otp"
-            );
             throw invalidOtp();
         }
 
         if (!otpService.verifyOtp(otp, token.tokenHash())) {
-            recordFailure("invalid_otp");
             throw invalidOtp();
         }
 
@@ -92,33 +68,30 @@ public class ResetPasswordUseCaseImpl implements ResetPasswordUseCase {
             token.id()
         );
         if (!consumed) {
-            recordFailure("already_consumed");
             throw invalidOtp();
         }
 
         String newPasswordHash = passwordEncoder.encode(newPassword);
         userRepository.save(user.updatePassword(newPasswordHash));
 
-        refreshTokenRepository.revokeAllActiveTokensForUser(
-            user.id(),
-            Instant.now()
-        );
+        Instant now = Instant.now();
+        List<RefreshToken> activeSessions =
+            refreshTokenRepository.findAllActiveSessionsForUser(user.id(), now);
 
-        meterRegistry
-            .counter("auth.password.reset.attempts", "outcome", "success")
-            .increment();
-    }
+        for (RefreshToken session : activeSessions) {
+            Optional<String> remoteJti = sessionTrackerPort.getActiveJti(
+                session.id()
+            );
+            if (remoteJti.isPresent()) {
+                Duration remainingTtl = sessionTrackerPort.getRemainingTtl(
+                    session.id()
+                );
+                jtiBlacklistPort.blacklistJti(remoteJti.get(), remainingTtl);
+            }
+            sessionTrackerPort.removeSession(session.id());
+        }
 
-    private void recordFailure(String reason) {
-        meterRegistry
-            .counter(
-                "auth.password.reset.attempts",
-                "outcome",
-                "failure",
-                "reason",
-                reason
-            )
-            .increment();
+        refreshTokenRepository.revokeAllActiveTokensForUser(user.id(), now);
     }
 
     private ValidationException invalidOtp() {

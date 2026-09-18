@@ -39,7 +39,7 @@ This feature provides two dedicated password modification flows for unauthentica
   2. The record is not consumed (`used_at IS NULL`).
   3. The record is not expired (`expires_at > now()`).
   4. The SHA-256 hash of the submitted OTP matches `token_hash`.
-- **FR-08:** The system SHALL reject the request with `422 Unprocessable Content` (`urn:unihub:error:validation` with `validationErrors: ["otp: Invalid or expired verification code."]`) if the user does not exist, or the OTP is incorrect, expired, or already consumed, without updating credentials or sessions.
+- **FR-08:** The system SHALL reject the request with `404 Not Found` (`urn:unihub:error:not-found` with detail `"No account found for this email."`) if no user exists for the submitted email. If the OTP is incorrect, expired, or already consumed, the system SHALL reject the request with `422 Unprocessable Content` (`urn:unihub:error:validation` with `validationErrors: ["otp: Invalid or expired verification code."]`), without updating credentials or sessions.
 - **FR-09:** The system SHALL mark the verified OTP record as consumed (`used_at = now()`).
 - **FR-10:** The system SHALL hash `newPassword` using Argon2id and update `users.password_hash` and `users.updated_at = now()`.
 - **FR-11:** If the account has `is_temporary_password = true`, the system SHALL set `is_temporary_password = false`.
@@ -49,9 +49,9 @@ This feature provides two dedicated password modification flows for unauthentica
 
 ### 3.3 First-Login Temporary Password Exchange (`POST /api/v1/auth/password/temporary`)
 
-- **FR-15:** The system SHALL accept `{ email, currentPassword, newPassword }` from an unauthenticated user on their first login without requiring an OTP.
+- **FR-15:** The system SHALL accept `{ email, currentPassword, newPassword }` from an unauthenticated user on their first login without requiring an OTP. The system SHALL automatically trim surrounding whitespace from `email` before validation and processing.
 - **FR-16:** The system SHALL verify that the user exists, is active (`is_active = true`), and has `is_temporary_password = true`.
-- **FR-17:** The system SHALL reject the request with `401 Unauthorized` (`urn:unihub:error:unauthorized`) if the user does not exist, is inactive, or `currentPassword` does not match the stored Argon2id password hash.
+- **FR-17:** The system SHALL reject the request with `401 Unauthorized` (`urn:unihub:error:unauthorized`) with detail `"Invalid email or current password"` if the user does not exist, is inactive, or `currentPassword` does not match the stored Argon2id password hash.
 - **FR-18:** The system SHALL reject the request with `400 Bad Request` (`urn:unihub:error:bad-request`) if the account exists and password matches but `is_temporary_password = false`.
 - **FR-19:** The system SHALL reject the request with `422 Unprocessable Content` (`urn:unihub:error:validation` with `validationErrors: ["newPassword: New password must be different from the temporary password."]`) if `newPassword` equals `currentPassword`.
 - **FR-20:** The system SHALL update `users.password_hash` with the Argon2id hash of `newPassword`, set `users.is_temporary_password = false`, update `users.last_login_at = now()`, and update `users.updated_at = now()`.
@@ -61,6 +61,7 @@ This feature provides two dedicated password modification flows for unauthentica
 
 - **FR-22:** The password reset flow SHALL enforce strict single-use OTP consumption: once verified and consumed (`used_at = now()`), subsequent submissions with the same OTP SHALL be rejected with `422 Unprocessable Content` (`urn:unihub:error:validation`).
 - **FR-23:** The temporary password exchange flow SHALL enforce single-use state transition: once exchanged, `is_temporary_password` is set to `false`, and subsequent requests with the old temporary password SHALL be rejected with `400 Bad Request` (`urn:unihub:error:bad-request`).
+- **FR-24:** The system SHALL reject requests with `400 Bad Request` (`urn:unihub:error:bad-request`) when the JSON payload syntax is malformed, and reject requests with `415 Unsupported Media Type` (`urn:unihub:error:unsupported-media-type`) when the request `Content-Type` header is not `application/json`.
 
 ## 4. Business Rules
 
@@ -76,7 +77,7 @@ This feature provides two dedicated password modification flows for unauthentica
   - If `user.is_active == true` -> issues `PASSWORD_RESET_OTP` (Feature 1.4).
   - Prior token invalidation is strictly scoped by `token_type`.
 - **BR-09 (Asynchronous Email Delivery):** Email notifications are dispatched out-of-band by the `notifications` worker via RabbitMQ after the transaction commits. Failure to send an email does not roll back token generation.
-- **BR-10 (Uniform Error Protection):** In `POST /api/v1/auth/password/reset`, invalid OTP, expired OTP, already used OTP, or non-existent user all return a uniform `422 Unprocessable Content` response with `validationErrors: ["otp: Invalid or expired verification code."]`, preventing account enumeration and timing attacks.
+- **BR-10 (Uniform OTP Error Protection):** In `POST /api/v1/auth/password/reset`, invalid OTP, expired OTP, or already used OTP all return a uniform `422 Unprocessable Content` response with `validationErrors: ["otp: Invalid or expired verification code."]`, preventing OTP timing analysis. If the user account does not exist, it returns `404 Not Found` (`urn:unihub:error:not-found`), harmonized across identity verification endpoints (A-01 through A-04).
 
 ## 5. State Transitions
 
@@ -105,7 +106,6 @@ This feature provides two dedicated password modification flows for unauthentica
 - **Concurrency & Atomicity:** Verification and password update in `POST /api/v1/auth/password/reset` and `POST /api/v1/auth/password/temporary` MUST occur in a single `@Transactional` block with optimistic locking or row locking where necessary to prevent double consumption under concurrent requests.
 - **Rate Limiting:** Public endpoints (`/password/reset`, `/password/temporary`, `/otp/resend`) MUST be governed by Redis Token Bucket rate limiting (`shared/ratelimit`, `auth-tier`: capacity 20 tokens, refill 20 tokens / 60s per client IP) with `429 Too Many Requests` and `Retry-After` header.
 - **Password Security:** Password hashing MUST use Argon2id with parameters conformant with ADR-005. Raw passwords MUST NEVER be logged, cached, or returned in responses.
-- **Observability:** Emit structured logs with `traceId` and masked user identity. Publish Micrometer metrics for password reset counts and failure rates.
 
 ## 7. Acceptance Criteria
 
@@ -158,7 +158,18 @@ And the response body contains error type "urn:unihub:error:validation"
 And "validationErrors" contains "otp: Invalid or expired verification code."
 ```
 
-### Scenario 5: Password reset fails with weak password
+### Scenario 5: Password reset fails when user account does not exist
+
+```gherkin
+Given no user account exists for "unknown.user@university.edu"
+When the user submits a POST request to "/api/v1/auth/password/reset" with email "unknown.user@university.edu"
+Then no credentials or sessions are altered
+And the HTTP response status is 404 Not Found
+And the response body contains error type "urn:unihub:error:not-found"
+And the detail message is "No account found for this email."
+```
+
+### Scenario 6: Password reset fails with weak password
 
 ```gherkin
 Given an active user has a valid "PASSWORD_RESET_OTP"
@@ -168,14 +179,14 @@ And "validationErrors" specifies password policy violations
 And the OTP remains unconsumed
 ```
 
-### Scenario 6: First-login staff exchanges temporary password for permanent password
+### Scenario 7: First-login staff exchanges temporary password for permanent password
 
 ```gherkin
 Given a user "staff.bob@unihub.edu" exists with is_active = true and is_temporary_password = true
 And their temporary password is "TempPassword123!"
 When the user submits a POST request to "/api/v1/auth/password/temporary" with:
-  | email           | "staff.bob@unihub.edu"        |
-  | currentPassword | "TempPassword123!"            |
+  | email           | "staff.bob@unihub.edu"          |
+  | currentPassword | "TempPassword123!"              |
   | newPassword     | "MyOfficialSecurePassword2026!" |
 Then the user's password_hash is updated with the hash of "MyOfficialSecurePassword2026!"
 And is_temporary_password is set to false
@@ -185,17 +196,18 @@ And the HTTP response status is 200 OK
 And the response data contains "accessToken", "refreshToken", "tokenType", "expiresIn", and "user" profile
 ```
 
-### Scenario 7: Temporary password exchange fails when current password is incorrect
+### Scenario 8: Temporary password exchange fails when current password is incorrect, user not found, or user inactive
 
 ```gherkin
-Given a user has is_temporary_password = true
-When the user submits a POST request to "/api/v1/auth/password/temporary" with an incorrect currentPassword
+Given a user submits a POST request to "/api/v1/auth/password/temporary" with an incorrect currentPassword, a non-existent email, or an inactive account
+When the request is processed
 Then the request is rejected with 401 Unauthorized
 And error type is "urn:unihub:error:unauthorized"
+And error detail is "Invalid email or current password"
 And no credentials or account flags are updated
 ```
 
-### Scenario 8: Temporary password exchange fails when account does not have a temporary password
+### Scenario 9: Temporary password exchange fails when account does not have a temporary password
 
 ```gherkin
 Given a user exists with is_active = true and is_temporary_password = false
@@ -205,7 +217,7 @@ And error type is "urn:unihub:error:bad-request"
 And error message indicates the account does not have a temporary password
 ```
 
-### Scenario 9: Temporary password exchange fails when new password matches current password
+### Scenario 10: Temporary password exchange fails when new password matches current password
 
 ```gherkin
 Given a user has is_temporary_password = true and currentPassword is "TempPassword123!"
@@ -214,7 +226,7 @@ Then the request is rejected with 422 Unprocessable Content
 And "validationErrors" contains "newPassword: New password must be different from the temporary password."
 ```
 
-### Scenario 10: Retried submission with already-consumed reset OTP
+### Scenario 11: Retried submission with already-consumed reset OTP
 
 ```gherkin
 Given a password reset request has succeeded and consumed the OTP
@@ -222,6 +234,30 @@ When the client retries the request with the same OTP
 Then the system rejects the request with 422 Unprocessable Content
 And error.type is "urn:unihub:error:validation"
 And "validationErrors" contains "otp: Invalid or expired verification code."
+```
+
+### Scenario 12: Whitespace surrounding email is automatically trimmed during temporary password exchange
+
+```gherkin
+Given a user "staff.bob@unihub.edu" exists with is_active = true and is_temporary_password = true
+And their temporary password is "TempPassword123!"
+When the user submits a POST request to "/api/v1/auth/password/temporary" with:
+  | email           | "   staff.bob@unihub.edu   "    |
+  | currentPassword | "TempPassword123!"              |
+  | newPassword     | "MyOfficialSecurePassword2026!" |
+Then the system trims whitespace from email and successfully matches the user account
+And the HTTP response status is 200 OK
+```
+
+### Scenario 13: Temporary password exchange fails with malformed JSON or unsupported media type
+
+```gherkin
+When a client submits a POST request to "/api/v1/auth/password/temporary" with Content-Type "text/plain"
+Then the request is rejected with 415 Unsupported Media Type
+And error type is "urn:unihub:error:unsupported-media-type"
+When a client submits a POST request to "/api/v1/auth/password/temporary" with malformed JSON syntax
+Then the request is rejected with 400 Bad Request
+And error type is "urn:unihub:error:bad-request"
 ```
 
 ## 8. Out of Scope

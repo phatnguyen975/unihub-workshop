@@ -4,9 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.Builder;
 
-@Builder
 public record ChangeTemporaryPasswordRequest(
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
@@ -24,4 +22,8 @@ public record ChangeTemporaryPasswordRequest(
         message = "Password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character"
     )
     String newPassword
-) {}
+) {
+    public ChangeTemporaryPasswordRequest {
+        email = email != null ? email.trim() : null;
+    }
+}
