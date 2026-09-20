@@ -72,7 +72,7 @@ server {
         proxy_send_timeout 60s;
         proxy_read_timeout 90s;
 
-        proxy_next_upstream error timeout invalid_header http_502 http_503 http_504;
+        proxy_next_upstream error timeout invalid_header http_502 http_504;
         proxy_next_upstream_tries 4;
     }
 }

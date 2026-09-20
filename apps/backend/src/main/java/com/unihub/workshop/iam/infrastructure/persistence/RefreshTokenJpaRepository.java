@@ -39,14 +39,29 @@ public interface RefreshTokenJpaRepository
         WHERE r.userId = :userId
             AND r.revokedAt IS NULL
             AND r.expiresAt > :now
+        ORDER BY r.createdAt DESC, r.id DESC
+        """
+    )
+    List<RefreshTokenJpaEntity> findFirstPage(
+        @Param("userId") UUID userId,
+        @Param("now") Instant now,
+        Pageable pageable
+    );
+
+    @Query(
+        """
+        SELECT r FROM RefreshTokenJpaEntity r
+        WHERE r.userId = :userId
+            AND r.revokedAt IS NULL
+            AND r.expiresAt > :now
             AND (
-                :cursorTime IS NULL OR r.createdAt < :cursorTime
+                r.createdAt < :cursorTime
                 OR (r.createdAt = :cursorTime AND r.id < :cursorId)
             )
         ORDER BY r.createdAt DESC, r.id DESC
         """
     )
-    List<RefreshTokenJpaEntity> findActiveSessions(
+    List<RefreshTokenJpaEntity> findNextPage(
         @Param("userId") UUID userId,
         @Param("now") Instant now,
         @Param("cursorTime") Instant cursorTime,

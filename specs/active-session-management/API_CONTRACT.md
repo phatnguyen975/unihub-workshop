@@ -38,10 +38,10 @@ This contract specifies the HTTP REST interface for the **Active Session Managem
 
 **Query Parameters:**
 
-| Parameter | Type    | Required | Default | Description                                                                             |
-| :-------- | :------ | :------: | :-----: | :-------------------------------------------------------------------------------------- |
-| `cursor`  | String  |    No    | `null`  | Base64-encoded keyset cursor string representing `{ "createdAt": "...", "id": "..." }`. |
-| `size`    | Integer |    No    |  `20`   | Requested page size. Must be an integer between 1 and 100 inclusive.                    |
+| Parameter | Type    | Required | Default | Description                                                                                                                                       |
+| :-------- | :------ | :------: | :-----: | :------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cursor`  | String  |    No    | `null`  | Base64-encoded keyset cursor string representing `{ "createdAt": "...", "id": "..." }`. Leading and trailing whitespace is automatically trimmed. |
+| `size`    | Integer |    No    |  `20`   | Requested page size. Must be an integer between 1 and 100 inclusive.                                                                              |
 
 **Request Body:** None.
 
@@ -92,11 +92,12 @@ This contract specifies the HTTP REST interface for the **Active Session Managem
 
 **Error Responses:**
 
-| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                              |
-| :-------------------------- | :------------------------------ | :-------------------- | :----------------------------------------------------------------------------------------------------- |
-| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | The `cursor` query parameter is malformed / invalid Base64, or `size` is outside the range [1, 100].   |
-| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing Bearer token, invalid token signature, expired token, or token revoked in Redis JTI blacklist. |
-| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server failure.                                                                             |
+| Status                      | Error Type (`error.type`)              | Title                 | Condition                                                                                                                                                                                              |
+| :-------------------------- | :------------------------------------- | :-------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`         | Bad Request           | The `cursor` query parameter is malformed / invalid Base64 / invalid JSON, or `size` is outside the range [1, 100], or `size` is not an integer.                                                       |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing Bearer token, invalid token signature, expired token, or token revoked in Redis JTI blacklist.                                                                                                 |
+| `503 Service Unavailable`   | `urn:unihub:error:service-unavailable` | Service Unavailable   | Centralized Redis blacklist is unreachable during JWT authentication (fail-closed per ADR-010). Response includes `Retry-After` header (configurable via `app.http.retry-after-seconds`, default 30s). |
+| `500 Internal Server Error` | `urn:unihub:error:internal`            | Internal Server Error | Unexpected server failure.                                                                                                                                                                             |
 
 #### Side Effects
 

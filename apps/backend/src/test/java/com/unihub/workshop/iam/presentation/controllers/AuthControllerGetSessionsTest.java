@@ -2,6 +2,7 @@ package com.unihub.workshop.iam.presentation.controllers;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -132,6 +133,13 @@ class AuthControllerGetSessionsTest {
                 jsonPath("$.data.cursor.nextCursor").value("next-cursor-token")
             )
             .andExpect(jsonPath("$.data.cursor.hasMore").value(true));
+
+        verify(getActiveSessionsUseCase).getActiveSessions(
+            USER_ID,
+            CURRENT_SESSION_ID,
+            null,
+            20
+        );
     }
 
     @Test
@@ -161,6 +169,40 @@ class AuthControllerGetSessionsTest {
     }
 
     @Test
+    void shouldReturn200_whenCustomSizeAndCursorProvided() throws Exception {
+        CursorPage<ActiveSession> page = new CursorPage<>(
+            List.of(),
+            null,
+            false
+        );
+
+        when(
+            getActiveSessionsUseCase.getActiveSessions(
+                eq(USER_ID),
+                eq(CURRENT_SESSION_ID),
+                eq("some-cursor"),
+                eq(50)
+            )
+        ).thenReturn(page);
+
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/auth/sessions?cursor=some-cursor&size=50"
+                ).principal(createAuth())
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        verify(getActiveSessionsUseCase).getActiveSessions(
+            USER_ID,
+            CURRENT_SESSION_ID,
+            "some-cursor",
+            50
+        );
+    }
+
+    @Test
     void shouldReturn400_whenSizeIsOutOfRange() throws Exception {
         when(
             getActiveSessionsUseCase.getActiveSessions(
@@ -174,6 +216,21 @@ class AuthControllerGetSessionsTest {
         mockMvc
             .perform(
                 get("/api/v1/auth/sessions?size=0").principal(createAuth())
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn400_whenSizeIsNotAnInteger() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/auth/sessions?size=invalid").principal(
+                    createAuth()
+                )
             )
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))

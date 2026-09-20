@@ -224,7 +224,6 @@ public class AuthController {
                 cursor,
                 size
             );
-
         List<SessionResponse.SessionItem> items = authMapper.toSessionItemList(
             page.items()
         );

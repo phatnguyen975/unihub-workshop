@@ -72,12 +72,12 @@ This plan delivers the complete active session management capability (Domain 1: 
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/GetActiveSessionsUseCaseImplTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerGetSessionsTest.java`
   - **Acceptance Criteria:**
-    - `GET /api/v1/auth/sessions` with a valid Bearer token returns `200 OK` wrapped in `ApiResponse<List<SessionResponse>>` with `pagination` metadata (`nextCursor`, `hasNext`).
+    - `GET /api/v1/auth/sessions` with a valid Bearer token returns `200 OK` wrapped in `ApiResponse<SessionResponse>` with cursor metadata (`nextCursor`, `hasMore`).
     - The returned sessions include only non-expired (`expires_at > NOW()`) and non-revoked (`revoked_at IS NULL`) sessions belonging exclusively to the authenticated user (`user_id = currentUserId`), ordered descending by `created_at DESC, id DESC`.
     - Exactly one session item has `isCurrentSession = true` matching the caller's JWT `sid` claim; all other sessions have `isCurrentSession = false`. If the caller's token has no matching active session in DB, all returned sessions have `isCurrentSession = false`.
-    - Keyset cursor pagination correctly decodes Base64 JSON cursor (`createdAt`, `id`), limits results by `size` (default 20, capped at 100), and emits `nextCursor` and `hasNext = true` when additional active sessions exist.
+    - Keyset cursor pagination correctly decodes Base64 JSON cursor (`createdAt`, `id`), limits results by `size` (default 20, capped at 100), and emits `nextCursor` and `hasMore = true` when additional active sessions exist.
     - Unauthenticated requests return `401 Unauthorized` (`urn:unihub:error:unauthorized`).
-    - Database query executes strictly against the Primary database via `@Transactional(readOnly = true)`.
+    - Database query executes strictly against the Primary database via `@Transactional` (omitting `readOnly = true` to prevent routing to read replica).
     - _(Traces to: FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-20, Scenarios 1, 2, 7, API Contract Section 3)_
 
 #### Checkpoint: Phase 2
@@ -154,7 +154,7 @@ This plan delivers the complete active session management capability (Domain 1: 
 | Redis fail-closed ordering: partial failures could leave DB updated while Redis blacklist is incomplete, allowing lingering access. | High   | All revocation use cases (`RevokeSessionUseCaseImpl`, `RevokeAllOtherSessionsUseCaseImpl`) execute Redis blacklist writes first. If Redis fails or throws, execution aborts with `503 Service Unavailable` and the DB transaction never commits, ensuring zero partial revocation state.                 |
 | Accidental current session termination during bulk revocation: caller could be locked out of their own account.                     | High   | Bulk revocation explicitly requires `sid` claim from caller's token; if missing, it rejects with `400 Bad Request`. The DB query strictly enforces `WHERE user_id = :userId AND id != :currentSessionId`, making it impossible to revoke the caller's session row.                                       |
 | Keyset cursor pagination ordering inconsistency if timestamps match.                                                                | Medium | Keyset cursor utilizes composite sorting `created_at DESC, id DESC` with tie-breaking on UUID `id`. The repository query checks `(createdAt < :cursorCreatedAt OR (createdAt = :cursorCreatedAt AND id < :cursorId))` ensuring deterministic ordering without skipping or repeating items.               |
-| Primary vs Replica DB lag on active session inspection.                                                                             | Medium | All read queries in `GetActiveSessionsUseCaseImpl` and writes in revocation use cases are explicitly routed to the Primary PostgreSQL instance via `@Transactional(readOnly = true)` and `@Transactional` respectively (ADR-015).                                                                        |
+| Primary vs Replica DB lag on active session inspection.                                                                             | Medium | All read queries in `GetActiveSessionsUseCaseImpl` and writes in revocation use cases are explicitly routed to the Primary PostgreSQL instance via `@Transactional` (omitting `readOnly = true` to prevent routing to read replica) (ADR-015).                                                           |
 
 ## Open Questions
 

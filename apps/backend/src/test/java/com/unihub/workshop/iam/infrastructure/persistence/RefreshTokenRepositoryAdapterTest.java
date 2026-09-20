@@ -69,11 +69,9 @@ class RefreshTokenRepositoryAdapterTest {
         );
 
         when(
-            repository.findActiveSessions(
+            repository.findFirstPage(
                 eq(userId),
                 any(Instant.class),
-                isNull(),
-                isNull(),
                 eq(PageRequest.of(0, 3))
             )
         ).thenReturn(List.of(e1, e2, e3));
@@ -125,7 +123,7 @@ class RefreshTokenRepositoryAdapterTest {
         );
 
         when(
-            repository.findActiveSessions(
+            repository.findNextPage(
                 eq(userId),
                 any(Instant.class),
                 eq(cursorTime),
@@ -164,6 +162,62 @@ class RefreshTokenRepositoryAdapterTest {
         )
             .isInstanceOf(BadRequestException.class)
             .hasMessage("Invalid cursor format");
+
+        String missingFieldJson = Base64.getEncoder().encodeToString(
+            "{\"id\":\"00000000-0000-0000-0000-000000000000\"}".getBytes()
+        );
+        assertThatThrownBy(() ->
+            adapter.findActiveSessions(userId, missingFieldJson, 20)
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+    }
+
+    @Test
+    void shouldFindActiveSessions_withWhitespacePaddedCursor_trimsAndSucceeds()
+        throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID cursorId = UUID.randomUUID();
+        Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
+
+        ObjectMapper mapper = new ObjectMapper().registerModule(
+            new JavaTimeModule()
+        );
+        String cursorJson = mapper.writeValueAsString(
+            new CursorData(cursorTime, cursorId)
+        );
+        String cursor =
+            "   " +
+            Base64.getEncoder().encodeToString(cursorJson.getBytes()) +
+            "   ";
+
+        UUID id = UUID.randomUUID();
+        RefreshTokenJpaEntity entity = createEntity(
+            id,
+            userId,
+            "Safari",
+            "3.3.3.3",
+            Instant.parse("2026-09-04T08:00:00Z")
+        );
+
+        when(
+            repository.findNextPage(
+                eq(userId),
+                any(Instant.class),
+                eq(cursorTime),
+                eq(cursorId),
+                eq(PageRequest.of(0, 3))
+            )
+        ).thenReturn(List.of(entity));
+
+        CursorPage<ActiveSession> page = adapter.findActiveSessions(
+            userId,
+            cursor,
+            2
+        );
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().get(0).id()).isEqualTo(id);
     }
 
     @Test

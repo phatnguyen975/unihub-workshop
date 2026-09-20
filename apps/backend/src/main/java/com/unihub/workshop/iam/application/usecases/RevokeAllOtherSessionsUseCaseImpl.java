@@ -6,7 +6,6 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.shared.exception.BadRequestException;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -26,11 +25,9 @@ public class RevokeAllOtherSessionsUseCaseImpl
     private final RefreshTokenRepository refreshTokenRepository;
     private final JtiBlacklistPort jtiBlacklistPort;
     private final SessionTrackerPort sessionTrackerPort;
-    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional(propagation = Propagation.NEVER)
-    // Enforce fail-closed: Redis operations must succeed before any DB mutation
     public void revokeAllOtherSessions(UUID userId, UUID currentSessionId) {
         if (userId == null || currentSessionId == null) {
             throw new BadRequestException(
@@ -49,15 +46,6 @@ public class RevokeAllOtherSessionsUseCaseImpl
             );
 
         if (remoteSessions.isEmpty()) {
-            meterRegistry
-                .counter(
-                    "auth.sessions.revoked",
-                    "outcome",
-                    "success",
-                    "target",
-                    "all_others"
-                )
-                .increment();
             return;
         }
 
@@ -66,10 +54,13 @@ public class RevokeAllOtherSessionsUseCaseImpl
             Optional<String> remoteJti = sessionTrackerPort.getActiveJti(
                 session.id()
             );
-            if (remoteJti.isPresent()) {
+            if (remoteJti.isPresent() && !remoteJti.get().isBlank()) {
                 Duration remainingTtl = sessionTrackerPort.getRemainingTtl(
                     session.id()
                 );
+                if (remainingTtl == null || remainingTtl.isNegative()) {
+                    remainingTtl = Duration.ZERO;
+                }
                 jtiBlacklistPort.blacklistJti(remoteJti.get(), remainingTtl);
             }
             sessionTrackerPort.removeSession(session.id());
@@ -81,16 +72,5 @@ public class RevokeAllOtherSessionsUseCaseImpl
             currentSessionId,
             now
         );
-
-        // 4. Record metric
-        meterRegistry
-            .counter(
-                "auth.sessions.revoked",
-                "outcome",
-                "success",
-                "target",
-                "all_others"
-            )
-            .increment();
     }
 }

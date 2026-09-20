@@ -9,6 +9,8 @@ import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.exception.InternalServerException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -16,6 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,7 +52,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CursorPage<ActiveSession> findActiveSessions(
         UUID userId,
         String cursor,
@@ -60,7 +63,11 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
 
         if (cursor != null && !cursor.isBlank()) {
             try {
-                String decoded = new String(Base64.getDecoder().decode(cursor));
+                String trimmedCursor = cursor.trim();
+                String decoded = new String(
+                    Base64.getDecoder().decode(trimmedCursor),
+                    StandardCharsets.UTF_8
+                );
                 CursorData cursorData = objectMapper.readValue(
                     decoded,
                     CursorData.class
@@ -83,13 +90,17 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         }
 
         Instant now = Instant.now();
-        List<RefreshTokenJpaEntity> entities = repository.findActiveSessions(
-            userId,
-            now,
-            cursorTime,
-            cursorId,
-            PageRequest.of(0, limit + 1)
-        );
+        Pageable pageable = PageRequest.of(0, limit + 1);
+        List<RefreshTokenJpaEntity> entities =
+            cursorTime == null
+                ? repository.findFirstPage(userId, now, pageable)
+                : repository.findNextPage(
+                      userId,
+                      now,
+                      cursorTime,
+                      cursorId,
+                      pageable
+                  );
 
         boolean hasMore = entities.size() > limit;
         List<RefreshTokenJpaEntity> pageEntities = hasMore
@@ -112,10 +123,13 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 );
                 String json = objectMapper.writeValueAsString(nextCursorData);
                 nextCursor = Base64.getEncoder().encodeToString(
-                    json.getBytes()
+                    json.getBytes(StandardCharsets.UTF_8)
                 );
             } catch (Exception e) {
-                throw new RuntimeException("Failed to encode next cursor", e);
+                throw new InternalServerException(
+                    "Failed to encode next cursor",
+                    e
+                );
             }
         }
 

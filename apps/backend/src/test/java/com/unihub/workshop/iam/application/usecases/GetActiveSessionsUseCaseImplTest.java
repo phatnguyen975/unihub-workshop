@@ -2,8 +2,6 @@ package com.unihub.workshop.iam.application.usecases;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -13,8 +11,6 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.shared.exception.BadRequestException;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,24 +20,12 @@ import org.junit.jupiter.api.Test;
 class GetActiveSessionsUseCaseImplTest {
 
     private RefreshTokenRepository refreshTokenRepository;
-    private MeterRegistry meterRegistry;
-    private Counter counter;
     private GetActiveSessionsUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
         refreshTokenRepository = mock(RefreshTokenRepository.class);
-        meterRegistry = mock(MeterRegistry.class);
-        counter = mock(Counter.class);
-
-        when(
-            meterRegistry.counter(anyString(), any(String[].class))
-        ).thenReturn(counter);
-
-        useCase = new GetActiveSessionsUseCaseImpl(
-            refreshTokenRepository,
-            meterRegistry
-        );
+        useCase = new GetActiveSessionsUseCaseImpl(refreshTokenRepository);
     }
 
     @Test
@@ -58,6 +42,12 @@ class GetActiveSessionsUseCaseImplTest {
         UUID userId = UUID.randomUUID();
         assertThatThrownBy(() ->
             useCase.getActiveSessions(userId, UUID.randomUUID(), null, 0)
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("size must be between 1 and 100");
+
+        assertThatThrownBy(() ->
+            useCase.getActiveSessions(userId, UUID.randomUUID(), null, -1)
         )
             .isInstanceOf(BadRequestException.class)
             .hasMessage("size must be between 1 and 100");
@@ -95,6 +85,45 @@ class GetActiveSessionsUseCaseImplTest {
 
         assertThat(result).isNotNull();
         assertThat(result.items()).isEmpty();
+        verify(refreshTokenRepository).findActiveSessions(userId, null, 20);
+    }
+
+    @Test
+    void shouldAcceptBoundarySize_oneAndOneHundred() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+
+        when(
+            refreshTokenRepository.findActiveSessions(
+                eq(userId),
+                eq(null),
+                eq(1)
+            )
+        ).thenReturn(new CursorPage<>(List.of(), null, false));
+
+        when(
+            refreshTokenRepository.findActiveSessions(
+                eq(userId),
+                eq(null),
+                eq(100)
+            )
+        ).thenReturn(new CursorPage<>(List.of(), null, false));
+
+        CursorPage<ActiveSession> resultMin = useCase.getActiveSessions(
+            userId,
+            currentSessionId,
+            null,
+            1
+        );
+        assertThat(resultMin).isNotNull();
+
+        CursorPage<ActiveSession> resultMax = useCase.getActiveSessions(
+            userId,
+            currentSessionId,
+            null,
+            100
+        );
+        assertThat(resultMax).isNotNull();
     }
 
     @Test
@@ -140,13 +169,6 @@ class GetActiveSessionsUseCaseImplTest {
         assertThat(result.items().get(1).isCurrentSession()).isFalse();
         assertThat(result.nextCursor()).isEqualTo("next-cursor");
         assertThat(result.hasMore()).isTrue();
-
-        verify(meterRegistry).counter(
-            "auth.sessions.listed",
-            "outcome",
-            "success"
-        );
-        verify(counter).increment();
     }
 
     @Test

@@ -853,6 +853,16 @@ sequenceDiagram
   end
 ```
 
+#### In-Memory Infrastructure Resilience
+
+Unlike third-party HTTP dependencies that suffer high-latency network drops and require Resilience4j Circuit Breakers, in-memory infrastructure (Redis) operates at sub-millisecond latencies. Applying a Circuit Breaker around Redis would impose synchronization overhead on the 12,000 req/s hot path and create policy conflicts (Rate Limiting requires Fail-Open, whereas Token Revocation and Capacity Allocation require Fail-Closed).
+
+Instead, the platform enforces driver-level fail-fast resilience:
+
+1. **Lettuce Client Fail-Fast:** `LettuceClientOptionsBuilderCustomizer` configures `disconnectedBehavior = REJECT_COMMANDS` and `TimeoutOptions.enabled()`. When Redis drops, Lettuce rejects commands immediately in < 1ms rather than buffering them in memory.
+2. **Deterministic Timeouts:** Configured directly in `application.yml` with `spring.data.redis.timeout: 2s` and `spring.data.redis.connect-timeout: 2s`.
+3. **Gateway Pass-Through:** In `infra/nginx/templates/default.conf.template`, `proxy_next_upstream` excludes `http_503`. When backend instances return `503 Service Unavailable` with `Retry-After: 30`, Nginx forwards the response directly to the client without triggering upstream retry loops that convert the error into an ambiguous `502 Bad Gateway`.
+
 ### Third-Party Service Resilience
 
 External payment gateways are inherently unreliable due to network latency, timeouts, and partial outages. If the backend waits on slow payment calls, request threads queue up and can exhaust the Spring Boot thread pool, causing a cascading failure across the system.
