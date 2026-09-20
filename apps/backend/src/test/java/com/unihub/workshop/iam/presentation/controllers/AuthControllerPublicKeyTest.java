@@ -181,6 +181,25 @@ class AuthControllerPublicKeyTest {
     }
 
     @Test
+    void getPublicKey_withRevokedJwt_returns401() throws Exception {
+        when(jwtDecoder.decode(anyString())).thenReturn(createMockJwt("STAFF"));
+        when(redisJtiValidator.isTokenValid(anyString())).thenReturn(false);
+
+        mockMvc
+            .perform(
+                get("/api/v1/auth/public-key").header(
+                    "Authorization",
+                    "Bearer token"
+                )
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            );
+    }
+
+    @Test
     void getPublicKey_whenRedisIsDown_returns503WithRetryAfter()
         throws Exception {
         when(jwtDecoder.decode(anyString())).thenReturn(createMockJwt("STAFF"));

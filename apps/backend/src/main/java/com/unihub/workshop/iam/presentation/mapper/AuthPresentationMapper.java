@@ -5,11 +5,9 @@ import com.unihub.workshop.iam.application.ports.in.TokenResult;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.presentation.dto.LoginResponse;
-import com.unihub.workshop.iam.presentation.dto.PublicKeyResponse;
 import com.unihub.workshop.iam.presentation.dto.RefreshTokenResponse;
 import com.unihub.workshop.iam.presentation.dto.SessionResponse;
 import com.unihub.workshop.iam.presentation.dto.UserProfileResponse;
-import com.unihub.workshop.shared.security.PublicKeyService;
 import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -28,6 +26,4 @@ public interface AuthPresentationMapper {
     List<SessionResponse.SessionItem> toSessionItemList(
         List<ActiveSession> sessions
     );
-
-    PublicKeyResponse toPublicKeyResponse(PublicKeyService service);
 }

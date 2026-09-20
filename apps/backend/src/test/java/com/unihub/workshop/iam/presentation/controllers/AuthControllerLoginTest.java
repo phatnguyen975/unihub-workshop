@@ -207,4 +207,146 @@ class AuthControllerLoginTest {
                 jsonPath("$.error.type").value("urn:unihub:error:validation")
             );
     }
+
+    @Test
+    void shouldReturn422WhenEmailBlank() throws Exception {
+        String requestBody = """
+        {
+            "email": "",
+            "password": "password"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            );
+    }
+
+    @Test
+    void shouldReturn422WhenPasswordBlank() throws Exception {
+        String requestBody = """
+        {
+            "email": "test@example.com",
+            "password": ""
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            );
+    }
+
+    @Test
+    void shouldReturn422OnEmptyBody() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            );
+    }
+
+    @Test
+    void shouldReturn400OnMalformedJson() throws Exception {
+        String malformedJson =
+            "{\"email\": \"test@example.com\", \"password\": ";
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(malformedJson)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn415OnUnsupportedMediaType() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .content("plain text content")
+            )
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(
+                jsonPath("$.error.type").value(
+                    "urn:unihub:error:unsupported-media-type"
+                )
+            );
+    }
+
+    @Test
+    void shouldAutoTrimEmail() throws Exception {
+        UUID userId = UUID.randomUUID();
+        User mockUser = User.builder()
+            .id(userId)
+            .role(UserRole.STUDENT)
+            .email("test@example.com")
+            .passwordHash("hash")
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .build();
+
+        when(
+            loginUseCase.login(
+                eq("test@example.com"),
+                eq("password"),
+                any(),
+                any()
+            )
+        ).thenReturn(
+            new LoginUseCase.LoginResult(
+                "access-token",
+                "refresh-token",
+                "Bearer",
+                900L,
+                mockUser
+            )
+        );
+
+        String requestBody = """
+        {
+            "email": "  test@example.com  ",
+            "password": "password"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.accessToken").value("access-token"));
+
+        verify(loginUseCase).login(
+            eq("test@example.com"),
+            eq("password"),
+            any(),
+            any()
+        );
+    }
 }

@@ -36,7 +36,7 @@ This feature lives in the `iam` module of the Core Backend, with the JWT filter 
 
 ### FR-01 — Login: credential validation
 
-The system **SHALL** accept an email and password from the request body and look up the matching `users` row by email (case-insensitive via `CITEXT`). The system **SHALL** verify the presented password against the stored `password_hash` using the same algorithm that produced the hash (Argon2, per `docs/database-schema.md §users`).
+The system **SHALL** accept an email and password from the request body and automatically trim leading and trailing whitespace from the submitted email before validation and processing. The system **SHALL** look up the matching `users` row by normalized email (case-insensitive via `CITEXT`). The system **SHALL** verify the presented password against the stored `password_hash` using the same algorithm that produced the hash (Argon2, per `docs/database-schema.md §users`).
 
 The system **SHALL** reject login with a generic `401 Unauthorized` when:
 
@@ -110,13 +110,14 @@ All nullable fields **SHALL** be omitted when null, conforming to `@JsonInclude(
 
 ### FR-08 — Token refresh: locate and validate
 
-The system **SHALL** accept a raw refresh token string in the request body. The system **SHALL** compute `SHA-256(rawToken)` and look up the matching `refresh_tokens` row by `token_hash`.
+The system **SHALL** accept a raw refresh token string in the request body. The system **SHALL** compute `SHA-256(rawToken)` (after auto-trimming whitespace) and look up the matching `refresh_tokens` row by `token_hash`.
 
 The system **SHALL** reject the refresh request with `401 Unauthorized` when:
 
 - No row matches the computed hash (token was never issued or already fully deleted), OR
 - The matched row has `revoked_at IS NOT NULL` (token was explicitly revoked), OR
-- The matched row has `expires_at < NOW()` (token has expired by TTL).
+- The matched row has `expires_at < NOW()` (token has expired by TTL), OR
+- The associated user account has `is_active = FALSE` or `is_temporary_password = TRUE` (BR-08).
 
 ### FR-09 — Token refresh: refresh token rotation
 
@@ -124,7 +125,7 @@ The system **SHALL** execute the following atomically in a single database trans
 
 1. Set `revoked_at = NOW()` on the consumed `refresh_tokens` row (invalidate the old token).
 2. Generate a new cryptographically random refresh token string.
-3. Insert a new `refresh_tokens` row with the new `token_hash`, inheriting the same `user_id`, `device_info`, `ip_address`, and a fresh `expires_at = NOW() + refreshTokenTtl`. `revoked_at` is `NULL`.
+3. Insert a new `refresh_tokens` row with the new `token_hash`, inheriting the same `user_id`, `device_info` (falling back to the consumed row's `device_info` if omitted or blank in the current request), `ip_address` (falling back to the consumed row's `ip_address` if omitted or blank), and a fresh `expires_at = NOW() + refreshTokenTtl`. `revoked_at` is `NULL`.
 4. Issue a new RS256-signed access token (with a fresh `jti` and `sid` matching the newly inserted `refresh_tokens.id`) for the user, and track the active session in Redis (`session:jti:{sessionId}`).
 
 The raw new refresh token string and the new access token **SHALL** be returned in the response body.
@@ -181,7 +182,7 @@ All reads from and writes to `refresh_tokens` **SHALL** be routed to the primary
 - **BR-07:** The Redis JTI blacklist TTL **SHALL** match the remaining validity of the access token at the time of logout (i.e., `exp - NOW()`). This prevents unbounded Redis growth while guaranteeing the key stays present until the token naturally expires.
 - **BR-08:** The `is_temporary_password` gate (FR-03) takes precedence over normal token issuance. An account with `is_temporary_password = TRUE` can never receive a standard session token until the password is changed via the `password-reset` or equivalent flow.
 - **BR-09:** `users.last_login_at` is updated on the primary DB on every successful login, consistent with the primary-routing requirements in `docs/database-schema.md §4`.
-- **BR-10:** Login attempts for non-existent emails **SHALL** take constant time (timing-safe comparison) to prevent user enumeration via timing side-channel. Argon2 verification is only called when the user row is found; when no row is found, a dummy Argon2 verification **SHALL** still be executed to preserve constant-time behaviour.
+- **BR-10:** Login attempts for non-existent emails and incorrect passwords **SHALL** return an identical generic `401 Unauthorized` response with the message `"Invalid email or password"` to prevent user enumeration. The system returns immediately upon detecting an unknown email without executing artificial delays or dummy password hashing to prevent CPU starvation and DoS under peak load.
 
 ## 5. State Transitions
 
@@ -219,20 +220,20 @@ The login endpoint does not mutate a single domain entity state machine, but a `
 
 ## 6. Non-Functional Requirements
 
-| ID     | Category      | Requirement                                                                                                                                                                                                                                                                                                             |
-| :----- | :------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| NFR-01 | Security      | The `jti` Redis blacklist check is **fail-closed** (ADR-010): Redis unavailability returns `503` with `Retry-After: 30` for both protected requests and the logout endpoint.                                                                                                                                            |
-| NFR-02 | Security      | Passwords are hashed with Argon2. The raw password **SHALL** never appear in logs, in a response body, or in the database.                                                                                                                                                                                              |
-| NFR-03 | Security      | Refresh tokens are stored only as `SHA-256` hashes. The raw token is returned to the client exactly once (in the response body). It is never logged, cached to Redis, or stored in any persistence layer.                                                                                                               |
-| NFR-04 | Performance   | Login MUST complete in under 2 seconds (p99) under normal load, including Argon2 verification, DB read/write, and Redis JTI write on logout. Argon2 parameters should be tuned so verification takes 50–500 ms on the target JVM.                                                                                       |
-| NFR-05 | Performance   | Token refresh MUST complete in under 500 ms (p99) — it involves only DB reads/writes and no Argon2 computation.                                                                                                                                                                                                         |
-| NFR-06 | Concurrency   | Concurrent refresh requests using the same refresh token MUST NOT produce two valid new sessions. The `revoked_at` update is the linearization point; `@Transactional` on the refresh use case ensures correctness.                                                                                                     |
-| NFR-07 | Observability | Failed login attempts (wrong password, inactive account, temporary password) **SHALL** be logged at `WARN` level with the user's email (not password) and the failure reason. Successful logins **SHALL** be logged at `INFO`.                                                                                          |
-| NFR-08 | Observability | A Micrometer counter `auth.login.attempts{outcome=success\|failure,reason=...}` **SHALL** be emitted on every login attempt, and `auth.token.refresh{outcome=...}` on every refresh attempt.                                                                                                                            |
-| NFR-09 | Rate Limiting | Login and token-refresh endpoints **SHALL** be subject to the dedicated Bucket4j `auth-tier` rate-limiting filter (default: capacity 20 tokens, refill 20 tokens per 60s per client IP) to protect against credential brute-force attacks and Argon2 CPU DoS. They are NOT subject to the registration-tier rate limit. |
-| NFR-10 | Correctness   | `last_login_at` update on the `users` row **SHALL** be routed to the primary database.                                                                                                                                                                                                                                  |
-| NFR-11 | Security      | The JWKS endpoint **SHALL NOT** expose the RSA private key or any secret material. Only the public key components are returned.                                                                                                                                                                                         |
-| NFR-12 | Timing safety | When no user row is found for the submitted email, the system **SHALL** still execute a dummy Argon2 verification to prevent timing attacks that reveal whether an email is registered.                                                                                                                                 |
+| ID     | Category               | Requirement                                                                                                                                                                                                                                                                                                             |
+| :----- | :--------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NFR-01 | Security               | The `jti` Redis blacklist check is **fail-closed** (ADR-010): Redis unavailability returns `503` with `Retry-After: 30` for both protected requests and the logout endpoint.                                                                                                                                            |
+| NFR-02 | Security               | Passwords are hashed with Argon2. The raw password **SHALL** never appear in logs, in a response body, or in the database.                                                                                                                                                                                              |
+| NFR-03 | Security               | Refresh tokens are stored only as `SHA-256` hashes. The raw token is returned to the client exactly once (in the response body). It is never logged, cached to Redis, or stored in any persistence layer.                                                                                                               |
+| NFR-04 | Performance            | Login MUST complete in under 2 seconds (p99) under normal load, including Argon2 verification, DB read/write, and Redis JTI write on logout. Argon2 parameters should be tuned so verification takes 50–500 ms on the target JVM.                                                                                       |
+| NFR-05 | Performance            | Token refresh MUST complete in under 500 ms (p99) — it involves only DB reads/writes and no Argon2 computation.                                                                                                                                                                                                         |
+| NFR-06 | Concurrency            | Concurrent refresh requests using the same refresh token MUST NOT produce two valid new sessions. The `revoked_at` update is the linearization point; `@Transactional` on the refresh use case ensures correctness.                                                                                                     |
+| NFR-07 | Observability          | Failed login attempts (wrong password, inactive account, temporary password) **SHALL** be logged at `WARN` level with the user's email (not password) and the failure reason. Successful logins **SHALL** be logged at `INFO`.                                                                                          |
+| NFR-08 | Observability          | Login and session authentication flows rely on structured application logging (`INFO`/`WARN`) and standard HTTP status codes; internal Micrometer counters are omitted to minimize overhead and avoid external metrics coupling.                                                                                        |
+| NFR-09 | Rate Limiting          | Login and token-refresh endpoints **SHALL** be subject to the dedicated Bucket4j `auth-tier` rate-limiting filter (default: capacity 20 tokens, refill 20 tokens per 60s per client IP) to protect against credential brute-force attacks and Argon2 CPU DoS. They are NOT subject to the registration-tier rate limit. |
+| NFR-10 | Correctness            | `last_login_at` update on the `users` row **SHALL** be routed to the primary database.                                                                                                                                                                                                                                  |
+| NFR-11 | Security               | The JWKS endpoint **SHALL NOT** expose the RSA private key or any secret material. Only the public key components are returned.                                                                                                                                                                                         |
+| NFR-12 | Enumeration prevention | The system **SHALL** return the identical generic error response (`401 Unauthorized`, `Invalid email or password`) regardless of whether the email exists or the password is incorrect, preventing user enumeration without artificial Argon2 delay.                                                                    |
 
 ## 7. Acceptance Criteria
 

@@ -182,23 +182,26 @@ public class AuthController {
     @PreAuthorize("hasRole('STAFF')")
     public ApiResponse<PublicKeyResponse> getPublicKey() {
         return ApiResponse.success(
-            authMapper.toPublicKeyResponse(publicKeyService),
+            new PublicKeyResponse(
+                publicKeyService.getKeyId(),
+                publicKeyService.getPublicKeyPem(),
+                publicKeyService.getIssuedAt()
+            ),
             "Public key retrieved successfully"
         );
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-        @RequestBody(required = false) LogoutRequest request,
+        @RequestBody(required = false) @Valid LogoutRequest request,
         Authentication authentication
     ) {
         String refreshToken = request != null ? request.refreshToken() : null;
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         String jti = SecurityContextUtils.extractJti(authentication);
         Instant exp = SecurityContextUtils.extractExpiration(authentication);
-        String token = SecurityContextUtils.extractToken(authentication);
 
-        logoutUseCase.logout(token, jti, exp, userId, refreshToken);
+        logoutUseCase.logout(jti, exp, userId, refreshToken);
 
         return ResponseEntity.noContent().build();
     }

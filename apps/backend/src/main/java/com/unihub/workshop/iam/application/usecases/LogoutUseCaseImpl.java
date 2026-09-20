@@ -5,7 +5,6 @@ import com.unihub.workshop.iam.application.ports.out.JtiBlacklistPort;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.application.utils.TokenUtils;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -20,13 +19,10 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
 
     private final JtiBlacklistPort jtiBlacklistPort;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional(propagation = Propagation.NEVER)
-    // Enforce fail-closed: Redis write must succeed before any DB mutation.
     public void logout(
-        String accessTokenString,
         String jti,
         Instant expiresAt,
         UUID userId,
@@ -58,7 +54,5 @@ public class LogoutUseCaseImpl implements LogoutUseCase {
         } else {
             refreshTokenRepository.revokeAllActiveTokensForUser(userId, now);
         }
-
-        meterRegistry.counter("auth.logout", "outcome", "success").increment();
     }
 }

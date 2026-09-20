@@ -12,8 +12,6 @@ import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.security.IssuedToken;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
-import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -34,23 +32,6 @@ public class LoginUseCaseImpl implements LoginUseCase {
     private final JwtTokenIssuer jwtTokenIssuer;
     private final PasswordEncoder passwordEncoder;
     private final SecurityProperties securityProperties;
-    private final MeterRegistry meterRegistry;
-
-    private volatile String dummyPasswordHash;
-
-    @PostConstruct
-    void init() {
-        if (dummyPasswordHash == null) {
-            dummyPasswordHash = passwordEncoder.encode("dummy-password-hash");
-        }
-    }
-
-    private String getDummyPasswordHash() {
-        if (dummyPasswordHash == null) {
-            dummyPasswordHash = passwordEncoder.encode("dummy-password-hash");
-        }
-        return dummyPasswordHash;
-    }
 
     @Override
     @Transactional
@@ -60,48 +41,24 @@ public class LoginUseCaseImpl implements LoginUseCase {
         String deviceInfo,
         String ipAddress
     ) {
-        Optional<User> optionalUser = userRepository.findByEmail(email);
+        String normalizedEmail =
+            email != null ? email.toLowerCase().trim() : "";
+
+        Optional<User> optionalUser = userRepository.findByEmail(
+            normalizedEmail
+        );
 
         if (optionalUser.isEmpty()) {
-            // Anti-enumeration: perform dummy hash check
-            passwordEncoder.matches(password, getDummyPasswordHash());
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .increment();
             throw new UnauthorizedException("Invalid email or password");
         }
 
         User user = optionalUser.get();
 
         if (!passwordEncoder.matches(password, user.passwordHash())) {
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .increment();
             throw new UnauthorizedException("Invalid email or password");
         }
 
         if (!user.isActive()) {
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "account_disabled"
-                )
-                .increment();
             throw new ForbiddenException(
                 "urn:unihub:error:account-disabled",
                 "Account is disabled"
@@ -109,15 +66,6 @@ public class LoginUseCaseImpl implements LoginUseCase {
         }
 
         if (user.isTemporaryPassword()) {
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "temporary_password"
-                )
-                .increment();
             throw new ForbiddenException(
                 "urn:unihub:error:temporary-password",
                 "Temporary password change required"
@@ -163,10 +111,6 @@ public class LoginUseCaseImpl implements LoginUseCase {
             issuedToken.jti(),
             Duration.ofMinutes(securityProperties.accessTokenTtlMinutes())
         );
-
-        meterRegistry
-            .counter("auth.login.attempts", "outcome", "success")
-            .increment();
 
         return new LoginResult(
             issuedToken.token(),

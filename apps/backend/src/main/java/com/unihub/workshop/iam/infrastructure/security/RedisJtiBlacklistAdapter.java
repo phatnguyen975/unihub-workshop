@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class RedisJtiBlacklistAdapter implements JtiBlacklistPort {
 
+    private static final String REDIS_JTI_PREFIX = "jti:blacklisted:";
+
     private final StringRedisTemplate redisTemplate;
     private final MeterRegistry meterRegistry;
 
@@ -20,7 +22,7 @@ public class RedisJtiBlacklistAdapter implements JtiBlacklistPort {
         try {
             redisTemplate
                 .opsForValue()
-                .set("jti:blacklisted:" + jti, "revoked", ttl);
+                .set(REDIS_JTI_PREFIX + jti, "revoked", ttl);
         } catch (Exception e) {
             meterRegistry
                 .counter("auth.blacklist.redis_unavailable")
