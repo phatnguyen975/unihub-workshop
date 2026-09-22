@@ -12,10 +12,12 @@ import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.seed.PasswordGenerator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProvisionUserUseCaseImpl implements ProvisionUserUseCase {
@@ -88,6 +90,15 @@ public class ProvisionUserUseCaseImpl implements ProvisionUserUseCase {
         );
 
         User saved = userRepository.save(user);
+
+        // TODO: Remove temporary password logging before production deployment once notifications worker is fully active.
+        log.info(
+            "Provisioned member user {} (email: {}, role: {}) with temporary password: {}",
+            saved.id(),
+            saved.email(),
+            saved.role(),
+            generatedPassword.plaintext()
+        );
 
         eventPublisher.publishEvent(
             new UserProvisionedEvent(

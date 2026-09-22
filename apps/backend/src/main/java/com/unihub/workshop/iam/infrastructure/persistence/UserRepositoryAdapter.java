@@ -118,14 +118,17 @@ public class UserRepositoryAdapter implements UserRepository {
         Boolean isActive,
         String search,
         String cursor,
-        int limit
+        int size
     ) {
         Instant cursorTime = null;
         UUID cursorId = null;
 
         if (cursor != null && !cursor.isBlank()) {
             try {
-                String decoded = new String(Base64.getDecoder().decode(cursor));
+                String trimmedCursor = cursor.trim();
+                String decoded = new String(
+                    Base64.getDecoder().decode(trimmedCursor)
+                );
                 CursorData cursorData = objectMapper.readValue(
                     decoded,
                     CursorData.class
@@ -149,20 +152,31 @@ public class UserRepositoryAdapter implements UserRepository {
 
         String roleStr = role != null ? role.name() : null;
         String sanitizedSearch = sanitizeSearch(search);
-        List<UserJpaEntity> entities = repository.findMembers(
-            organizationId,
-            callerId,
-            roleStr,
-            isActive,
-            sanitizedSearch,
-            cursorTime,
-            cursorId,
-            PageRequest.of(0, limit + 1)
-        );
+        PageRequest pageable = PageRequest.of(0, size + 1);
+        List<UserJpaEntity> entities =
+            cursorTime == null
+                ? repository.findFirstPage(
+                      organizationId,
+                      callerId,
+                      roleStr,
+                      isActive,
+                      sanitizedSearch,
+                      pageable
+                  )
+                : repository.findNextPage(
+                      organizationId,
+                      callerId,
+                      roleStr,
+                      isActive,
+                      sanitizedSearch,
+                      cursorTime,
+                      cursorId,
+                      pageable
+                  );
 
-        boolean hasMore = entities.size() > limit;
+        boolean hasMore = entities.size() > size;
         List<UserJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, limit)
+            ? entities.subList(0, size)
             : entities;
 
         List<User> items = userMapper.toDomainList(pageEntities);

@@ -120,7 +120,105 @@ class OrganizationControllerDetailTest {
             )
             .andExpect(
                 jsonPath("$.data.updatedAt").value("2026-09-08T10:15:00Z")
-            );
+            )
+            .andExpect(jsonPath("$.data.passwordHash").doesNotExist())
+            .andExpect(jsonPath("$.data.password").doesNotExist())
+            .andExpect(jsonPath("$.data.createdBy").doesNotExist())
+            .andExpect(jsonPath("$.data.updatedBy").doesNotExist());
+
+        verify(getOrganizationMemberUseCase).execute(ORG_ID, TARGET_USER_ID);
+    }
+
+    @Test
+    void shouldReturn200WithMemberDetail_whenCallerViewsOwnDetails()
+        throws Exception {
+        Instant now = Instant.parse("2026-09-08T10:15:00Z");
+        User callerUser = new User(
+            CALLER_ID,
+            ORG_ID,
+            UserRole.ORGANIZER,
+            "admin@techclub.org",
+            "+84901234567",
+            "hash",
+            "Admin User",
+            null,
+            true,
+            false,
+            now,
+            null,
+            now,
+            now,
+            null,
+            null
+        );
+
+        when(
+            getOrganizationMemberUseCase.execute(ORG_ID, CALLER_ID)
+        ).thenReturn(callerUser);
+
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/admin/organizations/users/{userId}",
+                    CALLER_ID
+                ).principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Member details retrieved"))
+            .andExpect(jsonPath("$.data.id").value(CALLER_ID.toString()))
+            .andExpect(
+                jsonPath("$.data.organizationId").value(ORG_ID.toString())
+            )
+            .andExpect(jsonPath("$.data.email").value("admin@techclub.org"))
+            .andExpect(jsonPath("$.data.role").value("ORGANIZER"));
+
+        verify(getOrganizationMemberUseCase).execute(ORG_ID, CALLER_ID);
+    }
+
+    @Test
+    void shouldReturn200WithMemberDetail_whenNullableFieldsAreNull()
+        throws Exception {
+        Instant now = Instant.parse("2026-09-08T10:15:00Z");
+        User memberWithNulls = new User(
+            TARGET_USER_ID,
+            ORG_ID,
+            UserRole.STAFF,
+            "staff@techclub.org",
+            null,
+            "hash",
+            "Staff Minimal",
+            null,
+            true,
+            false,
+            null,
+            null,
+            now,
+            now,
+            null,
+            null
+        );
+
+        when(
+            getOrganizationMemberUseCase.execute(ORG_ID, TARGET_USER_ID)
+        ).thenReturn(memberWithNulls);
+
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/admin/organizations/users/{userId}",
+                    TARGET_USER_ID
+                ).principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Member details retrieved"))
+            .andExpect(jsonPath("$.data.id").value(TARGET_USER_ID.toString()))
+            .andExpect(jsonPath("$.data.phoneNumber").doesNotExist())
+            .andExpect(jsonPath("$.data.avatarUrl").doesNotExist())
+            .andExpect(jsonPath("$.data.lastLoginAt").doesNotExist())
+            .andExpect(jsonPath("$.data.studentRecordId").doesNotExist())
+            .andExpect(jsonPath("$.data.passwordHash").doesNotExist());
 
         verify(getOrganizationMemberUseCase).execute(ORG_ID, TARGET_USER_ID);
     }
@@ -185,13 +283,29 @@ class OrganizationControllerDetailTest {
     }
 
     @Test
-    void shouldReturn403_whenRoleIsNotOrganizer() throws Exception {
+    void shouldReturn403_whenRoleIsStaff() throws Exception {
         mockMvc
             .perform(
                 get(
                     "/api/v1/admin/organizations/users/{userId}",
                     TARGET_USER_ID
                 ).principal(createAuth(CALLER_ID, ORG_ID, "STAFF"))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:forbidden")
+            );
+    }
+
+    @Test
+    void shouldReturn403_whenRoleIsStudent() throws Exception {
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/admin/organizations/users/{userId}",
+                    TARGET_USER_ID
+                ).principal(createAuth(CALLER_ID, ORG_ID, "STUDENT"))
             )
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.success").value(false))

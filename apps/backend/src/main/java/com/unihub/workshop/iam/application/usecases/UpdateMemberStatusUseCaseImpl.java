@@ -18,11 +18,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UpdateMemberStatusUseCaseImpl
@@ -67,8 +69,7 @@ public class UpdateMemberStatusUseCaseImpl
                 new NotFoundException("Member not found in your organization.")
             );
 
-        // 3. Idempotent check: if status is already the requested value, return
-        // immediately (no-op)
+        // 3. Idempotent: if status is already the requested value, return immediately
         if (targetUser.isActive() == command.isActive()) {
             return targetUser;
         }
@@ -87,9 +88,12 @@ public class UpdateMemberStatusUseCaseImpl
                 for (RefreshToken session : activeSessions) {
                     Optional<String> remoteJti =
                         sessionTrackerPort.getActiveJti(session.id());
-                    if (remoteJti.isPresent()) {
+                    if (remoteJti.isPresent() && !remoteJti.get().isBlank()) {
                         Duration remainingTtl =
                             sessionTrackerPort.getRemainingTtl(session.id());
+                        if (remainingTtl == null || remainingTtl.isNegative()) {
+                            remainingTtl = Duration.ZERO;
+                        }
                         jtiBlacklistPort.blacklistJti(
                             remoteJti.get(),
                             remainingTtl
@@ -129,6 +133,14 @@ public class UpdateMemberStatusUseCaseImpl
                 command.isActive(),
                 now
             )
+        );
+
+        log.info(
+            "Updated active status for member {} in organization {} to isActive={} by organizer {}",
+            command.targetUserId(),
+            command.organizationId(),
+            command.isActive(),
+            command.callerId()
         );
 
         return targetUser.updateActiveStatus(

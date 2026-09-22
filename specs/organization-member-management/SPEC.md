@@ -32,7 +32,7 @@ All operations are strictly scoped to the calling organizer's organization (`jwt
 - **FR-04:** The system SHALL support a `search` keyword parameter that performs a case-insensitive partial match (`ILIKE`) across `full_name`, `email`, and `phone_number`.
 - **FR-05:** The system SHALL allow combining multiple filters (`role`, `isActive`, `search`) conjunctively (logical `AND`).
 - **FR-06:** The system SHALL order member list results by `created_at DESC`, then `id DESC` as a tie-breaker, to guarantee deterministic cursor pagination.
-- **FR-07:** The system SHALL default pagination limit to 20 items per page, allow a maximum limit of 100, and reject requests exceeding 100 with `400 Bad Request`.
+- **FR-07:** The system SHALL default pagination page size (`size`) to 20 items per page, allow a maximum size of 100, and reject requests exceeding 100 with `400 Bad Request`.
 - **FR-08:** The list query SHALL be routed to the **PostgreSQL read replica** to preserve primary database write capacity.
 
 ### 3.2 View Member Detail
@@ -48,7 +48,7 @@ All operations are strictly scoped to the calling organizer's organization (`jwt
 - **FR-14:** The system SHALL reject provisioning requests with `409 Conflict` (`urn:unihub:error:conflict`) if the submitted email already exists in the system (globally unique across all organizations).
 - **FR-15:** The system SHALL auto-generate a cryptographically secure random temporary password (minimum 16 characters, mixed character classes) and store its Argon2id hash.
 - **FR-16:** The new member account SHALL be created with `is_active = true` and `is_temporary_password = true`.
-- **FR-17:** Upon successful account creation, the system SHALL publish a `UserProvisionedEvent` to the transactional outbox (`event_publication` table) externalized to RabbitMQ (`unihub.events::notifications`). The event payload SHALL include `userId`, `organizationId`, `orgSlug`, `email`, `fullName`, `role`, and the plaintext `temporaryPassword` for delivery via email.
+- **FR-17:** Upon successful account creation, the system SHALL publish a `UserProvisionedEvent` to the transactional outbox (`event_publication` table) externalized to RabbitMQ (`unihub.events::notifications`). The event payload SHALL include `userId`, `organizationId`, `orgSlug` (null when provisioned via API where only `organizationId` UUID is present; downstream notification worker resolves organization metadata by `organizationId`), `email`, `fullName`, `role`, and the plaintext `temporaryPassword` for delivery via email.
 - **FR-18:** The provisioning write operation SHALL be routed to the **PostgreSQL primary** database.
 
 ### 3.4 Update Member Active Status (Ban / Unban)
@@ -168,22 +168,22 @@ And the data items include "Nguyen Van Binh"
 
 ```gherkin
 Given organization "org-100" has 25 members (excluding the caller)
-When the ORGANIZER calls GET /api/v1/admin/organizations/users?limit=20
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?size=20
 Then the response status is 200 OK
 And data.items contains exactly 20 items
 And data.cursor.hasMore is true
 And data.cursor.nextCursor is a valid non-empty Base64 string
-When the ORGANIZER calls GET /api/v1/admin/organizations/users?limit=20&cursor=<nextCursor>
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?size=20&cursor=<nextCursor>
 Then the response status is 200 OK
 And data.items contains the remaining 5 items
 And data.cursor.hasMore is false
 And data.cursor.nextCursor is null
 ```
 
-### Scenario 5: Reject invalid pagination limit
+### Scenario 5: Reject invalid pagination page size
 
 ```gherkin
-When the ORGANIZER calls GET /api/v1/admin/organizations/users?limit=150
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?size=150
 Then the response status is 400 Bad Request
 And error.type is "urn:unihub:error:bad-request"
 ```

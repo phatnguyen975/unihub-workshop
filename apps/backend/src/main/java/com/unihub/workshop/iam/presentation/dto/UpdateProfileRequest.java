@@ -9,11 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
 
-@Getter
-@Builder
 @AllArgsConstructor
 public class UpdateProfileRequest {
 

@@ -35,7 +35,7 @@ public interface UserRepository {
         Boolean isActive,
         String search,
         String cursor,
-        int limit
+        int size
     );
 
     void updateIsActive(UUID userId, UUID organizationId, boolean isActive);

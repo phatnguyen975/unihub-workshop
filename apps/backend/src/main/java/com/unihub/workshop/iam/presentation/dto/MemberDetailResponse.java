@@ -3,9 +3,7 @@ package com.unihub.workshop.iam.presentation.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.Builder;
 
-@Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MemberDetailResponse(
     UUID id,

@@ -18,7 +18,6 @@ import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusRequest;
 import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusResponse;
 import com.unihub.workshop.iam.presentation.mapper.OrganizationPresentationMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
-import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import jakarta.validation.Valid;
@@ -59,23 +58,13 @@ public class OrganizationController {
         UUID callerId = SecurityContextUtils.extractUserId(authentication);
         UUID organizationId = getVerifiedOrganizationId(authentication);
 
-        UserRole role;
-        try {
-            role = UserRole.valueOf(request.role().trim().toUpperCase());
-        } catch (IllegalArgumentException | NullPointerException e) {
-            throw new ValidationException(
-                "role",
-                "Invalid role. Allowed values: STAFF, ORGANIZER"
-            );
-        }
-
         ProvisionUserCommand command = new ProvisionUserCommand(
             organizationId,
             callerId,
             request.email(),
             request.fullName(),
             request.phoneNumber(),
-            role
+            request.parseRole()
         );
 
         User user = provisionUserUseCase.execute(command);
@@ -132,40 +121,19 @@ public class OrganizationController {
         @RequestParam(required = false) Boolean isActive,
         @RequestParam(required = false) String search,
         @RequestParam(required = false) String cursor,
-        @RequestParam(required = false, defaultValue = "20") Integer limit
+        @RequestParam(required = false) Integer size
     ) {
         UUID callerId = SecurityContextUtils.extractUserId(authentication);
         UUID organizationId = getVerifiedOrganizationId(authentication);
 
-        if (limit == null || limit < 1 || limit > 100) {
-            throw new BadRequestException("limit must be between 1 and 100");
-        }
-
-        UserRole userRole = null;
-        if (role != null && !role.isBlank()) {
-            try {
-                userRole = UserRole.valueOf(role.trim().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new BadRequestException(
-                    "Invalid role filter. Allowed values: ORGANIZER, STAFF, STUDENT"
-                );
-            }
-        }
-
-        if (search != null && search.length() > 200) {
-            throw new BadRequestException(
-                "search parameter cannot exceed 200 characters"
-            );
-        }
-
         ListMembersQuery query = new ListMembersQuery(
             organizationId,
             callerId,
-            userRole,
+            parseRole(role),
             isActive,
-            search != null ? search.trim() : null,
+            search,
             cursor,
-            limit
+            size
         );
 
         CursorPage<User> page = listOrganizationMembersUseCase.execute(query);
@@ -179,6 +147,19 @@ public class OrganizationController {
         );
 
         return ApiResponse.success(response, "Organization members retrieved");
+    }
+
+    private UserRole parseRole(String role) {
+        if (role == null || role.isBlank()) {
+            return null;
+        }
+        try {
+            return UserRole.valueOf(role.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException(
+                "Invalid role filter. Allowed values: ORGANIZER, STAFF, STUDENT"
+            );
+        }
     }
 
     private UUID getVerifiedOrganizationId(Authentication authentication) {

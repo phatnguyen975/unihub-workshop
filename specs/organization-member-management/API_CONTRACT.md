@@ -48,7 +48,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 | Parameter  | Type    | Required | Default | Constraints                                  | Description                                                                  |
 | :--------- | :------ | :------: | :-----: | :------------------------------------------- | :--------------------------------------------------------------------------- |
 | `cursor`   | string  |    No    |  none   | Base64 JSON `{"createdAt":"...","id":"..."}` | Opaque cursor returned from previous page. Absent on initial request.        |
-| `limit`    | integer |    No    |   20    | Min: 1, Max: 100                             | Number of items per page. Defaults to 20 if omitted.                         |
+| `size`     | integer |    No    |   20    | Min: 1, Max: 100                             | Number of items per page. Defaults to 20 if omitted.                         |
 | `role`     | string  |    No    |  none   | Enum: `ORGANIZER`, `STAFF`, `STUDENT`        | Filters members by platform role. Case-insensitive.                          |
 | `isActive` | boolean |    No    |  none   | `true` or `false`                            | Filters members by active/banned status.                                     |
 | `search`   | string  |    No    |  none   | Max 200 characters                           | Partial keyword match against `fullName`, `email`, or `phoneNumber` (ILIKE). |
@@ -102,12 +102,12 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                               |
-| :----: | :------------------------------ | :-------------------- | :---------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | `limit < 1`, `limit > 100`, malformed `cursor`, or invalid `role` enum. |
-| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, malformed, or blacklisted Bearer token.               |
-| `403`  | `urn:unihub:error:forbidden`    | Forbidden             | Caller role is not `ORGANIZER`, or caller is inactive.                  |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                            |
+| Status | Error Type (`error.type`)       | Title                 | Condition                                                             |
+| :----: | :------------------------------ | :-------------------- | :-------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | `size < 1`, `size > 100`, malformed `cursor`, or invalid `role` enum. |
+| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, malformed, or blacklisted Bearer token.             |
+| `403`  | `urn:unihub:error:forbidden`    | Forbidden             | Caller role is not `ORGANIZER`, or caller is inactive.                |
+| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                          |
 
 **Error Response Example (400 Bad Request):**
 
@@ -118,7 +118,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
     "type": "urn:unihub:error:bad-request",
     "title": "Bad Request",
     "status": 400,
-    "detail": "Page limit must not exceed 100.",
+    "detail": "size must be between 1 and 100",
     "instance": "/api/v1/admin/organizations/users"
   },
   "metadata": {
@@ -257,7 +257,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 - `email`: Required string. Valid email format per RFC 5321. Max 254 characters. Stored case-insensitive (`CITEXT`).
 - `fullName`: Required string. Non-blank. 1–200 characters.
-- `phoneNumber`: Optional string. If provided, must match international format `^\+[1-9]\d{1,14}$`. Max 20 characters.
+- `phoneNumber`: Optional string. If provided, must match international format `^\+[1-9]\d{1,14}$`. Max 20 characters. Empty or whitespace string is automatically converted to null.
 - `role`: Required string. Enum value: `STAFF` or `ORGANIZER`. Submitting `STUDENT` returns `422 Unprocessable Content`.
 
 #### Response
@@ -336,7 +336,7 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 #### Side Effects
 
 - A new row is inserted into `users` with `is_active = true`, `is_temporary_password = true`, and Argon2id hashed password.
-- A `UserProvisionedEvent` is published to the transactional outbox (`event_publication` table) destined for RabbitMQ exchange `unihub.events::notifications`. Contains plaintext temporary password for email notification.
+- A `UserProvisionedEvent` (carrying `userId`, `organizationId`, `null` `orgSlug`, `email`, `fullName`, `role`, and plaintext `temporaryPassword`) is published to the transactional outbox (`event_publication` table) destined for RabbitMQ exchange `unihub.events::notifications`. Contains plaintext temporary password for email notification.
 
 #### Spec Traceability
 
