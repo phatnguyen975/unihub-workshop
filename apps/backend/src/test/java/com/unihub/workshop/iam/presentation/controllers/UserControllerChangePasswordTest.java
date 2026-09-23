@@ -94,7 +94,7 @@ class UserControllerChangePasswordTest {
         doThrow(
             new ValidationException(
                 "currentPassword",
-                "Current password does not match"
+                "Current password is incorrect."
             )
         )
             .when(changeUserPasswordUseCase)
@@ -309,5 +309,122 @@ class UserControllerChangePasswordTest {
             );
 
         verifyNoInteractions(changeUserPasswordUseCase);
+    }
+
+    @Test
+    void shouldReturn400_whenRequestBodyIsMissing() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/password")
+                    .principal(createAuth(CURRENT_SESSION_ID.toString()))
+                    .contentType(MediaType.APPLICATION_JSON)
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verifyNoInteractions(changeUserPasswordUseCase);
+    }
+
+    @Test
+    void shouldReturn400_whenRequestBodyIsMalformedJson() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/password")
+                    .principal(createAuth(CURRENT_SESSION_ID.toString()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{ \"currentPassword\": \"abc\", }")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verifyNoInteractions(changeUserPasswordUseCase);
+    }
+
+    @Test
+    void shouldReturn415_whenUnsupportedMediaType() throws Exception {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/password")
+                    .principal(createAuth(CURRENT_SESSION_ID.toString()))
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .content("currentPassword=OldPassword123!")
+            )
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value(
+                    "urn:unihub:error:unsupported-media-type"
+                )
+            );
+
+        verifyNoInteractions(changeUserPasswordUseCase);
+    }
+
+    @Test
+    void shouldReturn401_whenAccountIsDeactivated() throws Exception {
+        doThrow(
+            new com.unihub.workshop.shared.exception.UnauthorizedException(
+                "Account is deactivated"
+            )
+        )
+            .when(changeUserPasswordUseCase)
+            .changePassword(any(), any(), any(), any());
+
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/password")
+                    .principal(createAuth(CURRENT_SESSION_ID.toString()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                            "currentPassword": "OldPassword123!",
+                            "newPassword": "NewPassword456@"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            );
+    }
+
+    @Test
+    void shouldReturn401_whenUserNotFound() throws Exception {
+        doThrow(
+            new com.unihub.workshop.shared.exception.UnauthorizedException(
+                "User not found"
+            )
+        )
+            .when(changeUserPasswordUseCase)
+            .changePassword(any(), any(), any(), any());
+
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/password")
+                    .principal(createAuth(CURRENT_SESSION_ID.toString()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                            "currentPassword": "OldPassword123!",
+                            "newPassword": "NewPassword456@"
+                        }
+                        """
+                    )
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            );
     }
 }

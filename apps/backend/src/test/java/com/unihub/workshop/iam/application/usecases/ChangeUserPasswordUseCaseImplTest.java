@@ -8,7 +8,6 @@ import com.unihub.workshop.iam.application.ports.in.RevokeAllOtherSessionsUseCas
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
-import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.exception.ValidationException;
@@ -167,7 +166,7 @@ class ChangeUserPasswordUseCaseImplTest {
             )
         )
             .isInstanceOf(ValidationException.class)
-            .hasMessageContaining("Current password does not match");
+            .hasMessageContaining("Current password is incorrect.");
 
         verifyNoInteractions(revokeAllOtherSessionsUseCase);
         verify(userRepository, never()).save(any());
@@ -241,17 +240,74 @@ class ChangeUserPasswordUseCaseImplTest {
     }
 
     @Test
-    void shouldThrowBadRequestException_whenSidIsNull() {
+    void shouldThrowUnauthorizedException_whenAccountIsDeactivated() {
+        User user = new User(
+            USER_ID,
+            null,
+            UserRole.STUDENT,
+            "alice@university.edu",
+            "+84912345678",
+            STORED_HASH,
+            "Alice Smith",
+            null,
+            false, // deactivated
+            false,
+            Instant.now(),
+            null,
+            Instant.now().minusSeconds(86400),
+            Instant.now().minusSeconds(86400),
+            null,
+            null
+        );
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
         assertThatThrownBy(() ->
             useCase.changePassword(
                 USER_ID,
-                null,
+                CURRENT_SESSION_ID,
                 CURRENT_PASSWORD,
                 NEW_PASSWORD
             )
         )
-            .isInstanceOf(BadRequestException.class)
-            .hasMessageContaining("Current session ID (sid) is required");
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("Account is deactivated");
+
+        verifyNoInteractions(revokeAllOtherSessionsUseCase);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowUnauthorizedException_whenUserIdIsNull() {
+        assertThatThrownBy(() ->
+            useCase.changePassword(
+                null,
+                CURRENT_SESSION_ID,
+                CURRENT_PASSWORD,
+                NEW_PASSWORD
+            )
+        )
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("User not found");
+
+        verifyNoInteractions(revokeAllOtherSessionsUseCase);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowValidationException_whenCurrentPasswordIsNull() {
+        User user = createSampleUser();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() ->
+            useCase.changePassword(
+                USER_ID,
+                CURRENT_SESSION_ID,
+                null,
+                NEW_PASSWORD
+            )
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("Current password is incorrect.");
 
         verifyNoInteractions(revokeAllOtherSessionsUseCase);
         verify(userRepository, never()).save(any());

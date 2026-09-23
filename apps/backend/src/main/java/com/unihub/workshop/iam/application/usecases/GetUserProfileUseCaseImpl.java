@@ -21,8 +21,14 @@ public class GetUserProfileUseCaseImpl implements GetUserProfileUseCase {
         if (userId == null) {
             throw new UnauthorizedException("User not found");
         }
-        return userRepository
+        User user = userRepository
             .findById(userId)
             .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Account is deactivated");
+        }
+
+        return user;
     }
 }

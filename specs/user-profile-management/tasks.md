@@ -36,10 +36,10 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerTestBuilder.java` — NEW: test builder for `UserController`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerGetProfileTest.java` — NEW: MockMvc tests for 200 OK (STUDENT, ORGANIZER, STAFF), 401 no token
   - **Acceptance Criteria:**
-    - `GET /api/v1/users/me` with a valid `STUDENT` JWT returns `200 OK` with `data` containing all 9 profile fields; `organizationId` is absent when null; `studentRecordId` is present when set. (FR-01–FR-05, Scenario 1, Scenario 13)
-    - `GET /api/v1/users/me` with a valid `ORGANIZER` JWT returns `200 OK` with `organizationId` present and `studentRecordId` absent. (FR-03, FR-04, Scenario 13)
-    - `GET /api/v1/users/me` without an `Authorization` header returns `401` with `error.type = urn:unihub:error:unauthorized`. (FR-26, Scenario 2)
-    - `User.updateProfile(fullName, phoneNumber, avatarUrl)` returns a new `User` record with the supplied fields updated and `updatedAt` set to now, with all other fields identical. (FR-07, FR-13)
+    - `GET /api/v1/users/me` with a valid `STUDENT` JWT returns `200 OK` with `data` containing all 9 profile fields; `organizationId` is absent when null; `studentRecordId` is present when set. (FR-01–FR-05, Scenario 1, Scenario 15)
+    - `GET /api/v1/users/me` with a valid `ORGANIZER` JWT returns `200 OK` with `organizationId` present and `studentRecordId` absent. (FR-03, FR-04, Scenario 15)
+    - `GET /api/v1/users/me` without an `Authorization` header returns `401` with `error.type = urn:unihub:error:unauthorized`. (FR-28, Scenario 2)
+    - `User.updateProfile(fullName, phoneNumber, avatarUrl)` returns a new `User` record with the supplied fields updated and `updatedAt` set to now, with all other fields identical. (FR-07, FR-14)
     - Full test suite passes, including `ModulithArchitectureTest`.
 
 #### Checkpoint: Phase 1
@@ -65,8 +65,9 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
     - `PATCH /api/v1/users/me` with `{ "phoneNumber": "not-a-phone" }` returns `422` with `error.type = urn:unihub:error:validation` and `validationErrors` listing `phoneNumber`. (FR-10, FR-11, Scenario 5)
     - `PATCH /api/v1/users/me` with `{ "fullName": "   " }` returns `422` with `validationErrors` listing `fullName`. (FR-10, FR-11, Scenario 6)
     - `PATCH /api/v1/users/me` with `{ "email": "hack@evil.com" }` returns `422` with `validationErrors` listing `email` as an unrecognized/immutable field. (FR-08, FR-11, Scenario 7)
-    - After a successful update, the stored user record's `updated_at` reflects the current timestamp and `updated_by` reflects the caller's UUID. (FR-13)
-    - `PATCH /api/v1/users/me` without an `Authorization` header returns `401`. (FR-26)
+    - `PATCH /api/v1/users/me` without a request body returns `400` with `error.type = urn:unihub:error:bad-request`. (FR-12, Scenario 8)
+    - After a successful update, the stored user record's `updated_at` reflects the current timestamp and `updated_by` reflects the caller's UUID. (FR-14)
+    - `PATCH /api/v1/users/me` without an `Authorization` header returns `401`. (FR-28)
     - Full test suite passes, including `ModulithArchitectureTest`.
 
 #### Checkpoint: Phase 2
@@ -88,13 +89,14 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerChangePasswordTest.java` — NEW: MockMvc for 200 OK (data absent, message present, no Retry-After), 422 (wrong password, same, weak, blank), 503 (Redis down, Retry-After header present), 401
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerTestBuilder.java` — UPDATE: add `ChangeUserPasswordUseCase` mock + builder method
   - **Acceptance Criteria:**
-    - `PATCH /api/v1/users/me/password` with valid `currentPassword` and a strength-conforming `newPassword` returns `200 OK` with `success: true`, `message: "Password changed successfully."`, and no `data` key in the JSON. (FR-14, FR-19, FR-22, Scenario 8)
-    - After success, all remote sessions have `revoked_at` set and their `jti` values are in the Redis blacklist; the caller's current session (`sid`) is untouched. (FR-20, FR-21, FR-22, Scenario 8)
-    - `PATCH /api/v1/users/me/password` with incorrect `currentPassword` returns `422` with `validationErrors[0].field = "currentPassword"`. (FR-15, FR-16, Scenario 9)
-    - `PATCH /api/v1/users/me/password` with `newPassword == currentPassword` returns `422`. (FR-17, Scenario 10)
-    - `PATCH /api/v1/users/me/password` with `newPassword = "short"` (fails strength) returns `422` with `validationErrors[0].field = "newPassword"`. (FR-18, Scenario 11)
-    - `PATCH /api/v1/users/me/password` when Redis is unreachable returns `503` with a `Retry-After` header; `password_hash` in the database is **not** changed (verified by asserting `userRepository.save` was never called). (FR-23, BR-06, Scenario 12)
-    - `PATCH /api/v1/users/me/password` without an `Authorization` header returns `401`. (FR-26)
+    - `PATCH /api/v1/users/me/password` with valid `currentPassword` and a strength-conforming `newPassword` returns `200 OK` with `success: true`, `message: "Password changed successfully."`, and no `data` key in the JSON. (FR-15, FR-20, FR-23, Scenario 9)
+    - After success, all remote sessions have `revoked_at` set and their `jti` values are in the Redis blacklist; the caller's current session (`sid`) is untouched. (FR-21, FR-22, FR-23, Scenario 9)
+    - `PATCH /api/v1/users/me/password` with incorrect `currentPassword` returns `422` with `validationErrors[0].field = "currentPassword"`. (FR-16, FR-17, Scenario 10)
+    - `PATCH /api/v1/users/me/password` with `newPassword == currentPassword` returns `422`. (FR-18, Scenario 11)
+    - `PATCH /api/v1/users/me/password` with `newPassword = "short"` (fails strength) returns `422` with `validationErrors[0].field = "newPassword"`. (FR-19, Scenario 12)
+    - `PATCH /api/v1/users/me/password` when Redis is unreachable returns `503` with a `Retry-After` header; `password_hash` in the database is **not** changed (verified by asserting `userRepository.save` was never called). (FR-24, BR-06, Scenario 13)
+    - `PATCH /api/v1/users/me/password` without a request body returns `400` with `error.type = urn:unihub:error:bad-request`. (FR-27, Scenario 14)
+    - `PATCH /api/v1/users/me/password` without an `Authorization` header returns `401`. (FR-28)
     - Full test suite passes, including `ModulithArchitectureTest` and all existing `AuthController` tests.
 
 #### Checkpoint: Feature Complete

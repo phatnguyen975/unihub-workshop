@@ -76,6 +76,36 @@ class GetUserProfileUseCaseImplTest {
     }
 
     @Test
+    void shouldThrowUnauthorizedException_whenAccountIsDeactivated() {
+        UUID userId = UUID.randomUUID();
+        User inactiveUser = new User(
+            userId,
+            null,
+            UserRole.STUDENT,
+            "banned@student.hcmut.edu.vn",
+            null,
+            "hash",
+            "Banned User",
+            null,
+            false,
+            false,
+            null,
+            null,
+            Instant.now(),
+            Instant.now(),
+            null,
+            null
+        );
+        when(userRepository.findById(userId)).thenReturn(
+            Optional.of(inactiveUser)
+        );
+
+        assertThatThrownBy(() -> useCase.getProfile(userId))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("Account is deactivated");
+    }
+
+    @Test
     void shouldRouteToPrimaryDatabase_whenGettingProfile()
         throws NoSuchMethodException {
         var method = GetUserProfileUseCaseImpl.class.getMethod(

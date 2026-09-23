@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.unihub.workshop.iam.application.ports.in.GetUserProfileUseCase;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -204,6 +205,48 @@ class UserControllerGetProfileTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(
                 jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            );
+    }
+
+    @Test
+    void shouldReturn401_whenUserNotFoundInRepository() throws Exception {
+        when(getUserProfileUseCase.getProfile(USER_ID)).thenThrow(
+            new UnauthorizedException("User not found")
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/users/me").principal(
+                    createAuth(USER_ID, "STUDENT")
+                )
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            )
+            .andExpect(jsonPath("$.error.detail").value("User not found"));
+    }
+
+    @Test
+    void shouldReturn401_whenAccountIsDeactivated() throws Exception {
+        when(getUserProfileUseCase.getProfile(USER_ID)).thenThrow(
+            new UnauthorizedException("Account is deactivated")
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/users/me").principal(
+                    createAuth(USER_ID, "STUDENT")
+                )
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value("Account is deactivated")
             );
     }
 }

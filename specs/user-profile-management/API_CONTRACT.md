@@ -96,7 +96,7 @@ None.
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-26, FR-27, Scenario 1, Scenario 2, Scenario 13.
+- **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-28, FR-29, Scenario 1, Scenario 2, Scenario 15.
 
 ### PATCH /api/v1/users/me
 
@@ -171,6 +171,7 @@ None.
 
 | Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                                                                |
 | :-------------------------- | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Missing request body, malformed JSON syntax, or unparseable body.                                                                                                                                        |
 | `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer token.                                                                                                                                  |
 | `422 Unprocessable Content` | `urn:unihub:error:validation`   | Unprocessable Content | One or more fields fail their validation constraint (blank `fullName`, invalid `phoneNumber` format, invalid `avatarUrl` URL, or immutable field sent). `validationErrors` array is included in `error`. |
 | `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server failure.                                                                                                                                                                               |
@@ -207,7 +208,7 @@ None.
 
 #### Spec Traceability
 
-- **Satisfies:** FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-26, FR-27, Scenario 3, Scenario 4, Scenario 5, Scenario 6, Scenario 7.
+- **Satisfies:** FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-14, FR-28, FR-29, Scenario 3, Scenario 4, Scenario 5, Scenario 6, Scenario 7, Scenario 8.
 
 ### PATCH /api/v1/users/me/password
 
@@ -265,6 +266,7 @@ None.
 
 | Status                      | Error Type (`error.type`)              | Title                 | Condition                                                                                                                                                                                                        |
 | :-------------------------- | :------------------------------------- | :-------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`         | Bad Request           | Missing request body, malformed JSON syntax, or unparseable body.                                                                                                                                                |
 | `401 Unauthorized`          | `urn:unihub:error:unauthorized`        | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer token.                                                                                                                                          |
 | `422 Unprocessable Content` | `urn:unihub:error:validation`          | Unprocessable Content | Any of: `currentPassword` does not match stored hash; `newPassword` equals `currentPassword`; `newPassword` fails strength requirements; either field is blank. `validationErrors` array is included in `error`. |
 | `503 Service Unavailable`   | `urn:unihub:error:service-unavailable` | Service Unavailable   | Redis cluster is unreachable (fail-closed per ADR-010). No password hash updated, no sessions revoked. Response includes `Retry-After` header (configurable via `app.http.retry-after-seconds`, default 30 s).   |
@@ -306,11 +308,11 @@ Upon a **successful** request (all validations pass, Redis is reachable):
 5. The caller's current session (`sid`) and its associated access token remain unmodified in both PostgreSQL and Redis.
 
 > [!CAUTION]
-> Steps 1–4 form an atomic unit. If Redis is unreachable (step 4 cannot proceed), the entire operation is aborted before step 1 executes. The system does **not** update the password hash and then fail to blacklist sessions (fail-closed per ADR-010, FR-23, BR-06).
+> Steps 1–4 form an atomic unit. If Redis is unreachable (step 4 cannot proceed), the entire operation is aborted before step 1 executes. The system does **not** update the password hash and then fail to blacklist sessions (fail-closed per ADR-010, FR-24, BR-06).
 
 #### Spec Traceability
 
-- **Satisfies:** FR-14, FR-15, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-22, FR-23, FR-24, FR-25, FR-26, FR-27, Scenario 8, Scenario 9, Scenario 10, Scenario 11, Scenario 12.
+- **Satisfies:** FR-15, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-22, FR-23, FR-24, FR-25, FR-26, FR-27, FR-28, FR-29, Scenario 9, Scenario 10, Scenario 11, Scenario 12, Scenario 13, Scenario 14.
 
 ## 4. Rate Limiting Behavior
 
@@ -320,7 +322,7 @@ All three endpoints are subject to the platform's standard **Default Tier** Buck
 - **Bucket Keying:** Keyed by authenticated user identifier (`jwt.sub`).
 - **Bucket Configuration:** Configuration-driven via `rate-limit.default-tier` in `application.yml` (default: capacity 100 tokens, refill 100 tokens per 60 seconds).
 - **On Limit Exceeded:** Returns HTTP `429 Too Many Requests` with RFC 7807 problem type `urn:unihub:error:rate-limited`, headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After`, and `Retry-After`.
-- **Fail-Open Policy:** If Redis is unavailable for rate-limit checks, the filter allows the request through and emits telemetry (ADR-019). This is strictly distinct from the fail-closed Redis policy on the password-change blacklist write (FR-23, BR-06).
+- **Fail-Open Policy:** If Redis is unavailable for rate-limit checks, the filter allows the request through and emits telemetry (ADR-019). This is strictly distinct from the fail-closed Redis policy on the password-change blacklist write (FR-24, BR-06).
 
 ### Endpoint Routing Summary
 

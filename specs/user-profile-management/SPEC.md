@@ -49,28 +49,30 @@ This feature provides authenticated users of any role (`STUDENT`, `ORGANIZER`, `
   - `phoneNumber`: must either be `null` (to clear the stored value) or, if non-null, match the international format pattern `^\+?[0-9]{8,15}$`; maximum 20 characters.
   - `avatarUrl`: must either be `null` (to clear the stored value) or, if non-null, be a well-formed absolute URL; maximum 2048 characters.
 - **FR-11:** The system SHALL reject a profile update request with `422 Unprocessable Content` when any supplied field fails its validation constraint defined in FR-10, including the full list of offending fields in `validationErrors`.
-- **FR-12:** The system SHALL route all profile update writes to the primary database.
-- **FR-13:** The system SHALL set the `updated_at` audit timestamp to the current UTC time and `updated_by` to the caller's UUID on each successful profile update.
+- **FR-12:** The system SHALL reject a profile update request with `400 Bad Request` when the request body is missing or contains malformed JSON syntax.
+- **FR-13:** The system SHALL route all profile update writes to the primary database.
+- **FR-14:** The system SHALL set the `updated_at` audit timestamp to the current UTC time and `updated_by` to the caller's UUID on each successful profile update.
 
 ### Password Change
 
-- **FR-14:** The system SHALL allow an authenticated caller to change their own account password by providing a `currentPassword` and a `newPassword`.
-- **FR-15:** The system SHALL verify that `currentPassword` matches the stored password hash for the caller's account using the platform's standard password verification algorithm (Argon2) before performing any mutation.
-- **FR-16:** The system SHALL reject a password change request with `422 Unprocessable Content` when `currentPassword` does not match the stored hash, without altering any stored value.
-- **FR-17:** The system SHALL reject a password change request with `422 Unprocessable Content` when `newPassword` is identical to `currentPassword`.
-- **FR-18:** The system SHALL enforce the following password strength requirements on `newPassword`: minimum 8 characters, maximum 255 characters, containing at least one uppercase letter, one lowercase letter, one digit, and one special character.
-- **FR-19:** The system SHALL hash `newPassword` using Argon2 and atomically persist the resulting hash as the new `password_hash` for the caller's account only after all validations pass and Redis is reachable.
-- **FR-20:** Upon a successful password change, the system SHALL revoke all active refresh-token sessions belonging to the caller **except** the caller's current session (identified by the `sid` claim of the presented JWT), by setting `revoked_at = NOW()` on each affected `refresh_tokens` record in the primary database.
-- **FR-21:** For each remote session revoked under FR-20, the system SHALL write the associated active access token `jti` to the Redis JTI blacklist with a TTL equal to the remaining validity duration of that token (`exp - NOW()`).
-- **FR-22:** The system SHALL preserve the caller's current session (identified by `sid`) unmodified in both the database and the Redis blacklist, ensuring the caller remains authenticated without interruption.
-- **FR-23:** The system SHALL enforce a fail-closed policy on the Redis blacklist write: if Redis is unreachable at the time of the password change request, the system SHALL abort the entire operation (no password hash update, no session revocations) and return `503 Service Unavailable` with a `Retry-After` header.
-- **FR-24:** The system SHALL route all password change reads and writes to the primary database.
-- **FR-25:** The system SHALL set `updated_at` to the current UTC time and `updated_by` to the caller's UUID on each successful password change.
+- **FR-15:** The system SHALL allow an authenticated caller to change their own account password by providing a `currentPassword` and a `newPassword`.
+- **FR-16:** The system SHALL verify that `currentPassword` matches the stored password hash for the caller's account using the platform's standard password verification algorithm (Argon2) before performing any mutation.
+- **FR-17:** The system SHALL reject a password change request with `422 Unprocessable Content` when `currentPassword` does not match the stored hash, without altering any stored value.
+- **FR-18:** The system SHALL reject a password change request with `422 Unprocessable Content` when `newPassword` is identical to `currentPassword`.
+- **FR-19:** The system SHALL enforce the following password strength requirements on `newPassword`: minimum 8 characters, maximum 255 characters, containing at least one uppercase letter, one lowercase letter, one digit, and one special character.
+- **FR-20:** The system SHALL hash `newPassword` using Argon2 and atomically persist the resulting hash as the new `password_hash` for the caller's account only after all validations pass and Redis is reachable.
+- **FR-21:** Upon a successful password change, the system SHALL revoke all active refresh-token sessions belonging to the caller **except** the caller's current session (identified by the `sid` claim of the presented JWT), by setting `revoked_at = NOW()` on each affected `refresh_tokens` record in the primary database.
+- **FR-22:** For each remote session revoked under FR-21, the system SHALL write the associated active access token `jti` to the Redis JTI blacklist with a TTL equal to the remaining validity duration of that token (`exp - NOW()`).
+- **FR-23:** The system SHALL preserve the caller's current session (identified by `sid`) unmodified in both the database and the Redis blacklist, ensuring the caller remains authenticated without interruption.
+- **FR-24:** The system SHALL enforce a fail-closed policy on the Redis blacklist write: if Redis is unreachable at the time of the password change request, the system SHALL abort the entire operation (no password hash update, no session revocations) and return `503 Service Unavailable` with a `Retry-After` header.
+- **FR-25:** The system SHALL route all password change reads and writes to the primary database.
+- **FR-26:** The system SHALL set `updated_at` to the current UTC time and `updated_by` to the caller's UUID on each successful password change.
+- **FR-27:** The system SHALL reject a password change request with `400 Bad Request` when the request body is missing or contains malformed JSON syntax.
 
 ### Security & Access Control
 
-- **FR-26:** The system SHALL reject any request to any endpoint in this feature that does not present a valid, unexpired, non-revoked JWT Bearer access token with `401 Unauthorized`.
-- **FR-27:** The system SHALL enforce that all operations (profile read, profile update, password change) act exclusively on the account whose `id` matches the `sub` claim of the caller's JWT; no path parameter, query parameter, or body field may override this identity binding.
+- **FR-28:** The system SHALL reject any request to any endpoint in this feature that does not present a valid, unexpired, non-revoked JWT Bearer access token with `401 Unauthorized`.
+- **FR-29:** The system SHALL enforce that all operations (profile read, profile update, password change) act exclusively on the account whose `id` matches the `sub` claim of the caller's JWT; no path parameter, query parameter, or body field may override this identity binding.
 
 ## 4. Business Rules
 
@@ -104,9 +106,9 @@ This feature does not introduce a new stateful entity. State changes are field-l
 - **Performance:** Profile retrieval is a single primary-key lookup; target p99 ≤ 50 ms. Profile update and password change are single-row read + write; target p99 ≤ 200 ms (excluding Redis roundtrip for password flow).
 - **Concurrency:** Concurrent profile updates by the same user are handled by JPA `@DynamicUpdate` (only dirty columns flushed), which is acceptable for profile fields. Password change read-then-write must be performed within a single database transaction to prevent TOCTOU races on the hash comparison.
 - **Idempotency:** Profile update (`PATCH /api/v1/users/me`) is naturally idempotent for the same payload. Password change is not idempotent (second call with same `currentPassword` fails because the hash has already changed); no `Idempotency-Key` header is required.
-- **Rate Limiting:** All endpoints are subject to the Default Tier Bucket4j Token Bucket filter (keyed by `jwt.sub`), operating fail-open on Redis unavailability for rate-limit checks (ADR-019). The Redis fail-closed policy (FR-23) applies only to the password change blacklist write, not to the rate-limit check.
+- **Rate Limiting:** All endpoints are subject to the Default Tier Bucket4j Token Bucket filter (keyed by `jwt.sub`), operating fail-open on Redis unavailability for rate-limit checks (ADR-019). The Redis fail-closed policy (FR-24) applies only to the password change blacklist write, not to the rate-limit check.
 - **Security:** The `password_hash` field must never appear in any API response. Argon2 is the mandatory hashing algorithm, consistent with the rest of the IAM module. All inputs crossing the trust boundary are validated. Error messages must not leak whether a particular email or user ID exists.
-- **Reliability:** Profile retrieval and update are non-critical paths (fail with `500` on DB error). Password change is a security-critical path with explicit fail-closed semantics on the Redis step (FR-23, BR-06).
+- **Reliability:** Profile retrieval and update are non-critical paths (fail with `500` on DB error). Password change is a security-critical path with explicit fail-closed semantics on the Redis step (FR-24, BR-06).
 - **Observability:** Standard Micrometer → Prometheus → Grafana instrumentation. Request logs include `traceId`, HTTP method/URI, status, duration, and `processedBy` per `docs/api-standards.md §API Logging`.
 
 ## 7. Acceptance Criteria
@@ -134,7 +136,7 @@ Then the response status is 401 Unauthorized
 And error.type is urn:unihub:error:unauthorized
 ```
 
-> Satisfies: FR-26
+> Satisfies: FR-28
 
 ### Scenario 3: Successful partial profile update — fullName only
 
@@ -200,7 +202,18 @@ And the email value in the database is unchanged
 
 > Satisfies: FR-08, FR-11
 
-### Scenario 8: Successful password change with remote session revocation
+### Scenario 8: Profile update rejected — missing request body
+
+```gherkin
+Given an authenticated user with a valid JWT
+When the user sends PATCH /api/v1/users/me without a request body
+Then the response status is 400 Bad Request
+And error.type is urn:unihub:error:bad-request
+```
+
+> Satisfies: FR-12
+
+### Scenario 9: Successful password change with remote session revocation
 
 ```gherkin
 Given an authenticated user with a valid JWT (sid = session-A) and two other active sessions (session-B, session-C)
@@ -214,9 +227,9 @@ And the jti values of session-B and session-C tokens are written to Redis blackl
 And session-A remains active with revoked_at = NULL
 ```
 
-> Satisfies: FR-14, FR-15, FR-19, FR-20, FR-21, FR-22
+> Satisfies: FR-15, FR-16, FR-20, FR-21, FR-22, FR-23
 
-### Scenario 9: Password change rejected — wrong current password
+### Scenario 10: Password change rejected — wrong current password
 
 ```gherkin
 Given an authenticated user with a valid JWT
@@ -226,9 +239,9 @@ And error.type is urn:unihub:error:validation
 And password_hash in the database is unchanged
 ```
 
-> Satisfies: FR-15, FR-16
+> Satisfies: FR-16, FR-17
 
-### Scenario 10: Password change rejected — new password same as current
+### Scenario 11: Password change rejected — new password same as current
 
 ```gherkin
 Given an authenticated user with a valid JWT and current password "Same@Password1"
@@ -238,9 +251,9 @@ And error.type is urn:unihub:error:validation
 And validationErrors notes the new password must differ from the current password
 ```
 
-> Satisfies: FR-17
+> Satisfies: FR-18
 
-### Scenario 11: Password change rejected — weak new password
+### Scenario 12: Password change rejected — weak new password
 
 ```gherkin
 Given an authenticated user with a valid JWT
@@ -250,9 +263,9 @@ And error.type is urn:unihub:error:validation
 And validationErrors lists the password strength constraint violation
 ```
 
-> Satisfies: FR-18
+> Satisfies: FR-19
 
-### Scenario 12: Password change aborted — Redis unavailable
+### Scenario 13: Password change aborted — Redis unavailable
 
 ```gherkin
 Given an authenticated user with a valid JWT
@@ -264,9 +277,20 @@ And the response includes a Retry-After header
 And password_hash in the database is unchanged
 ```
 
-> Satisfies: FR-23
+> Satisfies: FR-24
 
-### Scenario 13: One user cannot retrieve another user's profile via this endpoint
+### Scenario 14: Password change rejected — missing request body
+
+```gherkin
+Given an authenticated user with a valid JWT
+When the user sends PATCH /api/v1/users/me/password without a request body
+Then the response status is 400 Bad Request
+And error.type is urn:unihub:error:bad-request
+```
+
+> Satisfies: FR-27
+
+### Scenario 15: One user cannot retrieve another user's profile via this endpoint
 
 ```gherkin
 Given authenticated user A with a valid JWT (sub = userId-A)
@@ -275,7 +299,7 @@ Then the response reflects only userId-A's profile
 And there is no mechanism to supply userId-B to retrieve another user's data through this endpoint
 ```
 
-> Satisfies: FR-02, FR-27
+> Satisfies: FR-02, FR-29
 
 ## 8. Out of Scope
 

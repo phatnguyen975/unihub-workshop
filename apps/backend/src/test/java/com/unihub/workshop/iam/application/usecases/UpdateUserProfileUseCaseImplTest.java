@@ -222,4 +222,100 @@ class UpdateUserProfileUseCaseImplTest {
             .isInstanceOf(UnauthorizedException.class)
             .hasMessage("User not found");
     }
+
+    @Test
+    void shouldThrowUnauthorizedException_whenUserIdIsNull() {
+        UpdateUserProfileCommand command = new UpdateUserProfileCommand(
+            "New Name",
+            true,
+            null,
+            false,
+            null,
+            false
+        );
+
+        assertThatThrownBy(() -> useCase.updateProfile(null, command))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("User not found");
+    }
+
+    @Test
+    void shouldThrowUnauthorizedException_whenAccountIsDeactivated() {
+        User deactivated = new User(
+            USER_ID,
+            ORG_ID,
+            UserRole.STUDENT,
+            "student@university.edu",
+            "+84912345678",
+            "hash",
+            "Alice Smith",
+            "https://cdn.unihub.vn/avatar.jpg",
+            false, // deactivated
+            false,
+            Instant.now(),
+            STUDENT_RECORD_ID,
+            Instant.now().minusSeconds(3600),
+            Instant.now().minusSeconds(3600),
+            null,
+            null
+        );
+        when(userRepository.findById(USER_ID)).thenReturn(
+            Optional.of(deactivated)
+        );
+
+        UpdateUserProfileCommand command = new UpdateUserProfileCommand(
+            "New Name",
+            true,
+            null,
+            false,
+            null,
+            false
+        );
+
+        assertThatThrownBy(() -> useCase.updateProfile(USER_ID, command))
+            .isInstanceOf(UnauthorizedException.class)
+            .hasMessage("Account is deactivated");
+    }
+
+    @Test
+    void shouldThrowValidationException_whenFullNameProvidedAsNullInCommand() {
+        User existing = createSampleUser();
+        when(userRepository.findById(USER_ID)).thenReturn(
+            Optional.of(existing)
+        );
+
+        UpdateUserProfileCommand command = new UpdateUserProfileCommand(
+            null,
+            true,
+            null,
+            false,
+            null,
+            false
+        );
+
+        assertThatThrownBy(() -> useCase.updateProfile(USER_ID, command))
+            .isInstanceOf(ValidationException.class)
+            .hasMessage("Full name may not be set to null");
+    }
+
+    @Test
+    void shouldThrowValidationException_whenFullNameProvidedAsBlankInCommand() {
+        User existing = createSampleUser();
+        when(userRepository.findById(USER_ID)).thenReturn(
+            Optional.of(existing)
+        );
+
+        UpdateUserProfileCommand command = new UpdateUserProfileCommand(
+            "   ",
+            true,
+            null,
+            false,
+            null,
+            false
+        );
+
+        assertThatThrownBy(() -> useCase.updateProfile(USER_ID, command))
+            .isInstanceOf(ValidationException.class)
+            .hasMessage("Full name must not be blank");
+    }
 }

@@ -9,7 +9,6 @@ import com.unihub.workshop.iam.presentation.dto.ChangePasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.UpdateProfileRequest;
 import com.unihub.workshop.iam.presentation.dto.UserProfileResponse;
 import com.unihub.workshop.iam.presentation.mapper.UserPresentationMapper;
-import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import jakarta.validation.Valid;
@@ -48,12 +47,9 @@ public class UserController {
     @PatchMapping("/me")
     public ApiResponse<UserProfileResponse> updateMyProfile(
         Authentication authentication,
-        @RequestBody(required = false) Map<String, Object> body
+        @RequestBody Map<String, Object> body
     ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
-        if (body == null) {
-            throw new ValidationException("Request body must not be null");
-        }
         UpdateProfileRequest request = UpdateProfileRequest.from(body);
         UpdateUserProfileCommand command = request.toCommand();
         User updated = updateUserProfileUseCase.updateProfile(userId, command);
@@ -66,11 +62,8 @@ public class UserController {
     @PatchMapping("/me/password")
     public ApiResponse<Void> changeMyPassword(
         Authentication authentication,
-        @Valid @RequestBody(required = false) ChangePasswordRequest request
+        @Valid @RequestBody ChangePasswordRequest request
     ) {
-        if (request == null) {
-            throw new ValidationException("Request body must not be null");
-        }
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         UUID currentSessionId = SecurityContextUtils.extractSessionId(
             authentication
