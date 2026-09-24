@@ -21,8 +21,20 @@ public interface IngestionJobReportJpaRepository
         """
         SELECT r FROM IngestionJobReportJpaEntity r
         WHERE r.organizationId = :orgId
+        ORDER BY r.completedAt DESC, r.id DESC
+        """
+    )
+    List<IngestionJobReportJpaEntity> findFirstPage(
+        @Param("orgId") UUID orgId,
+        Pageable pageable
+    );
+
+    @Query(
+        """
+        SELECT r FROM IngestionJobReportJpaEntity r
+        WHERE r.organizationId = :orgId
             AND (
-                :cursorTime IS NULL OR r.completedAt < :cursorTime
+                r.completedAt < :cursorTime
                 OR (r.completedAt = :cursorTime AND r.id < :cursorId)
             )
         ORDER BY r.completedAt DESC, r.id DESC

@@ -7,8 +7,10 @@ import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.IngestionJobReportPersistenceMapperImpl;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
@@ -130,6 +132,52 @@ class IngestionJobReportRepositoryAdapterTest {
         assertThrows(BadRequestException.class, () ->
             adapter.findByOrganizationId(orgId, "invalid-base64-cursor", 10)
         );
+    }
+
+    @Test
+    void findByOrganizationId_cursorWithEmptyJson_throwsBadRequestException() {
+        UUID orgId = UUID.randomUUID();
+        String emptyJsonCursor = Base64.getEncoder().encodeToString(
+            "{}".getBytes(StandardCharsets.UTF_8)
+        );
+        assertThrows(BadRequestException.class, () ->
+            adapter.findByOrganizationId(orgId, emptyJsonCursor, 10)
+        );
+    }
+
+    @Test
+    void findByOrganizationId_cursorWithNullFields_throwsBadRequestException() {
+        UUID orgId = UUID.randomUUID();
+        String nullFieldsCursor = Base64.getEncoder().encodeToString(
+            "{\"completedAt\": null, \"id\": null}".getBytes(
+                StandardCharsets.UTF_8
+            )
+        );
+        assertThrows(BadRequestException.class, () ->
+            adapter.findByOrganizationId(orgId, nullFieldsCursor, 10)
+        );
+    }
+
+    @Test
+    void findByOrganizationId_cursorWithWhitespace_decodesSuccessfully() {
+        UUID orgId = UUID.randomUUID();
+        createEntity(orgId, Instant.now());
+        createEntity(orgId, Instant.now().minusSeconds(10));
+
+        CursorPage<IngestionJobReport> page1 = adapter.findByOrganizationId(
+            orgId,
+            null,
+            1
+        );
+        assertNotNull(page1.nextCursor());
+
+        String whitespaceCursor = "   " + page1.nextCursor() + "   \n";
+        CursorPage<IngestionJobReport> page2 = adapter.findByOrganizationId(
+            orgId,
+            whitespaceCursor,
+            1
+        );
+        assertEquals(1, page2.items().size());
     }
 
     private IngestionJobReportJpaEntity createEntity(UUID orgId, Instant time) {

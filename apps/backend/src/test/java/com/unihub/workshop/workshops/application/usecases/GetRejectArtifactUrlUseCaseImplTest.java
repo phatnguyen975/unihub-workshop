@@ -3,6 +3,7 @@ package com.unihub.workshop.workshops.application.usecases;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import com.unihub.workshop.workshops.application.ports.out.ArtifactPresignPort;
@@ -183,5 +184,21 @@ class GetRejectArtifactUrlUseCaseImplTest {
             useCase.execute(JOB_ID, ORG_ID)
         );
         assertTrue(ex.getMessage().contains("IngestionJobReport not found"));
+    }
+
+    @Test
+    void execute_WhenJobIdNull_ThrowsBadRequestException() {
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+            useCase.execute(null, ORG_ID)
+        );
+        assertEquals("jobId must not be null", ex.getMessage());
+    }
+
+    @Test
+    void execute_WhenOrganizationIdNull_ThrowsBadRequestException() {
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+            useCase.execute(JOB_ID, null)
+        );
+        assertEquals("organizationId must not be null", ex.getMessage());
     }
 }
