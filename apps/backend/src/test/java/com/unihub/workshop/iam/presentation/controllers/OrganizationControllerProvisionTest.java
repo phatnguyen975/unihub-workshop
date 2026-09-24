@@ -351,4 +351,173 @@ class OrganizationControllerProvisionTest {
                 jsonPath("$.error.type").value("urn:unihub:error:forbidden")
             );
     }
+
+    @Test
+    void shouldReturn201_whenPhoneNumberIsBlank_andConvertedToNull()
+        throws Exception {
+        UUID newUserId = UUID.randomUUID();
+        String payload = """
+        {
+            "email": "staff.nophone@techclub.org",
+            "fullName": "No Phone Staff",
+            "phoneNumber": "   ",
+            "role": "STAFF"
+        }
+        """;
+
+        User createdUser = new User(
+            newUserId,
+            ORG_ID,
+            UserRole.STAFF,
+            "staff.nophone@techclub.org",
+            null,
+            "argon2hash",
+            "No Phone Staff",
+            null,
+            true,
+            true,
+            null,
+            null,
+            Instant.now(),
+            Instant.now(),
+            CALLER_ID,
+            CALLER_ID
+        );
+
+        when(
+            provisionUserUseCase.execute(any(ProvisionUserCommand.class))
+        ).thenReturn(createdUser);
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/organizations/users")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(payload)
+                    .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.userId").value(newUserId.toString()))
+            .andExpect(
+                jsonPath("$.data.email").value("staff.nophone@techclub.org")
+            );
+
+        verify(provisionUserUseCase).execute(
+            new ProvisionUserCommand(
+                ORG_ID,
+                CALLER_ID,
+                "staff.nophone@techclub.org",
+                "No Phone Staff",
+                null,
+                UserRole.STAFF
+            )
+        );
+    }
+
+    @Test
+    void shouldTrimAndNormalizeInputs_whenPayloadHasLeadingTrailingWhitespace()
+        throws Exception {
+        UUID newUserId = UUID.randomUUID();
+        String payload = """
+        {
+            "email": "  Carol.Staff@TechClub.org  ",
+            "fullName": "  Carol Danvers  ",
+            "phoneNumber": " +84912345678 ",
+            "role": "  staff  "
+        }
+        """;
+
+        User createdUser = new User(
+            newUserId,
+            ORG_ID,
+            UserRole.STAFF,
+            "carol.staff@techclub.org",
+            "+84912345678",
+            "argon2hash",
+            "Carol Danvers",
+            null,
+            true,
+            true,
+            null,
+            null,
+            Instant.now(),
+            Instant.now(),
+            CALLER_ID,
+            CALLER_ID
+        );
+
+        when(
+            provisionUserUseCase.execute(any(ProvisionUserCommand.class))
+        ).thenReturn(createdUser);
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/organizations/users")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(payload)
+                    .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true));
+
+        verify(provisionUserUseCase).execute(
+            new ProvisionUserCommand(
+                ORG_ID,
+                CALLER_ID,
+                "carol.staff@techclub.org",
+                "Carol Danvers",
+                "+84912345678",
+                UserRole.STAFF
+            )
+        );
+    }
+
+    @Test
+    void shouldReturn422_whenPhoneNumberIsInvalidFormat() throws Exception {
+        String payload = """
+        {
+            "email": "user@techclub.org",
+            "fullName": "Test User",
+            "phoneNumber": "12345",
+            "role": "STAFF"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/organizations/users")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(payload)
+                    .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+            )
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            );
+    }
+
+    @Test
+    void shouldReturn422_whenRoleIsNull() throws Exception {
+        String payload = """
+        {
+            "email": "user@techclub.org",
+            "fullName": "Test User",
+            "role": null
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/organizations/users")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(payload)
+                    .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+            )
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            );
+    }
 }

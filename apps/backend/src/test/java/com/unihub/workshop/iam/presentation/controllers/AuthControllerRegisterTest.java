@@ -1,7 +1,9 @@
 package com.unihub.workshop.iam.presentation.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +16,7 @@ import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -317,5 +320,143 @@ class AuthControllerRegisterTest {
             )
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.metadata").exists());
+    }
+
+    @Test
+    void shouldPassRawEmailToUseCaseWithoutModifyingCase() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(
+            registerUserUseCase.register(
+                "ALICE@UNIVERSITY.EDU",
+                "Str0ng!Pass",
+                "Alice Smith"
+            )
+        ).thenReturn(userId);
+
+        String requestBody = """
+        {
+            "email": "ALICE@UNIVERSITY.EDU",
+            "password": "Str0ng!Pass",
+            "fullName": "Alice Smith"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.userId").value(userId.toString()));
+
+        verify(registerUserUseCase).register(
+            "ALICE@UNIVERSITY.EDU",
+            "Str0ng!Pass",
+            "Alice Smith"
+        );
+    }
+
+    @Test
+    void shouldReturn409WhenDataIntegrityViolationOccurs() throws Exception {
+        when(registerUserUseCase.register(any(), any(), any())).thenThrow(
+            new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint"
+            )
+        );
+
+        String requestBody = """
+        {
+            "email": "existing@university.edu",
+            "password": "Str0ng!Pass",
+            "fullName": "Alice Smith"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:conflict")
+            );
+    }
+
+    @Test
+    void shouldTrimWhitespaceFromEmailAndFullNameOnRegister() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(
+            registerUserUseCase.register(
+                "alice@university.edu",
+                "Str0ng!Pass",
+                "Alice Smith"
+            )
+        ).thenReturn(userId);
+
+        String requestBody = """
+        {
+            "email": "   alice@university.edu   ",
+            "password": "Str0ng!Pass",
+            "fullName": "   Alice Smith   "
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.userId").value(userId.toString()));
+
+        verify(registerUserUseCase).register(
+            "alice@university.edu",
+            "Str0ng!Pass",
+            "Alice Smith"
+        );
+    }
+
+    @Test
+    void shouldSerializeResponseInExactOrderSpecifiedByApiStandards()
+        throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(registerUserUseCase.register(any(), any(), any())).thenReturn(
+            userId
+        );
+
+        String requestBody = """
+        {
+            "email": "alice@university.edu",
+            "password": "Str0ng!Pass",
+            "fullName": "Alice Smith"
+        }
+        """;
+
+        String jsonResponse = mockMvc
+            .perform(
+                post("/api/v1/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        int successIdx = jsonResponse.indexOf("\"success\"");
+        int messageIdx = jsonResponse.indexOf("\"message\"");
+        int dataIdx = jsonResponse.indexOf("\"data\"");
+        int metadataIdx = jsonResponse.indexOf("\"metadata\"");
+
+        assertThat(successIdx).isGreaterThanOrEqualTo(0);
+        assertThat(messageIdx).isGreaterThan(successIdx);
+        assertThat(dataIdx).isGreaterThan(messageIdx);
+        assertThat(metadataIdx).isGreaterThan(dataIdx);
     }
 }

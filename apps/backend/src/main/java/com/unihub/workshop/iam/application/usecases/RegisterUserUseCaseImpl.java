@@ -10,10 +10,10 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.events.OtpRequestedEvent;
 import com.unihub.workshop.shared.exception.ConflictException;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
     private final UserRepository userRepository;
@@ -33,7 +34,8 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
     @Override
     @Transactional
     public UUID register(String email, String password, String fullName) {
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail =
+            email != null ? email.toLowerCase().trim() : "";
 
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new ConflictException(
@@ -64,13 +66,21 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
         String otp = otpService.generateOtp();
         String otpHash = otpService.hashOtp(otp);
-        Instant expiresAt = otpService.calculateExpiryInstant();
+
+        // TODO: Remove OTP logging before production deployment once notifications worker is fully active.
+        log.info(
+            "Generated activation OTP for user {} (email: {}): {}",
+            savedUser.id(),
+            savedUser.email(),
+            otp
+        );
 
         UserVerificationToken token = UserVerificationToken.createActivationOtp(
             savedUser.id(),
             otpHash,
-            expiresAt
+            otpService.calculateExpiryInstant()
         );
+
         userVerificationTokenRepository.save(token);
 
         eventPublisher.publishEvent(

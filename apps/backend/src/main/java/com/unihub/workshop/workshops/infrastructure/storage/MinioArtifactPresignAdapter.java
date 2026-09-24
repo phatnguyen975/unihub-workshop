@@ -52,10 +52,6 @@ public class MinioArtifactPresignAdapter implements ArtifactPresignPort {
         this.bucketName = bucketName;
     }
 
-    void setS3Presigner(S3Presigner s3Presigner) {
-        this.s3Presigner = s3Presigner;
-    }
-
     @Override
     public URL generateDownloadUrl(String objectKey, Duration ttl) {
         try {
@@ -80,5 +76,9 @@ public class MinioArtifactPresignAdapter implements ArtifactPresignPort {
                 e
             );
         }
+    }
+
+    public void setS3Presigner(S3Presigner s3Presigner) {
+        this.s3Presigner = s3Presigner;
     }
 }

@@ -6,18 +6,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import com.unihub.workshop.iam.application.ports.out.JtiBlacklistPort;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
+import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.application.ports.out.UserVerificationTokenRepository;
 import com.unihub.workshop.iam.application.utils.OtpService;
+import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,9 +33,10 @@ class ResetPasswordUseCaseImplTest {
     private UserRepository userRepository;
     private UserVerificationTokenRepository userVerificationTokenRepository;
     private RefreshTokenRepository refreshTokenRepository;
+    private SessionTrackerPort sessionTrackerPort;
+    private JtiBlacklistPort jtiBlacklistPort;
     private OtpService otpService;
     private PasswordEncoder passwordEncoder;
-    private MeterRegistry meterRegistry;
     private ResetPasswordUseCaseImpl useCase;
 
     @BeforeEach
@@ -42,19 +46,19 @@ class ResetPasswordUseCaseImplTest {
             UserVerificationTokenRepository.class
         );
         refreshTokenRepository = mock(RefreshTokenRepository.class);
+        sessionTrackerPort = mock(SessionTrackerPort.class);
+        jtiBlacklistPort = mock(JtiBlacklistPort.class);
         otpService = mock(OtpService.class);
         passwordEncoder = mock(PasswordEncoder.class);
-        meterRegistry = new SimpleMeterRegistry();
-
-        when(otpService.hashOtp("000000")).thenReturn("dummyHash");
 
         useCase = new ResetPasswordUseCaseImpl(
             userRepository,
             userVerificationTokenRepository,
             refreshTokenRepository,
+            sessionTrackerPort,
+            jtiBlacklistPort,
             otpService,
-            passwordEncoder,
-            meterRegistry
+            passwordEncoder
         );
     }
 
@@ -104,6 +108,27 @@ class ResetPasswordUseCaseImplTest {
         ).thenReturn(true);
         when(passwordEncoder.encode(newPassword)).thenReturn("argon2NewHash");
 
+        UUID sessionId = UUID.randomUUID();
+        RefreshToken activeSession = RefreshToken.builder()
+            .id(sessionId)
+            .userId(userId)
+            .tokenHash("rtHash123")
+            .expiresAt(Instant.now().plus(Duration.ofDays(7)))
+            .createdAt(Instant.now())
+            .build();
+        when(
+            refreshTokenRepository.findAllActiveSessionsForUser(
+                eq(userId),
+                any(Instant.class)
+            )
+        ).thenReturn(List.of(activeSession));
+        when(sessionTrackerPort.getActiveJti(sessionId)).thenReturn(
+            Optional.of("jti-abc")
+        );
+        when(sessionTrackerPort.getRemainingTtl(sessionId)).thenReturn(
+            Duration.ofMinutes(45)
+        );
+
         useCase.resetPassword(email, otp, newPassword);
 
         verify(userVerificationTokenRepository).markConsumed(token.id());
@@ -114,15 +139,16 @@ class ResetPasswordUseCaseImplTest {
         assertThat(savedUser.passwordHash()).isEqualTo("argon2NewHash");
         assertThat(savedUser.isTemporaryPassword()).isFalse();
 
+        verify(jtiBlacklistPort).blacklistJti(
+            "jti-abc",
+            Duration.ofMinutes(45)
+        );
+        verify(sessionTrackerPort).removeSession(sessionId);
+
         verify(refreshTokenRepository).revokeAllActiveTokensForUser(
             eq(userId),
             any(Instant.class)
         );
-        assertThat(
-            meterRegistry
-                .counter("auth.password.reset.attempts", "outcome", "success")
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -179,48 +205,25 @@ class ResetPasswordUseCaseImplTest {
             any(),
             any()
         );
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.password.reset.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "already_consumed"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
-    void shouldThrowValidationExceptionWhenUserNotFound() {
+    void shouldThrowNotFoundExceptionWhenUserNotFound() {
         String email = "unknown@university.edu";
         when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
             useCase.resetPassword(email, "123456", "Pass1234!")
         )
-            .isInstanceOf(ValidationException.class)
-            .hasMessage("Invalid or expired verification code.");
+            .isInstanceOf(NotFoundException.class)
+            .hasMessage("No account found for this email.");
 
-        verify(otpService).verifyOtp("123456", "dummyHash");
         verify(userVerificationTokenRepository, never()).markConsumed(any());
         verify(userRepository, never()).save(any());
         verify(refreshTokenRepository, never()).revokeAllActiveTokensForUser(
             any(),
             any()
         );
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.password.reset.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "user_not_found"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -247,20 +250,8 @@ class ResetPasswordUseCaseImplTest {
             .isInstanceOf(ValidationException.class)
             .hasMessage("Invalid or expired verification code.");
 
-        verify(otpService).verifyOtp("123456", "dummyHash");
         verify(userVerificationTokenRepository, never()).markConsumed(any());
         verify(userRepository, never()).save(any());
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.password.reset.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "inactive_user"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -437,5 +428,20 @@ class ResetPasswordUseCaseImplTest {
             .hasMessage("Invalid or expired verification code.");
 
         verify(userVerificationTokenRepository, never()).markConsumed(any());
+    }
+
+    @Test
+    void shouldNormalizeEmailBeforeLookup() {
+        String rawEmail = "  Student.Bob@University.EDU  ";
+        String normalizedEmail = "student.bob@university.edu";
+        when(userRepository.findByEmail(normalizedEmail)).thenReturn(
+            Optional.empty()
+        );
+
+        assertThatThrownBy(() ->
+            useCase.resetPassword(rawEmail, "123456", "Pass1234!")
+        ).isInstanceOf(NotFoundException.class);
+
+        verify(userRepository).findByEmail(normalizedEmail);
     }
 }

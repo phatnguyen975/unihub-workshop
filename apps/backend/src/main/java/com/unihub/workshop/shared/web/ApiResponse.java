@@ -1,6 +1,7 @@
 package com.unihub.workshop.shared.web;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,6 +11,7 @@ import lombok.Setter;
 @Builder
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonPropertyOrder({ "success", "message", "data", "error", "metadata" })
 public class ApiResponse<T> {
 
     private final boolean success;
@@ -35,6 +37,7 @@ public class ApiResponse<T> {
     @Getter
     @Builder
     @AllArgsConstructor
+    @JsonPropertyOrder({ "processedBy", "traceId" })
     public static class Metadata {
 
         private final String traceId;

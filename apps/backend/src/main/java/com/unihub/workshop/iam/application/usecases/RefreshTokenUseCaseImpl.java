@@ -11,7 +11,6 @@ import com.unihub.workshop.shared.exception.UnauthorizedException;
 import com.unihub.workshop.shared.security.IssuedToken;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -29,7 +28,6 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
     private final SessionTrackerPort sessionTrackerPort;
     private final JwtTokenIssuer jwtTokenIssuer;
     private final SecurityProperties securityProperties;
-    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional
@@ -42,72 +40,31 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
 
         RefreshToken oldToken = refreshTokenRepository
             .findByTokenHash(tokenHash)
-            .orElseThrow(() -> {
-                meterRegistry
-                    .counter(
-                        "auth.token.refresh",
-                        "outcome",
-                        "failure",
-                        "reason",
-                        "not_found"
-                    )
-                    .increment();
-                return new UnauthorizedException("Invalid refresh token");
-            });
+            .orElseThrow(() ->
+                new UnauthorizedException("Invalid refresh token")
+            );
 
         Instant now = Instant.now();
 
         if (oldToken.revokedAt() != null) {
-            meterRegistry
-                .counter(
-                    "auth.token.refresh",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "revoked"
-                )
-                .increment();
             throw new UnauthorizedException("Invalid refresh token");
         }
 
         if (oldToken.expiresAt().isBefore(now)) {
-            meterRegistry
-                .counter(
-                    "auth.token.refresh",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "expired"
-                )
-                .increment();
             throw new UnauthorizedException("Invalid refresh token");
         }
 
         User user = userRepository
             .findById(oldToken.userId())
-            .orElseThrow(() -> {
-                meterRegistry
-                    .counter(
-                        "auth.token.refresh",
-                        "outcome",
-                        "failure",
-                        "reason",
-                        "user_not_found"
-                    )
-                    .increment();
-                return new UnauthorizedException("Invalid refresh token");
-            });
+            .orElseThrow(() ->
+                new UnauthorizedException("Invalid refresh token")
+            );
 
         if (!user.isActive()) {
-            meterRegistry
-                .counter(
-                    "auth.token.refresh",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "account_disabled"
-                )
-                .increment();
+            throw new UnauthorizedException("Invalid refresh token");
+        }
+
+        if (user.isTemporaryPassword()) {
             throw new UnauthorizedException("Invalid refresh token");
         }
 
@@ -127,13 +84,22 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
             ChronoUnit.DAYS
         );
 
+        String resolvedDevice =
+            userAgent != null && !userAgent.isBlank()
+                ? userAgent
+                : oldToken.deviceInfo();
+        String resolvedIp =
+            ipAddress != null && !ipAddress.isBlank()
+                ? ipAddress
+                : oldToken.ipAddress();
+
         UUID newSessionId = UUID.randomUUID();
         RefreshToken newRefreshToken = RefreshToken.builder()
             .id(newSessionId)
             .userId(user.id())
             .tokenHash(newTokenHash)
-            .deviceInfo(userAgent)
-            .ipAddress(ipAddress)
+            .deviceInfo(resolvedDevice)
+            .ipAddress(resolvedIp)
             .expiresAt(newExpiresAt)
             .createdAt(now)
             .updatedAt(now)
@@ -152,10 +118,6 @@ public class RefreshTokenUseCaseImpl implements RefreshTokenUseCase {
             issuedToken.jti(),
             Duration.ofMinutes(securityProperties.accessTokenTtlMinutes())
         );
-
-        meterRegistry
-            .counter("auth.token.refresh", "outcome", "success")
-            .increment();
 
         return new RefreshResult(
             issuedToken.token(),

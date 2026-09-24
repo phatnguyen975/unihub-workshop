@@ -146,11 +146,9 @@ class UserRepositoryAdapterTest {
         );
 
         when(
-            jpaRepo.findMembers(
+            jpaRepo.findFirstPage(
                 eq(orgId),
                 eq(callerId),
-                isNull(),
-                isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
@@ -215,7 +213,7 @@ class UserRepositoryAdapterTest {
         );
 
         when(
-            jpaRepo.findMembers(
+            jpaRepo.findNextPage(
                 eq(orgId),
                 eq(callerId),
                 eq("STAFF"),
@@ -281,14 +279,12 @@ class UserRepositoryAdapterTest {
         UUID callerId = UUID.randomUUID();
 
         when(
-            jpaRepo.findMembers(
+            jpaRepo.findFirstPage(
                 eq(orgId),
                 eq(callerId),
                 isNull(),
                 isNull(),
                 eq("100\\%\\_test\\\\user"),
-                isNull(),
-                isNull(),
                 eq(PageRequest.of(0, 21))
             )
         ).thenReturn(List.of());
@@ -303,14 +299,12 @@ class UserRepositoryAdapterTest {
             20
         );
 
-        verify(jpaRepo).findMembers(
+        verify(jpaRepo).findFirstPage(
             eq(orgId),
             eq(callerId),
             isNull(),
             isNull(),
             eq("100\\%\\_test\\\\user"),
-            isNull(),
-            isNull(),
             eq(PageRequest.of(0, 21))
         );
     }

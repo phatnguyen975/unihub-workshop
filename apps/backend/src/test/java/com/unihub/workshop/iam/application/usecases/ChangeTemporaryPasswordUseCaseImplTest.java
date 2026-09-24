@@ -17,8 +17,6 @@ import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.IssuedToken;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -36,7 +34,6 @@ class ChangeTemporaryPasswordUseCaseImplTest {
     private JwtTokenIssuer jwtTokenIssuer;
     private SecurityProperties securityProperties;
     private PasswordEncoder passwordEncoder;
-    private MeterRegistry meterRegistry;
     private ChangeTemporaryPasswordUseCaseImpl changeTemporaryPasswordUseCase;
 
     @BeforeEach
@@ -47,13 +44,9 @@ class ChangeTemporaryPasswordUseCaseImplTest {
         jwtTokenIssuer = mock(JwtTokenIssuer.class);
         securityProperties = mock(SecurityProperties.class);
         passwordEncoder = new Argon2PasswordEncoder(16, 32, 1, 4096, 1);
-        meterRegistry = new SimpleMeterRegistry();
 
         when(securityProperties.accessTokenTtlMinutes()).thenReturn(60);
         when(securityProperties.refreshTokenTtlDays()).thenReturn(7);
-        when(userRepository.save(any(User.class))).thenAnswer(invocation ->
-            invocation.getArgument(0)
-        );
 
         changeTemporaryPasswordUseCase = new ChangeTemporaryPasswordUseCaseImpl(
             userRepository,
@@ -61,8 +54,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
             sessionTrackerPort,
             jwtTokenIssuer,
             passwordEncoder,
-            securityProperties,
-            meterRegistry
+            securityProperties
         );
     }
 
@@ -132,15 +124,6 @@ class ChangeTemporaryPasswordUseCaseImplTest {
             eq("mock-jti"),
             eq(Duration.ofMinutes(60))
         );
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "success"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -180,17 +163,6 @@ class ChangeTemporaryPasswordUseCaseImplTest {
 
         verify(refreshTokenRepository, never()).save(any());
         verify(jwtTokenIssuer, never()).issueToken(any(), any(), any(), any());
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "not_temporary_password"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -210,19 +182,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
             .isInstanceOf(UnauthorizedException.class)
             .hasMessage("Invalid email or current password");
 
-        verify(userRepository, never()).save(any());
         verify(refreshTokenRepository, never()).save(any());
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -256,7 +216,6 @@ class ChangeTemporaryPasswordUseCaseImplTest {
             .isInstanceOf(UnauthorizedException.class)
             .hasMessage("Invalid email or current password");
 
-        verify(userRepository, never()).save(any());
         verify(refreshTokenRepository, never()).save(any());
     }
 
@@ -292,19 +251,7 @@ class ChangeTemporaryPasswordUseCaseImplTest {
             .isInstanceOf(UnauthorizedException.class)
             .hasMessage("Invalid email or current password");
 
-        verify(userRepository, never()).save(any());
         verify(refreshTokenRepository, never()).save(any());
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.password.temporary.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -338,7 +285,6 @@ class ChangeTemporaryPasswordUseCaseImplTest {
             .isInstanceOf(BadRequestException.class)
             .hasMessage("Account does not have a temporary password.");
 
-        verify(userRepository, never()).save(any());
         verify(refreshTokenRepository, never()).save(any());
     }
 
@@ -381,7 +327,59 @@ class ChangeTemporaryPasswordUseCaseImplTest {
                 );
             });
 
-        verify(userRepository, never()).save(any());
         verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldNormalizeEmailBeforeLookingUpUser() {
+        String email = "  Staff.Bob@UniHub.edu  ";
+        String normalizedEmail = "staff.bob@unihub.edu";
+        String currentPassword = "TempPassword123!";
+        String newPassword = "MyOfficialSecurePassword2026!";
+        String encodedTempPassword = passwordEncoder.encode(currentPassword);
+
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .organizationId(UUID.randomUUID())
+            .role(UserRole.STAFF)
+            .email(normalizedEmail)
+            .passwordHash(encodedTempPassword)
+            .isActive(true)
+            .isTemporaryPassword(true)
+            .lastLoginAt(null)
+            .build();
+
+        when(userRepository.findByEmail(normalizedEmail)).thenReturn(
+            Optional.of(user)
+        );
+        when(
+            jwtTokenIssuer.issueToken(
+                eq(user.id().toString()),
+                eq("STAFF"),
+                eq(user.organizationId().toString()),
+                any()
+            )
+        ).thenReturn(
+            new IssuedToken(
+                "mock-access-token",
+                "mock-jti",
+                Instant.now().plusSeconds(3600)
+            )
+        );
+        when(
+            userRepository.updateTemporaryPassword(eq(user.id()), any(), any())
+        ).thenReturn(true);
+
+        ChangeTemporaryPasswordUseCase.ChangeTemporaryPasswordResult result =
+            changeTemporaryPasswordUseCase.changeTemporaryPassword(
+                email,
+                currentPassword,
+                newPassword,
+                "Mozilla/5.0",
+                "127.0.0.1"
+            );
+
+        assertThat(result.accessToken()).isEqualTo("mock-access-token");
+        verify(userRepository).findByEmail(normalizedEmail);
     }
 }

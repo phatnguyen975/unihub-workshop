@@ -163,6 +163,10 @@ class OrganizationControllerListTest {
                     "2026-08-01T07:00:00Z"
                 )
             )
+            .andExpect(jsonPath("$.data.items[0].passwordHash").doesNotExist())
+            .andExpect(jsonPath("$.data.items[0].password").doesNotExist())
+            .andExpect(jsonPath("$.data.items[0].createdBy").doesNotExist())
+            .andExpect(jsonPath("$.data.items[0].updatedBy").doesNotExist())
             .andExpect(
                 jsonPath("$.data.items[1].id").value(member2Id.toString())
             )
@@ -174,6 +178,36 @@ class OrganizationControllerListTest {
 
         verify(listOrganizationMembersUseCase).execute(
             new ListMembersQuery(ORG_ID, CALLER_ID, null, null, null, null, 20)
+        );
+    }
+
+    @Test
+    void shouldReturn200WithTrimmedRole_whenRoleHasWhitespace()
+        throws Exception {
+        CursorPage<User> page = new CursorPage<>(List.of(), null, false);
+        when(
+            listOrganizationMembersUseCase.execute(any(ListMembersQuery.class))
+        ).thenReturn(page);
+
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/admin/organizations/users?role=  STAFF  "
+                ).principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        verify(listOrganizationMembersUseCase).execute(
+            new ListMembersQuery(
+                ORG_ID,
+                CALLER_ID,
+                UserRole.STAFF,
+                null,
+                null,
+                null,
+                20
+            )
         );
     }
 
@@ -220,7 +254,7 @@ class OrganizationControllerListTest {
         mockMvc
             .perform(
                 get(
-                    "/api/v1/admin/organizations/users?search=alice&cursor=prevCursor&limit=10"
+                    "/api/v1/admin/organizations/users?search=alice&cursor=prevCursor&size=10"
                 ).principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
             )
             .andExpect(status().isOk())
@@ -240,10 +274,10 @@ class OrganizationControllerListTest {
     }
 
     @Test
-    void shouldReturn400_whenLimitIsGreaterThan100() throws Exception {
+    void shouldReturn400_whenSizeIsGreaterThan100() throws Exception {
         mockMvc
             .perform(
-                get("/api/v1/admin/organizations/users?limit=101").principal(
+                get("/api/v1/admin/organizations/users?size=101").principal(
                     createAuth(CALLER_ID, ORG_ID, "ORGANIZER")
                 )
             )
@@ -255,12 +289,42 @@ class OrganizationControllerListTest {
     }
 
     @Test
-    void shouldReturn400_whenLimitIsLessThan1() throws Exception {
+    void shouldReturn400_whenSizeIsLessThan1() throws Exception {
         mockMvc
             .perform(
-                get("/api/v1/admin/organizations/users?limit=0").principal(
+                get("/api/v1/admin/organizations/users?size=0").principal(
                     createAuth(CALLER_ID, ORG_ID, "ORGANIZER")
                 )
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn400_whenSizeIsNotAnInteger() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/admin/organizations/users?size=abc").principal(
+                    createAuth(CALLER_ID, ORG_ID, "ORGANIZER")
+                )
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn400_whenIsActiveIsNotABoolean() throws Exception {
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/admin/organizations/users?isActive=not-a-bool"
+                ).principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
             )
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))

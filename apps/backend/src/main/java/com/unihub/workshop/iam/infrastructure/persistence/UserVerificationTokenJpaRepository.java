@@ -18,14 +18,21 @@ public interface UserVerificationTokenJpaRepository
 
     @Modifying
     @Query(
-        "UPDATE UserVerificationTokenJpaEntity t SET t.usedAt = :now, t.updatedAt = :now WHERE t.id = :id AND t.usedAt IS NULL"
+        """
+        UPDATE UserVerificationTokenJpaEntity t
+        SET t.usedAt = :now, t.updatedAt = :now
+        WHERE t.id = :id AND t.usedAt IS NULL
+        """
     )
     int markConsumed(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying
     @Query(
-        "UPDATE UserVerificationTokenJpaEntity t SET t.usedAt = :now, t.updatedAt = :now " +
-            "WHERE t.userId = :userId AND t.tokenType = :tokenType AND t.usedAt IS NULL"
+        """
+        UPDATE UserVerificationTokenJpaEntity t
+        SET t.usedAt = :now, t.updatedAt = :now
+        WHERE t.userId = :userId AND t.tokenType = :tokenType AND t.usedAt IS NULL
+        """
     )
     void invalidateActiveTokens(
         @Param("userId") UUID userId,

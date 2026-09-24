@@ -183,4 +183,19 @@ class ResendOtpUseCaseImplTest {
             OtpRequestedEvent.PURPOSE_PASSWORD_RESET
         );
     }
+
+    @Test
+    void shouldNormalizeEmailBeforeLookup() {
+        String rawEmail = "  Student.Bob@University.EDU  ";
+        String normalizedEmail = "student.bob@university.edu";
+        when(userRepository.findByEmail(normalizedEmail)).thenReturn(
+            Optional.empty()
+        );
+
+        assertThatThrownBy(() -> useCase.resendOtp(rawEmail)).isInstanceOf(
+            NotFoundException.class
+        );
+
+        verify(userRepository).findByEmail(normalizedEmail);
+    }
 }

@@ -1,0 +1,196 @@
+workspace "UniHub Workshop" "C4 Model" {
+  model {
+    student = person "Student" "Browses workshops, registers, pays, and checks in." {
+      tags "Person"
+    }
+    organizer = person "Organizer" "Manages workshops, schedules, and analytics within a Logical Multi-tenant Organization scope (Faculty/Department)." {
+      tags "Person"
+    }
+    staff = person "Check-in Staff" "Scans QR codes and records attendance on-site." {
+      tags "Person"
+    }
+
+    unihub = softwareSystem "UniHub Workshop System" "End-to-end platform for registration, payments, and check-in." {
+      tags "System"
+
+      web = container "Web App" "Student and Admin web portal." "React, TypeScript (Local Node.js)" {
+        tags "Container" "Browser"
+      }
+
+      mobile = container "Mobile App" "Check-in app with offline-first QR scanning and local offline storage." "React Native, TypeScript" {
+        tags "Container" "Mobile"
+      }
+
+      mobiledb = container "Local SQLite" "Local offline relational store for check-in events." "SQLite" {
+        tags "Container" "Database"
+      }
+
+      gateway = container "API Gateway / Load Balancer" "Edge routing, load balancing, and Token Bucket rate limiting." "Nginx (Docker)" {
+        tags "Container"
+      }
+
+      api = container "Core Backend Monolith" "Core business logic with HikariCP, Resilience4j, and Spring Modulith." "Java, Spring Boot, Spring Modulith (Docker)" {
+        tags "Container"
+      }
+
+      worker = container "Background Workers" "Async jobs for notifications, AI summaries, and CSV ingestion (Spring Batch)." "Java, Spring Boot, Spring Batch (Docker)" {
+        tags "Container"
+      }
+
+      db = container "PostgreSQL" "Authoritative transactional store hosted externally (Neon)." "Neon PostgreSQL (Cloud Service)" {
+        tags "Container" "Database"
+      }
+
+      search = container "Search Engine" "Elasticsearch for full-text search queries (CQRS read model)." "Elasticsearch (Docker)" {
+        tags "Container" "Database"
+      }
+
+      broker = container "Message Broker" "Async events and job queues (outbox-driven)." "RabbitMQ (Docker)" {
+        tags "Container" "Queue"
+      }
+
+      cache = container "Cache / Rate Limiter" "Cache-aside reads and Token Bucket counters." "Redis (Docker)" {
+        tags "Container" "Cache"
+      }
+
+      storage = container "Object Storage" "Workshop PDFs and CSV drops." "MinIO / S3-compatible (Docker)" {
+        tags "Container" "Storage"
+      }
+    }
+
+    legacy = softwareSystem "Legacy Student Management System" "Exports nightly student CSV files." {
+      tags "External System"
+    }
+
+    payment = softwareSystem "Payment Gateway" "Processes online payments." {
+      tags "External System" "Payment"
+    }
+
+    ai = softwareSystem "AI Summarization Service" "Generates summaries from workshop PDFs." {
+      tags "External System"
+    }
+
+    notify = softwareSystem "Notification Providers" "Email and in-app notification delivery." {
+      tags "External System" "Notify"
+    }
+
+    student -> web "Browses workshops and registers" "Web Browser"
+    organizer -> web "Manages workshops and staff" "Web Browser"
+    staff -> mobile "Scans QR codes and syncs attendance" "Mobile App"
+
+    web -> gateway "Makes API calls" "HTTP"
+    mobile -> gateway "Syncs attendance batches" "HTTP"
+    gateway -> api "Routes API requests" "HTTP"
+
+    api -> cache "Reads/Writes cache and token bucket state" "RESP"
+    api -> db "Writes to primary (domain data + outbox events); reads from replicas" "JDBC over SSL/TLS"
+    api -> search "Reads/Searches full-text data from" "REST/JSON"
+    api -> payment "Processes payments" "HTTPS / JSON API"
+    api -> storage "Uploads and fetches PDFs" "HTTP / S3 API"
+    api -> broker "Publishes events (Modulith Event Externalization)" "AMQP"
+
+    worker -> broker "Consumes task queues" "AMQP"
+    worker -> db "Writes async task results" "JDBC over SSL/TLS"
+    worker -> search "Writes/Syncs workshop data to (CQRS)" "REST/JSON"
+    worker -> ai "Requests PDF summarization" "HTTPS / JSON API"
+    worker -> notify "Sends email and in-app notifications" "HTTPS / JSON API"
+    worker -> storage "Reads PDFs and CSV batches" "HTTP / S3 API"
+
+    mobile -> mobiledb "Reads/Writes offline check-in events" "Local SQL"
+
+    legacy -> storage "Drops nightly CSV exports" "Scheduled File Drop / S3 API"
+  }
+
+  views {
+    systemContext unihub "SystemContext" {
+      include student
+      include organizer
+      include staff
+      include unihub
+      include legacy
+      include payment
+      include ai
+      include notify
+      autolayout lr
+    }
+
+    container unihub "Container" {
+      include student
+      include organizer
+      include staff
+      include web
+      include mobile
+      include mobiledb
+      include gateway
+      include api
+      include worker
+      include db
+      include search
+      include broker
+      include cache
+      include storage
+      include legacy
+      include payment
+      include ai
+      include notify
+      autolayout tb
+    }
+
+    styles {
+      element "*" {
+        background #ffffff
+        strokeWidth 7
+      }
+      element "Person" {
+        shape Person
+        color #2f8538
+        stroke #2f8538
+      }
+      element "System" {
+        shape RoundedBox
+        color #1168bd
+        stroke #1168bd
+      }
+      element "Container" {
+        shape RoundedBox
+        color #1168bd
+        stroke #1168bd
+      }
+      element "Browser" {
+        shape WebBrowser
+        color #1168bd
+        stroke #1168bd
+      }
+      element "Mobile" {
+        shape MobileDevicePortrait
+        color #1168bd
+        stroke #1168bd
+      }
+      element "Database" {
+        shape Cylinder
+        color #1168bd
+        stroke #1168bd
+      }
+      element "Queue" {
+        shape Pipe
+        color #1168bd
+        stroke #1168bd
+      }
+      element "External System" {
+        shape RoundedBox
+        color #666666
+        stroke #666666
+      }
+      element "Payment" {
+        shape RoundedBox
+        color #d88100
+        stroke #d88100
+      }
+      element "Notify" {
+        shape RoundedBox
+        color #c41a22
+        stroke #c41a22
+      }
+    }
+  }
+}

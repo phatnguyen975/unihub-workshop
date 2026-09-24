@@ -28,7 +28,7 @@ This plan builds the complete `GET /api/v1/auth/public-key` endpoint end-to-end:
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/PublicKeyResponse.java` _(new)_ — record `{ String keyId, String publicKeyPem, Instant issuedAt }`.
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/AuthController.java` _(modified)_ — add `@GetMapping("/public-key")` handler annotated `@PreAuthorize("hasRole('STAFF')")` that calls `PublicKeyService` and returns `ApiResponse<PublicKeyResponse>`.
     - `apps/backend/src/test/java/com/unihub/workshop/shared/security/PublicKeyServiceTest.java` _(new)_ — unit tests: PEM begins/ends with correct headers; `keyId` is deterministic (same key → same id); `keyId` changes when key changes; `issuedAt` is non-null and in the past or present.
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerPublicKeyTest.java` _(new)_ — controller-layer unit tests (MockMvc slice): 200 OK with correct JSON shape for a STAFF principal; 403 for ORGANIZER principal; 403 for STUDENT principal; 401 for missing Authorization header; 401 for expired JWT; 503 with Retry-After: 30 when Redis is down.
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerPublicKeyTest.java` _(new)_ — controller-layer unit tests (MockMvc slice): 200 OK with correct JSON shape for a STAFF principal; 403 for ORGANIZER principal; 403 for STUDENT principal; 401 for missing Authorization header; 401 for expired JWT; 401 for revoked JWT on Redis JTI blacklist; 503 with Retry-After: 30 when Redis is down.
   - **Acceptance Criteria:**
     - Calling `GET /api/v1/auth/public-key` with a valid STAFF JWT returns HTTP `200 OK` with a JSON body whose `data.publicKeyPem` begins with `-----BEGIN PUBLIC KEY-----` and ends with `-----END PUBLIC KEY-----`. _(Traces to FR-01, Scenario 1)_
     - The `data.keyId` in the response is a non-empty lowercase hex string. Two successive calls with the same key loaded return an identical `keyId`. _(Traces to FR-02, FR-08, Scenario 7)_
@@ -37,6 +37,7 @@ This plan builds the complete `GET /api/v1/auth/public-key` endpoint end-to-end:
     - Calling the endpoint with a valid JWT whose `role` is `STUDENT` returns HTTP `403 Forbidden` with RFC 7807 error `type = "urn:unihub:error:forbidden"`. _(Traces to FR-06, BR-01, Scenario 6)_
     - Calling the endpoint with no `Authorization` header returns HTTP `401 Unauthorized` with RFC 7807 error `type = "urn:unihub:error:unauthorized"`. _(Traces to FR-04, Scenario 2)_
     - Calling the endpoint with an expired JWT returns HTTP `401 Unauthorized` with RFC 7807 error `type = "urn:unihub:error:unauthorized"`. _(Traces to FR-05, Scenario 3)_
+    - Calling the endpoint with a revoked JWT (whose `jti` is present in Redis blacklist) returns HTTP `401 Unauthorized` with RFC 7807 error `type = "urn:unihub:error:unauthorized"`. _(Traces to FR-05, Scenario 4)_
     - Calling the endpoint when Redis is unavailable returns HTTP `503 Service Unavailable` with `Retry-After: 30` header and RFC 7807 error `type = "urn:unihub:error:service-unavailable"`. _(Traces to BR-04, ADR-010, Scenario 9)_
     - The full test suite (including `ModulithArchitectureTest`) passes with no failures.
 
@@ -44,7 +45,7 @@ This plan builds the complete `GET /api/v1/auth/public-key` endpoint end-to-end:
 
 - [x] T1 is checked off and all its acceptance criteria have been verified end-to-end against the running application (or MockMvc slice).
 - [x] `PublicKeyService` unit tests pass: deterministic `keyId`, correct PEM format, non-null `issuedAt`.
-- [x] `AuthControllerPublicKeyTest` passes all scenarios including the rejection scenarios (403 ×2, 401 ×2, 503 ×1).
+- [x] `AuthControllerPublicKeyTest` passes all scenarios including the rejection scenarios (403 ×2, 401 ×3, 503 ×1).
 - [x] `ModulithArchitectureTest` passes — no new cross-module boundary violation introduced.
 - [x] Full test suite is green.
 - [x] Ready for `/review public-key-distribution`.

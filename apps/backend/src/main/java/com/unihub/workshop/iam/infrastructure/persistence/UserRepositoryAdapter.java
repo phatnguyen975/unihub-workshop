@@ -30,6 +30,7 @@ public class UserRepositoryAdapter implements UserRepository {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
+    @Transactional
     public Optional<User> findById(UUID id) {
         return repository.findById(id).map(userMapper::toDomain);
     }
@@ -46,16 +47,19 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional
     public Optional<User> findByEmail(String email) {
         return repository.findByEmail(email).map(userMapper::toDomain);
     }
 
     @Override
+    @Transactional
     public boolean existsByEmail(String email) {
         return repository.existsByEmail(email);
     }
 
     @Override
+    @Transactional
     public User save(User user) {
         UserJpaEntity entity = userMapper.toEntity(user);
         UserJpaEntity saved = repository.save(entity);
@@ -63,16 +67,19 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional
     public void updateLastLoginAt(UUID userId, Instant lastLoginAt) {
         repository.updateLastLoginAt(userId, lastLoginAt);
     }
 
     @Override
+    @Transactional
     public void activate(UUID userId) {
         repository.activateUser(userId, Instant.now());
     }
 
     @Override
+    @Transactional
     public boolean updateTemporaryPassword(
         UUID userId,
         String newPasswordHash,
@@ -111,14 +118,17 @@ public class UserRepositoryAdapter implements UserRepository {
         Boolean isActive,
         String search,
         String cursor,
-        int limit
+        int size
     ) {
         Instant cursorTime = null;
         UUID cursorId = null;
 
         if (cursor != null && !cursor.isBlank()) {
             try {
-                String decoded = new String(Base64.getDecoder().decode(cursor));
+                String trimmedCursor = cursor.trim();
+                String decoded = new String(
+                    Base64.getDecoder().decode(trimmedCursor)
+                );
                 CursorData cursorData = objectMapper.readValue(
                     decoded,
                     CursorData.class
@@ -142,20 +152,31 @@ public class UserRepositoryAdapter implements UserRepository {
 
         String roleStr = role != null ? role.name() : null;
         String sanitizedSearch = sanitizeSearch(search);
-        List<UserJpaEntity> entities = repository.findMembers(
-            organizationId,
-            callerId,
-            roleStr,
-            isActive,
-            sanitizedSearch,
-            cursorTime,
-            cursorId,
-            PageRequest.of(0, limit + 1)
-        );
+        PageRequest pageable = PageRequest.of(0, size + 1);
+        List<UserJpaEntity> entities =
+            cursorTime == null
+                ? repository.findFirstPage(
+                      organizationId,
+                      callerId,
+                      roleStr,
+                      isActive,
+                      sanitizedSearch,
+                      pageable
+                  )
+                : repository.findNextPage(
+                      organizationId,
+                      callerId,
+                      roleStr,
+                      isActive,
+                      sanitizedSearch,
+                      cursorTime,
+                      cursorId,
+                      pageable
+                  );
 
-        boolean hasMore = entities.size() > limit;
+        boolean hasMore = entities.size() > size;
         List<UserJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, limit)
+            ? entities.subList(0, size)
             : entities;
 
         List<User> items = userMapper.toDomainList(pageEntities);

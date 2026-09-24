@@ -36,74 +36,66 @@ class ListOrganizationMembersUseCaseImplTest {
         assertThatThrownBy(() -> useCase.execute(null))
             .isInstanceOf(BadRequestException.class)
             .hasMessage("Query must not be null");
+
+        verifyNoInteractions(userRepository);
     }
 
     @Test
     void shouldThrowBadRequest_whenOrganizationIdIsNull() {
-        ListMembersQuery query = new ListMembersQuery(
-            null,
-            CALLER_ID,
-            null,
-            null,
-            null,
-            null,
-            20
-        );
-        assertThatThrownBy(() -> useCase.execute(query))
+        assertThatThrownBy(() ->
+            new ListMembersQuery(null, CALLER_ID, null, null, null, null, 20)
+        )
             .isInstanceOf(BadRequestException.class)
             .hasMessage("organizationId must not be null");
     }
 
     @Test
     void shouldThrowBadRequest_whenCallerIdIsNull() {
-        ListMembersQuery query = new ListMembersQuery(
-            ORG_ID,
-            null,
-            null,
-            null,
-            null,
-            null,
-            20
-        );
-        assertThatThrownBy(() -> useCase.execute(query))
+        assertThatThrownBy(() ->
+            new ListMembersQuery(ORG_ID, null, null, null, null, null, 20)
+        )
             .isInstanceOf(BadRequestException.class)
             .hasMessage("callerId must not be null");
     }
 
     @Test
-    void shouldThrowBadRequest_whenLimitIsLessThanOne() {
-        ListMembersQuery query = new ListMembersQuery(
-            ORG_ID,
-            CALLER_ID,
-            null,
-            null,
-            null,
-            null,
-            0
-        );
-        assertThatThrownBy(() -> useCase.execute(query))
+    void shouldThrowBadRequest_whenSizeIsLessThanOne() {
+        assertThatThrownBy(() ->
+            new ListMembersQuery(ORG_ID, CALLER_ID, null, null, null, null, 0)
+        )
             .isInstanceOf(BadRequestException.class)
-            .hasMessage("limit must be between 1 and 100");
+            .hasMessage("size must be between 1 and 100");
     }
 
     @Test
-    void shouldThrowBadRequest_whenLimitIsGreaterThan100() {
-        ListMembersQuery query = new ListMembersQuery(
-            ORG_ID,
-            CALLER_ID,
-            null,
-            null,
-            null,
-            null,
-            101
-        );
-        assertThatThrownBy(() -> useCase.execute(query))
+    void shouldThrowBadRequest_whenSizeIsGreaterThan100() {
+        assertThatThrownBy(() ->
+            new ListMembersQuery(ORG_ID, CALLER_ID, null, null, null, null, 101)
+        )
             .isInstanceOf(BadRequestException.class)
-            .hasMessage("limit must be between 1 and 100");
+            .hasMessage("size must be between 1 and 100");
     }
 
     @Test
-    void shouldDefaultLimitTo20_whenLimitIsNull() {
+    void shouldThrowBadRequest_whenSearchExceeds200Characters() {
+        String longSearch = "a".repeat(201);
+        assertThatThrownBy(() ->
+            new ListMembersQuery(
+                ORG_ID,
+                CALLER_ID,
+                null,
+                null,
+                longSearch,
+                null,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("search parameter cannot exceed 200 characters");
+    }
+
+    @Test
+    void shouldDefaultSizeTo20_whenSizeIsNull() {
         ListMembersQuery query = new ListMembersQuery(
             ORG_ID,
             CALLER_ID,
@@ -217,6 +209,45 @@ class ListOrganizationMembersUseCaseImplTest {
         ).thenReturn(new CursorPage<>(List.of(), null, false));
 
         useCase.execute(query);
+
+        verify(userRepository).findMembersByOrganizationId(
+            ORG_ID,
+            CALLER_ID,
+            null,
+            null,
+            null,
+            null,
+            20
+        );
+    }
+
+    @Test
+    void shouldPropagateException_whenRepositoryThrowsException() {
+        ListMembersQuery query = new ListMembersQuery(
+            ORG_ID,
+            CALLER_ID,
+            null,
+            null,
+            null,
+            null,
+            20
+        );
+
+        when(
+            userRepository.findMembersByOrganizationId(
+                ORG_ID,
+                CALLER_ID,
+                null,
+                null,
+                null,
+                null,
+                20
+            )
+        ).thenThrow(new RuntimeException("Database query error"));
+
+        assertThatThrownBy(() -> useCase.execute(query))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessage("Database query error");
 
         verify(userRepository).findMembersByOrganizationId(
             ORG_ID,

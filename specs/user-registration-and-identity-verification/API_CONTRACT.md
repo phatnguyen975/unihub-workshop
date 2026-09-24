@@ -50,9 +50,9 @@ This contract defines the three REST endpoints introduced by Feature 1.1 (`user-
 
 **Validation Rules:**
 
-- `email`: Required, non-blank string. Must be a valid email format conforming to RFC 5321. Max 254 characters. Case-insensitive.
+- `email`: Required, non-blank string. Must be a valid email format conforming to RFC 5321 (surrounding whitespace is trimmed automatically). Max 254 characters. Case-insensitive.
 - `password`: Required, non-blank string. Min 8 characters, max 255 characters. Must contain at least one uppercase letter, one lowercase letter, one digit, and one special character.
-- `fullName`: Required, non-blank string. Max 200 characters.
+- `fullName`: Required, non-blank string (surrounding whitespace is trimmed automatically). Max 200 characters.
 
 #### Response
 
@@ -74,13 +74,14 @@ This contract defines the three REST endpoints introduced by Feature 1.1 (`user-
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                  |
-| :----: | :------------------------------ | :-------------------- | :--------------------------------------------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON syntax or unparseable HTTP payload.                                                         |
-| `409`  | `urn:unihub:error:conflict`     | Conflict              | A user account with the submitted email already exists (active or inactive).                               |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Payload fails `@Valid` constraints (missing fields, invalid email format, weak password, length exceeded). |
-| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Bucket4j Token Bucket rate limit exceeded for client IP.                                                   |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error (e.g. database unreachable, outbox event persistence failure).                     |
+| Status | Error Type (`error.type`)                 | Title                  | Condition                                                                                                  |
+| :----: | :---------------------------------------- | :--------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`            | Bad Request            | Malformed JSON syntax or unparseable HTTP payload.                                                         |
+| `409`  | `urn:unihub:error:conflict`               | Conflict               | A user account with the submitted email already exists (active or inactive).                               |
+| `415`  | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Request payload `Content-Type` is not supported (must be `application/json`).                              |
+| `422`  | `urn:unihub:error:validation`             | Unprocessable Content  | Payload fails `@Valid` constraints (missing fields, invalid email format, weak password, length exceeded). |
+| `429`  | `urn:unihub:error:rate-limited`           | Too Many Requests      | Bucket4j Token Bucket rate limit exceeded for client IP.                                                   |
+| `500`  | `urn:unihub:error:internal`               | Internal Server Error  | Unexpected server error (e.g. database unreachable, outbox event persistence failure).                     |
 
 **Error Response Example (422 Unprocessable Content):**
 
@@ -156,8 +157,8 @@ This contract defines the three REST endpoints introduced by Feature 1.1 (`user-
 
 **Validation Rules:**
 
-- `email`: Required, non-blank string. Valid email format. Max 254 characters.
-- `otp`: Required, non-blank string. Must be exactly 6 numeric digits matching `^[0-9]{6}$`.
+- `email`: Required, non-blank string. Valid email format (surrounding whitespace is trimmed automatically). Max 254 characters.
+- `otp`: Required, non-blank string. Must be exactly 6 numeric digits matching `^[0-9]{6}$` (surrounding whitespace is trimmed automatically).
 
 #### Response
 
@@ -178,13 +179,15 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                 |
-| :----: | :------------------------------ | :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON syntax or unparseable HTTP payload.                                                                                                        |
-| `409`  | `urn:unihub:error:conflict`     | Conflict              | The account for the submitted email is already active (`is_active = true`).                                                                               |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Payload fails `@Valid` constraints, OR **uniform error** when the OTP is incorrect, expired, already consumed, or no user exists for the submitted email. |
-| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (protects against brute-forcing OTPs).                                                                                                |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server failure.                                                                                                                                |
+| Status | Error Type (`error.type`)                 | Title                  | Condition                                                                                                         |
+| :----: | :---------------------------------------- | :--------------------- | :---------------------------------------------------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`            | Bad Request            | Malformed JSON syntax or unparseable HTTP payload.                                                                |
+| `404`  | `urn:unihub:error:not-found`              | Not Found              | No user account exists for the submitted email address.                                                           |
+| `409`  | `urn:unihub:error:conflict`               | Conflict               | The account for the submitted email is already active (`is_active = true`).                                       |
+| `415`  | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Request payload `Content-Type` is not supported (must be `application/json`).                                     |
+| `422`  | `urn:unihub:error:validation`             | Unprocessable Content  | Payload fails `@Valid` constraints, OR **uniform error** when the OTP is incorrect, expired, or already consumed. |
+| `429`  | `urn:unihub:error:rate-limited`           | Too Many Requests      | Rate limit exceeded (protects against brute-forcing OTPs).                                                        |
+| `500`  | `urn:unihub:error:internal`               | Internal Server Error  | Unexpected server failure.                                                                                        |
 
 **Error Response Example (422 Invalid OTP — Uniform Response):**
 
@@ -261,7 +264,7 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 
 **Validation Rules:**
 
-- `email`: Required, non-blank string. Valid email format conforming to RFC 5321. Max 254 characters.
+- `email`: Required, non-blank string. Valid email format conforming to RFC 5321 (surrounding whitespace is trimmed automatically). Max 254 characters.
 
 #### Response
 
@@ -280,13 +283,14 @@ _(Note: `data` is omitted per `@JsonInclude(NON_NULL)`. The user proceeds to the
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                          |
-| :----: | :------------------------------ | :-------------------- | :------------------------------------------------- |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON syntax or unparseable HTTP payload. |
-| `404`  | `urn:unihub:error:not-found`    | Not Found             | No user account exists for the submitted email.    |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Missing or malformed email address.                |
-| `429`  | `urn:unihub:error:rate-limited` | Too Many Requests     | Rate limit exceeded (preventing email spam/abuse). |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                           |
+| Status | Error Type (`error.type`)                 | Title                  | Condition                                                                     |
+| :----: | :---------------------------------------- | :--------------------- | :---------------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`            | Bad Request            | Malformed JSON syntax or unparseable HTTP payload.                            |
+| `404`  | `urn:unihub:error:not-found`              | Not Found              | No user account exists for the submitted email.                               |
+| `415`  | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Request payload `Content-Type` is not supported (must be `application/json`). |
+| `422`  | `urn:unihub:error:validation`             | Unprocessable Content  | Missing or malformed email address.                                           |
+| `429`  | `urn:unihub:error:rate-limited`           | Too Many Requests      | Rate limit exceeded (preventing email spam/abuse).                            |
+| `500`  | `urn:unihub:error:internal`               | Internal Server Error  | Unexpected server error.                                                      |
 
 **Error Response Example (404 Not Found):**
 
@@ -336,5 +340,5 @@ All three endpoints are **public** (unauthenticated) and are protected by the de
 1. **Password Hashing:** **Argon2** (`Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()`).
 2. **OTP Hashing:** HMAC-SHA256 using server-side secret (`app.auth.otp.hmac-secret`), never stored plain-text.
 3. **OTP TTL:** Default 15 minutes, configurable via `app.auth.otp.ttl-minutes`.
-4. **Anti-Enumeration on Activation:** Uniform error message (`"Invalid or expired activation code."`) for all verification failure conditions.
+4. **Anti-Enumeration on Activation:** Uniform error message (`"Invalid or expired activation code."`) for all OTP-level verification failures (wrong code, expired, already consumed). User-not-found returns `404 Not Found` as a distinct, clear error.
 5. **Worker Decoupling:** Outbox event `OtpRequestedEvent` externalized to RabbitMQ (`unihub.events::notifications`); no worker notification execution in Feature 1.1 scope.

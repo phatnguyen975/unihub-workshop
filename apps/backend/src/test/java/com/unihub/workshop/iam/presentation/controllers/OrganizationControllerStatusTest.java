@@ -392,4 +392,98 @@ class OrganizationControllerStatusTest {
                 jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
             );
     }
+
+    @Test
+    @DisplayName(
+        "422 Unprocessable Content: explicit null isActive returns 422"
+    )
+    void shouldReturn422_whenIsActiveIsExplicitNull() throws Exception {
+        mockMvc
+            .perform(
+                patch(
+                    "/api/v1/admin/organizations/users/{userId}/status",
+                    TARGET_USER_ID
+                )
+                    .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"isActive\": null}")
+            )
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            );
+    }
+
+    @Test
+    @DisplayName(
+        "400 Bad Request: malformed JSON non-boolean value returns 400"
+    )
+    void shouldReturn400_whenIsActiveIsNotABoolean() throws Exception {
+        mockMvc
+            .perform(
+                patch(
+                    "/api/v1/admin/organizations/users/{userId}/status",
+                    TARGET_USER_ID
+                )
+                    .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"isActive\": \"invalid-boolean\"}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    @DisplayName(
+        "403 Forbidden: caller with missing org claim in JWT returns 403"
+    )
+    void shouldReturn403_whenMissingOrgClaim() throws Exception {
+        UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(
+            false
+        );
+
+        mockMvc
+            .perform(
+                patch(
+                    "/api/v1/admin/organizations/users/{userId}/status",
+                    TARGET_USER_ID
+                )
+                    .principal(createAuth(CALLER_ID, null, "ORGANIZER"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:forbidden")
+            );
+    }
+
+    @Test
+    @DisplayName("403 Forbidden: caller with STUDENT role returns 403")
+    void shouldReturn403_whenCallerIsStudent() throws Exception {
+        UpdateMemberStatusRequest request = new UpdateMemberStatusRequest(
+            false
+        );
+
+        mockMvc
+            .perform(
+                patch(
+                    "/api/v1/admin/organizations/users/{userId}/status",
+                    TARGET_USER_ID
+                )
+                    .principal(createAuth(CALLER_ID, ORG_ID, "STUDENT"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:forbidden")
+            );
+    }
 }

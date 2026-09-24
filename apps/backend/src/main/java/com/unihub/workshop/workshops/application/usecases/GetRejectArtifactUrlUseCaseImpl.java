@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.application.usecases;
 
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.security.SecurityProperties;
 import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
@@ -25,6 +26,13 @@ public class GetRejectArtifactUrlUseCaseImpl
     private final SecurityProperties securityProperties;
 
     public RejectArtifactUrlResult execute(UUID jobId, UUID organizationId) {
+        if (jobId == null) {
+            throw new BadRequestException("jobId must not be null");
+        }
+        if (organizationId == null) {
+            throw new BadRequestException("organizationId must not be null");
+        }
+
         // Must use primary data source to prevent replication lag
         IngestionJobReport report = repository
             .findByIdAndOrganizationIdFromPrimary(jobId, organizationId)

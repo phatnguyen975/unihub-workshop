@@ -303,6 +303,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "urn:unihub:error:rate-limited";
         else if (httpStatus == HttpStatus.SERVICE_UNAVAILABLE) type =
             "urn:unihub:error:service-unavailable";
+        else if (httpStatus == HttpStatus.UNSUPPORTED_MEDIA_TYPE) type =
+            "urn:unihub:error:unsupported-media-type";
 
         ProblemDetail problem = createProblemDetail(
             httpStatus,

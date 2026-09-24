@@ -155,6 +155,29 @@ class IngestionJobControllerTest {
     }
 
     @Test
+    void getIngestionJobs_withInvalidCursor_returns400() throws Exception {
+        UUID orgId = UUID.randomUUID();
+        when(jwtDecoder.decode(anyString())).thenReturn(
+            createMockJwt("ORGANIZER", orgId)
+        );
+
+        when(
+            listUseCase.execute(eq(orgId), eq("invalid-cursor"), eq(20))
+        ).thenThrow(new BadRequestException("Invalid cursor format"));
+
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/admin/ingestion-jobs?cursor=invalid-cursor"
+                ).header("Authorization", "Bearer token")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
     void getIngestionJobs_whenNoMorePages_omitsNextCursor() throws Exception {
         UUID orgId = UUID.randomUUID();
         when(jwtDecoder.decode(anyString())).thenReturn(

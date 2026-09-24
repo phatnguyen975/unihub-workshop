@@ -1,6 +1,15 @@
 package com.unihub.workshop.iam.presentation.dto;
 
-import lombok.Builder;
+import jakarta.validation.constraints.Size;
 
-@Builder
-public record LogoutRequest(String refreshToken) {}
+public record LogoutRequest(
+    @Size(max = 255, message = "Refresh token must not exceed 255 characters")
+    String refreshToken
+) {
+    public LogoutRequest {
+        refreshToken =
+            refreshToken != null && !refreshToken.isBlank()
+                ? refreshToken.trim()
+                : null;
+    }
+}

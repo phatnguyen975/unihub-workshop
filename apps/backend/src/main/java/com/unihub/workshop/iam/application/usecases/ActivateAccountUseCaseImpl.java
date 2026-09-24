@@ -7,6 +7,7 @@ import com.unihub.workshop.iam.application.utils.OtpService;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ConflictException;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,9 +26,12 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
     public void activate(String email, String otp) {
         String normalizedEmail =
             email != null ? email.toLowerCase().trim() : "";
+
         User user = userRepository
             .findByEmail(normalizedEmail)
-            .orElseThrow(this::invalidOtp);
+            .orElseThrow(() ->
+                new NotFoundException("No account found for this email.")
+            );
 
         if (user.isActive()) {
             throw new ConflictException("Account is already active.");
@@ -51,6 +55,7 @@ public class ActivateAccountUseCaseImpl implements ActivateAccountUseCase {
         if (!userVerificationTokenRepository.markConsumed(token.id())) {
             throw invalidOtp();
         }
+
         userRepository.activate(user.id());
     }
 

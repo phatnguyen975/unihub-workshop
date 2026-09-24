@@ -33,7 +33,7 @@ This feature provides authenticated users across all roles (`STUDENT`, `STAFF`, 
 
 - **FR-01:** The system SHALL return a paginated collection of active sessions belonging exclusively to the authenticated user upon request.
 - **FR-02:** The system SHALL filter session records to include only those where revocation timestamp is absent (`revoked_at IS NULL`) and expiration timestamp is in the future (`expires_at > NOW()`).
-- **FR-03:** The system SHALL support keyset cursor-based pagination using the combination of session creation timestamp (`created_at`) and unique session identifier (`id`), ordered descending (`created_at DESC, id DESC`).
+- **FR-03:** The system SHALL support keyset cursor-based pagination using the combination of session creation timestamp (`created_at`) and unique session identifier (`id`), ordered descending (`created_at DESC, id DESC`). Any leading or trailing whitespace in the `cursor` query parameter SHALL be automatically trimmed prior to Base64 and JSON decoding.
 - **FR-04:** The system SHALL default pagination page size to 20 items when not specified, and SHALL enforce a strict upper limit cap of 100 items per request.
 - **FR-05:** The system SHALL evaluate and include a boolean indicator `isCurrentSession = true` for the session matching the `sid` claim present in the caller's active access token, and `isCurrentSession = false` for all other sessions.
 - **FR-06:** The system SHALL expose only non-sensitive device metadata in each session item: unique session identifier (`id`), device details (`deviceInfo`), originating IP address (`ipAddress`), session establishment timestamp (`createdAt`), and the current session flag (`isCurrentSession`).
@@ -87,15 +87,16 @@ This feature provides authenticated users across all roles (`STUDENT`, `STAFF`, 
 
 ### Transition Matrix
 
-| Current State | Trigger / Event                             | Target State | Valid? | Rejection Behavior                                                                            |
-| :------------ | :------------------------------------------ | :----------- | :----: | :-------------------------------------------------------------------------------------------- |
-| `ACTIVE`      | Query active sessions (`GET`)               | `ACTIVE`     |  Yes   | Returned in paginated response with `isCurrentSession` flag.                                  |
-| `ACTIVE`      | Revoke single session (`DELETE /{id}`)      | `REVOKED`    |  Yes   | `revoked_at` set to `NOW()`, `jti` added to blacklist, returns `204 No Content`.              |
-| `ACTIVE`      | Revoke other sessions (`DELETE`)            | `REVOKED`    |  Yes   | Remote sessions become `REVOKED`, current session remains `ACTIVE`, returns `204 No Content`. |
-| `ACTIVE`      | Natural time passage (`expires_at < NOW()`) | `EXPIRED`    |  Yes   | Omitted from active sessions query; purged by TTL cleanup job.                                |
-| `REVOKED`     | Query active sessions (`GET`)               | `REVOKED`    |   No   | Excluded from results by query filter (`revoked_at IS NULL`).                                 |
-| `REVOKED`     | Revoke single session (`DELETE /{id}`)      | `REVOKED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                 |
-| `EXPIRED`     | Revoke single session (`DELETE /{id}`)      | `EXPIRED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                 |
+| Current State | Trigger / Event                                          | Target State | Valid? | Rejection Behavior                                                                                                                          |
+| :------------ | :------------------------------------------------------- | :----------- | :----: | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ACTIVE`      | Query active sessions (`GET`)                            | `ACTIVE`     |  Yes   | Returned in paginated response with `isCurrentSession` flag.                                                                                |
+| `ACTIVE`      | Revoke remote session (`DELETE /{id}`, `id != sid`)      | `REVOKED`    |  Yes   | `revoked_at` set to `NOW()`, remote `jti` blacklisted via Redis mapping, returns `204 No Content`.                                          |
+| `ACTIVE`      | Revoke own current session (`DELETE /{id}`, `id == sid`) | `REVOKED`    |  Yes   | `revoked_at` set to `NOW()`, current `jti` blacklisted; caller is force-logged-out (subsequent requests → `401`). Returns `204 No Content`. |
+| `ACTIVE`      | Revoke other sessions (`DELETE`)                         | `REVOKED`    |  Yes   | Remote sessions become `REVOKED`, current session remains `ACTIVE`, returns `204 No Content`.                                               |
+| `ACTIVE`      | Natural time passage (`expires_at < NOW()`)              | `EXPIRED`    |  Yes   | Omitted from active sessions query; purged by TTL cleanup job.                                                                              |
+| `REVOKED`     | Query active sessions (`GET`)                            | `REVOKED`    |   No   | Excluded from results by query filter (`revoked_at IS NULL`).                                                                               |
+| `REVOKED`     | Revoke single session (`DELETE /{id}`)                   | `REVOKED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                                                               |
+| `EXPIRED`     | Revoke single session (`DELETE /{id}`)                   | `EXPIRED`    |   No   | Rejected with `404 Not Found` (`urn:unihub:error:not-found`).                                                                               |
 
 ## 6. Non-Functional Requirements
 
@@ -110,9 +111,11 @@ This feature provides authenticated users across all roles (`STUDENT`, `STAFF`, 
   - Zero leakage of raw refresh token hashes or cross-user identifiers.
 - **Reliability & Resilience:**
   - When the centralized Redis blacklist service is down, revocation returns `503 Service Unavailable` with a `Retry-After` header (configurable via `app.http.retry-after-seconds`, default 30) to prevent partial revocation states.
+  - Driver-level fail-fast is enforced via Lettuce client configuration (`REJECT_COMMANDS`, `TimeoutOptions.enabled()`, `spring.data.redis.timeout: 2s`, `connect-timeout: 2s`), guaranteeing instant rejection (<1ms) when Redis is disconnected without blocking Tomcat HTTP request threads.
+  - API Gateway (Nginx) reverse proxy explicitly excludes `http_503` from `proxy_next_upstream`, ensuring backend 503 responses with `Retry-After` headers pass directly to clients without triggering upstream retry loops.
   - Database queries are protected with connection lease timeouts via HikariCP.
 - **Observability:**
-  - Metrics recorded via Micrometer: `auth.sessions.listed` (outcome), `auth.sessions.revoked` (outcome, target: `single` vs `all_others`), and `auth.blacklist.redis_unavailable` (counter).
+  - Active session queries rely on structured application logging and standard HTTP status codes; internal Micrometer counters are omitted to minimize overhead and maintain Clean Architecture isolation in application use cases.
   - All operations log masked client IP and User-Agent metadata under structured logging format.
 
 ## 7. Acceptance Criteria

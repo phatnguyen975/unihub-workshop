@@ -10,8 +10,6 @@ import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -25,8 +23,6 @@ class RevokeAllOtherSessionsUseCaseImplTest {
     private RefreshTokenRepository refreshTokenRepository;
     private JtiBlacklistPort jtiBlacklistPort;
     private SessionTrackerPort sessionTrackerPort;
-    private MeterRegistry meterRegistry;
-    private Counter counter;
 
     private RevokeAllOtherSessionsUseCaseImpl useCase;
 
@@ -35,18 +31,11 @@ class RevokeAllOtherSessionsUseCaseImplTest {
         refreshTokenRepository = mock(RefreshTokenRepository.class);
         jtiBlacklistPort = mock(JtiBlacklistPort.class);
         sessionTrackerPort = mock(SessionTrackerPort.class);
-        meterRegistry = mock(MeterRegistry.class);
-        counter = mock(Counter.class);
-
-        when(
-            meterRegistry.counter(anyString(), any(String[].class))
-        ).thenReturn(counter);
 
         useCase = new RevokeAllOtherSessionsUseCaseImpl(
             refreshTokenRepository,
             jtiBlacklistPort,
-            sessionTrackerPort,
-            meterRegistry
+            sessionTrackerPort
         );
     }
 
@@ -151,16 +140,6 @@ class RevokeAllOtherSessionsUseCaseImplTest {
             eq(currentSessionId),
             any(Instant.class)
         );
-
-        // Verify metrics
-        verify(meterRegistry).counter(
-            "auth.sessions.revoked",
-            "outcome",
-            "success",
-            "target",
-            "all_others"
-        );
-        verify(counter).increment();
     }
 
     @Test
@@ -178,19 +157,276 @@ class RevokeAllOtherSessionsUseCaseImplTest {
 
         useCase.revokeAllOtherSessions(userId, currentSessionId);
 
-        // No Redis calls needed
+        // No Redis or DB calls needed
         verifyNoInteractions(jtiBlacklistPort);
         verify(sessionTrackerPort, never()).removeSession(any());
-
-        // Verify metrics recorded
-        verify(meterRegistry).counter(
-            "auth.sessions.revoked",
-            "outcome",
-            "success",
-            "target",
-            "all_others"
+        verify(refreshTokenRepository, never()).revokeAllOtherActiveSessions(
+            any(),
+            any(),
+            any()
         );
-        verify(counter).increment();
+    }
+
+    @Test
+    void shouldSkipBlacklist_whenRemoteJtiIsBlank() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        UUID remoteId = UUID.randomUUID();
+
+        RefreshToken r1 = new RefreshToken(
+            remoteId,
+            userId,
+            "hash1",
+            "Chrome",
+            "1.1.1.1",
+            Instant.now().plusSeconds(3600),
+            null
+        );
+
+        when(
+            refreshTokenRepository.findActiveRemoteSessions(
+                eq(userId),
+                eq(currentSessionId),
+                any(Instant.class)
+            )
+        ).thenReturn(List.of(r1));
+
+        when(sessionTrackerPort.getActiveJti(remoteId)).thenReturn(
+            Optional.of("   ")
+        );
+
+        useCase.revokeAllOtherSessions(userId, currentSessionId);
+
+        // Blank JTI should NOT be blacklisted
+        verifyNoInteractions(jtiBlacklistPort);
+        // But session mapping must still be cleaned up
+        verify(sessionTrackerPort).removeSession(remoteId);
+        // And DB must be updated
+        verify(refreshTokenRepository).revokeAllOtherActiveSessions(
+            eq(userId),
+            eq(currentSessionId),
+            any(Instant.class)
+        );
+    }
+
+    @Test
+    void shouldClampTtlToZero_whenRemainingTtlIsNull() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        UUID remoteId = UUID.randomUUID();
+
+        RefreshToken r1 = new RefreshToken(
+            remoteId,
+            userId,
+            "hash1",
+            "Chrome",
+            "1.1.1.1",
+            Instant.now().plusSeconds(3600),
+            null
+        );
+
+        when(
+            refreshTokenRepository.findActiveRemoteSessions(
+                eq(userId),
+                eq(currentSessionId),
+                any(Instant.class)
+            )
+        ).thenReturn(List.of(r1));
+
+        when(sessionTrackerPort.getActiveJti(remoteId)).thenReturn(
+            Optional.of("jti-remote-1")
+        );
+        when(sessionTrackerPort.getRemainingTtl(remoteId)).thenReturn(null);
+
+        useCase.revokeAllOtherSessions(userId, currentSessionId);
+
+        // TTL clamped to Duration.ZERO
+        verify(jtiBlacklistPort).blacklistJti("jti-remote-1", Duration.ZERO);
+        verify(sessionTrackerPort).removeSession(remoteId);
+        verify(refreshTokenRepository).revokeAllOtherActiveSessions(
+            eq(userId),
+            eq(currentSessionId),
+            any(Instant.class)
+        );
+    }
+
+    @Test
+    void shouldClampTtlToZero_whenRemainingTtlIsNegative() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        UUID remoteId = UUID.randomUUID();
+
+        RefreshToken r1 = new RefreshToken(
+            remoteId,
+            userId,
+            "hash1",
+            "Chrome",
+            "1.1.1.1",
+            Instant.now().plusSeconds(3600),
+            null
+        );
+
+        when(
+            refreshTokenRepository.findActiveRemoteSessions(
+                eq(userId),
+                eq(currentSessionId),
+                any(Instant.class)
+            )
+        ).thenReturn(List.of(r1));
+
+        when(sessionTrackerPort.getActiveJti(remoteId)).thenReturn(
+            Optional.of("jti-remote-1")
+        );
+        when(sessionTrackerPort.getRemainingTtl(remoteId)).thenReturn(
+            Duration.ofSeconds(-15)
+        );
+
+        useCase.revokeAllOtherSessions(userId, currentSessionId);
+
+        // Negative TTL clamped to Duration.ZERO
+        verify(jtiBlacklistPort).blacklistJti("jti-remote-1", Duration.ZERO);
+        verify(sessionTrackerPort).removeSession(remoteId);
+        verify(refreshTokenRepository).revokeAllOtherActiveSessions(
+            eq(userId),
+            eq(currentSessionId),
+            any(Instant.class)
+        );
+    }
+
+    @Test
+    void shouldHandleRemoteSessionWithoutActiveJti_andStillRemoveSessionAndMutateDb() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        UUID remoteId = UUID.randomUUID();
+
+        RefreshToken r1 = new RefreshToken(
+            remoteId,
+            userId,
+            "hash1",
+            "Chrome",
+            "1.1.1.1",
+            Instant.now().plusSeconds(3600),
+            null
+        );
+
+        when(
+            refreshTokenRepository.findActiveRemoteSessions(
+                eq(userId),
+                eq(currentSessionId),
+                any(Instant.class)
+            )
+        ).thenReturn(List.of(r1));
+
+        when(sessionTrackerPort.getActiveJti(remoteId)).thenReturn(
+            Optional.empty()
+        );
+
+        useCase.revokeAllOtherSessions(userId, currentSessionId);
+
+        // No blacklist call
+        verifyNoInteractions(jtiBlacklistPort);
+        // Session mapping cleanup
+        verify(sessionTrackerPort).removeSession(remoteId);
+        // DB update performed
+        verify(refreshTokenRepository).revokeAllOtherActiveSessions(
+            eq(userId),
+            eq(currentSessionId),
+            any(Instant.class)
+        );
+    }
+
+    @Test
+    void shouldFailClosedAndNotMutateDb_whenRedisFailsOnGetActiveJti() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        UUID remoteId1 = UUID.randomUUID();
+
+        RefreshToken r1 = new RefreshToken(
+            remoteId1,
+            userId,
+            "hash1",
+            "Firefox",
+            "1.1.1.1",
+            Instant.now().plusSeconds(3600),
+            null
+        );
+
+        when(
+            refreshTokenRepository.findActiveRemoteSessions(
+                eq(userId),
+                eq(currentSessionId),
+                any(Instant.class)
+            )
+        ).thenReturn(List.of(r1));
+
+        doThrow(
+            new ServiceUnavailableException(
+                "urn:unihub:error:service-unavailable",
+                "Redis down"
+            )
+        )
+            .when(sessionTrackerPort)
+            .getActiveJti(remoteId1);
+
+        assertThatThrownBy(() ->
+            useCase.revokeAllOtherSessions(userId, currentSessionId)
+        ).isInstanceOf(ServiceUnavailableException.class);
+
+        // DB update must NOT have occurred
+        verify(refreshTokenRepository, never()).revokeAllOtherActiveSessions(
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
+    void shouldFailClosedAndNotMutateDb_whenRedisFailsOnGetRemainingTtl() {
+        UUID userId = UUID.randomUUID();
+        UUID currentSessionId = UUID.randomUUID();
+        UUID remoteId1 = UUID.randomUUID();
+
+        RefreshToken r1 = new RefreshToken(
+            remoteId1,
+            userId,
+            "hash1",
+            "Firefox",
+            "1.1.1.1",
+            Instant.now().plusSeconds(3600),
+            null
+        );
+
+        when(
+            refreshTokenRepository.findActiveRemoteSessions(
+                eq(userId),
+                eq(currentSessionId),
+                any(Instant.class)
+            )
+        ).thenReturn(List.of(r1));
+
+        when(sessionTrackerPort.getActiveJti(remoteId1)).thenReturn(
+            Optional.of("jti-remote-1")
+        );
+
+        doThrow(
+            new ServiceUnavailableException(
+                "urn:unihub:error:service-unavailable",
+                "Redis down"
+            )
+        )
+            .when(sessionTrackerPort)
+            .getRemainingTtl(remoteId1);
+
+        assertThatThrownBy(() ->
+            useCase.revokeAllOtherSessions(userId, currentSessionId)
+        ).isInstanceOf(ServiceUnavailableException.class);
+
+        // DB update must NOT have occurred
+        verify(refreshTokenRepository, never()).revokeAllOtherActiveSessions(
+            any(),
+            any(),
+            any()
+        );
     }
 
     @Test

@@ -2,9 +2,7 @@ package com.unihub.workshop.iam.domain.model;
 
 import java.time.Instant;
 import java.util.UUID;
-import lombok.Builder;
 
-@Builder(toBuilder = true)
 public record StudentDirectory(
     UUID id,
     UUID organizationId,

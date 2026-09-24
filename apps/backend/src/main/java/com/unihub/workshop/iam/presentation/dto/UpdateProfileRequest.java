@@ -9,11 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
 
-@Getter
-@Builder
 @AllArgsConstructor
 public class UpdateProfileRequest {
 
@@ -38,33 +34,32 @@ public class UpdateProfileRequest {
             throw new ValidationException("Request body must not be null");
         }
 
+        List<String> errors = new ArrayList<>();
+
         List<String> unknownFields = new ArrayList<>();
         for (String key : body.keySet()) {
             if (!ALLOWED_FIELDS.contains(key)) {
                 unknownFields.add(key);
             }
         }
-
-        if (!unknownFields.isEmpty()) {
-            List<String> errors = unknownFields
-                .stream()
-                .sorted()
-                .map(field -> field + ": Field is immutable or unrecognized")
-                .toList();
-            throw new ValidationException("Validation failed", errors);
+        for (String field : unknownFields.stream().sorted().toList()) {
+            errors.add(field + ": Field is immutable or unrecognized");
         }
 
         boolean hasFullName = body.containsKey("fullName");
         boolean hasPhoneNumber = body.containsKey("phoneNumber");
         boolean hasAvatarUrl = body.containsKey("avatarUrl");
 
-        if (!hasFullName && !hasPhoneNumber && !hasAvatarUrl) {
+        if (
+            !hasFullName &&
+            !hasPhoneNumber &&
+            !hasAvatarUrl &&
+            unknownFields.isEmpty()
+        ) {
             throw new ValidationException(
                 "At least one field must be provided for update."
             );
         }
-
-        List<String> errors = new ArrayList<>();
 
         String parsedFullName = null;
         if (hasFullName) {
@@ -74,13 +69,15 @@ public class UpdateProfileRequest {
             } else if (!(raw instanceof String)) {
                 errors.add("fullName: Full name must be a string");
             } else {
-                parsedFullName = (String) raw;
-                if (parsedFullName.trim().isEmpty()) {
+                String str = ((String) raw).trim();
+                if (str.isEmpty()) {
                     errors.add("fullName: Full name must not be blank");
-                } else if (parsedFullName.length() > 200) {
+                } else if (str.length() > 200) {
                     errors.add(
                         "fullName: Full name must not exceed 200 characters"
                     );
+                } else {
+                    parsedFullName = str;
                 }
             }
         }
@@ -92,17 +89,17 @@ public class UpdateProfileRequest {
                 if (!(raw instanceof String)) {
                     errors.add("phoneNumber: Phone number must be a string");
                 } else {
-                    parsedPhoneNumber = (String) raw;
-                    if (parsedPhoneNumber.length() > 20) {
+                    String str = ((String) raw).trim();
+                    if (str.length() > 20) {
                         errors.add(
                             "phoneNumber: Phone number must not exceed 20 characters"
                         );
-                    } else if (
-                        !PHONE_PATTERN.matcher(parsedPhoneNumber).matches()
-                    ) {
+                    } else if (!PHONE_PATTERN.matcher(str).matches()) {
                         errors.add(
                             "phoneNumber: Phone number must match international format ^\\+?[0-9]{8,15}$"
                         );
+                    } else {
+                        parsedPhoneNumber = str;
                     }
                 }
             }
@@ -115,15 +112,17 @@ public class UpdateProfileRequest {
                 if (!(raw instanceof String)) {
                     errors.add("avatarUrl: Avatar URL must be a string");
                 } else {
-                    parsedAvatarUrl = (String) raw;
-                    if (parsedAvatarUrl.length() > 2048) {
+                    String str = ((String) raw).trim();
+                    if (str.length() > 2048) {
                         errors.add(
                             "avatarUrl: Avatar URL must not exceed 2048 characters"
                         );
-                    } else if (!isValidAbsoluteUrl(parsedAvatarUrl)) {
+                    } else if (!isValidAbsoluteUrl(str)) {
                         errors.add(
                             "avatarUrl: Avatar URL must be a well-formed absolute URL"
                         );
+                    } else {
+                        parsedAvatarUrl = str;
                     }
                 }
             }
@@ -134,7 +133,7 @@ public class UpdateProfileRequest {
         }
 
         return new UpdateProfileRequest(
-            parsedFullName != null ? parsedFullName.trim() : null,
+            parsedFullName,
             hasFullName,
             parsedPhoneNumber,
             hasPhoneNumber,

@@ -52,13 +52,17 @@ public class ChangeUserPasswordUseCaseImpl
             .findById(userId)
             .orElseThrow(() -> new UnauthorizedException("User not found"));
 
+        if (!user.isActive()) {
+            throw new UnauthorizedException("Account is deactivated");
+        }
+
         if (
             currentPassword == null ||
             !passwordEncoder.matches(currentPassword, user.passwordHash())
         ) {
             throw new ValidationException(
                 "currentPassword",
-                "Current password does not match"
+                "Current password is incorrect."
             );
         }
 

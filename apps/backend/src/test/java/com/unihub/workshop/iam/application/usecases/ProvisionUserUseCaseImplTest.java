@@ -130,6 +130,86 @@ class ProvisionUserUseCaseImplTest {
     }
 
     @Test
+    void shouldThrowValidationException_whenEmailIsBlankOrNull() {
+        ProvisionUserCommand nullEmail = new ProvisionUserCommand(
+            ORG_ID,
+            CALLER_ID,
+            null,
+            "Staff User",
+            "+84901234567",
+            UserRole.STAFF
+        );
+        assertThatThrownBy(() -> useCase.execute(nullEmail))
+            .isInstanceOf(ValidationException.class)
+            .hasMessage("Email must not be blank");
+
+        ProvisionUserCommand blankEmail = new ProvisionUserCommand(
+            ORG_ID,
+            CALLER_ID,
+            "   ",
+            "Staff User",
+            "+84901234567",
+            UserRole.STAFF
+        );
+        assertThatThrownBy(() -> useCase.execute(blankEmail))
+            .isInstanceOf(ValidationException.class)
+            .hasMessage("Email must not be blank");
+    }
+
+    @Test
+    void shouldThrowValidationException_whenFullNameIsBlankOrNull() {
+        ProvisionUserCommand nullName = new ProvisionUserCommand(
+            ORG_ID,
+            CALLER_ID,
+            "staff@test.org",
+            null,
+            "+84901234567",
+            UserRole.STAFF
+        );
+        assertThatThrownBy(() -> useCase.execute(nullName))
+            .isInstanceOf(ValidationException.class)
+            .hasMessage("Full name must not be blank");
+
+        ProvisionUserCommand blankName = new ProvisionUserCommand(
+            ORG_ID,
+            CALLER_ID,
+            "staff@test.org",
+            "   ",
+            "+84901234567",
+            UserRole.STAFF
+        );
+        assertThatThrownBy(() -> useCase.execute(blankName))
+            .isInstanceOf(ValidationException.class)
+            .hasMessage("Full name must not be blank");
+    }
+
+    @Test
+    void shouldSetPhoneNumberToNull_whenPhoneNumberIsEmptyOrWhitespace() {
+        ProvisionUserCommand command = new ProvisionUserCommand(
+            ORG_ID,
+            CALLER_ID,
+            "staff.nophone@test.org",
+            "No Phone Staff",
+            "",
+            UserRole.STAFF
+        );
+
+        when(userRepository.existsByEmail("staff.nophone@test.org")).thenReturn(
+            false
+        );
+        when(passwordGenerator.generate()).thenReturn(
+            new PasswordGenerator.GeneratedPassword("pass123", "hash123")
+        );
+
+        when(userRepository.save(any(User.class))).thenAnswer(invocation ->
+            invocation.getArgument(0)
+        );
+
+        User result = useCase.execute(command);
+        assertThat(result.phoneNumber()).isNull();
+    }
+
+    @Test
     void shouldProvisionStaffMember_whenValidCommand() {
         ProvisionUserCommand command = new ProvisionUserCommand(
             ORG_ID,

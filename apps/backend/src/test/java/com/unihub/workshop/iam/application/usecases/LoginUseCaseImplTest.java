@@ -16,8 +16,6 @@ import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.security.IssuedToken;
 import com.unihub.workshop.shared.security.JwtTokenIssuer;
 import com.unihub.workshop.shared.security.SecurityProperties;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -37,7 +35,6 @@ class LoginUseCaseImplTest {
     private JwtTokenIssuer jwtTokenIssuer;
     private SecurityProperties securityProperties;
     private PasswordEncoder passwordEncoder;
-    private MeterRegistry meterRegistry;
     private LoginUseCaseImpl loginUseCase;
 
     @BeforeEach
@@ -48,7 +45,6 @@ class LoginUseCaseImplTest {
         jwtTokenIssuer = mock(JwtTokenIssuer.class);
         securityProperties = mock(SecurityProperties.class);
         passwordEncoder = new Argon2PasswordEncoder(16, 32, 1, 4096, 1);
-        meterRegistry = new SimpleMeterRegistry();
 
         when(securityProperties.accessTokenTtlMinutes()).thenReturn(15);
         when(securityProperties.refreshTokenTtlDays()).thenReturn(7);
@@ -59,8 +55,7 @@ class LoginUseCaseImplTest {
             sessionTrackerPort,
             jwtTokenIssuer,
             passwordEncoder,
-            securityProperties,
-            meterRegistry
+            securityProperties
         );
     }
 
@@ -128,11 +123,6 @@ class LoginUseCaseImplTest {
             eq("mock-jti"),
             eq(Duration.ofMinutes(15))
         );
-        assertThat(
-            meterRegistry
-                .counter("auth.login.attempts", "outcome", "success")
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -195,18 +185,6 @@ class LoginUseCaseImplTest {
         )
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED);
-
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -230,18 +208,6 @@ class LoginUseCaseImplTest {
         )
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED);
-
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "invalid_credentials"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -265,18 +231,6 @@ class LoginUseCaseImplTest {
         )
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.FORBIDDEN);
-
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "account_disabled"
-                )
-                .count()
-        ).isEqualTo(1.0);
     }
 
     @Test
@@ -300,17 +254,43 @@ class LoginUseCaseImplTest {
         )
             .isInstanceOf(AppException.class)
             .hasFieldOrPropertyWithValue("status", HttpStatus.FORBIDDEN);
+    }
 
-        assertThat(
-            meterRegistry
-                .counter(
-                    "auth.login.attempts",
-                    "outcome",
-                    "failure",
-                    "reason",
-                    "temporary_password"
-                )
-                .count()
-        ).isEqualTo(1.0);
+    @Test
+    void shouldNormalizeEmailBeforeLookingUpUser() {
+        String rawEmail = "  Student.Alice@University.EDU  ";
+        String normalizedEmail = "student.alice@university.edu";
+        String password = "password123";
+        String encodedPassword = passwordEncoder.encode(password);
+
+        User user = User.builder()
+            .id(UUID.randomUUID())
+            .role(UserRole.STUDENT)
+            .email(normalizedEmail)
+            .passwordHash(encodedPassword)
+            .isActive(true)
+            .isTemporaryPassword(false)
+            .build();
+
+        when(userRepository.findByEmail(normalizedEmail)).thenReturn(
+            Optional.of(user)
+        );
+        when(jwtTokenIssuer.issueToken(any(), any(), any(), any())).thenReturn(
+            new IssuedToken(
+                "access-token",
+                "jti",
+                Instant.now().plusSeconds(900)
+            )
+        );
+
+        LoginUseCase.LoginResult result = loginUseCase.login(
+            rawEmail,
+            password,
+            "device-1",
+            "127.0.0.1"
+        );
+
+        assertThat(result).isNotNull();
+        verify(userRepository).findByEmail(normalizedEmail);
     }
 }

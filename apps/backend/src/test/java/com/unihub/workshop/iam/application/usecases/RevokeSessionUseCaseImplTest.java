@@ -11,8 +11,6 @@ import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -25,8 +23,6 @@ class RevokeSessionUseCaseImplTest {
     private RefreshTokenRepository refreshTokenRepository;
     private JtiBlacklistPort jtiBlacklistPort;
     private SessionTrackerPort sessionTrackerPort;
-    private MeterRegistry meterRegistry;
-    private Counter counter;
     private RevokeSessionUseCaseImpl useCase;
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -38,18 +34,11 @@ class RevokeSessionUseCaseImplTest {
         refreshTokenRepository = mock(RefreshTokenRepository.class);
         jtiBlacklistPort = mock(JtiBlacklistPort.class);
         sessionTrackerPort = mock(SessionTrackerPort.class);
-        meterRegistry = mock(MeterRegistry.class);
-        counter = mock(Counter.class);
-
-        when(
-            meterRegistry.counter(anyString(), any(String[].class))
-        ).thenReturn(counter);
 
         useCase = new RevokeSessionUseCaseImpl(
             refreshTokenRepository,
             jtiBlacklistPort,
-            sessionTrackerPort,
-            meterRegistry
+            sessionTrackerPort
         );
     }
 
@@ -99,7 +88,6 @@ class RevokeSessionUseCaseImplTest {
             eq(USER_ID),
             any(Instant.class)
         );
-        verify(counter).increment();
     }
 
     @Test
@@ -138,7 +126,6 @@ class RevokeSessionUseCaseImplTest {
             eq(USER_ID),
             any(Instant.class)
         );
-        verify(counter).increment();
     }
 
     @Test
@@ -172,7 +159,6 @@ class RevokeSessionUseCaseImplTest {
             eq(USER_ID),
             any(Instant.class)
         );
-        verify(counter).increment();
     }
 
     @Test
@@ -306,5 +292,111 @@ class RevokeSessionUseCaseImplTest {
                 Instant.now()
             )
         ).isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void shouldRevokeCurrentSession_whenTokenExpiresAtIsInThePast_clampsTtlToZero() {
+        Instant pastExpiration = Instant.now().minusSeconds(100);
+        RefreshToken activeToken = createActiveToken(
+            CURRENT_SESSION_ID,
+            USER_ID
+        );
+
+        when(
+            refreshTokenRepository.findActiveSessionByIdAndUserId(
+                eq(CURRENT_SESSION_ID),
+                eq(USER_ID),
+                any(Instant.class)
+            )
+        ).thenReturn(Optional.of(activeToken));
+
+        useCase.revokeSession(
+            USER_ID,
+            CURRENT_SESSION_ID,
+            CURRENT_SESSION_ID,
+            CURRENT_JTI,
+            pastExpiration
+        );
+
+        verify(jtiBlacklistPort).blacklistJti(
+            eq(CURRENT_JTI),
+            eq(Duration.ZERO)
+        );
+        verify(sessionTrackerPort).removeSession(CURRENT_SESSION_ID);
+        verify(refreshTokenRepository).revokeActiveSession(
+            eq(CURRENT_SESSION_ID),
+            eq(USER_ID),
+            any(Instant.class)
+        );
+    }
+
+    @Test
+    void shouldRevokeRemoteSession_whenActiveJtiIsBlank_doesNotBlacklist() {
+        UUID remoteSessionId = UUID.randomUUID();
+        RefreshToken activeToken = createActiveToken(remoteSessionId, USER_ID);
+
+        when(
+            refreshTokenRepository.findActiveSessionByIdAndUserId(
+                eq(remoteSessionId),
+                eq(USER_ID),
+                any(Instant.class)
+            )
+        ).thenReturn(Optional.of(activeToken));
+        when(sessionTrackerPort.getActiveJti(remoteSessionId)).thenReturn(
+            Optional.of("   ")
+        );
+
+        useCase.revokeSession(
+            USER_ID,
+            remoteSessionId,
+            CURRENT_SESSION_ID,
+            CURRENT_JTI,
+            Instant.now().plusSeconds(1800)
+        );
+
+        verify(jtiBlacklistPort, never()).blacklistJti(any(), any());
+        verify(sessionTrackerPort).removeSession(remoteSessionId);
+        verify(refreshTokenRepository).revokeActiveSession(
+            eq(remoteSessionId),
+            eq(USER_ID),
+            any(Instant.class)
+        );
+    }
+
+    @Test
+    void shouldRevokeRemoteSession_whenRemainingTtlIsZeroOrNegative_clampsToZero() {
+        UUID remoteSessionId = UUID.randomUUID();
+        String remoteJti = "remote-jti-789";
+        RefreshToken activeToken = createActiveToken(remoteSessionId, USER_ID);
+
+        when(
+            refreshTokenRepository.findActiveSessionByIdAndUserId(
+                eq(remoteSessionId),
+                eq(USER_ID),
+                any(Instant.class)
+            )
+        ).thenReturn(Optional.of(activeToken));
+        when(sessionTrackerPort.getActiveJti(remoteSessionId)).thenReturn(
+            Optional.of(remoteJti)
+        );
+        when(sessionTrackerPort.getRemainingTtl(remoteSessionId)).thenReturn(
+            Duration.ofSeconds(-10)
+        );
+
+        useCase.revokeSession(
+            USER_ID,
+            remoteSessionId,
+            CURRENT_SESSION_ID,
+            CURRENT_JTI,
+            Instant.now().plusSeconds(1800)
+        );
+
+        verify(jtiBlacklistPort).blacklistJti(eq(remoteJti), eq(Duration.ZERO));
+        verify(sessionTrackerPort).removeSession(remoteSessionId);
+        verify(refreshTokenRepository).revokeActiveSession(
+            eq(remoteSessionId),
+            eq(USER_ID),
+            any(Instant.class)
+        );
     }
 }

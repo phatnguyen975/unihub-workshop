@@ -21,18 +21,32 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
     boolean existsByEmail(String email);
 
     @Modifying
-    @Query("UPDATE UserJpaEntity u SET u.lastLoginAt = :time WHERE u.id = :id")
+    @Query(
+        """
+        UPDATE UserJpaEntity u
+        SET u.lastLoginAt = :time
+        WHERE u.id = :id
+        """
+    )
     void updateLastLoginAt(@Param("id") UUID id, @Param("time") Instant time);
 
     @Modifying
     @Query(
-        "UPDATE UserJpaEntity u SET u.isActive = true, u.updatedAt = :now WHERE u.id = :id"
+        """
+        UPDATE UserJpaEntity u
+        SET u.isActive = true, u.updatedAt = :now
+        WHERE u.id = :id
+        """
     )
     void activateUser(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying
     @Query(
-        "UPDATE UserJpaEntity u SET u.isActive = :isActive, u.updatedAt = :now WHERE u.id = :id AND u.organizationId = :organizationId"
+        """
+        UPDATE UserJpaEntity u
+        SET u.isActive = :isActive, u.updatedAt = :now
+        WHERE u.id = :id AND u.organizationId = :organizationId
+        """
     )
     int updateIsActive(
         @Param("id") UUID id,
@@ -71,15 +85,39 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
                 OR LOWER(u.email) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
                 OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\')
             )
+        ORDER BY u.createdAt DESC, u.id DESC
+        """
+    )
+    List<UserJpaEntity> findFirstPage(
+        @Param("organizationId") UUID organizationId,
+        @Param("callerId") UUID callerId,
+        @Param("role") String role,
+        @Param("isActive") Boolean isActive,
+        @Param("search") String search,
+        Pageable pageable
+    );
+
+    @Query(
+        """
+        SELECT u FROM UserJpaEntity u
+        WHERE u.organizationId = :organizationId
+            AND u.id != :callerId
+            AND (:role IS NULL OR u.role = :role)
+            AND (:isActive IS NULL OR u.isActive = :isActive)
             AND (
-                :cursorTime IS NULL
-                OR u.createdAt < :cursorTime
+                :search IS NULL OR :search = ''
+                OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
+                OR LOWER(u.email) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
+                OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\')
+            )
+            AND (
+                u.createdAt < :cursorTime
                 OR (u.createdAt = :cursorTime AND u.id < :cursorId)
             )
         ORDER BY u.createdAt DESC, u.id DESC
         """
     )
-    List<UserJpaEntity> findMembers(
+    List<UserJpaEntity> findNextPage(
         @Param("organizationId") UUID organizationId,
         @Param("callerId") UUID callerId,
         @Param("role") String role,

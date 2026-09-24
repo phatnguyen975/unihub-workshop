@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -19,6 +20,7 @@ public class UserVerificationTokenRepositoryAdapter
     private final UserVerificationTokenPersistenceMapper tokenMapper;
 
     @Override
+    @Transactional
     public UserVerificationToken save(UserVerificationToken token) {
         UserVerificationTokenJpaEntity entity = tokenMapper.toEntity(token);
         UserVerificationTokenJpaEntity saved = repository.save(entity);
@@ -26,6 +28,7 @@ public class UserVerificationTokenRepositoryAdapter
     }
 
     @Override
+    @Transactional
     public Optional<UserVerificationToken> findLatestByUserIdAndType(
         UUID userId,
         String tokenType
@@ -39,11 +42,13 @@ public class UserVerificationTokenRepositoryAdapter
     }
 
     @Override
+    @Transactional
     public boolean markConsumed(UUID tokenId) {
         return repository.markConsumed(tokenId, Instant.now()) > 0;
     }
 
     @Override
+    @Transactional
     public void invalidateActiveTokens(UUID userId, String tokenType) {
         repository.invalidateActiveTokens(userId, tokenType, Instant.now());
     }

@@ -49,7 +49,7 @@ This contract defines the two REST endpoints exposed by the `workshops` module i
 
 **Validation Rules:**
 
-- `size` — optional integer; if supplied, must be in range `[1, 100]`. Values outside this range return `400 Bad Request`.
+- `size` — optional integer; if supplied, values below `1` return `400 Bad Request`, and values exceeding `100` are clamped to `100` (default: `20`).
 - `cursor` — optional opaque string; if supplied and malformed (cannot be decoded to a valid pagination position), returns `400 Bad Request`.
 
 #### Response

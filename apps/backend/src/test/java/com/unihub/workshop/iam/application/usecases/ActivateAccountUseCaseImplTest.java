@@ -11,6 +11,7 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.exception.ConflictException;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -124,13 +125,13 @@ class ActivateAccountUseCaseImplTest {
     }
 
     @Test
-    void shouldThrowValidationExceptionWhenUserNotFound() {
+    void shouldThrowNotFoundExceptionWhenUserNotFound() {
         String email = "nonexistent@university.edu";
         when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.activate(email, "123456"))
-            .isInstanceOf(ValidationException.class)
-            .hasMessage("Invalid or expired activation code.");
+            .isInstanceOf(NotFoundException.class)
+            .hasMessage("No account found for this email.");
 
         verify(userRepository, never()).activate(any());
         verify(userVerificationTokenRepository, never()).markConsumed(any());
@@ -316,5 +317,20 @@ class ActivateAccountUseCaseImplTest {
 
         verify(userRepository, never()).activate(any());
         verify(userVerificationTokenRepository, never()).markConsumed(any());
+    }
+
+    @Test
+    void shouldNormalizeEmailBeforeLookup() {
+        String rawEmail = "  Student.Alice@University.EDU  ";
+        String normalizedEmail = "student.alice@university.edu";
+        when(userRepository.findByEmail(normalizedEmail)).thenReturn(
+            Optional.empty()
+        );
+
+        assertThatThrownBy(() ->
+            useCase.activate(rawEmail, "123456")
+        ).isInstanceOf(NotFoundException.class);
+
+        verify(userRepository).findByEmail(normalizedEmail);
     }
 }

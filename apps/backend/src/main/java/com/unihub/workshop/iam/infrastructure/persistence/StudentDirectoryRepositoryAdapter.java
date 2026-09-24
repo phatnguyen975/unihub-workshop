@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.infrastructure.persistence.mapper.StudentDirector
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class StudentDirectoryRepositoryAdapter
     private final StudentDirectoryPersistenceMapper studentDirectoryMapper;
 
     @Override
+    @Transactional
     public Optional<StudentDirectory> findActiveByEmail(String email) {
         return repository
             .findByEmailAndStatus(email, "ACTIVE")

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.unihub.workshop.iam.application.ports.in.ActivateAccountUseCase;
 import com.unihub.workshop.shared.exception.ConflictException;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -176,5 +177,91 @@ class AuthControllerActivateTest {
                 jsonPath("$.error.type").value("urn:unihub:error:validation")
             )
             .andExpect(jsonPath("$.error.validationErrors[0]").exists());
+    }
+
+    @Test
+    void shouldReturn404WhenEmailNotFound() throws Exception {
+        doThrow(new NotFoundException("No account found for this email."))
+            .when(activateAccountUseCase)
+            .activate(any(), any());
+
+        String requestBody = """
+        {
+            "email": "notfound@university.edu",
+            "otp": "123456"
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/activate")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:not-found")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "No account found for this email."
+                )
+            );
+    }
+
+    @Test
+    void shouldTrimWhitespaceFromEmailAndOtpOnActivate() throws Exception {
+        String requestBody = """
+        {
+            "email": "  student@university.edu  ",
+            "otp": "  123456  "
+        }
+        """;
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/activate")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+
+        verify(activateAccountUseCase).activate(
+            "student@university.edu",
+            "123456"
+        );
+    }
+
+    @Test
+    void shouldReturn400OnMalformedJson() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/activate")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{ malformed json }")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    void shouldReturn422WhenFieldsAreMissing() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/activate")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            )
+            .andExpect(jsonPath("$.error.validationErrors.length()").value(2));
     }
 }

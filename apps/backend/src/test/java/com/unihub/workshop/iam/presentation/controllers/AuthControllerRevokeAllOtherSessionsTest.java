@@ -118,6 +118,76 @@ class AuthControllerRevokeAllOtherSessionsTest {
     }
 
     @Test
+    void shouldReturn204_whenOrganizerRevokesAllOtherSessionsSuccessfully()
+        throws Exception {
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+            USER_ID.toString(),
+            UUID.randomUUID().toString(),
+            CURRENT_JTI,
+            "ORGANIZER",
+            CURRENT_SESSION_ID.toString(),
+            Instant.now(),
+            Instant.now().plusSeconds(3600)
+        );
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(
+            principal,
+            null,
+            "ROLE_ORGANIZER"
+        );
+
+        mockMvc
+            .perform(delete("/api/v1/auth/sessions").principal(auth))
+            .andExpect(status().isNoContent());
+
+        verify(revokeAllOtherSessionsUseCase).revokeAllOtherSessions(
+            eq(USER_ID),
+            eq(CURRENT_SESSION_ID)
+        );
+    }
+
+    @Test
+    void shouldReturn204_whenStaffRevokesAllOtherSessionsSuccessfully()
+        throws Exception {
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+            USER_ID.toString(),
+            null,
+            CURRENT_JTI,
+            "STAFF",
+            CURRENT_SESSION_ID.toString(),
+            Instant.now(),
+            Instant.now().plusSeconds(3600)
+        );
+        TestingAuthenticationToken auth = new TestingAuthenticationToken(
+            principal,
+            null,
+            "ROLE_STAFF"
+        );
+
+        mockMvc
+            .perform(delete("/api/v1/auth/sessions").principal(auth))
+            .andExpect(status().isNoContent());
+
+        verify(revokeAllOtherSessionsUseCase).revokeAllOtherSessions(
+            eq(USER_ID),
+            eq(CURRENT_SESSION_ID)
+        );
+    }
+
+    @Test
+    void shouldReturn400_whenSidIsBlankString() throws Exception {
+        mockMvc
+            .perform(
+                delete("/api/v1/auth/sessions").principal(createAuth("   "))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verifyNoInteractions(revokeAllOtherSessionsUseCase);
+    }
+
+    @Test
     void shouldReturn503WithRetryAfter_whenRedisIsUnavailable()
         throws Exception {
         doThrow(

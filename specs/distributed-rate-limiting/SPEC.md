@@ -87,6 +87,7 @@ N/A — this feature does not introduce or modify any stateful PostgreSQL entity
 - **Security:** The bucket key for authenticated users must be `jwt.sub` (the user's UUID), never a client-supplied header value such as `X-User-Id`. For unauthenticated IP keying, the IP must be extracted from the `X-Forwarded-For` header set by Nginx (the trusted proxy), taking only the leftmost entry that represents the real client — not blind trust of all `X-Forwarded-For` values, which can be spoofed by clients.
 - **Reliability / Failure modes:**
   - **Redis unreachable:** fail-open (FR-11). Log WARN + increment metric (FR-12, FR-13).
+  - **Driver-level fail-fast:** Lettuce client configuration (`REJECT_COMMANDS`, `TimeoutOptions.enabled()`) ensures that when Redis is disconnected, commands are rejected in <1ms without command buffering, allowing the rate-limit filter to execute its fail-open fallback immediately without thread pool blocking.
   - **Redis command timeout:** Bucket4j command timeout must be configured short (recommended ≤ 100 ms) to bound added latency. On timeout, treat as Redis unavailable and fail open.
   - **JVM crash mid-decrement:** Bucket4j sets a TTL on bucket keys in Redis. On key expiry and recreation the counter resets to full capacity — a safe, self-healing outcome.
 - **Observability:**
@@ -211,16 +212,16 @@ And the response header "X-RateLimit-Remaining" equals "19"
 
 ## 9. Linked References
 
-| Reference                                                    | Relevance                                                                                                                                            |
-| :----------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/feature-catalog.md §10.1 distributed-rate-limiting`    | Authoritative feature entry: module ownership (`shared/web`, `shared/config`, `shared/observability`), system flow refs, ADR refs, key constraints   |
-| `docs/system-design.md §6 — Traffic Spike Management`        | Sequence diagram and rationale for Token Bucket in the application filter layer; fail-open model described                                           |
-| `docs/system-design.md §4 — Workshop Registration Flow`      | Rate limiting as Step 1 in the registration flow, preceding idempotency check and Redis capacity DECR                                                |
-| `docs/system-design.md §6 — System Telemetry & Core Metrics` | Bucket4j rate-limiting drop rate tracked via Redis counter; Grafana `redis-bucket4j.json` dashboard                                                  |
-| `docs/adrs.md ADR-010`                                       | Redis fail-open for rate limiting; `rate_limiter.redis_unavailable` metric mandate; fail-closed for capacity DECR (distinct concern)                 |
-| `docs/adrs.md ADR-019`                                       | Bucket4j Token Bucket mandate; per-user bucket keying by `jwt.sub`; backend filter placement (Nginx excluded); registration vs. default tier tuning  |
-| `docs/api-standards.md §Standard Response Headers`           | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After` header spec                                                                  |
-| `docs/api-standards.md §CORS Policy`                         | `X-RateLimit-*` headers must appear in `Access-Control-Expose-Headers` and `Access-Control-Allow-Headers`                                            |
-| `docs/api-standards.md §HTTP Status Codes`                   | 429 Too Many Requests — Bucket4j rate limit exceeded                                                                                                 |
-| `docs/api-standards.md §Error Response — RFC 7807`           | Mandatory error envelope format for the 429 response body                                                                                            |
-| `docs/project-structure.md §Core Backend`                    | `shared/web` (HTTP filters), `shared/config` (infrastructure beans), `shared/observability` (Micrometer metrics) package locations                   |
+| Reference                                                    | Relevance                                                                                                                                           |
+| :----------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/feature-catalog.md §10.1 distributed-rate-limiting`    | Authoritative feature entry: module ownership (`shared/web`, `shared/config`, `shared/observability`), system flow refs, ADR refs, key constraints  |
+| `docs/system-design.md §6 — Traffic Spike Management`        | Sequence diagram and rationale for Token Bucket in the application filter layer; fail-open model described                                          |
+| `docs/system-design.md §4 — Workshop Registration Flow`      | Rate limiting as Step 1 in the registration flow, preceding idempotency check and Redis capacity DECR                                               |
+| `docs/system-design.md §6 — System Telemetry & Core Metrics` | Bucket4j rate-limiting drop rate tracked via Redis counter; Grafana `redis-bucket4j.json` dashboard                                                 |
+| `docs/adrs.md ADR-010`                                       | Redis fail-open for rate limiting; `rate_limiter.redis_unavailable` metric mandate; fail-closed for capacity DECR (distinct concern)                |
+| `docs/adrs.md ADR-019`                                       | Bucket4j Token Bucket mandate; per-user bucket keying by `jwt.sub`; backend filter placement (Nginx excluded); registration vs. default tier tuning |
+| `docs/api-standards.md §Standard Response Headers`           | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Retry-After` header spec                                                                 |
+| `docs/api-standards.md §CORS Policy`                         | `X-RateLimit-*` headers must appear in `Access-Control-Expose-Headers` and `Access-Control-Allow-Headers`                                           |
+| `docs/api-standards.md §HTTP Status Codes`                   | 429 Too Many Requests — Bucket4j rate limit exceeded                                                                                                |
+| `docs/api-standards.md §Error Response — RFC 7807`           | Mandatory error envelope format for the 429 response body                                                                                           |
+| `docs/project-structure.md §Core Backend`                    | `shared/web` (HTTP filters), `shared/config` (infrastructure beans), `shared/observability` (Micrometer metrics) package locations                  |

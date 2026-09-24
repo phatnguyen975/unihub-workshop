@@ -33,19 +33,37 @@ public class UpdateUserProfileUseCaseImpl implements UpdateUserProfileUseCase {
                 "At least one field must be provided for update."
             );
         }
+        if (command.hasFullName()) {
+            if (command.fullName() == null) {
+                throw new ValidationException(
+                    "Full name may not be set to null"
+                );
+            }
+            if (command.fullName().trim().isEmpty()) {
+                throw new ValidationException("Full name must not be blank");
+            }
+        }
 
         User existing = userRepository
             .findById(userId)
             .orElseThrow(() -> new UnauthorizedException("User not found"));
 
+        if (!existing.isActive()) {
+            throw new UnauthorizedException("Account is deactivated");
+        }
+
         String newFullName = command.hasFullName()
-            ? command.fullName()
+            ? command.fullName().trim()
             : existing.fullName();
         String newPhoneNumber = command.hasPhoneNumber()
-            ? command.phoneNumber()
+            ? command.phoneNumber() != null
+                ? command.phoneNumber().trim()
+                : null
             : existing.phoneNumber();
         String newAvatarUrl = command.hasAvatarUrl()
-            ? command.avatarUrl()
+            ? command.avatarUrl() != null
+                ? command.avatarUrl().trim()
+                : null
             : existing.avatarUrl();
 
         User updated = existing.updateProfile(

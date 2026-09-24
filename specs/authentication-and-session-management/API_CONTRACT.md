@@ -47,10 +47,10 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 }
 ```
 
-| Field      | Type   | Required | Constraints                                  |
-| :--------- | :----- | :------: | :------------------------------------------- |
-| `email`    | string |   Yes    | Non-blank, valid email format, max 254 chars |
-| `password` | string |   Yes    | Non-blank, max 255 chars                     |
+| Field      | Type   | Required | Constraints                                                            |
+| :--------- | :----- | :------: | :--------------------------------------------------------------------- |
+| `email`    | string |   Yes    | Non-blank, valid email format, max 254 chars (whitespace auto-trimmed) |
+| `password` | string |   Yes    | Non-blank, max 255 chars                                               |
 
 ### Success Response — 200 OK
 
@@ -110,15 +110,16 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ### Error Responses
 
-| Scenario                                      | HTTP Status | `type`                                 | `title`               | Notes                                                                                                                                             |
-| :-------------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Wrong password or unknown email               |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Generic; does not distinguish email-not-found from wrong-password (anti-enumeration)                                                              |
-| Account is inactive                           |    `403`    | `urn:unihub:error:account-disabled`    | Forbidden             | `is_active = FALSE`                                                                                                                               |
-| Temporary password must be reset              |    `403`    | `urn:unihub:error:temporary-password`  | Forbidden             | `is_temporary_password = TRUE`; client must route to password-change screen (`POST /api/v1/auth/password/temporary`)                              |
-| Request body validation failure               |    `422`    | `urn:unihub:error:validation`          | Unprocessable Content | Missing or invalid `email`/`password` fields; returns `validationErrors` list                                                                     |
-| Malformed JSON body                           |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                                                                                                           |
-| Redis unavailable (JTI write on future calls) |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included. Login itself does not write to Redis; this only applies if Redis is checked during subsequent protected calls. |
-| Unexpected server error                       |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)                                                                                         |
+| Scenario                                      | HTTP Status | `type`                                    | `title`                | Notes                                                                                                                                             |
+| :-------------------------------------------- | :---------: | :---------------------------------------- | :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Wrong password or unknown email               |    `401`    | `urn:unihub:error:unauthorized`           | Unauthorized           | Generic; does not distinguish email-not-found from wrong-password (anti-enumeration)                                                              |
+| Account is inactive                           |    `403`    | `urn:unihub:error:account-disabled`       | Forbidden              | `is_active = FALSE`                                                                                                                               |
+| Temporary password must be reset              |    `403`    | `urn:unihub:error:temporary-password`     | Forbidden              | `is_temporary_password = TRUE`; client must route to password-change screen (`POST /api/v1/auth/password/temporary`)                              |
+| Request body validation failure               |    `422`    | `urn:unihub:error:validation`             | Unprocessable Content  | Missing or invalid `email`/`password` fields; returns `validationErrors` list                                                                     |
+| Malformed JSON body                           |    `400`    | `urn:unihub:error:bad-request`            | Bad Request            | Unparseable JSON syntax                                                                                                                           |
+| Unsupported Content-Type                      |    `415`    | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Request `Content-Type` header is not `application/json`                                                                                           |
+| Redis unavailable (JTI write on future calls) |    `503`    | `urn:unihub:error:service-unavailable`    | Service Unavailable    | `Retry-After: 30` header included. Login itself does not write to Redis; this only applies if Redis is checked during subsequent protected calls. |
+| Unexpected server error                       |    `500`    | `urn:unihub:error:internal`               | Internal Server Error  | Unhandled server error (technical stack trace suppressed)                                                                                         |
 
 **RFC 7807 Error body shape (Authentication Failed):**
 
@@ -200,9 +201,9 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 }
 ```
 
-| Field          | Type   | Required | Constraints |
-| :------------- | :----- | :------: | :---------- |
-| `refreshToken` | string |   Yes    | Non-blank   |
+| Field          | Type   | Required | Constraints                                                                           |
+| :------------- | :----- | :------: | :------------------------------------------------------------------------------------ |
+| `refreshToken` | string |   Yes    | Non-blank, max 255 chars (whitespace is automatically trimmed by compact constructor) |
 
 ### Success Response — 200 OK
 
@@ -239,15 +240,17 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 
 ### Error Responses
 
-| Scenario                                 | HTTP Status | `type`                                 | `title`               | Notes                                                                  |
-| :--------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :--------------------------------------------------------------------- |
-| Token not found (unknown hash)           |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | No matching `token_hash` in `refresh_tokens`                           |
-| Token revoked (`revoked_at IS NOT NULL`) |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Token was already rotated or explicitly revoked                        |
-| Token expired (`expires_at < NOW()`)     |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Refresh token TTL has lapsed                                           |
-| Request body validation failure          |    `422`    | `urn:unihub:error:validation`          | Unprocessable Content | Missing or blank `refreshToken` field; returns `validationErrors` list |
-| Malformed JSON body                      |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                                |
-| Redis unavailable                        |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included                                      |
-| Unexpected server error                  |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)              |
+| Scenario                                 | HTTP Status | `type`                                    | `title`                | Notes                                                                             |
+| :--------------------------------------- | :---------: | :---------------------------------------- | :--------------------- | :-------------------------------------------------------------------------------- |
+| Token not found (unknown hash)           |    `401`    | `urn:unihub:error:unauthorized`           | Unauthorized           | No matching `token_hash` in `refresh_tokens`                                      |
+| Token revoked (`revoked_at IS NOT NULL`) |    `401`    | `urn:unihub:error:unauthorized`           | Unauthorized           | Token was already rotated or explicitly revoked                                   |
+| Token expired (`expires_at < NOW()`)     |    `401`    | `urn:unihub:error:unauthorized`           | Unauthorized           | Refresh token TTL has lapsed                                                      |
+| Inactive or temporary password user      |    `401`    | `urn:unihub:error:unauthorized`           | Unauthorized           | Account disabled (`is_active=false`) or temporary password reset required (BR-08) |
+| Request body validation failure          |    `422`    | `urn:unihub:error:validation`             | Unprocessable Content  | Missing, blank, or > 255 chars `refreshToken`; returns `validationErrors` list    |
+| Malformed JSON body                      |    `400`    | `urn:unihub:error:bad-request`            | Bad Request            | Unparseable JSON syntax                                                           |
+| Unsupported media type                   |    `415`    | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Sent payload without `Content-Type: application/json`                             |
+| Redis unavailable                        |    `503`    | `urn:unihub:error:service-unavailable`    | Service Unavailable    | `Retry-After: 30` header included                                                 |
+| Unexpected server error                  |    `500`    | `urn:unihub:error:internal`               | Internal Server Error  | Unhandled server error (technical stack trace suppressed)                         |
 
 ## Endpoint 3 — Logout: `POST /api/v1/auth/logout`
 
@@ -272,9 +275,9 @@ All API endpoints comply with the following invariants from `docs/api-standards.
 }
 ```
 
-| Field          | Type   | Required | Description                                                                                                                                                                 |
-| :------------- | :----- | :------: | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `refreshToken` | string |    No    | If provided, the system revokes only this specific refresh token row. If absent, all non-expired, non-revoked refresh tokens for the user are revoked (full session clear). |
+| Field          | Type   | Required | Description                                                                                                                                                                                          |
+| :------------- | :----- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `refreshToken` | string |    No    | If provided, max 255 chars (whitespace automatically trimmed by compact constructor). If absent or blank, all non-expired, non-revoked refresh tokens for the user are revoked (full session clear). |
 
 ### Success Response — 204 No Content
 
@@ -287,12 +290,14 @@ No response body.
 
 ### Error Responses
 
-| Scenario                                      | HTTP Status | `type`                                 | `title`               | Notes                                                      |
-| :-------------------------------------------- | :---------: | :------------------------------------- | :-------------------- | :--------------------------------------------------------- |
-| Malformed JSON body                           |    `400`    | `urn:unihub:error:bad-request`         | Bad Request           | Unparseable JSON syntax                                    |
-| Missing or invalid Bearer token               |    `401`    | `urn:unihub:error:unauthorized`        | Unauthorized          | Standard filter rejection before the endpoint is reached   |
-| Unexpected server error                       |    `500`    | `urn:unihub:error:internal`            | Internal Server Error | Unhandled server error (technical stack trace suppressed)  |
-| Redis unavailable (JTI blacklist write fails) |    `503`    | `urn:unihub:error:service-unavailable` | Service Unavailable   | `Retry-After: 30` header included. No DB changes are made. |
+| Scenario                                      | HTTP Status | `type`                                    | `title`                | Notes                                                       |
+| :-------------------------------------------- | :---------: | :---------------------------------------- | :--------------------- | :---------------------------------------------------------- |
+| Request body validation failure               |    `422`    | `urn:unihub:error:validation`             | Unprocessable Content  | > 255 chars `refreshToken`; returns `validationErrors` list |
+| Malformed JSON body                           |    `400`    | `urn:unihub:error:bad-request`            | Bad Request            | Unparseable JSON syntax                                     |
+| Unsupported media type                        |    `415`    | `urn:unihub:error:unsupported-media-type` | Unsupported Media Type | Sent payload without `Content-Type: application/json`       |
+| Missing or invalid Bearer token               |    `401`    | `urn:unihub:error:unauthorized`           | Unauthorized           | Standard filter rejection before the endpoint is reached    |
+| Redis unavailable (JTI blacklist write fails) |    `503`    | `urn:unihub:error:service-unavailable`    | Service Unavailable    | `Retry-After: 30` header included. No DB changes are made.  |
+| Unexpected server error                       |    `500`    | `urn:unihub:error:internal`               | Internal Server Error  | Unhandled server error (technical stack trace suppressed)   |
 
 ## Endpoint 4 — JWKS (Public Key): `GET /.well-known/jwks.json`
 
@@ -313,10 +318,10 @@ No request body or query parameters.
   "keys": [
     {
       "kty": "RSA",
+      "e": "AQAB",
       "use": "sig",
-      "alg": "RS256",
       "n": "sn38-rsa-public-modulus-base64url-encoded...",
-      "e": "AQAB"
+      "alg": "RS256"
     }
   ]
 }

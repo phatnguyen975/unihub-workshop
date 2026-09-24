@@ -6,7 +6,6 @@ import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.application.ports.out.SessionTrackerPort;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.NotFoundException;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -23,11 +22,9 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JtiBlacklistPort jtiBlacklistPort;
     private final SessionTrackerPort sessionTrackerPort;
-    private final MeterRegistry meterRegistry;
 
     @Override
     @Transactional(propagation = Propagation.NEVER)
-    // Enforce fail-closed: Redis operations must succeed before any DB mutation
     public void revokeSession(
         UUID userId,
         UUID sessionIdToRevoke,
@@ -70,10 +67,13 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
             Optional<String> remoteJti = sessionTrackerPort.getActiveJti(
                 sessionIdToRevoke
             );
-            if (remoteJti.isPresent()) {
+            if (remoteJti.isPresent() && !remoteJti.get().isBlank()) {
                 Duration remainingTtl = sessionTrackerPort.getRemainingTtl(
                     sessionIdToRevoke
                 );
+                if (remainingTtl == null || remainingTtl.isNegative()) {
+                    remainingTtl = Duration.ZERO;
+                }
                 jtiBlacklistPort.blacklistJti(remoteJti.get(), remainingTtl);
             }
         }
@@ -85,16 +85,5 @@ public class RevokeSessionUseCaseImpl implements RevokeSessionUseCase {
             userId,
             now
         );
-
-        // 4. Record metric
-        meterRegistry
-            .counter(
-                "auth.sessions.revoked",
-                "outcome",
-                "success",
-                "target",
-                isCurrent ? "current" : "single"
-            )
-            .increment();
     }
 }

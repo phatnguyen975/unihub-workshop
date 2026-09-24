@@ -9,12 +9,14 @@ import com.unihub.workshop.iam.domain.model.UserVerificationToken;
 import com.unihub.workshop.shared.events.OtpRequestedEvent;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ResendOtpUseCaseImpl implements ResendOtpUseCase {
 
     private final UserRepository userRepository;
@@ -27,6 +29,7 @@ public class ResendOtpUseCaseImpl implements ResendOtpUseCase {
     public void resendOtp(String email) {
         String normalizedEmail =
             email != null ? email.toLowerCase().trim() : "";
+
         User user = userRepository
             .findByEmail(normalizedEmail)
             .orElseThrow(() ->
@@ -34,55 +37,55 @@ public class ResendOtpUseCaseImpl implements ResendOtpUseCase {
             );
 
         if (user.isActive()) {
-            userVerificationTokenRepository.invalidateActiveTokens(
-                user.id(),
-                UserVerificationToken.TYPE_PASSWORD_RESET_OTP
+            issueOtp(
+                user,
+                UserVerificationToken.TYPE_PASSWORD_RESET_OTP,
+                OtpRequestedEvent.PURPOSE_PASSWORD_RESET
             );
-
-            String otp = otpService.generateOtp();
-            String tokenHash = otpService.hashOtp(otp);
-
-            UserVerificationToken token =
-                UserVerificationToken.createPasswordResetOtp(
-                    user.id(),
-                    tokenHash,
-                    otpService.calculateExpiryInstant()
-                );
-            userVerificationTokenRepository.save(token);
-
-            eventPublisher.publishEvent(
-                new OtpRequestedEvent(
-                    user.id(),
-                    user.email(),
-                    otp,
-                    OtpRequestedEvent.PURPOSE_PASSWORD_RESET
-                )
+        } else {
+            issueOtp(
+                user,
+                UserVerificationToken.TYPE_ACTIVATION_OTP,
+                OtpRequestedEvent.PURPOSE_ACTIVATION
             );
-            return;
         }
+    }
 
+    private void issueOtp(User user, String tokenType, String purpose) {
         userVerificationTokenRepository.invalidateActiveTokens(
             user.id(),
-            UserVerificationToken.TYPE_ACTIVATION_OTP
+            tokenType
         );
 
         String otp = otpService.generateOtp();
         String tokenHash = otpService.hashOtp(otp);
 
-        UserVerificationToken token = UserVerificationToken.createActivationOtp(
+        // TODO: Remove OTP logging before production deployment once notifications worker is fully active.
+        log.info(
+            "Resent {} OTP for user {} (email: {}): {}",
+            purpose.toLowerCase(),
             user.id(),
-            tokenHash,
-            otpService.calculateExpiryInstant()
+            user.email(),
+            otp
         );
+
+        UserVerificationToken token =
+            UserVerificationToken.TYPE_PASSWORD_RESET_OTP.equals(tokenType)
+                ? UserVerificationToken.createPasswordResetOtp(
+                      user.id(),
+                      tokenHash,
+                      otpService.calculateExpiryInstant()
+                  )
+                : UserVerificationToken.createActivationOtp(
+                      user.id(),
+                      tokenHash,
+                      otpService.calculateExpiryInstant()
+                  );
+
         userVerificationTokenRepository.save(token);
 
         eventPublisher.publishEvent(
-            new OtpRequestedEvent(
-                user.id(),
-                user.email(),
-                otp,
-                OtpRequestedEvent.PURPOSE_ACTIVATION
-            )
+            new OtpRequestedEvent(user.id(), user.email(), otp, purpose)
         );
     }
 }
