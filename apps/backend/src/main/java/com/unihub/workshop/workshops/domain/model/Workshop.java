@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.domain.model;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 
@@ -27,8 +28,15 @@ public record Workshop(
     Instant createdAt,
     Instant updatedAt,
     UUID createdBy,
-    UUID updatedBy
+    UUID updatedBy,
+    List<Speaker> speakers
 ) {
+    public Workshop {
+        if (speakers == null) {
+            speakers = List.of();
+        }
+    }
+
     public static Workshop createDraft(
         UUID organizationId,
         String title,
@@ -43,6 +51,40 @@ public record Workshop(
         BigDecimal price,
         String currency,
         UUID createdBy
+    ) {
+        return createDraft(
+            organizationId,
+            title,
+            slug,
+            description,
+            coverImageUrl,
+            location,
+            timezone,
+            startsAt,
+            endsAt,
+            capacity,
+            price,
+            currency,
+            createdBy,
+            List.of()
+        );
+    }
+
+    public static Workshop createDraft(
+        UUID organizationId,
+        String title,
+        String slug,
+        String description,
+        String coverImageUrl,
+        String location,
+        String timezone,
+        Instant startsAt,
+        Instant endsAt,
+        Integer capacity,
+        BigDecimal price,
+        String currency,
+        UUID createdBy,
+        List<Speaker> speakers
     ) {
         Instant now = Instant.now();
         return Workshop.builder()
@@ -71,6 +113,7 @@ public record Workshop(
             .updatedAt(now)
             .createdBy(createdBy)
             .updatedBy(createdBy)
+            .speakers(speakers != null ? List.copyOf(speakers) : List.of())
             .build();
     }
 
@@ -88,6 +131,38 @@ public record Workshop(
         String currency,
         UUID updatedBy
     ) {
+        return updateDraft(
+            title,
+            slug,
+            description,
+            coverImageUrl,
+            location,
+            timezone,
+            startsAt,
+            endsAt,
+            capacity,
+            price,
+            currency,
+            updatedBy,
+            null
+        );
+    }
+
+    public Workshop updateDraft(
+        String title,
+        String slug,
+        String description,
+        String coverImageUrl,
+        String location,
+        String timezone,
+        Instant startsAt,
+        Instant endsAt,
+        Integer capacity,
+        BigDecimal price,
+        String currency,
+        UUID updatedBy,
+        List<Speaker> speakers
+    ) {
         if (this.status != WorkshopStatus.DRAFT) {
             throw new com.unihub.workshop.shared.exception.ConflictException(
                 "INVALID_WORKSHOP_STATUS",
@@ -95,6 +170,13 @@ public record Workshop(
             );
         }
         Instant now = Instant.now();
+        List<Speaker> effectiveSpeakers =
+            speakers != null
+                ? List.copyOf(speakers)
+                : this.speakers != null
+                  ? this.speakers
+                  : List.of();
+
         return this.toBuilder()
             .title(title)
             .slug(slug != null ? slug : this.slug)
@@ -127,6 +209,7 @@ public record Workshop(
             )
             .updatedAt(now)
             .updatedBy(updatedBy)
+            .speakers(effectiveSpeakers)
             .build();
     }
 }

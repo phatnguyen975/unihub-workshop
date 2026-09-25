@@ -10,6 +10,7 @@ import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,6 +38,18 @@ public class WorkshopController {
         UUID callerId = SecurityContextUtils.extractUserId(authentication);
         UUID organizationId = getVerifiedOrganizationId(authentication);
 
+        List<SaveDraftCommand.SpeakerCommand> speakerCommands = request.speakers() != null
+            ? request.speakers().stream()
+                .map(s -> SaveDraftCommand.SpeakerCommand.builder()
+                    .name(s.name())
+                    .email(s.email())
+                    .bio(s.bio())
+                    .avatarUrl(s.avatarUrl())
+                    .linkedinUrl(s.linkedinUrl())
+                    .build())
+                .toList()
+            : null;
+
         SaveDraftCommand command = SaveDraftCommand.builder()
             .id(request.id())
             .version(request.version())
@@ -52,6 +65,7 @@ public class WorkshopController {
             .capacity(request.capacity())
             .price(request.price())
             .currency(request.currency())
+            .speakers(speakerCommands)
             .build();
 
         Workshop workshop = saveDraftUseCase.execute(command);

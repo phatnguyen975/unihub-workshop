@@ -2,8 +2,12 @@ package com.unihub.workshop.workshops.infrastructure.persistence;
 
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
+import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.WorkshopPersistenceMapper;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkshopRepositoryAdapter implements WorkshopRepository {
 
     private final WorkshopJpaRepository repository;
+    private final WorkshopSpeakerJpaRepository speakerRepository;
     private final WorkshopPersistenceMapper mapper;
 
     @Override
@@ -24,7 +29,37 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         WorkshopJpaEntity entity = mapper.toEntity(workshop);
         try {
             WorkshopJpaEntity saved = repository.saveAndFlush(entity);
-            return mapper.toDomain(saved);
+
+            if (workshop.speakers() != null) {
+                speakerRepository.deleteByWorkshopId(saved.getId());
+                if (!workshop.speakers().isEmpty()) {
+                    List<WorkshopSpeakerJpaEntity> speakerEntities = workshop
+                        .speakers()
+                        .stream()
+                        .map(s -> {
+                            WorkshopSpeakerJpaEntity se =
+                                mapper.toSpeakerEntity(s);
+                            se.setWorkshopId(saved.getId());
+                            return se;
+                        })
+                        .toList();
+                    speakerRepository.saveAllAndFlush(speakerEntities);
+                }
+            }
+
+            List<WorkshopSpeakerJpaEntity> persistedSpeakers =
+                speakerRepository.findByWorkshopIdOrderBySortOrderAsc(
+                    saved.getId()
+                );
+            List<Speaker> domainSpeakers = mapper.toSpeakerDomainList(
+                persistedSpeakers
+            );
+
+            return mapper
+                .toDomain(saved)
+                .toBuilder()
+                .speakers(domainSpeakers)
+                .build();
         } catch (OptimisticLockingFailureException ex) {
             throw new ConflictException(
                 "VERSION_CONFLICT",
@@ -37,7 +72,17 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Workshop> findById(UUID id) {
-        return repository.findById(id).map(mapper::toDomain);
+        return repository.findById(id).map(entity -> {
+            List<WorkshopSpeakerJpaEntity> speakers =
+                speakerRepository.findByWorkshopIdOrderBySortOrderAsc(
+                    entity.getId()
+                );
+            return mapper
+                .toDomain(entity)
+                .toBuilder()
+                .speakers(mapper.toSpeakerDomainList(speakers))
+                .build();
+        });
     }
 
     @Override
@@ -48,12 +93,65 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     ) {
         return repository
             .findByIdAndOrganizationId(id, organizationId)
-            .map(mapper::toDomain);
+            .map(entity -> {
+                List<WorkshopSpeakerJpaEntity> speakers =
+                    speakerRepository.findByWorkshopIdOrderBySortOrderAsc(
+                        entity.getId()
+                    );
+                return mapper
+                    .toDomain(entity)
+                    .toBuilder()
+                    .speakers(mapper.toSpeakerDomainList(speakers))
+                    .build();
+            });
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean existsBySlug(String slug) {
         return repository.existsBySlug(slug);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> findConflictingSpeakerEmails(
+        Collection<String> emails,
+        Instant startsAt,
+        Instant endsAt,
+        UUID excludeWorkshopId
+    ) {
+        if (
+            emails == null ||
+            emails.isEmpty() ||
+            startsAt == null ||
+            endsAt == null
+        ) {
+            return List.of();
+        }
+        List<String> normalizedEmails = emails
+            .stream()
+            .filter(e -> e != null && !e.isBlank())
+            .map(String::trim)
+            .map(String::toLowerCase)
+            .toList();
+
+        if (normalizedEmails.isEmpty()) {
+            return List.of();
+        }
+
+        if (excludeWorkshopId != null) {
+            return speakerRepository.findConflictingSpeakerEmailsExcludingWorkshop(
+                normalizedEmails,
+                startsAt,
+                endsAt,
+                excludeWorkshopId
+            );
+        } else {
+            return speakerRepository.findConflictingSpeakerEmails(
+                normalizedEmails,
+                startsAt,
+                endsAt
+            );
+        }
     }
 }

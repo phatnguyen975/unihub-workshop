@@ -1,6 +1,8 @@
 package com.unihub.workshop.workshops.presentation.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
@@ -52,5 +54,7 @@ public record SaveDraftRequest(
         message = "Currency must be a 3-letter ISO 4217 code"
     )
     String currency,
-    List<Object> speakers
+    @Size(max = 10, message = "A workshop cannot have more than 10 speakers")
+    List<@Valid SpeakerRequest> speakers
 ) {}
+

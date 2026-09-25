@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.application.ports.in;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 
@@ -20,5 +21,15 @@ public record SaveDraftCommand(
     Instant endsAt,
     Integer capacity,
     BigDecimal price,
-    String currency
-) {}
+    String currency,
+    List<SpeakerCommand> speakers
+) {
+    @Builder
+    public record SpeakerCommand(
+        String name,
+        String email,
+        String bio,
+        String avatarUrl,
+        String linkedinUrl
+    ) {}
+}

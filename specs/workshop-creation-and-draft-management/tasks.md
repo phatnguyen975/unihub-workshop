@@ -92,7 +92,7 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
 
 ### Phase 3: Speaker Validation and Schedule Conflict Detection
 
-- [ ] **T3 — ORGANIZER can attach speakers to a draft; conflict with existing booked speakers is rejected**
+- [x] **T3 — ORGANIZER can attach speakers to a draft; conflict with existing booked speakers is rejected**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -126,10 +126,10 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
 
 #### Checkpoint: Phase 3
 
-- [ ] T3 acceptance criteria are all verified end-to-end.
-- [ ] The overlap detection query uses a single batched query (no per-speaker N+1 loop) — verifiable by inspecting Hibernate SQL logs in test output.
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Full unit test suite (T1 + T2 + T3) is green.
+- [x] T3 acceptance criteria are all verified end-to-end.
+- [x] The overlap detection query uses a single batched query (no per-speaker N+1 loop) — verifiable by inspecting Hibernate SQL logs in test output.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Full unit test suite (T1 + T2 + T3) is green.
 
 ### Phase 4: Preview and Delete
 

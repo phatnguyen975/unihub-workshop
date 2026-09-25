@@ -200,4 +200,93 @@ class WorkshopTest {
                 ).isEqualTo("INVALID_WORKSHOP_STATUS");
             });
     }
+
+    @Test
+    @DisplayName(
+        "createDraft attaches speakers and updateDraft replaces or retains speakers"
+    )
+    void shouldHandleSpeakersOnCreateAndUpdate() {
+        UUID workshopId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Speaker s1 = Speaker.create(
+            workshopId,
+            "Alice",
+            "Alice@Example.com",
+            "Bio",
+            null,
+            null,
+            0,
+            userId
+        );
+
+        Workshop draft = Workshop.createDraft(
+            UUID.randomUUID(),
+            "Title",
+            "title-slug",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            userId,
+            java.util.List.of(s1)
+        );
+
+        assertThat(draft.speakers()).hasSize(1);
+        assertThat(draft.speakers().get(0).name()).isEqualTo("Alice");
+        assertThat(draft.speakers().get(0).email()).isEqualTo(
+            "alice@example.com"
+        );
+
+        // When updating with null speakers -> retains existing speakers
+        Workshop updatedRetain = draft.updateDraft(
+            "New Title",
+            "new-title",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            userId,
+            null
+        );
+        assertThat(updatedRetain.speakers()).hasSize(1);
+
+        // When updating with new list -> replaces speakers
+        Speaker s2 = Speaker.create(
+            workshopId,
+            "Bob",
+            "bob@example.com",
+            null,
+            null,
+            null,
+            0,
+            userId
+        );
+        Workshop updatedReplace = draft.updateDraft(
+            "New Title",
+            "new-title",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            userId,
+            java.util.List.of(s2)
+        );
+        assertThat(updatedReplace.speakers()).hasSize(1);
+        assertThat(updatedReplace.speakers().get(0).name()).isEqualTo("Bob");
+    }
 }

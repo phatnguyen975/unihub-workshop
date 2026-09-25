@@ -24,12 +24,5 @@ public record WorkshopResponse(
     Instant createdAt,
     Instant updatedAt,
     List<SpeakerResponse> speakers
-) {
-    public record SpeakerResponse(
-        UUID id,
-        String name,
-        String email,
-        String bio,
-        String avatarUrl
-    ) {}
-}
+) {}
+

@@ -9,11 +9,17 @@ import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.out.SlugGeneratorPort;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
+import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import java.math.BigDecimal;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Currency;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +30,9 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
 
     private static final BigDecimal MAX_PRICE = new BigDecimal("99999999.99");
     private static final int MAX_CAPACITY = 1_000_000;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+        "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+    );
 
     private final WorkshopRepository workshopRepository;
     private final SlugGeneratorPort slugGeneratorPort;
@@ -165,6 +174,8 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
             }
         }
 
+        List<Speaker> domainSpeakers = validateAndMapSpeakers(command);
+
         if (command.id() == null) {
             return createDraft(
                 command,
@@ -175,7 +186,8 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
                 timezone,
                 capacity,
                 price,
-                currency
+                currency,
+                domainSpeakers
             );
         }
 
@@ -188,8 +200,154 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
             timezone,
             capacity,
             price,
-            currency
+            currency,
+            domainSpeakers
         );
+    }
+
+    private List<Speaker> validateAndMapSpeakers(SaveDraftCommand command) {
+        if (command.speakers() == null) {
+            return null;
+        }
+
+        if (command.speakers().size() > 10) {
+            throw new ValidationException(
+                "speakers",
+                "A workshop cannot have more than 10 speakers"
+            );
+        }
+
+        if (command.speakers().isEmpty()) {
+            return List.of();
+        }
+
+        if (command.startsAt() == null || command.endsAt() == null) {
+            throw new ValidationException(
+                "speakers",
+                "startsAt and endsAt are mandatory when attaching speakers"
+            );
+        }
+
+        Set<String> seenEmails = new HashSet<>();
+        List<String> emailsToCheck = new ArrayList<>();
+        List<Speaker> domainSpeakers = new ArrayList<>();
+
+        for (int i = 0; i < command.speakers().size(); i++) {
+            SaveDraftCommand.SpeakerCommand sc = command.speakers().get(i);
+            if (sc == null) {
+                throw new ValidationException("speakers", "Speaker entry must not be null");
+            }
+
+            String speakerName = cleanString(sc.name());
+            if (speakerName == null) {
+                throw new ValidationException("speakers", "Speaker name is mandatory");
+            }
+            if (speakerName.length() > 255) {
+                throw new ValidationException(
+                    "speakers",
+                    "Speaker name must not exceed 255 characters"
+                );
+            }
+
+            String speakerEmail = cleanString(sc.email());
+            if (speakerEmail == null) {
+                throw new ValidationException("speakers", "Speaker email is mandatory");
+            }
+            if (speakerEmail.length() > 255) {
+                throw new ValidationException(
+                    "speakers",
+                    "Speaker email must not exceed 255 characters"
+                );
+            }
+            if (!EMAIL_PATTERN.matcher(speakerEmail).matches()) {
+                throw new ValidationException(
+                    "speakers",
+                    "Speaker email must be a valid email address"
+                );
+            }
+
+            String normalizedEmail = speakerEmail.toLowerCase();
+            if (!seenEmails.add(normalizedEmail)) {
+                throw new ValidationException(
+                    "speakers",
+                    "Duplicate speaker email: " + normalizedEmail
+                );
+            }
+            emailsToCheck.add(normalizedEmail);
+
+            String bio = cleanString(sc.bio());
+            if (bio != null && bio.length() > 2000) {
+                throw new ValidationException(
+                    "speakers",
+                    "Speaker bio must not exceed 2000 characters"
+                );
+            }
+
+            String avatarUrl = cleanString(sc.avatarUrl());
+            if (avatarUrl != null) {
+                if (avatarUrl.length() > 2048) {
+                    throw new ValidationException(
+                        "speakers",
+                        "Speaker avatarUrl must not exceed 2048 characters"
+                    );
+                }
+                if (
+                    !avatarUrl.startsWith("http://") &&
+                    !avatarUrl.startsWith("https://")
+                ) {
+                    throw new ValidationException(
+                        "speakers",
+                        "Speaker avatarUrl must be a valid HTTP or HTTPS URL"
+                    );
+                }
+            }
+
+            String linkedinUrl = cleanString(sc.linkedinUrl());
+            if (linkedinUrl != null) {
+                if (linkedinUrl.length() > 2048) {
+                    throw new ValidationException(
+                        "speakers",
+                        "Speaker linkedinUrl must not exceed 2048 characters"
+                    );
+                }
+                if (
+                    !linkedinUrl.startsWith("http://") &&
+                    !linkedinUrl.startsWith("https://")
+                ) {
+                    throw new ValidationException(
+                        "speakers",
+                        "Speaker linkedinUrl must be a valid HTTP or HTTPS URL"
+                    );
+                }
+            }
+
+            domainSpeakers.add(
+                Speaker.builder()
+                    .name(speakerName)
+                    .email(normalizedEmail)
+                    .bio(bio)
+                    .avatarUrl(avatarUrl)
+                    .linkedinUrl(linkedinUrl)
+                    .sortOrder(i)
+                    .build()
+            );
+        }
+
+        List<String> conflicts = workshopRepository.findConflictingSpeakerEmails(
+            emailsToCheck,
+            command.startsAt(),
+            command.endsAt(),
+            command.id()
+        );
+        if (!conflicts.isEmpty()) {
+            throw new ValidationException(
+                "speakers",
+                "Speaker schedule conflict detected for email(s): " +
+                    String.join(", ", conflicts)
+            );
+        }
+
+        return domainSpeakers;
     }
 
     private Workshop updateDraft(
@@ -201,7 +359,8 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
         String timezone,
         Integer capacity,
         BigDecimal price,
-        String currency
+        String currency,
+        List<Speaker> domainSpeakers
     ) {
         if (command.version() == null) {
             throw new ValidationException(
@@ -261,7 +420,8 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
             capacity,
             price,
             currency,
-            command.callerId()
+            command.callerId(),
+            domainSpeakers
         );
 
         return workshopRepository.save(updated);
@@ -276,7 +436,8 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
         String timezone,
         Integer capacity,
         BigDecimal price,
-        String currency
+        String currency,
+        List<Speaker> domainSpeakers
     ) {
         String slug = slugGeneratorPort.generateSlug(title);
 
@@ -293,7 +454,8 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
             capacity,
             price,
             currency,
-            command.callerId()
+            command.callerId(),
+            domainSpeakers
         );
 
         return workshopRepository.save(draft);
