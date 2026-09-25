@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -386,6 +387,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "A data conflict or unique constraint violation occurred.",
             request.getRequestURI()
         );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ProblemDetail> handleOptimisticLockingFailure(
+        OptimisticLockingFailureException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problem = createProblemDetail(
+            HttpStatus.CONFLICT,
+            "urn:unihub:error:conflict",
+            "Conflict",
+            "A version conflict occurred. The resource has been modified by another transaction.",
+            request.getRequestURI()
+        );
+        problem.setProperty("errorIdentifier", "VERSION_CONFLICT");
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 

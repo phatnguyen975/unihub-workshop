@@ -107,6 +107,7 @@ dependencies {
     implementation 'org.mapstruct:mapstruct:1.6.3'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
     implementation 'com.github.slugify:slugify:3.0.7'
+    implementation 'com.ibm.icu:icu4j:76.1'
 
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'

@@ -34,40 +34,48 @@ This feature allows an authenticated **ORGANIZER** to compose a workshop increme
 - **FR-09:** The system SHALL reject a Save as Draft update (FR-05) with `422 Unprocessable Entity` when no `version` is supplied in the request body for an update operation (i.e., workshop identifier is present but `version` is absent).
 - **FR-10:** The system SHALL reject a Save as Draft operation (both create and update) with `409 Conflict` when the status of the targeted workshop is not `DRAFT` (i.e., the workshop has already been published, completed, or canceled).
 
-### 3.3 Required Fields
+### 3.3 Required Fields and Validation Rules
 
-- **FR-11:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `title` is absent or blank.
+- **FR-11:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `title` is absent, blank, or exceeds 255 characters.
+- **FR-12:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `description` exceeds 5000 characters. Blank string is normalized to null.
+- **FR-13:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `cover_image_url`, if provided, is not a valid HTTP or HTTPS URL or exceeds 2048 characters. Blank string is normalized to null.
+- **FR-14:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `location`, if provided, exceeds 255 characters. Blank string is normalized to null.
+- **FR-15:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `timezone`, if provided, is not a valid IANA timezone identifier or exceeds 64 characters. Defaults to `Asia/Ho_Chi_Minh` if omitted.
+- **FR-16:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `capacity`, if provided, is not in the range [1, 1000000].
+- **FR-17:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `price`, if provided, is negative, exceeds 99,999,999.99, or has more than 2 decimal places. Defaults to 0 if omitted.
+- **FR-18:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `currency`, if provided, is not a valid 3-letter ISO 4217 currency code. Defaults to `USD` if omitted. Case-insensitive and normalized to uppercase.
+- **FR-19:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when `starts_at` and `ends_at` are both present and `ends_at` is not strictly after `starts_at`.
 
 ### 3.4 Slug Management
 
-- **FR-12:** The system SHALL automatically generate a URL-safe, unique `slug` from the `title` upon the first Save as Draft (create), supporting both Vietnamese and English characters via transliteration to ASCII kebab-case.
-- **FR-13:** The system SHALL automatically regenerate and update the `slug` whenever the `title` changes during a Save as Draft update, while the workshop remains in `DRAFT` status.
-- **FR-14:** The system SHALL guarantee `slug` uniqueness across all workshops by appending a short random suffix to the generated slug when a collision is detected.
+- **FR-20:** The system SHALL automatically generate a URL-safe, unique `slug` from the `title` upon the first Save as Draft (create), supporting both Vietnamese and English characters via transliteration to ASCII kebab-case.
+- **FR-21:** The system SHALL automatically regenerate and update the `slug` whenever the `title` changes during a Save as Draft update, while the workshop remains in `DRAFT` status.
+- **FR-22:** The system SHALL guarantee `slug` uniqueness across all workshops by appending a short random suffix to the generated slug when a collision is detected.
 
 ### 3.5 Speaker Management
 
-- **FR-15:** The system SHALL accept `speakers` as an optional array in the Save as Draft request; omitting the field is valid and results in no speakers being stored.
-- **FR-16:** The system SHALL replace the entire speaker list for the workshop on every Save as Draft update that includes a `speakers` field (full replace, not merge).
-- **FR-17:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when the `speakers` array contains two or more entries with the same email address (intra-request duplicate).
-- **FR-18:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when the `speakers` array is non-empty and `starts_at` or `ends_at` is absent (schedule is required to perform overlap detection).
-- **FR-19:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when one or more speaker emails conflict with a confirmed booking at another workshop (status is `PUBLISHED` or `COMPLETED`) whose time interval overlaps the proposed `starts_at`–`ends_at` window, excluding the current workshop being updated.
-- **FR-20:** The system SHALL normalize every speaker email to lowercase and trim surrounding whitespace before storing it and before performing overlap checks.
-- **FR-21:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when any speaker entry is missing the required `name` field.
-- **FR-22:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when any speaker entry contains an `email` that is not a syntactically valid email address.
+- **FR-23:** The system SHALL accept `speakers` as an optional array in the Save as Draft request; omitting the field is valid and results in no speakers being stored.
+- **FR-24:** The system SHALL replace the entire speaker list for the workshop on every Save as Draft update that includes a `speakers` field (full replace, not merge).
+- **FR-25:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when the `speakers` array contains two or more entries with the same email address (intra-request duplicate).
+- **FR-26:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when the `speakers` array is non-empty and `starts_at` or `ends_at` is absent (schedule is required to perform overlap detection).
+- **FR-27:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when one or more speaker emails conflict with a confirmed booking at another workshop (status is `PUBLISHED` or `COMPLETED`) whose time interval overlaps the proposed `starts_at`–`ends_at` window, excluding the current workshop being updated.
+- **FR-28:** The system SHALL normalize every speaker email to lowercase and trim surrounding whitespace before storing it and before performing overlap checks.
+- **FR-29:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when any speaker entry is missing the required `name` field.
+- **FR-30:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when any speaker entry contains an `email` that is not a syntactically valid email address.
 
 ### 3.6 Preview Draft
 
-- **FR-23:** The system SHALL return the full workshop details (including the speaker list) for a given workshop identifier when a Preview Draft request is received and the requester is an ORGANIZER belonging to the same organization as the workshop.
-- **FR-24:** The system SHALL reject a Preview Draft request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
-- **FR-25:** The system SHALL reject a Preview Draft request with `404 Not Found` when the workshop identifier does not exist.
-- **FR-26:** The system SHALL allow Preview Draft for a workshop in any status (DRAFT, PUBLISHED, COMPLETED, CANCELED), not only DRAFT.
+- **FR-31:** The system SHALL return the full workshop details (including the speaker list) for a given workshop identifier when a Preview Draft request is received and the requester is an ORGANIZER belonging to the same organization as the workshop.
+- **FR-32:** The system SHALL reject a Preview Draft request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
+- **FR-33:** The system SHALL reject a Preview Draft request with `404 Not Found` when the workshop identifier does not exist.
+- **FR-34:** The system SHALL allow Preview Draft for a workshop in any status (DRAFT, PUBLISHED, COMPLETED, CANCELED), not only DRAFT.
 
 ### 3.7 Delete Draft
 
-- **FR-27:** The system SHALL permanently delete a workshop and all associated speakers when a Delete Draft request is received and the workshop is in `DRAFT` status and belongs to the caller's organization.
-- **FR-28:** The system SHALL reject a Delete Draft request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
-- **FR-29:** The system SHALL reject a Delete Draft request with `404 Not Found` when the workshop identifier does not exist.
-- **FR-30:** The system SHALL reject a Delete Draft request with `409 Conflict` when the workshop is not in `DRAFT` status (deletion of published, completed, or canceled workshops is not permitted by this feature).
+- **FR-35:** The system SHALL permanently delete a workshop and all associated speakers when a Delete Draft request is received and the workshop is in `DRAFT` status and belongs to the caller's organization.
+- **FR-36:** The system SHALL reject a Delete Draft request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
+- **FR-37:** The system SHALL reject a Delete Draft request with `404 Not Found` when the workshop identifier does not exist.
+- **FR-38:** The system SHALL reject a Delete Draft request with `409 Conflict` when the workshop is not in `DRAFT` status (deletion of published, completed, or canceled workshops is not permitted by this feature).
 
 ## 4. Business Rules
 
@@ -84,7 +92,7 @@ This feature allows an authenticated **ORGANIZER** to compose a workshop increme
 - **BR-11:** No Elasticsearch index update occurs for any draft operation. Search indexing is deferred to Feature 2.2. _(Source: `docs/feature-catalog.md` — Feature 2.1 Out of Scope)_
 - **BR-12:** The `timezone` field defaults to `Asia/Ho_Chi_Minh` when not supplied. _(Source: `docs/database-schema.md` — column default)_
 - **BR-13:** The `price` defaults to `0` and `currency` defaults to `USD` when not supplied. _(Source: `docs/database-schema.md`)_
-- **BR-14:** `capacity`, when supplied, must be a positive integer (≥ 1). _(Source: `docs/database-schema.md` — CHECK constraint)_
+- **BR-14:** `capacity`, when supplied, must be a positive integer in range `[1, 1000000]`. _(Source: `docs/database-schema.md` — CHECK constraint)_
 
 ## 5. State Transitions
 
@@ -126,7 +134,7 @@ And returns HTTP 201 with the new workshop's id, slug, version = 0, and status =
 And the slug is a URL-safe kebab-case string derived from "Introduction to AI"
 ```
 
-_Satisfies: FR-04, FR-11, FR-12, FR-03_
+_Satisfies: FR-04, FR-11, FR-20, FR-03_
 
 ### Scenario 2: ORGANIZER creates a draft with a Vietnamese title
 
@@ -137,7 +145,7 @@ Then the system creates a new workshop and the slug is ASCII kebab-case (e.g., "
 And the slug contains no diacritical marks or non-ASCII characters
 ```
 
-_Satisfies: FR-12, FR-14_
+_Satisfies: FR-20, FR-22_
 
 ### Scenario 3: ORGANIZER updates a draft and title changes → slug is regenerated
 
@@ -152,7 +160,7 @@ And version is incremented to 1
 And returns HTTP 200
 ```
 
-_Satisfies: FR-05, FR-13, FR-14_
+_Satisfies: FR-05, FR-21, FR-22_
 
 ### Scenario 4: Optimistic locking rejects stale update
 
@@ -221,7 +229,7 @@ Then the system creates the draft with one speaker, email stored as "alice@examp
 And returns HTTP 201
 ```
 
-_Satisfies: FR-15, FR-19, FR-20_
+_Satisfies: FR-23, FR-27, FR-28_
 
 ### Scenario 10: Speaker schedule conflict is rejected
 
@@ -234,7 +242,7 @@ And no workshop record is created
 And the response identifies which speaker email caused the conflict
 ```
 
-_Satisfies: FR-19_
+_Satisfies: FR-27_
 
 ### Scenario 11: Speakers provided but schedule missing
 
@@ -244,7 +252,7 @@ When they send a Save as Draft request with speakers = [{name: "Carol", email: "
 Then the system returns HTTP 422 Unprocessable Entity with a message indicating schedule is required when speakers are provided
 ```
 
-_Satisfies: FR-18_
+_Satisfies: FR-26_
 
 ### Scenario 12: Intra-request duplicate speaker emails are rejected
 
@@ -255,7 +263,7 @@ Then the system returns HTTP 422 Unprocessable Entity
 And no workshop record is created
 ```
 
-_Satisfies: FR-17_
+_Satisfies: FR-25_
 
 ### Scenario 13: Preview Draft returns full workshop details
 
@@ -266,7 +274,7 @@ When they send a Preview Draft request for id = W1
 Then the system returns HTTP 200 with the full workshop object, including the speakers array
 ```
 
-_Satisfies: FR-23_
+_Satisfies: FR-31_
 
 ### Scenario 14: Preview Draft denied for another organization's workshop
 
@@ -277,7 +285,7 @@ When they send a Preview Draft request for id = W1
 Then the system returns HTTP 403 Forbidden
 ```
 
-_Satisfies: FR-24_
+_Satisfies: FR-32_
 
 ### Scenario 15: ORGANIZER deletes a DRAFT workshop
 
@@ -290,7 +298,7 @@ And the workshop record is permanently removed from the database
 And all associated speaker records are also removed
 ```
 
-_Satisfies: FR-27, BR-09_
+_Satisfies: FR-35, BR-09_
 
 ### Scenario 16: Delete Draft denied for published workshop
 
@@ -302,7 +310,7 @@ Then the system returns HTTP 409 Conflict
 And the workshop record is unchanged
 ```
 
-_Satisfies: FR-30_
+_Satisfies: FR-38_
 
 ### Scenario 17: Unauthenticated request is rejected
 

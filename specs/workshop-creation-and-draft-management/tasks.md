@@ -17,12 +17,13 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
 - **`SlugService` is a plain Spring `@Service`**, not a domain concept, because it depends on the third-party `com.github.slugify:slugify:3.0.7` library and `NanoId` for uniqueness — infrastructure dependency, not domain logic.
 - **T4 reuses the `WorkshopRepository` outbound port** established in T1; it needs no new persistence infrastructure beyond one additional query method.
 - **No module facade (`workshops/api/`)** is created in this feature — the `workshops` module has no synchronous callers from other modules in F-2.1. The facade will be created in a future feature when a real caller materializes (YAGNI per `docs/project-structure.md`).
+- **Reuses standard `shared.exception.*`** (`NotFoundException`, `ConflictException`, `ValidationException`, `ForbiddenException`) directly in application use cases, exactly like the IAM module, ensuring strict adherence to DRY, YAGNI, and the RFC 7807 error format defined in `docs/api-standards.md`.
 
 ## Task List
 
 ### Phase 1: Core Create Flow (Foundation)
 
-- [ ] **T1 — ORGANIZER can save a new workshop as a DRAFT (no speakers)**
+- [x] **T1 — ORGANIZER can save a new workshop as a DRAFT (no speakers)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -30,8 +31,6 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
     - `workshops/package-info.java`
     - `workshops/domain/model/Workshop.java`
     - `workshops/domain/model/WorkshopStatus.java`
-    - `workshops/domain/exceptions/WorkshopNotFoundException.java`
-    - `workshops/domain/exceptions/WorkshopNotDraftException.java`
     - `workshops/application/ports/in/SaveDraftUseCase.java`
     - `workshops/application/ports/out/WorkshopRepository.java`
     - `workshops/application/usecases/SaveDraftUseCaseImpl.java`
@@ -48,8 +47,8 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
     - `src/test/java/.../workshops/infrastructure/config/SlugServiceTest.java`
     - `src/test/java/.../workshops/presentation/controllers/WorkshopControllerCreateTest.java`
   - **Acceptance Criteria:**
-    - `POST /api/v1/workshops/drafts` with `{ "title": "My Workshop" }` and no `id` field, from a valid ORGANIZER JWT, returns `201 Created` with `status = "DRAFT"`, a non-null `id`, a non-empty ASCII kebab-case `slug`, `version = 0`, and `organizationId` matching the JWT `org` claim. _(FR-04, FR-11, FR-12, FR-03)_
-    - The same request sent with a Vietnamese title (e.g. `"Hội thảo AI"`) returns `201` with a slug containing only ASCII kebab-case characters and a random suffix (e.g. `"hoi-thao-ai-<suffix>"`). _(FR-12, FR-14)_
+    - `POST /api/v1/workshops/drafts` with `{ "title": "My Workshop" }` and no `id` field, from a valid ORGANIZER JWT, returns `201 Created` with `status = "DRAFT"`, a non-null `id`, a non-empty ASCII kebab-case `slug`, `version = 0`, and `organizationId` matching the JWT `org` claim. _(FR-03, FR-04, FR-11, FR-20)_
+    - The same request sent with a Vietnamese title (e.g. `"Hội thảo AI"`) returns `201` with a slug containing only ASCII kebab-case characters and a random suffix (e.g. `"hoi-thao-ai-<suffix>"`). _(FR-20, FR-22)_
     - A request with no `Authorization` header returns `401`. _(FR-01)_
     - A request with a JWT whose `role = STUDENT` returns `403`. _(FR-02)_
     - A request with a blank or missing `title` returns `422`. _(FR-11)_
@@ -57,18 +56,17 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
 
 #### Checkpoint: Phase 1
 
-- [ ] T1 acceptance criteria are all verified end-to-end against a running application.
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Unit test suite for T1 is green with no skips.
+- [x] T1 acceptance criteria are all verified end-to-end against a running application.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Unit test suite for T1 is green with no skips.
 
 ### Phase 2: Update Draft + Slug Re-Generation
 
-- [ ] **T2 — ORGANIZER can update an existing DRAFT workshop's core fields (title, metadata, no speakers)**
+- [x] **T2 — ORGANIZER can update an existing DRAFT workshop's core fields (title, metadata, no speakers)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
-    - `workshops/domain/exceptions/WorkshopAccessDeniedException.java` _(new)_
     - `workshops/application/usecases/SaveDraftUseCaseImpl.java` _(extended — update branch)_
     - `workshops/application/ports/out/WorkshopRepository.java` _(extended — `findById` + `save`)_
     - `workshops/infrastructure/persistence/WorkshopRepositoryAdapter.java` _(extended)_
@@ -77,7 +75,7 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
     - `src/test/java/.../workshops/application/usecases/SaveDraftUseCaseImplTest.java` _(extended — update scenarios)_
     - `src/test/java/.../workshops/presentation/controllers/WorkshopControllerUpdateTest.java` _(new)_
   - **Acceptance Criteria:**
-    - `POST /api/v1/workshops/drafts` with `{ "id": "<existing-draft-id>", "version": 0, "title": "Updated Title" }` returns `200 OK` with the updated `title`, a regenerated `slug` derived from `"Updated Title"`, and `version = 1`. _(FR-05, FR-13, FR-14)_
+    - `POST /api/v1/workshops/drafts` with `{ "id": "<existing-draft-id>", "version": 0, "title": "Updated Title" }` returns `200 OK` with the updated `title`, a regenerated `slug` derived from `"Updated Title"`, and `version = 1`. _(FR-05, FR-21, FR-22)_
     - The same update request with `version = 5` (stale) against a workshop at `version = 6` returns `409 Conflict` with `"VERSION_CONFLICT"`. _(FR-08)_
     - An update request that omits `version` entirely (while `id` is present) returns `422`. _(FR-09)_
     - An update request targeting a `PUBLISHED` workshop returns `409 Conflict` with `"INVALID_WORKSHOP_STATUS"`. _(FR-10)_
@@ -87,10 +85,10 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
 
 #### Checkpoint: Phase 2
 
-- [ ] T2 acceptance criteria are all verified end-to-end.
-- [ ] Slug is consistently regenerated when `title` changes and left unchanged when only other fields change.
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Full unit test suite (T1 + T2) is green.
+- [x] T2 acceptance criteria are all verified end-to-end.
+- [x] Slug is consistently regenerated when `title` changes and left unchanged when only other fields change.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Full unit test suite (T1 + T2) is green.
 
 ### Phase 3: Speaker Validation and Schedule Conflict Detection
 
@@ -100,7 +98,6 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
     - `workshops/domain/model/Speaker.java` _(new)_
-    - `workshops/domain/exceptions/SpeakerScheduleConflictException.java` _(new)_
     - `workshops/application/ports/out/WorkshopRepository.java` _(extended — `findConflictingSpeakers` batch query)_
     - `workshops/application/usecases/SaveDraftUseCaseImpl.java` _(extended — speaker replace + overlap check)_
     - `workshops/infrastructure/persistence/WorkshopSpeakerJpaEntity.java` _(new)_
@@ -116,13 +113,13 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
     - `src/test/java/.../workshops/infrastructure/persistence/WorkshopRepositoryAdapterSpeakerTest.java` _(new)_
     - `src/test/java/.../workshops/presentation/controllers/WorkshopControllerSpeakerTest.java` _(new)_
   - **Acceptance Criteria:**
-    - `POST /api/v1/workshops/drafts` with `speakers = [{name: "Alice", email: "Alice@Example.com"}]` and valid `startsAt`/`endsAt`, where Alice is not booked at any PUBLISHED/COMPLETED workshop in that interval, returns `201` with `speakers[0].email = "alice@example.com"` (normalized). _(FR-15, FR-20)_
-    - The same request where `"alice@example.com"` is already booked at a `PUBLISHED` workshop overlapping the proposed interval returns `422` with `"VALIDATION_ERROR"` and a detail identifying Alice's email as the conflict. _(FR-19)_
-    - A request with `speakers` present but `startsAt` or `endsAt` absent returns `422` with a message indicating schedule is required when speakers are provided. _(FR-18)_
-    - A request with two speaker entries both having `email = "bob@example.com"` returns `422` (`"VALIDATION_ERROR"` — intra-request duplicate). _(FR-17)_
-    - A speaker entry with a blank `name` returns `422`. _(FR-21)_
-    - A speaker entry with `email = "not-an-email"` returns `422`. _(FR-22)_
-    - On update (with `id` present), the stored speaker list is fully replaced: if the prior draft had 3 speakers and the update sends 1 speaker, only 1 speaker exists after the call. _(FR-16)_
+    - `POST /api/v1/workshops/drafts` with `speakers = [{name: "Alice", email: "Alice@Example.com"}]` and valid `startsAt`/`endsAt`, where Alice is not booked at any PUBLISHED/COMPLETED workshop in that interval, returns `201` with `speakers[0].email = "alice@example.com"` (normalized). _(FR-23, FR-28)_
+    - The same request where `"alice@example.com"` is already booked at a `PUBLISHED` workshop overlapping the proposed interval returns `422` with `"VALIDATION_ERROR"` and a detail identifying Alice's email as the conflict. _(FR-27)_
+    - A request with `speakers` present but `startsAt` or `endsAt` absent returns `422` with a message indicating schedule is required when speakers are provided. _(FR-26)_
+    - A request with two speaker entries both having `email = "bob@example.com"` returns `422` (`"VALIDATION_ERROR"` — intra-request duplicate). _(FR-25)_
+    - A speaker entry with a blank `name` returns `422`. _(FR-29)_
+    - A speaker entry with `email = "not-an-email"` returns `422`. _(FR-30)_
+    - On update (with `id` present), the stored speaker list is fully replaced: if the prior draft had 3 speakers and the update sends 1 speaker, only 1 speaker exists after the call. _(FR-24)_
     - If `speakers` is omitted entirely on update, the existing speaker list is unchanged. _(API_CONTRACT Cross-Endpoint Note 4)_
     - A booked speaker at a `DRAFT`-status workshop does NOT trigger a conflict — only `PUBLISHED` and `COMPLETED` workshops are checked. _(BR-06)_
     - `ModulithArchitectureTest` passes.
@@ -152,14 +149,14 @@ This plan delivers Feature 2.1 across four tasks. Each task is a complete vertic
     - `src/test/java/.../workshops/application/usecases/DeleteDraftUseCaseImplTest.java` _(new)_
     - `src/test/java/.../workshops/presentation/controllers/WorkshopControllerPreviewDeleteTest.java` _(new)_
   - **Acceptance Criteria:**
-    - `GET /api/v1/workshops/{id}` for a DRAFT workshop owned by the caller's org returns `200 OK` with the full workshop object including the `speakers` array. _(FR-23, FR-26)_
-    - `GET /api/v1/workshops/{id}` for a PUBLISHED workshop owned by the caller's org also returns `200 OK` (preview works for any status). _(FR-26)_
-    - `GET /api/v1/workshops/{id}` where the workshop belongs to a different org returns `403`. _(FR-24)_
-    - `GET /api/v1/workshops/{id}` for a non-existent `id` returns `404`. _(FR-25)_
-    - `DELETE /api/v1/workshops/{id}` for a DRAFT workshop owned by the caller returns `204 No Content` and the record (plus all speaker rows) no longer exists in the database afterward. _(FR-27, BR-09)_
-    - `DELETE /api/v1/workshops/{id}` for a PUBLISHED workshop returns `409 Conflict` with `"INVALID_WORKSHOP_STATUS"`. _(FR-30)_
-    - `DELETE /api/v1/workshops/{id}` where the workshop belongs to a different org returns `403`. _(FR-28)_
-    - `DELETE /api/v1/workshops/{id}` for a non-existent `id` returns `404`. _(FR-29)_
+    - `GET /api/v1/workshops/{id}` for a DRAFT workshop owned by the caller's org returns `200 OK` with the full workshop object including the `speakers` array. _(FR-31, FR-34)_
+    - `GET /api/v1/workshops/{id}` for a PUBLISHED workshop owned by the caller's org also returns `200 OK` (preview works for any status). _(FR-34)_
+    - `GET /api/v1/workshops/{id}` where the workshop belongs to a different org returns `403`. _(FR-32)_
+    - `GET /api/v1/workshops/{id}` for a non-existent `id` returns `404`. _(FR-33)_
+    - `DELETE /api/v1/workshops/{id}` for a DRAFT workshop owned by the caller returns `204 No Content` and the record (plus all speaker rows) no longer exists in the database afterward. _(FR-35, BR-09)_
+    - `DELETE /api/v1/workshops/{id}` for a PUBLISHED workshop returns `409 Conflict` with `"INVALID_WORKSHOP_STATUS"`. _(FR-38)_
+    - `DELETE /api/v1/workshops/{id}` where the workshop belongs to a different org returns `403`. _(FR-36)_
+    - `DELETE /api/v1/workshops/{id}` for a non-existent `id` returns `404`. _(FR-37)_
     - `ModulithArchitectureTest` passes.
 
 #### Checkpoint: Feature Complete

@@ -71,15 +71,15 @@ This contract defines the three endpoints exposed by the `workshops` module for 
 - `id` — Optional UUID. When present: must reference an existing workshop in `DRAFT` status belonging to the caller's organization. When absent (or `null`): triggers a create operation.
 - `version` — Required integer when `id` is present; must match the current stored `version` of the workshop. Omitted on create (the system initializes `version = 0`).
 - `title` — Required; must not be blank or whitespace-only; maximum 255 characters.
-- `description` — Optional; maximum 5000 characters.
-- `coverImageUrl` — Optional; if provided, must be a syntactically valid URL.
-- `location` — Optional; maximum 500 characters.
-- `timezone` — Optional; if provided, must be a valid IANA timezone identifier (e.g. `"Asia/Ho_Chi_Minh"`, `"UTC"`).
+- `description` — Optional; maximum 5000 characters. Blank string normalized to null.
+- `coverImageUrl` — Optional; if provided, must be a syntactically valid HTTP or HTTPS URL; maximum 2048 characters. Blank string normalized to null.
+- `location` — Optional; maximum 255 characters (matching database column `VARCHAR(255)`). Blank string normalized to null.
+- `timezone` — Optional; if provided, must be a valid IANA timezone identifier (e.g. `"Asia/Ho_Chi_Minh"`, `"UTC"`); maximum 64 characters; defaults to `"Asia/Ho_Chi_Minh"` if omitted.
 - `startsAt` — Optional ISO 8601 datetime; required when `speakers` array is non-empty; must be a future or current instant (no past enforcement at draft stage).
 - `endsAt` — Optional ISO 8601 datetime; required when `speakers` array is non-empty; must be strictly after `startsAt` when both are present.
-- `capacity` — Optional positive integer (≥ 1).
-- `price` — Optional non-negative number.
-- `currency` — Optional 3-character uppercase string; if omitted defaults to `USD`.
+- `capacity` — Optional positive integer in range `[1, 1000000]`.
+- `price` — Optional non-negative decimal (≥ 0.00, maximum 99,999,999.99, at most 2 decimal places); defaults to 0 if omitted.
+- `currency` — Optional valid 3-letter ISO 4217 currency code (case-insensitive, normalized to uppercase); defaults to `USD` if omitted.
 - `speakers` — Optional array; may be empty `[]` or omitted entirely (treated as "no change" only on update if omitted; "clear all" if `[]` is supplied explicitly on update — see Cross-Endpoint Consistency Notes). Each entry:
   - `name` — Required; must not be blank; maximum 255 characters.
   - `email` — Required; must be a syntactically valid email address; trimmed and lowercased before storage.
@@ -151,7 +151,7 @@ None. No domain events are published. No Elasticsearch index is updated. The ope
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-22
+- **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-22, FR-23, FR-24, FR-25, FR-26, FR-27, FR-28, FR-29, FR-30
 - **Scenarios:** 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18
 
 ### GET /api/v1/workshops/{id}
@@ -231,7 +231,7 @@ None. Read-only operation.
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-23, FR-24, FR-25, FR-26
+- **Satisfies:** FR-01, FR-02, FR-31, FR-32, FR-33, FR-34
 - **Scenarios:** 13, 14, 17, 18
 
 ### DELETE /api/v1/workshops/{id}
@@ -279,7 +279,7 @@ On success: all `workshop_speakers` rows associated with the deleted workshop ar
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-27, FR-28, FR-29, FR-30, BR-09
+- **Satisfies:** FR-01, FR-02, FR-35, FR-36, FR-37, FR-38, BR-09
 - **Scenarios:** 15, 16, 17, 18
 
 ## 4. Rate Limiting Behavior
