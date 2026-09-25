@@ -316,16 +316,89 @@ sequenceDiagram
   participant ES as Elasticsearch
   participant Notify as Notification Providers
 
-  Note over Organizer,Notify: CREATE OPERATION
-  Organizer->>Web: Click "Save Draft"
-  Web->>GW: POST /api/v1/workshops
+  Note over Organizer,Notify: SAVE DRAFT OPERATION (CREATE OR UPDATE DRAFT)
+  Organizer->>Web: Click "Save as Draft"
+  Web->>GW: POST /api/v1/workshops/drafts
   GW->>API: Forward Request
-  API->>DB: Verify ownership (Bypassed for Create)
-  API->>DB: Insert Workshop record (Status: DRAFT)
-  DB-->>API: Row persisted
-  API-->>GW: 201 Created (Draft Saved)
-  GW-->>Web: 201 Created
-  Web-->>Organizer: Show Draft Status in UI
+  alt payload.id is null (Create New Draft)
+    API->>API: Validate title & optional fields (generate slug from title)
+    opt If speakers provided
+      API->>DB: Check speaker schedule overlap across non-CANCELED, non-DRAFT workshops
+      alt Conflict found
+        API-->>GW: 422 Unprocessable Entity (Speaker Schedule Conflict)
+        GW-->>Web: 422 Unprocessable Entity
+      end
+    end
+    API->>DB: Insert Workshop record (Status: DRAFT, version: 0, organization_id: jwt.org)
+    opt If speakers provided
+      API->>DB: Insert WorkshopSpeaker records
+    end
+    DB-->>API: Persisted
+    API-->>GW: 201 Created (Draft Saved)
+    GW-->>Web: 201 Created
+  else payload.id is provided (Update Existing Draft)
+    API->>DB: Verify ownership (workshop.organization_id == jwt.org)
+    alt Unauthorized
+      API-->>GW: 403 Forbidden
+      GW-->>Web: 403 Forbidden
+    else Authorized
+      API->>DB: Select current_status, version from workshops
+      alt current_status != DRAFT
+        API-->>GW: 422 Unprocessable Entity (Only DRAFT workshops can be modified via Save Draft)
+        GW-->>Web: 422 Unprocessable Entity
+      else
+        API->>API: Verify optimistic locking version & synchronize slug if title changed
+        opt If speakers provided
+          API->>DB: Check speaker schedule overlap (excluding current workshop)
+          alt Conflict found
+            API-->>GW: 422 Unprocessable Entity (Speaker Schedule Conflict)
+            GW-->>Web: 422 Unprocessable Entity
+          end
+        end
+        API->>DB: Update modified fields & replace speakers (version incremented)
+        DB-->>API: Persisted
+        API-->>GW: 200 OK (Draft Updated)
+        GW-->>Web: 200 OK
+      end
+    end
+  end
+  Note over API,DB: DRAFT changes do not emit transactional outbox events
+
+  Note over Organizer,Notify: PREVIEW DRAFT OPERATION
+  Organizer->>Web: Click "Preview Draft"
+  Web->>GW: GET /api/v1/workshops/{id}
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
+  alt Unauthorized
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+  else Authorized
+    API->>DB: Query workshop and attached speakers
+    DB-->>API: Workshop details & speakers
+    API-->>GW: 200 OK (Workshop Details)
+    GW-->>Web: 200 OK
+  end
+
+  Note over Organizer,Notify: DELETE DRAFT OPERATION
+  Organizer->>Web: Click "Delete Draft"
+  Web->>GW: DELETE /api/v1/workshops/{id}
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
+  alt Unauthorized
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+  else Authorized
+    API->>DB: Select current_status from workshops
+    alt current_status != DRAFT
+      API-->>GW: 422 Unprocessable Entity (Only DRAFT workshops can be deleted)
+      GW-->>Web: 422 Unprocessable Entity
+    else
+      API->>DB: Hard delete workshop (workshop_speakers deleted via ON DELETE CASCADE)
+      DB-->>API: Deleted
+      API-->>GW: 204 No Content
+      GW-->>Web: 204 No Content
+    end
+  end
 
   Note over Organizer,Notify: PUBLISH OPERATION
   Organizer->>Web: Click "Publish Workshop"
