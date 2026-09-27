@@ -32,7 +32,7 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-class WorkshopControllerUpdateTest {
+class AdminWorkshopControllerUpdateTest {
 
     private MockMvc mockMvc;
     private SaveDraftUseCase saveDraftUseCase;
@@ -49,7 +49,7 @@ class WorkshopControllerUpdateTest {
         );
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-        WorkshopController controller = new WorkshopController(
+        AdminWorkshopController controller = new AdminWorkshopController(
             saveDraftUseCase,
             mapper
         );
@@ -125,7 +125,7 @@ class WorkshopControllerUpdateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -158,7 +158,6 @@ class WorkshopControllerUpdateTest {
 
         when(saveDraftUseCase.execute(any(SaveDraftCommand.class))).thenThrow(
             new ConflictException(
-                "VERSION_CONFLICT",
                 "Workshop version conflict: expected 6, but received 5"
             )
         );
@@ -181,14 +180,16 @@ class WorkshopControllerUpdateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
             )
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.type").value("VERSION_CONFLICT"));
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:conflict")
+            );
     }
 
     @Test
@@ -223,7 +224,7 @@ class WorkshopControllerUpdateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -234,14 +235,13 @@ class WorkshopControllerUpdateTest {
 
     @Test
     @DisplayName(
-        "Returns 409 Conflict with INVALID_WORKSHOP_STATUS when workshop is not in DRAFT status"
+        "Returns 409 Conflict with standard error type when workshop is not in DRAFT status"
     )
     void shouldReturn409WhenWorkshopNotDraft() throws Exception {
         UUID workshopId = UUID.randomUUID();
 
         when(saveDraftUseCase.execute(any(SaveDraftCommand.class))).thenThrow(
             new ConflictException(
-                "INVALID_WORKSHOP_STATUS",
                 "Only workshops in DRAFT status can be updated as a draft"
             )
         );
@@ -264,7 +264,7 @@ class WorkshopControllerUpdateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -272,7 +272,7 @@ class WorkshopControllerUpdateTest {
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(
-                jsonPath("$.error.type").value("INVALID_WORKSHOP_STATUS")
+                jsonPath("$.error.type").value("urn:unihub:error:conflict")
             );
     }
 
@@ -285,7 +285,6 @@ class WorkshopControllerUpdateTest {
 
         when(saveDraftUseCase.execute(any(SaveDraftCommand.class))).thenThrow(
             new ForbiddenException(
-                "FORBIDDEN",
                 "You do not have access to workshops in other organizations"
             )
         );
@@ -308,14 +307,16 @@ class WorkshopControllerUpdateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
             )
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.type").value("FORBIDDEN"));
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:forbidden")
+            );
     }
 
     @Test
@@ -324,10 +325,7 @@ class WorkshopControllerUpdateTest {
         UUID workshopId = UUID.randomUUID();
 
         when(saveDraftUseCase.execute(any(SaveDraftCommand.class))).thenThrow(
-            new NotFoundException(
-                "WORKSHOP_NOT_FOUND",
-                "Workshop not found with id: " + workshopId
-            )
+            new NotFoundException("Workshop not found with id: " + workshopId)
         );
 
         SaveDraftRequest request = new SaveDraftRequest(
@@ -348,13 +346,15 @@ class WorkshopControllerUpdateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
             )
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.type").value("WORKSHOP_NOT_FOUND"));
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:not-found")
+            );
     }
 }

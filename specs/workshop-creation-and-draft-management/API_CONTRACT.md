@@ -6,21 +6,110 @@
 
 ## 1. Overview
 
-This contract defines the three endpoints exposed by the `workshops` module for Feature 2.1 — Workshop Creation and Draft Management. All endpoints are ORGANIZER-only and serve the use cases of saving a workshop as a draft (create or update), previewing a draft, and permanently deleting a draft. This contract traces directly to `SPEC.md` for this feature and conforms in full to `docs/api-standards.md`.
+This contract defines the four endpoints exposed by the `workshops` module for Feature 2.1 — Workshop Creation and Draft Management: uploading workshop media assets (`POST /api/v1/admin/workshops/media/upload`), saving a workshop as a draft (create or update via `POST /api/v1/admin/workshops/drafts`), retrieving workshop details for viewing or edit form hydration (`GET /api/v1/admin/workshops/{id}`), and permanently deleting a draft (`DELETE /api/v1/admin/workshops/{id}`). All endpoints are ORGANIZER-only. This contract traces directly to `SPEC.md` for this feature and conforms in full to `docs/api-standards.md`.
 
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** All endpoints are prefixed with `/api/v1/`. Resources are named with plural nouns following RESTful conventions. _(Source: `docs/api-standards.md`)_
 - **Pagination convention:** No collection endpoint exists in this feature; pagination is not applicable.
-- **Success response shape:** `ApiResponse<T>` envelope — `{ "success": true, "message": "...", "data": { ... } }`. `204 No Content` responses carry no body.
-- **Error response format:** RFC 7807 Problem Details — `{ "type": "...", "title": "...", "status": <int>, "detail": "...", "instance": "..." }` with `Content-Type: application/problem+json`. _(Source: `docs/api-standards.md`)_
+- **Success response shape:** Unified `ApiResponse<T>` envelope — `{ "success": true, "message": "...", "data": { ... }, "metadata": { "processedBy": "...", "traceId": "..." } }`. `204 No Content` responses carry no body. Null fields dropped via non-null serialization (`@JsonInclude(Include.NON_NULL)`). _(Source: `docs/api-standards.md`)_
+- **Error response format:** RFC 7807 Problem Details wrapped inside the standard response envelope with `success = false`, `error` object (`type`, `title`, `status`, `detail`, `instance`, and optional `validationErrors`), and `metadata` (`processedBy`, `traceId`) with `Content-Type: application/problem+json`. _(Source: `docs/api-standards.md`)_
 - **Idempotency-key convention:** Not applicable for this feature (see per-endpoint decisions below).
 - **Auth header convention:** `Authorization: Bearer <JWT>` — RS256 signed, required on every endpoint.
 - **Date/time formatting convention:** ISO 8601 with UTC offset — `YYYY-MM-DDTHH:mm:ssZ`.
 
 ## 3. Endpoints
 
-### POST /api/v1/workshops/drafts
+### POST /api/v1/admin/workshops/media/upload
+
+**Description:** Uploads a workshop cover image or speaker avatar to MinIO object storage (`unihub-media`). Returns the generated public URL and storage key. This endpoint is stateless with respect to the database; it does not persist workshop records or modify database rows.  
+**Required Role / Auth:** `ORGANIZER` — JWT with `role = ORGANIZER`.  
+**Idempotency Requirement:** Not Required — each upload generates a new unique file key.
+
+#### Request
+
+**Headers:**
+
+| Header          | Required | Description           |
+| :-------------- | :------- | :-------------------- |
+| `Authorization` | Yes      | `Bearer <JWT>`        |
+| `Content-Type`  | Yes      | `multipart/form-data` |
+
+**Form Data / Multipart Parts:**
+
+| Parameter | Type          | Required | Description                                                                                                                                                               |
+| :-------- | :------------ | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `file`    | MultipartFile | Yes      | Binary image file. Max 5MB (5,242,880 bytes). Supported MIME: `image/jpeg`, `image/jpg`, `image/png`, `image/webp`. Allowed extensions: `.jpg`, `.jpeg`, `.png`, `.webp`. |
+| `type`    | String (enum) | Yes      | Media asset type: `COVER_IMAGE` or `SPEAKER_AVATAR`.                                                                                                                      |
+
+**Validation Rules:**
+
+- `file` must be present, non-empty, and under 5,242,880 bytes.
+- `file` Content-Type and magic bytes must correspond to JPEG/JPG, PNG, or WebP.
+- `type` must be exactly `COVER_IMAGE` or `SPEAKER_AVATAR`.
+
+#### Response
+
+**Success — 201 Created:**
+
+```json
+{
+  "success": true,
+  "message": "Media uploaded successfully.",
+  "data": {
+    "url": "http://localhost:9000/unihub-media/workshops/covers/550e8400-e29b-41d4-a716-446655440000.jpg",
+    "fileKey": "workshops/covers/550e8400-e29b-41d4-a716-446655440000.jpg",
+    "type": "COVER_IMAGE",
+    "size": 1048576,
+    "contentType": "image/jpeg"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**Error Responses:**
+
+| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                             |
+| :-------------------------- | :------------------------------ | :-------------------- | :-------------------------------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Missing `file` or `type` form field, or invalid `type` value.         |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT. |
+| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Forbidden             | JWT `role` is not `ORGANIZER`.                                        |
+| `422 Unprocessable Content` | `urn:unihub:error:validation`   | Unprocessable Content | File is empty, exceeds 5MB limit, or unsupported file format / MIME.  |
+| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Storage provider error during MinIO upload.                           |
+
+**Error Response Example (422 Unprocessable Content):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:validation",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "detail": "File size exceeds the 5MB maximum limit.",
+    "instance": "/api/v1/admin/workshops/media/upload",
+    "validationErrors": ["file: File size exceeds the 5MB maximum limit."]
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+#### Side Effects
+
+Stores an object in the `unihub-media` MinIO bucket. No database record is created or modified.
+
+#### Spec Traceability
+
+- **Satisfies:** FR-01, FR-02, FR-31, FR-32, FR-33, FR-34, FR-35, BR-15, BR-16
+- **Scenarios:** 13, 14, 20, 21
+
+### POST /api/v1/admin/workshops/drafts
 
 **Description:** Unified Save as Draft — creates a new `DRAFT` workshop when no `id` is supplied, or updates an existing `DRAFT` workshop when `id` is present.  
 **Required Role / Auth:** `ORGANIZER` — JWT with `role = ORGANIZER` and `org` claim present.  
@@ -60,7 +149,9 @@ This contract defines the three endpoints exposed by the `workshops` module for 
       "name": "string — required",
       "email": "string — required, valid email format",
       "bio": "string | null — optional",
-      "avatarUrl": "string | null — optional"
+      "avatarUrl": "string | null — optional, valid HTTP/HTTPS URL",
+      "linkedinUrl": "string | null — optional, valid HTTP/HTTPS URL",
+      "sortOrder": "integer — optional, defaults to 0"
     }
   ]
 }
@@ -81,10 +172,12 @@ This contract defines the three endpoints exposed by the `workshops` module for 
 - `price` — Optional non-negative decimal (≥ 0.00, maximum 99,999,999.99, at most 2 decimal places); defaults to 0 if omitted.
 - `currency` — Optional valid 3-letter ISO 4217 currency code (case-insensitive, normalized to uppercase); defaults to `USD` if omitted.
 - `speakers` — Optional array; may be empty `[]` or omitted entirely (treated as "no change" only on update if omitted; "clear all" if `[]` is supplied explicitly on update — see Cross-Endpoint Consistency Notes). Each entry:
-  - `name` — Required; must not be blank; maximum 255 characters.
+  - `name` — Required; must not be blank; maximum 200 characters.
   - `email` — Required; must be a syntactically valid email address; trimmed and lowercased before storage.
-  - `bio` — Optional; maximum 2 000 characters.
-  - `avatarUrl` — Optional; if provided, must be a syntactically valid URL.
+  - `bio` — Optional; maximum 2 000 characters. Blank string normalized to null.
+  - `avatarUrl` — Optional; if provided, must be a syntactically valid HTTP or HTTPS URL; maximum 2048 characters. Blank string normalized to null.
+  - `linkedinUrl` — Optional; if provided, must be a syntactically valid HTTP or HTTPS URL; maximum 2048 characters. Blank string normalized to null.
+  - `sortOrder` — Optional non-negative integer; defaults to 0 if omitted.
 - Intra-request: all speaker `email` values (after normalization) must be unique across the array.
 
 > **Speaker update semantics on update:** When `speakers` is **present** (including `[]`) in an update request, the stored speaker list is fully replaced. When `speakers` is **omitted entirely** from an update request, existing speakers are left unchanged.
@@ -121,9 +214,15 @@ This contract defines the three endpoints exposed by the `workshops` module for 
         "name": "string",
         "email": "string",
         "bio": "string | null",
-        "avatarUrl": "string | null"
+        "avatarUrl": "string | null",
+        "linkedinUrl": "string | null",
+        "sortOrder": 0
       }
     ]
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
   }
 }
 ```
@@ -134,29 +233,68 @@ Same shape as `201` above; `version` reflects the incremented value after the up
 
 **Error Responses:**
 
-| Status                      | Error Identifier          | Condition                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| :-------------------------- | :------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400 Bad Request`           | `INVALID_REQUEST`         | Malformed JSON body or missing `Content-Type: application/json` header.                                                                                                                                                                                                                                                                                                                                                                             |
-| `401 Unauthorized`          | `UNAUTHORIZED`            | No or expired or invalid JWT.                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `403 Forbidden`             | `FORBIDDEN`               | JWT `role` is not `ORGANIZER`, or `id` refers to a workshop belonging to a different organization.                                                                                                                                                                                                                                                                                                                                                  |
-| `404 Not Found`             | `WORKSHOP_NOT_FOUND`      | `id` is supplied but no workshop with that identifier exists.                                                                                                                                                                                                                                                                                                                                                                                       |
-| `409 Conflict`              | `VERSION_CONFLICT`        | `id` is supplied and `version` does not match the stored version (optimistic locking).                                                                                                                                                                                                                                                                                                                                                              |
-| `409 Conflict`              | `INVALID_WORKSHOP_STATUS` | `id` refers to a workshop whose status is not `DRAFT` (e.g., `PUBLISHED`, `COMPLETED`, `CANCELED`).                                                                                                                                                                                                                                                                                                                                                 |
-| `422 Unprocessable Entity`  | `VALIDATION_ERROR`        | One or more validation rules failed: `title` missing/blank; `version` missing when `id` is present; `capacity < 1`; `endsAt ≤ startsAt`; speakers present but `startsAt`/`endsAt` absent; duplicate speaker emails; invalid speaker email format; speaker `name` blank; speaker schedule conflict; invalid timezone; invalid URL for `coverImageUrl` or `avatarUrl`. The `detail` field MUST identify the specific failing field(s) and the reason. |
-| `500 Internal Server Error` | `INTERNAL_ERROR`          | Slug uniqueness retry exhausted or unexpected database error.                                                                                                                                                                                                                                                                                                                                                                                       |
+| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| :-------------------------- | :------------------------------ | :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Malformed JSON body or missing `Content-Type: application/json` header.                                                                                                                                                                                                                                                                                                                                                                             |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                                                                                                                                                                                                                                                                                                                                                                               |
+| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Forbidden             | JWT `role` is not `ORGANIZER`, `org` claim missing, or `id` refers to a workshop belonging to a different organization.                                                                                                                                                                                                                                                                                                                             |
+| `404 Not Found`             | `urn:unihub:error:not-found`    | Not Found             | `id` is supplied but no workshop with that identifier exists.                                                                                                                                                                                                                                                                                                                                                                                       |
+| `409 Conflict`              | `urn:unihub:error:conflict`     | Conflict              | `id` is supplied and `version` does not match the stored version (optimistic locking), or `id` refers to a workshop whose status is not `DRAFT` (e.g., `PUBLISHED`, `COMPLETED`, `CANCELED`).                                                                                                                                                                                                                                                       |
+| `422 Unprocessable Content` | `urn:unihub:error:validation`   | Unprocessable Content | One or more validation rules failed: `title` missing/blank; `version` missing when `id` is present; `capacity < 1`; `endsAt ≤ startsAt`; speakers present but `startsAt`/`endsAt` absent; duplicate speaker emails; invalid speaker email format; speaker `name` blank; speaker schedule conflict; invalid timezone; invalid URL for `coverImageUrl` or `avatarUrl`. The `validationErrors` list identifies each specific failing field and reason. |
+| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Slug uniqueness retry exhausted or unexpected database error.                                                                                                                                                                                                                                                                                                                                                                                       |
+
+**Error Response Example (422 Unprocessable Content):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:validation",
+    "title": "Unprocessable Content",
+    "status": 422,
+    "detail": "Validation failed for 'saveDraftRequest'. 1 error(s) found.",
+    "instance": "/api/v1/admin/workshops/drafts",
+    "validationErrors": ["title: must not be blank"]
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**Error Response Example (409 Conflict — Stale Version):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:conflict",
+    "title": "Conflict",
+    "status": 409,
+    "detail": "Workshop version conflict: expected version 2 but found version 3.",
+    "instance": "/api/v1/admin/workshops/drafts"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 #### Side Effects
 
-None. No domain events are published. No Elasticsearch index is updated. The operation is scoped entirely to the PostgreSQL `workshops` and `workshop_speakers` tables.
+On create: writes to `workshops` and optionally `workshop_speakers`. No domain events are published. No Elasticsearch index is updated.
+On update: updates `workshops` and replaces `workshop_speakers`. If `coverImageUrl` was replaced or removed, the obsolete cover image object in MinIO is deleted. If `speakers` was replaced and previous speaker `avatarUrl`s are no longer present, the obsolete avatar objects in MinIO are deleted.
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-22, FR-23, FR-24, FR-25, FR-26, FR-27, FR-28, FR-29, FR-30
-- **Scenarios:** 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18
+- **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-22, FR-23, FR-24, FR-25, FR-26, FR-27, FR-28, FR-29, FR-30, FR-36, FR-37, FR-47, BR-16
+- **Scenarios:** 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 20, 21
 
-### GET /api/v1/workshops/{id}
+### GET /api/v1/admin/workshops/{id}
 
-**Description:** Preview a workshop's full details (including speakers), accessible by the owning ORGANIZER for any workshop status.  
+**Description:** Retrieve a workshop's full details (including speakers), accessible by the owning ORGANIZER for any workshop status, for viewing or hydrating the edit form.  
 **Required Role / Auth:** `ORGANIZER` — JWT with `role = ORGANIZER` and `org` claim matching the workshop's `organization_id`.  
 **Idempotency Requirement:** Not Required — read-only operation; naturally safe to repeat.
 
@@ -206,24 +344,49 @@ None. No domain events are published. No Elasticsearch index is updated. The ope
     "updatedAt": "ISO 8601 datetime",
     "speakers": [
       {
-        "id": "uuid",
-        "name": "string",
-        "email": "string",
-        "bio": "string | null",
-        "avatarUrl": "string | null"
+        "id": "11111111-2222-3333-4444-555555555555",
+        "name": "Dr. Alan Turing",
+        "email": "alan.turing@university.edu",
+        "bio": "AI Researcher",
+        "avatarUrl": "http://localhost:9000/unihub-media/speakers/avatars/660e8400-e29b-41d4-a716-446655440000.jpg",
+        "linkedinUrl": "https://linkedin.com/in/alan-turing",
+        "sortOrder": 0
       }
     ]
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
   }
 }
 ```
 
 **Error Responses:**
 
-| Status             | Error Identifier     | Condition                                                                                                             |
-| :----------------- | :------------------- | :-------------------------------------------------------------------------------------------------------------------- |
-| `401 Unauthorized` | `UNAUTHORIZED`       | No or expired or invalid JWT.                                                                                         |
-| `403 Forbidden`    | `FORBIDDEN`          | JWT `role` is not `ORGANIZER`, or the workshop belongs to a different organization than the caller's JWT `org` claim. |
-| `404 Not Found`    | `WORKSHOP_NOT_FOUND` | No workshop exists with the given `id`.                                                                               |
+| Status             | Error Type (`error.type`)       | Title        | Condition                                                                                                             |
+| :----------------- | :------------------------------ | :----------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized` | `urn:unihub:error:unauthorized` | Unauthorized | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                                                 |
+| `403 Forbidden`    | `urn:unihub:error:forbidden`    | Forbidden    | JWT `role` is not `ORGANIZER`, or the workshop belongs to a different organization than the caller's JWT `org` claim. |
+| `404 Not Found`    | `urn:unihub:error:not-found`    | Not Found    | No workshop exists with the given `id`.                                                                               |
+
+**Error Response Example (404 Not Found):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:not-found",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "Workshop not found.",
+    "instance": "/api/v1/admin/workshops/8e4b9b3b-9c1a-4a8d-9f6b-3c8b7f9f2c10"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 #### Side Effects
 
@@ -231,12 +394,12 @@ None. Read-only operation.
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-31, FR-32, FR-33, FR-34
-- **Scenarios:** 13, 14, 17, 18
+- **Satisfies:** FR-01, FR-02, FR-39, FR-40, FR-41, FR-42
+- **Scenarios:** 15, 16, 20, 21
 
-### DELETE /api/v1/workshops/{id}
+### DELETE /api/v1/admin/workshops/{id}
 
-**Description:** Permanently delete a workshop that is in `DRAFT` status, including all associated speaker records.  
+**Description:** Permanently delete a workshop that is in `DRAFT` status, cascading to all associated speaker records, and deleting all associated media assets from MinIO.  
 **Required Role / Auth:** `ORGANIZER` — JWT with `role = ORGANIZER` and `org` claim matching the workshop's `organization_id`.  
 **Idempotency Requirement:** Not Required — a second `DELETE` on the same already-deleted `id` returns `404`, which is an acceptable idempotent behavior for a hard delete (the caller's intent — resource is gone — is satisfied).
 
@@ -266,43 +429,82 @@ No response body.
 
 **Error Responses:**
 
-| Status             | Error Identifier          | Condition                                                                                                             |
-| :----------------- | :------------------------ | :-------------------------------------------------------------------------------------------------------------------- |
-| `401 Unauthorized` | `UNAUTHORIZED`            | No or expired or invalid JWT.                                                                                         |
-| `403 Forbidden`    | `FORBIDDEN`               | JWT `role` is not `ORGANIZER`, or the workshop belongs to a different organization than the caller's JWT `org` claim. |
-| `404 Not Found`    | `WORKSHOP_NOT_FOUND`      | No workshop exists with the given `id`.                                                                               |
-| `409 Conflict`     | `INVALID_WORKSHOP_STATUS` | The workshop exists but is not in `DRAFT` status (e.g., PUBLISHED, COMPLETED, CANCELED).                              |
+| Status             | Error Type (`error.type`)       | Title        | Condition                                                                                                             |
+| :----------------- | :------------------------------ | :----------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized` | `urn:unihub:error:unauthorized` | Unauthorized | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                                                 |
+| `403 Forbidden`    | `urn:unihub:error:forbidden`    | Forbidden    | JWT `role` is not `ORGANIZER`, or the workshop belongs to a different organization than the caller's JWT `org` claim. |
+| `404 Not Found`    | `urn:unihub:error:not-found`    | Not Found    | No workshop exists with the given `id`.                                                                               |
+| `409 Conflict`     | `urn:unihub:error:conflict`     | Conflict     | The workshop exists but is not in `DRAFT` status (e.g., `PUBLISHED`, `COMPLETED`, `CANCELED`).                        |
+
+**Error Response Example (409 Conflict — Not in DRAFT Status):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:conflict",
+    "title": "Conflict",
+    "status": 409,
+    "detail": "Workshop cannot be deleted because it is not in DRAFT status.",
+    "instance": "/api/v1/admin/workshops/8e4b9b3b-9c1a-4a8d-9f6b-3c8b7f9f2c10"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 #### Side Effects
 
-On success: all `workshop_speakers` rows associated with the deleted workshop are removed via `ON DELETE CASCADE` at the database level. No domain events are published. No Elasticsearch documents are deleted (search indexing is managed in Feature 2.2).
+On success: all `workshop_speakers` rows associated with the deleted workshop are removed via `ON DELETE CASCADE` at the database level. Associated `coverImageUrl` and all speaker `avatarUrl`s hosted in MinIO bucket `unihub-media` are deleted from MinIO storage. No domain events are published. No Elasticsearch documents are deleted (search indexing is managed in Feature 2.2).
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-35, FR-36, FR-37, FR-38, BR-09
-- **Scenarios:** 15, 16, 17, 18
+- **Satisfies:** FR-01, FR-02, FR-43, FR-44, FR-45, FR-46, BR-09, BR-16
+- **Scenarios:** 18, 19, 20, 21
 
 ## 4. Rate Limiting Behavior
 
-All three endpoints in this contract fall under the **Default Tier** of the Bucket4j + Redis Token Bucket enforced at the Core Backend Monolith filter layer (not at Nginx). _(Source: `docs/system-design.md` — Rate Limiting Tiers)_
+All four endpoints in this contract fall under the **Default Tier** of the Bucket4j + Redis Token Bucket enforced at the Core Backend Monolith filter layer (not at Nginx). _(Source: `docs/system-design.md` — Rate Limiting Tiers)_
 
-| Endpoint                        | Tier    |  Capacity  | Refill Rate  | Key                               |
-| :------------------------------ | :------ | :--------: | :----------: | :-------------------------------- |
-| `POST /api/v1/workshops/drafts` | Default | 100 tokens | 100 per 60 s | `jwt.sub` (authenticated user ID) |
-| `GET /api/v1/workshops/{id}`    | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
-| `DELETE /api/v1/workshops/{id}` | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
+| Endpoint                                    | Tier    |  Capacity  | Refill Rate  | Key                               |
+| :------------------------------------------ | :------ | :--------: | :----------: | :-------------------------------- |
+| `POST /api/v1/admin/workshops/media/upload` | Default | 100 tokens | 100 per 60 s | `jwt.sub` (authenticated user ID) |
+| `POST /api/v1/admin/workshops/drafts`       | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
+| `GET /api/v1/admin/workshops/{id}`          | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
+| `DELETE /api/v1/admin/workshops/{id}`       | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
 
 The Default Tier is appropriate because:
 
 - All callers are authenticated ORGANIZERs (low population, no anonymous spike risk).
 - Save-as-Draft is an infrequent creative action; 100 requests per minute per user is a ceiling no legitimate use case will reach.
-- No dedicated tier (Registration, Auth, Stream) applies to `/api/v1/workshops/**` paths.
+- No dedicated tier (Registration, Auth, Stream) applies to `/api/v1/admin/workshops/**` paths.
 
 **When the bucket is exhausted**, the Core Backend returns:
 
-| Status                  | Error Identifier | Condition                                         |
-| :---------------------- | :--------------- | :------------------------------------------------ |
-| `429 Too Many Requests` | `RATE_LIMITED`   | Token bucket for the caller's `jwt.sub` is empty. |
+| Status                  | Error Type (`error.type`)       | Title             | Condition                                         |
+| :---------------------- | :------------------------------ | :---------------- | :------------------------------------------------ |
+| `429 Too Many Requests` | `urn:unihub:error:rate-limited` | Too Many Requests | Token bucket for the caller's `jwt.sub` is empty. |
+
+**Error Response Example (429 Too Many Requests):**
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "urn:unihub:error:rate-limited",
+    "title": "Too Many Requests",
+    "status": 429,
+    "detail": "Rate limit exceeded. Try again in 30 seconds.",
+    "instance": "/api/v1/admin/workshops/drafts"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
 
 Response headers included on `429`:
 
@@ -318,17 +520,17 @@ Clients SHOULD implement exponential backoff upon receiving `429`. The frontend 
 
 No endpoint in this contract requires an idempotency key:
 
-- **`POST /api/v1/workshops/drafts` (create):** Standard `POST` semantics; repeated requests create additional drafts. Clients receive the `id` on the first call and should include it for subsequent saves. No financial consequence.
-- **`POST /api/v1/workshops/drafts` (update):** Protected by optimistic locking (`version`). A retried update with the same `version` will succeed only once; subsequent retries will receive `409 Conflict` (version mismatch), preventing accidental double-update.
-- **`GET /api/v1/workshops/{id}`:** Read-only; naturally idempotent.
-- **`DELETE /api/v1/workshops/{id}`:** Hard delete; second call returns `404`, which is an acceptable safe outcome.
+- **`POST /api/v1/admin/workshops/drafts` (create):** Standard `POST` semantics; repeated requests create additional drafts. Clients receive the `id` on the first call and should include it for subsequent saves. No financial consequence.
+- **`POST /api/v1/admin/workshops/drafts` (update):** Protected by optimistic locking (`version`). A retried update with the same `version` will succeed only once; subsequent retries will receive `409 Conflict` (version mismatch), preventing accidental double-update.
+- **`GET /api/v1/admin/workshops/{id}`:** Read-only; naturally idempotent.
+- **`DELETE /api/v1/admin/workshops/{id}`:** Hard delete; second call returns `404`, which is an acceptable safe outcome.
 
 ## 6. Cross-Endpoint Consistency Notes
 
-1. **Workshop resource shape:** The response body from `POST /api/v1/workshops/drafts` (both 201 and 200) and `GET /api/v1/workshops/{id}` use the **same field names, types, and nesting structure** for the workshop object and the embedded `speakers` array. This ensures clients can use a single deserialization model for any workshop response.
-2. **`INVALID_WORKSHOP_STATUS` error identifier** is reused for both `POST /api/v1/workshops/drafts` (update on non-DRAFT) and `DELETE /api/v1/workshops/{id}` (delete on non-DRAFT), keeping the error taxonomy consistent rather than introducing per-endpoint error names for the same underlying condition.
-3. **`WORKSHOP_NOT_FOUND` error identifier** is shared across all three endpoints that accept a workshop `{id}`, ensuring clients can write one `404` handler.
+1. **Workshop resource shape:** The response body from `POST /api/v1/admin/workshops/drafts` (both 201 and 200) and `GET /api/v1/admin/workshops/{id}` use the **same field names, types, and nesting structure** for the workshop object and the embedded `speakers` array. This ensures clients can use a single deserialization model for any workshop response.
+2. **`urn:unihub:error:conflict` error type** is reused for both `POST /api/v1/admin/workshops/drafts` (update on non-DRAFT or version mismatch) and `DELETE /api/v1/admin/workshops/{id}` (delete on non-DRAFT), keeping the error taxonomy consistent per `docs/api-standards.md`.
+3. **`urn:unihub:error:not-found` error type** is shared across all three endpoints that accept a workshop `{id}`, ensuring clients can write one `404` handler.
 4. **Null vs omitted semantics for `speakers` on update:** To avoid ambiguity between "caller forgot to include speakers" and "caller intends to clear all speakers," the contract treats `speakers` field **presence** as the discriminator:
    - Field **present** (even as `[]`) → full replace of the speaker list.
    - Field **absent** → existing speakers unchanged.
-     This behavior is explicitly documented in the Request Body section for `POST /api/v1/workshops/drafts` and must be documented in the client SDK / frontend integration guide.
+     This behavior is explicitly documented in the Request Body section for `POST /api/v1/admin/workshops/drafts` and must be documented in the client SDK / frontend integration guide.

@@ -21,10 +21,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/workshops")
+@RequestMapping("/api/v1/admin/workshops")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ORGANIZER')")
-public class WorkshopController {
+public class AdminWorkshopController {
 
     private final SaveDraftUseCase saveDraftUseCase;
     private final WorkshopPresentationMapper workshopMapper;
@@ -38,17 +38,23 @@ public class WorkshopController {
         UUID callerId = SecurityContextUtils.extractUserId(authentication);
         UUID organizationId = getVerifiedOrganizationId(authentication);
 
-        List<SaveDraftCommand.SpeakerCommand> speakerCommands = request.speakers() != null
-            ? request.speakers().stream()
-                .map(s -> SaveDraftCommand.SpeakerCommand.builder()
-                    .name(s.name())
-                    .email(s.email())
-                    .bio(s.bio())
-                    .avatarUrl(s.avatarUrl())
-                    .linkedinUrl(s.linkedinUrl())
-                    .build())
-                .toList()
-            : null;
+        List<SaveDraftCommand.SpeakerCommand> speakerCommands =
+            request.speakers() != null
+                ? request
+                      .speakers()
+                      .stream()
+                      .map(s ->
+                          SaveDraftCommand.SpeakerCommand.builder()
+                              .name(s.name())
+                              .email(s.email())
+                              .bio(s.bio())
+                              .avatarUrl(s.avatarUrl())
+                              .linkedinUrl(s.linkedinUrl())
+                              .sortOrder(s.sortOrder())
+                              .build()
+                      )
+                      .toList()
+                : null;
 
         SaveDraftCommand command = SaveDraftCommand.builder()
             .id(request.id())

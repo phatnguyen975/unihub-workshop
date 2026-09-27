@@ -28,7 +28,7 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-class WorkshopControllerCreateTest {
+class AdminWorkshopControllerCreateTest {
 
     private MockMvc mockMvc;
     private SaveDraftUseCase saveDraftUseCase;
@@ -45,7 +45,7 @@ class WorkshopControllerCreateTest {
         );
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-        WorkshopController controller = new WorkshopController(
+        AdminWorkshopController controller = new AdminWorkshopController(
             saveDraftUseCase,
             mapper
         );
@@ -121,7 +121,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -172,7 +172,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
             )
@@ -204,7 +204,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "STUDENT"))
@@ -237,7 +237,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, null, "ORGANIZER"))
@@ -270,7 +270,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -300,7 +300,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -330,7 +330,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -362,7 +362,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -394,7 +394,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -426,7 +426,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
@@ -458,7 +458,7 @@ class WorkshopControllerCreateTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))

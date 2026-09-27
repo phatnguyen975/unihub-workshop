@@ -235,23 +235,32 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
         for (int i = 0; i < command.speakers().size(); i++) {
             SaveDraftCommand.SpeakerCommand sc = command.speakers().get(i);
             if (sc == null) {
-                throw new ValidationException("speakers", "Speaker entry must not be null");
+                throw new ValidationException(
+                    "speakers",
+                    "Speaker entry must not be null"
+                );
             }
 
             String speakerName = cleanString(sc.name());
             if (speakerName == null) {
-                throw new ValidationException("speakers", "Speaker name is mandatory");
-            }
-            if (speakerName.length() > 255) {
                 throw new ValidationException(
                     "speakers",
-                    "Speaker name must not exceed 255 characters"
+                    "Speaker name is mandatory"
+                );
+            }
+            if (speakerName.length() > 200) {
+                throw new ValidationException(
+                    "speakers",
+                    "Speaker name must not exceed 200 characters"
                 );
             }
 
             String speakerEmail = cleanString(sc.email());
             if (speakerEmail == null) {
-                throw new ValidationException("speakers", "Speaker email is mandatory");
+                throw new ValidationException(
+                    "speakers",
+                    "Speaker email is mandatory"
+                );
             }
             if (speakerEmail.length() > 255) {
                 throw new ValidationException(
@@ -321,24 +330,28 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
                 }
             }
 
+            int sortOrder = sc.sortOrder() != null ? sc.sortOrder() : i;
             domainSpeakers.add(
-                Speaker.builder()
-                    .name(speakerName)
-                    .email(normalizedEmail)
-                    .bio(bio)
-                    .avatarUrl(avatarUrl)
-                    .linkedinUrl(linkedinUrl)
-                    .sortOrder(i)
-                    .build()
+                Speaker.create(
+                    command.id(),
+                    speakerName,
+                    normalizedEmail,
+                    bio,
+                    avatarUrl,
+                    linkedinUrl,
+                    sortOrder,
+                    command.callerId()
+                )
             );
         }
 
-        List<String> conflicts = workshopRepository.findConflictingSpeakerEmails(
-            emailsToCheck,
-            command.startsAt(),
-            command.endsAt(),
-            command.id()
-        );
+        List<String> conflicts =
+            workshopRepository.findConflictingSpeakerEmails(
+                emailsToCheck,
+                command.startsAt(),
+                command.endsAt(),
+                command.id()
+            );
         if (!conflicts.isEmpty()) {
             throw new ValidationException(
                 "speakers",
@@ -373,21 +386,18 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
             .findById(command.id())
             .orElseThrow(() ->
                 new NotFoundException(
-                    "WORKSHOP_NOT_FOUND",
                     "Workshop not found with id: " + command.id()
                 )
             );
 
         if (!existing.organizationId().equals(command.organizationId())) {
             throw new ForbiddenException(
-                "FORBIDDEN",
                 "You do not have access to workshops in other organizations"
             );
         }
 
         if (existing.status() != WorkshopStatus.DRAFT) {
             throw new ConflictException(
-                "INVALID_WORKSHOP_STATUS",
                 "Only workshops in DRAFT status can be updated as a draft. Current status: " +
                     existing.status()
             );
@@ -395,7 +405,6 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
 
         if (!existing.version().equals(command.version())) {
             throw new ConflictException(
-                "VERSION_CONFLICT",
                 String.format(
                     "Workshop version conflict: current version is %d, but request provided %d",
                     existing.version(),

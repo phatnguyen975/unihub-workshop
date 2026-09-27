@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-This feature allows an authenticated **ORGANIZER** to compose a workshop incrementally and save it as a `DRAFT` before it is ready to publish. Drafts are private to the owning organization: they are not visible to students, not indexed for search, and not eligible for registration. A single "Save as Draft" action covers both first-time creation and subsequent updates to the same draft, disambiguated by whether the caller supplies an existing workshop identifier. An ORGANIZER can also preview their draft, and permanently delete it if it is no longer needed. This feature replaces the previous manual process and is a prerequisite for Feature 2.2 (workshop publishing and lifecycle management).
+This feature allows an authenticated **ORGANIZER** to compose a workshop incrementally and save it as a `DRAFT` before it is ready to publish. Drafts are private to the owning organization: they are not visible to students, not indexed for search, and not eligible for registration. A single "Save as Draft" action covers both first-time creation and subsequent updates to the same draft, disambiguated by whether the caller supplies an existing workshop identifier. An ORGANIZER can also upload media assets (workshop cover images and speaker portraits) via a dedicated upload endpoint, retrieve full workshop details to inspect or hydrate the edit form, and permanently delete a draft if it is no longer needed. This feature replaces the previous manual process and is a prerequisite for Feature 2.2 (workshop publishing and lifecycle management).
 
 ## 2. Actors & Preconditions
 
@@ -54,7 +54,7 @@ This feature allows an authenticated **ORGANIZER** to compose a workshop increme
 
 ### 3.5 Speaker Management
 
-- **FR-23:** The system SHALL accept `speakers` as an optional array in the Save as Draft request; omitting the field is valid and results in no speakers being stored.
+- **FR-23:** The system SHALL accept `speakers` as an optional array in the Save as Draft request (with required fields `name`, `email` and optional metadata specified in FR-47); omitting the field is valid and results in no speakers being stored.
 - **FR-24:** The system SHALL replace the entire speaker list for the workshop on every Save as Draft update that includes a `speakers` field (full replace, not merge).
 - **FR-25:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when the `speakers` array contains two or more entries with the same email address (intra-request duplicate).
 - **FR-26:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when the `speakers` array is non-empty and `starts_at` or `ends_at` is absent (schedule is required to perform overlap detection).
@@ -63,19 +63,37 @@ This feature allows an authenticated **ORGANIZER** to compose a workshop increme
 - **FR-29:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when any speaker entry is missing the required `name` field.
 - **FR-30:** The system SHALL reject a Save as Draft request with `422 Unprocessable Entity` when any speaker entry contains an `email` that is not a syntactically valid email address.
 
-### 3.6 Preview Draft
+### 3.6 Media Upload & Storage
 
-- **FR-31:** The system SHALL return the full workshop details (including the speaker list) for a given workshop identifier when a Preview Draft request is received and the requester is an ORGANIZER belonging to the same organization as the workshop.
-- **FR-32:** The system SHALL reject a Preview Draft request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
-- **FR-33:** The system SHALL reject a Preview Draft request with `404 Not Found` when the workshop identifier does not exist.
-- **FR-34:** The system SHALL allow Preview Draft for a workshop in any status (DRAFT, PUBLISHED, COMPLETED, CANCELED), not only DRAFT.
+- **FR-31:** The system SHALL accept a multipart/form-data request at `POST /api/v1/admin/workshops/media/upload` containing a binary `file` and a `type` parameter with allowed values `COVER_IMAGE` or `SPEAKER_AVATAR`.
+- **FR-32:** The system SHALL validate that `file` is non-empty, does not exceed 5MB (5,242,880 bytes), and has a MIME type of `image/jpeg`, `image/jpg`, `image/png`, or `image/webp` (supported file extensions: `.jpg`, `.jpeg`, `.png`, `.webp`).
+- **FR-33:** The system SHALL stream the validated file to MinIO bucket `unihub-media` under `workshops/covers/{uuid}.{ext}` for `COVER_IMAGE` or `speakers/avatars/{uuid}.{ext}` for `SPEAKER_AVATAR`.
+- **FR-34:** The system SHALL return HTTP `201 Created` with the public media URL, storage key, and media type upon successful upload, without creating or modifying any database record.
+- **FR-35:** The system SHALL reject media upload requests with `422 Unprocessable Entity` if the file is empty, exceeds 5MB, or is not an allowed image format.
 
-### 3.7 Delete Draft
+### 3.7 Media Lifecycle & Cleanup
 
-- **FR-35:** The system SHALL permanently delete a workshop and all associated speakers when a Delete Draft request is received and the workshop is in `DRAFT` status and belongs to the caller's organization.
-- **FR-36:** The system SHALL reject a Delete Draft request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
-- **FR-37:** The system SHALL reject a Delete Draft request with `404 Not Found` when the workshop identifier does not exist.
-- **FR-38:** The system SHALL reject a Delete Draft request with `409 Conflict` when the workshop is not in `DRAFT` status (deletion of published, completed, or canceled workshops is not permitted by this feature).
+- **FR-36:** When an existing draft workshop is updated via Save as Draft and the stored `cover_image_url` is replaced or removed, the system SHALL delete the previous cover image object from MinIO if it was stored in the system's MinIO storage.
+- **FR-37:** When an existing draft workshop is updated via Save as Draft and the speaker list is replaced, the system SHALL delete previous speaker avatar objects from MinIO for any speakers whose `avatar_url` is no longer present in the updated list.
+- **FR-38:** When a draft workshop is deleted via Delete Draft, the system SHALL delete its associated cover image and all attached speaker avatars from MinIO.
+
+### 3.8 Workshop Details for Organizer
+
+- **FR-39:** The system SHALL return full workshop details (including the speaker list) for a given workshop identifier when a workshop detail request (`GET /api/v1/admin/workshops/{id}`) is received from an ORGANIZER belonging to the same organization as the workshop.
+- **FR-40:** The system SHALL reject a workshop detail request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
+- **FR-41:** The system SHALL reject a workshop detail request with `404 Not Found` when the workshop identifier does not exist.
+- **FR-42:** The system SHALL allow retrieving workshop details for a workshop in any status (`DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED`).
+
+### 3.9 Delete Draft
+
+- **FR-43:** The system SHALL permanently delete a workshop and all associated speakers from the database, and purge associated media from MinIO, when a Delete Draft request is received and the workshop is in `DRAFT` status and belongs to the caller's organization.
+- **FR-44:** The system SHALL reject a Delete Draft request with `403 Forbidden` when the workshop belongs to a different organization than the caller's JWT `org` claim.
+- **FR-45:** The system SHALL reject a Delete Draft request with `404 Not Found` when the workshop identifier does not exist.
+- **FR-46:** The system SHALL reject a Delete Draft request with `409 Conflict` when the workshop is not in `DRAFT` status (deletion of published, completed, or canceled workshops is not permitted by this feature).
+
+### 3.10 Speaker Optional Metadata
+
+- **FR-47:** The system SHALL accept optional speaker metadata `bio` (max 2000 chars), `avatar_url` (valid HTTP/HTTPS URL, max 2048 chars), `linkedin_url` (valid HTTP/HTTPS URL, max 2048 chars), and `sort_order` (non-negative integer, default 0) for each speaker entry in the Save as Draft request, normalizing blank string values to `null`.
 
 ## 4. Business Rules
 
@@ -93,6 +111,8 @@ This feature allows an authenticated **ORGANIZER** to compose a workshop increme
 - **BR-12:** The `timezone` field defaults to `Asia/Ho_Chi_Minh` when not supplied. _(Source: `docs/database-schema.md` — column default)_
 - **BR-13:** The `price` defaults to `0` and `currency` defaults to `USD` when not supplied. _(Source: `docs/database-schema.md`)_
 - **BR-14:** `capacity`, when supplied, must be a positive integer in range `[1, 1000000]`. _(Source: `docs/database-schema.md` — CHECK constraint)_
+- **BR-15:** Media upload is stateless with respect to the database; it does not persist workshop records or modify database entities. URLs returned from media upload must be included in the Save Draft payload to be persisted. _(Source: ADR-032)_
+- **BR-16:** Media files uploaded to MinIO bucket `unihub-media` must follow strict key partitioning (`workshops/covers/{uuid}.{ext}` for cover images and `speakers/avatars/{uuid}.{ext}` for speaker portraits). Stale or deleted assets must be cleaned up from MinIO. _(Source: ADR-032)_
 
 ## 5. State Transitions
 
@@ -265,42 +285,77 @@ And no workshop record is created
 
 _Satisfies: FR-25_
 
-### Scenario 13: Preview Draft returns full workshop details
+### Scenario 13: ORGANIZER uploads a valid workshop cover image
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT
+When they upload a 2MB JPEG/JPG image file to POST /api/v1/admin/workshops/media/upload with type = "COVER_IMAGE"
+Then the system returns HTTP 201 Created
+And the response includes the public URL matching MinIO storage path (e.g., ".../workshops/covers/<uuid>.jpg")
+And no database record is created or modified
+```
+
+_Satisfies: FR-31, FR-32, FR-33, FR-34, BR-15, BR-16_
+
+### Scenario 14: Media upload rejected for invalid file size or type
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT
+When they upload a 6MB file or an unsupported format (e.g. text/plain) to POST /api/v1/admin/workshops/media/upload
+Then the system returns HTTP 422 Unprocessable Entity
+And no object is stored in MinIO
+```
+
+_Satisfies: FR-32, FR-35_
+
+### Scenario 15: Workshop details returned for organizer
 
 ```gherkin
 Given a workshop with id = W1, status = DRAFT, organization_id = org-A, with two speakers
 And an authenticated ORGANIZER from org-A
-When they send a Preview Draft request for id = W1
+When they send a GET /api/v1/admin/workshops/W1 request
 Then the system returns HTTP 200 with the full workshop object, including the speakers array
 ```
 
-_Satisfies: FR-31_
+_Satisfies: FR-39, FR-42_
 
-### Scenario 14: Preview Draft denied for another organization's workshop
+### Scenario 16: Workshop details denied for another organization's workshop
 
 ```gherkin
 Given a workshop with id = W1, status = DRAFT, organization_id = org-B
 And an authenticated ORGANIZER from org-A
-When they send a Preview Draft request for id = W1
+When they send a GET /api/v1/admin/workshops/W1 request
 Then the system returns HTTP 403 Forbidden
 ```
 
-_Satisfies: FR-32_
+_Satisfies: FR-40_
 
-### Scenario 15: ORGANIZER deletes a DRAFT workshop
+### Scenario 17: Save as Draft update cleans up replaced cover image and removed speaker avatars
 
 ```gherkin
-Given a workshop with id = W1, status = DRAFT, organization_id = org-A, with three speakers
+Given a DRAFT workshop with coverImageUrl = ".../workshops/covers/old.jpg" and speaker avatarUrl = ".../speakers/avatars/speaker-old.jpg"
+And an authenticated ORGANIZER from the owning organization
+When they send a Save as Draft update replacing coverImageUrl with ".../workshops/covers/new.jpg" and removing the speaker
+Then the system updates the draft in the database
+And the old cover image and removed speaker avatar objects are deleted from MinIO
+```
+
+_Satisfies: FR-36, FR-37, BR-16_
+
+### Scenario 18: ORGANIZER deletes a DRAFT workshop and associated media is cleaned up
+
+```gherkin
+Given a workshop with id = W1, status = DRAFT, organization_id = org-A, with cover image and three speakers
 And an authenticated ORGANIZER from org-A
 When they send a Delete Draft request for id = W1
 Then the system returns HTTP 204 No Content
-And the workshop record is permanently removed from the database
-And all associated speaker records are also removed
+And the workshop record and associated speaker records are permanently deleted from the database
+And the cover image and all speaker avatar files are deleted from MinIO
 ```
 
-_Satisfies: FR-35, BR-09_
+_Satisfies: FR-43, BR-09, BR-16_
 
-### Scenario 16: Delete Draft denied for published workshop
+### Scenario 19: Delete Draft denied for published workshop
 
 ```gherkin
 Given a workshop with id = W1, status = PUBLISHED, organization_id = org-A
@@ -310,9 +365,9 @@ Then the system returns HTTP 409 Conflict
 And the workshop record is unchanged
 ```
 
-_Satisfies: FR-38_
+_Satisfies: FR-46_
 
-### Scenario 17: Unauthenticated request is rejected
+### Scenario 20: Unauthenticated request is rejected
 
 ```gherkin
 Given no Authorization header
@@ -322,7 +377,7 @@ Then the system returns HTTP 401 Unauthorized
 
 _Satisfies: FR-01_
 
-### Scenario 18: Non-ORGANIZER role is rejected
+### Scenario 21: Non-ORGANIZER role is rejected
 
 ```gherkin
 Given a valid JWT with role = STUDENT
@@ -338,9 +393,10 @@ _Satisfies: FR-02_
 - **Updating a workshop that is already PUBLISHED, COMPLETED, or CANCELED** — this is Feature 2.2.
 - **Canceling a workshop** — this is Feature 2.5.
 - **Student-facing workshop discovery or registration** — these are Features 3.x.
+- **Public workshop catalog browsing and student detail view** — public browsing of published workshops is Feature 3.1 (`workshop-catalog-browsing`).
+- **In-progress live preview rendering** — rendering changes before saving is handled client-side in the web frontend using local form state.
 - **Search indexing (Elasticsearch)** — Elasticsearch CQRS write-side updates are triggered on publish (Feature 2.2), not on draft save.
 - **Event publishing (RabbitMQ outbox)** — no domain events are published for draft operations.
-- **File upload for cover image** — `cover_image_url` is a string URL; the upload/storage workflow (MinIO) is a separate concern outside this feature.
 - **Capacity enforcement or overbooking prevention** — relevant only when registration is open (Feature 3.x).
 - **Payment setup or pricing validation** — `price` and `currency` are stored as-is in draft; Stripe integration is out of scope for this feature.
 - **QR code generation** — part of Feature 4.x.
@@ -349,12 +405,12 @@ _Satisfies: FR-02_
 
 ## 9. Linked References
 
-| Document                    | Section Consulted                                                                                                                                    |
-| :-------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/feature-catalog.md`   | Feature 2.1 — Workshop Creation and Draft Management; Appendix A — Feature Dependency Map                                                            |
-| `docs/system-design.md`     | Workshop Lifecycle Flow; SAVE DRAFT OPERATION; PREVIEW DRAFT OPERATION; DELETE DRAFT OPERATION; RBAC sequence diagrams; System Protection Mechanisms |
-| `docs/database-schema.md`   | `workshops` table (all columns, constraints, indexes); `workshop_speakers` table (columns, FK, `ON DELETE CASCADE`, `idx_workshop_speakers_email`)   |
-| `docs/adrs.md`              | ADR-006 (RBAC), ADR-008 (Flyway migrations), ADR-013 (optimistic locking via `@Version`)                                                             |
-| `docs/api-standards.md`     | HTTP status code table; RFC 7807 error format; JSON envelope format; Auth header conventions                                                         |
-| `docs/project-structure.md` | `workshops` module Clean Architecture layout; inter-module communication rules                                                                       |
-| `AGENTS.md`                 | Feature status lifecycle; SDD + TDD methodology; RBAC enforcement                                                                                    |
+| Document                    | Section Consulted                                                                                                                                                   |
+| :-------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `docs/feature-catalog.md`   | Feature 2.1 — Workshop Creation and Draft Management; Appendix A — Feature Dependency Map                                                                           |
+| `docs/system-design.md`     | Workshop Lifecycle Flow; MEDIA UPLOAD OPERATION; SAVE DRAFT OPERATION; GET WORKSHOP DETAILS FOR ORGANIZER OPERATION; DELETE DRAFT OPERATION; RBAC sequence diagrams |
+| `docs/database-schema.md`   | `workshops` table (all columns, constraints, indexes); `workshop_speakers` table (columns, FK, `ON DELETE CASCADE`, `idx_workshop_speakers_email`)                  |
+| `docs/adrs.md`              | ADR-006 (RBAC), ADR-008 (Flyway migrations), ADR-013 (optimistic locking via `@Version`), ADR-032 (Decoupled Media Upload via MinIO)                                |
+| `docs/api-standards.md`     | HTTP status code table; RFC 7807 error format; JSON envelope format; Auth header conventions                                                                        |
+| `docs/project-structure.md` | `workshops` module Clean Architecture layout; inter-module communication rules                                                                                      |
+| `AGENTS.md`                 | Feature status lifecycle; SDD + TDD methodology; RBAC enforcement                                                                                                   |

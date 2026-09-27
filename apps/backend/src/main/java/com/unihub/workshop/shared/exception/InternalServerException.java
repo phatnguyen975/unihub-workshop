@@ -16,14 +16,6 @@ public class InternalServerException extends AppException {
         super(HttpStatus.INTERNAL_SERVER_ERROR, type, message);
     }
 
-    public InternalServerException(
-        String type,
-        String message,
-        Throwable cause
-    ) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, type, message, cause);
-    }
-
     public InternalServerException(String message, Throwable cause) {
         super(
             HttpStatus.INTERNAL_SERVER_ERROR,

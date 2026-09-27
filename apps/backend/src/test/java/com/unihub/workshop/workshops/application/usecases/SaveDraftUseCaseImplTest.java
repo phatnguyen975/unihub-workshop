@@ -7,6 +7,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.exception.ConflictException;
+import com.unihub.workshop.shared.exception.ForbiddenException;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.out.SlugGeneratorPort;
@@ -15,6 +18,7 @@ import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -337,7 +341,7 @@ class SaveDraftUseCaseImplTest {
             .build();
 
         when(workshopRepository.findById(workshopId)).thenReturn(
-            java.util.Optional.of(existing)
+            Optional.of(existing)
         );
         when(slugGeneratorPort.generateSlug("Updated Title")).thenReturn(
             "updated-title-456"
@@ -400,7 +404,7 @@ class SaveDraftUseCaseImplTest {
             .build();
 
         when(workshopRepository.findById(workshopId)).thenReturn(
-            java.util.Optional.of(existing)
+            Optional.of(existing)
         );
         when(workshopRepository.save(any(Workshop.class))).thenAnswer(
             invocation -> {
@@ -465,23 +469,23 @@ class SaveDraftUseCaseImplTest {
             .build();
 
         when(workshopRepository.findById(workshopId)).thenReturn(
-            java.util.Optional.of(existing)
+            Optional.of(existing)
         );
 
         assertThatThrownBy(() -> useCase.execute(command))
-            .isInstanceOf(
-                com.unihub.workshop.shared.exception.ConflictException.class
-            )
+            .isInstanceOf(ConflictException.class)
             .satisfies(e -> {
-                com.unihub.workshop.shared.exception.ConflictException ce =
-                    (com.unihub.workshop.shared.exception.ConflictException) e;
-                assertThat(ce.getType()).isEqualTo("VERSION_CONFLICT");
+                ConflictException ce = (ConflictException) e;
+                assertThat(ce.getType()).isEqualTo("urn:unihub:error:conflict");
+                assertThat(ce.getMessage()).contains(
+                    "Workshop version conflict"
+                );
             });
     }
 
     @Test
     @DisplayName(
-        "Throws ConflictException with INVALID_WORKSHOP_STATUS when workshop is not in DRAFT status"
+        "Throws ConflictException when workshop is not in DRAFT status"
     )
     void shouldThrowConflictExceptionWhenWorkshopNotDraft() {
         UUID workshopId = UUID.randomUUID();
@@ -504,17 +508,17 @@ class SaveDraftUseCaseImplTest {
             .build();
 
         when(workshopRepository.findById(workshopId)).thenReturn(
-            java.util.Optional.of(published)
+            Optional.of(published)
         );
 
         assertThatThrownBy(() -> useCase.execute(command))
-            .isInstanceOf(
-                com.unihub.workshop.shared.exception.ConflictException.class
-            )
+            .isInstanceOf(ConflictException.class)
             .satisfies(e -> {
-                com.unihub.workshop.shared.exception.ConflictException ce =
-                    (com.unihub.workshop.shared.exception.ConflictException) e;
-                assertThat(ce.getType()).isEqualTo("INVALID_WORKSHOP_STATUS");
+                ConflictException ce = (ConflictException) e;
+                assertThat(ce.getType()).isEqualTo("urn:unihub:error:conflict");
+                assertThat(ce.getMessage()).contains(
+                    "Only workshops in DRAFT status"
+                );
             });
     }
 
@@ -544,11 +548,11 @@ class SaveDraftUseCaseImplTest {
             .build();
 
         when(workshopRepository.findById(workshopId)).thenReturn(
-            java.util.Optional.of(existing)
+            Optional.of(existing)
         );
 
         assertThatThrownBy(() -> useCase.execute(command)).isInstanceOf(
-            com.unihub.workshop.shared.exception.ForbiddenException.class
+            ForbiddenException.class
         );
     }
 
@@ -566,11 +570,11 @@ class SaveDraftUseCaseImplTest {
             .build();
 
         when(workshopRepository.findById(workshopId)).thenReturn(
-            java.util.Optional.empty()
+            Optional.empty()
         );
 
         assertThatThrownBy(() -> useCase.execute(command)).isInstanceOf(
-            com.unihub.workshop.shared.exception.NotFoundException.class
+            NotFoundException.class
         );
     }
 }

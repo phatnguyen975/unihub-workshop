@@ -40,6 +40,21 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
                             WorkshopSpeakerJpaEntity se =
                                 mapper.toSpeakerEntity(s);
                             se.setWorkshopId(saved.getId());
+                            if (se.getId() == null) {
+                                se.setId(UUID.randomUUID());
+                            }
+                            if (se.getCreatedBy() == null) {
+                                se.setCreatedBy(saved.getCreatedBy());
+                            }
+                            if (se.getUpdatedBy() == null) {
+                                se.setUpdatedBy(saved.getUpdatedBy());
+                            }
+                            if (se.getCreatedAt() == null) {
+                                se.setCreatedAt(Instant.now());
+                            }
+                            if (se.getUpdatedAt() == null) {
+                                se.setUpdatedAt(Instant.now());
+                            }
                             return se;
                         })
                         .toList();
@@ -62,7 +77,6 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
                 .build();
         } catch (OptimisticLockingFailureException ex) {
             throw new ConflictException(
-                "VERSION_CONFLICT",
                 "Workshop version conflict occurred while saving: " +
                     ex.getMessage()
             );

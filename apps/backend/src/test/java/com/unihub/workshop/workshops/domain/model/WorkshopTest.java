@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.unihub.workshop.shared.exception.ConflictException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -189,15 +190,12 @@ class WorkshopTest {
                 UUID.randomUUID()
             )
         )
-            .isInstanceOf(
-                com.unihub.workshop.shared.exception.ConflictException.class
-            )
+            .isInstanceOf(ConflictException.class)
             .satisfies(e -> {
-                com.unihub.workshop.shared.exception.ConflictException ce =
-                    (com.unihub.workshop.shared.exception.ConflictException) e;
+                ConflictException ce = (ConflictException) e;
                 org.assertj.core.api.Assertions.assertThat(
                     ce.getType()
-                ).isEqualTo("INVALID_WORKSHOP_STATUS");
+                ).isEqualTo("urn:unihub:error:conflict");
             });
     }
 

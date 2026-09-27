@@ -10,5 +10,6 @@ public record SpeakerResponse(
     String email,
     String bio,
     String avatarUrl,
-    String linkedinUrl
+    String linkedinUrl,
+    Integer sortOrder
 ) {}

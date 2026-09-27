@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,7 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-class WorkshopControllerSpeakerTest {
+class AdminWorkshopControllerSpeakerTest {
 
     private MockMvc mockMvc;
     private SaveDraftUseCase saveDraftUseCase;
@@ -50,7 +51,7 @@ class WorkshopControllerSpeakerTest {
         );
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-        WorkshopController controller = new WorkshopController(
+        AdminWorkshopController controller = new AdminWorkshopController(
             saveDraftUseCase,
             mapper
         );
@@ -144,13 +145,14 @@ class WorkshopControllerSpeakerTest {
                     .bio("Keynote Speaker")
                     .avatarUrl("https://example.com/alice.jpg")
                     .linkedinUrl("https://linkedin.com/in/alice")
+                    .sortOrder(1)
                     .build()
             )
         );
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
@@ -174,7 +176,43 @@ class WorkshopControllerSpeakerTest {
                 jsonPath("$.data.speakers[0].linkedinUrl").value(
                     "https://linkedin.com/in/alice"
                 )
-            );
+            )
+            .andExpect(jsonPath("$.data.speakers[0].sortOrder").value(0));
+    }
+
+    @Test
+    @DisplayName("Speaker with negative sortOrder returns 422")
+    void speakerWithNegativeSortOrder_Returns422() throws Exception {
+        SaveDraftRequest request = new SaveDraftRequest(
+            null,
+            null,
+            "Valid Title",
+            null,
+            null,
+            null,
+            "Asia/Ho_Chi_Minh",
+            Instant.now().plusSeconds(3600),
+            Instant.now().plusSeconds(7200),
+            null,
+            null,
+            null,
+            List.of(
+                SpeakerRequest.builder()
+                    .name("Alice")
+                    .email("alice@example.com")
+                    .sortOrder(-1)
+                    .build()
+            )
+        );
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/workshops/drafts")
+                    .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request))
+            )
+            .andExpect(status().isUnprocessableContent());
     }
 
     @Test
@@ -203,7 +241,7 @@ class WorkshopControllerSpeakerTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
@@ -237,7 +275,7 @@ class WorkshopControllerSpeakerTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
@@ -276,7 +314,7 @@ class WorkshopControllerSpeakerTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
@@ -319,7 +357,7 @@ class WorkshopControllerSpeakerTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))
@@ -328,7 +366,7 @@ class WorkshopControllerSpeakerTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(
                 jsonPath("$.error.detail").value(
-                    org.hamcrest.Matchers.containsString(
+                    Matchers.containsString(
                         "Speaker schedule conflict detected"
                     )
                 )
@@ -398,7 +436,7 @@ class WorkshopControllerSpeakerTest {
 
         mockMvc
             .perform(
-                post("/api/v1/workshops/drafts")
+                post("/api/v1/admin/workshops/drafts")
                     .principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request))

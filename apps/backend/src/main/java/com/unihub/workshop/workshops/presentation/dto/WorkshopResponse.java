@@ -25,4 +25,3 @@ public record WorkshopResponse(
     Instant updatedAt,
     List<SpeakerResponse> speakers
 ) {}
-

@@ -6,12 +6,12 @@ flowchart LR
     Nginx -- "Load Balancing & SSE Stream" --> App1("Core Backend Monolith (Node 1)") & App2("Core Backend Monolith (Node 2)")
     App1 -. "Cache + Rate Limit + Pub/Sub" .-> Redis("Cache / Rate Limiter / Pub-Sub (Redis)")
     App2 -. "Cache + Rate Limit + Pub/Sub" .-> Redis
-    App1 -- Read Data (Cache Miss) --> Replica[("PostgreSQL Replica (Neon)")]
-    App2 -- Read Data (Cache Miss) --> Replica
+    App1 -- "Read Data (Cache Miss)" --> Replica[("PostgreSQL Replica (Neon)")]
+    App2 -- "Read Data (Cache Miss)" --> Replica
     App1 -- Search Queries --> ES[("Search Engine (Elasticsearch)")]
     App2 -- Search Queries --> ES
-    App1 -- Write Data (Domain + Outbox) --> Primary[("PostgreSQL Primary (Neon)")]
-    App2 -- Write Data (Domain + Outbox) --> Primary
+    App1 -- "Write Data (Domain + Outbox)" --> Primary[("PostgreSQL Primary (Neon)")]
+    App2 -- "Write Data (Domain + Outbox)" --> Primary
     Primary -- Replication --> Replica
     App1 -- Payment Requests --> Pay("Payment Gateway")
     App2 -- Payment Requests --> Pay
@@ -24,7 +24,7 @@ flowchart LR
     Worker -- Write Async Results --> Primary
     Worker -- Consume Task Queues --> Rabbit
     Worker -- Read PDFs/CSVs --> S3
-    Worker -- Sync Workshop Data (CQRS) --> ES
+    Worker -- "Sync Workshop Data (CQRS)" --> ES
     Worker -- Summarization Requests --> AI("AI Summarization Service")
     Worker -- Notification Requests --> Notify("Notification Providers")
     Worker -. "Event Pub/Sub" .-> Redis

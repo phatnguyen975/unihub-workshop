@@ -30,6 +30,7 @@ public record SaveDraftCommand(
         String email,
         String bio,
         String avatarUrl,
-        String linkedinUrl
+        String linkedinUrl,
+        Integer sortOrder
     ) {}
 }

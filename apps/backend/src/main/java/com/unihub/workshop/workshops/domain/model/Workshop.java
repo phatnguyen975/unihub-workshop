@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.domain.model;
 
+import com.unihub.workshop.shared.exception.ConflictException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -164,8 +165,7 @@ public record Workshop(
         List<Speaker> speakers
     ) {
         if (this.status != WorkshopStatus.DRAFT) {
-            throw new com.unihub.workshop.shared.exception.ConflictException(
-                "INVALID_WORKSHOP_STATUS",
+            throw new ConflictException(
                 "Only workshops in DRAFT status can be updated as a draft"
             );
         }
