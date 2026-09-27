@@ -12,23 +12,19 @@ import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
-import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
-import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
-import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mapstruct.factory.Mappers;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,17 +42,12 @@ class AdminWorkshopControllerUpdateTest {
     @BeforeEach
     void setUp() {
         saveDraftUseCase = mock(SaveDraftUseCase.class);
-        WorkshopPresentationMapper mapper = Mappers.getMapper(
-            WorkshopPresentationMapper.class
-        );
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-        AdminWorkshopController controller = new AdminWorkshopController(
-            saveDraftUseCase,
-            mock(GetWorkshopUseCase.class),
-            mapper,
-            mock(MediaStoragePort.class)
-        );
+        AdminWorkshopController controller =
+            AdminWorkshopControllerTestBuilder.builder()
+                .withSaveDraftUseCase(saveDraftUseCase)
+                .build();
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(

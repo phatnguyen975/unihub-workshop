@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class SlugService implements SlugGeneratorPort {
 
+    private static final int MAX_BASE_LENGTH = 240;
     private final Slugify slugify;
 
     public SlugService() {
@@ -22,6 +23,12 @@ public class SlugService implements SlugGeneratorPort {
         String base = title != null ? slugify.slugify(title) : "workshop";
         if (base == null || base.isBlank()) {
             base = "workshop";
+        }
+        if (base.length() > MAX_BASE_LENGTH) {
+            base = base.substring(0, MAX_BASE_LENGTH);
+            if (base.endsWith("-")) {
+                base = base.substring(0, base.length() - 1);
+            }
         }
         String suffix = UUID.randomUUID()
             .toString()

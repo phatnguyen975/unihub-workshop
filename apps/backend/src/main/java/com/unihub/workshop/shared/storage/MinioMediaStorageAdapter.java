@@ -148,6 +148,17 @@ public class MinioMediaStorageAdapter implements MediaStoragePort {
             if (bucketIdx >= 0) {
                 return path.substring(bucketIdx + bucketPrefix.length());
             }
+
+            // Fallback for virtual-hosted style (e.g. https://unihub-media.s3.amazonaws.com/...)
+            // or CDN domains (e.g. https://media.unihub.edu.vn/...)
+            for (MediaAssetType assetType : MediaAssetType.values()) {
+                String prefix = "/" + assetType.getFolderPrefix() + "/";
+                int idx = path.indexOf(prefix);
+                if (idx >= 0) {
+                    return path.substring(idx + 1);
+                }
+            }
+
             return null;
         } catch (Exception e) {
             log.debug(

@@ -192,7 +192,7 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
 
 ### Phase 6: Delete Draft Workshop
 
-- [ ] **T6 — ORGANIZER can permanently delete a DRAFT workshop via `DELETE /api/v1/admin/workshops/{id}` with media purge**
+- [x] **T6 — ORGANIZER can permanently delete a DRAFT workshop via `DELETE /api/v1/admin/workshops/{id}` with media purge**
   - **Size:** S
   - **Depends on:** T5
   - **Layers touched:** Application, Infrastructure, Presentation
@@ -213,11 +213,11 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks (T1–T6) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end against a running application.
-- [ ] Full unit test suite (T1 through T6) passes with no skips.
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Ready for `/review workshop-creation-and-draft-management`.
+- [x] All tasks (T1–T6) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end against a running application.
+- [x] Full unit test suite (T1 through T6) passes with no skips.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Ready for `/review workshop-creation-and-draft-management`.
 
 ## Risks and Mitigations
 

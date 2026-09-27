@@ -8,6 +8,7 @@ import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.storage.MediaValidationUtils;
 import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
+import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
@@ -19,7 +20,6 @@ import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMap
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,6 +46,7 @@ public class AdminWorkshopController {
 
     private final SaveDraftUseCase saveDraftUseCase;
     private final GetWorkshopUseCase getWorkshopUseCase;
+    private final DeleteDraftUseCase deleteDraftUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -62,6 +64,16 @@ public class AdminWorkshopController {
         );
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteWorkshop(
+        @PathVariable UUID id,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+        deleteDraftUseCase.execute(id, organizationId);
+    }
+
     @PostMapping("/drafts")
     public ApiResponse<WorkshopResponse> saveDraft(
         @Valid @RequestBody SaveDraftRequest request,
@@ -71,41 +83,11 @@ public class AdminWorkshopController {
         UUID callerId = SecurityContextUtils.extractUserId(authentication);
         UUID organizationId = getVerifiedOrganizationId(authentication);
 
-        List<SaveDraftCommand.SpeakerCommand> speakerCommands =
-            request.speakers() != null
-                ? request
-                      .speakers()
-                      .stream()
-                      .map(s ->
-                          SaveDraftCommand.SpeakerCommand.builder()
-                              .name(s.name())
-                              .email(s.email())
-                              .bio(s.bio())
-                              .avatarUrl(s.avatarUrl())
-                              .linkedinUrl(s.linkedinUrl())
-                              .sortOrder(s.sortOrder())
-                              .build()
-                      )
-                      .toList()
-                : null;
-
-        SaveDraftCommand command = SaveDraftCommand.builder()
-            .id(request.id())
-            .version(request.version())
-            .organizationId(organizationId)
-            .callerId(callerId)
-            .title(request.title())
-            .description(request.description())
-            .coverImageUrl(request.coverImageUrl())
-            .location(request.location())
-            .timezone(request.timezone())
-            .startsAt(request.startsAt())
-            .endsAt(request.endsAt())
-            .capacity(request.capacity())
-            .price(request.price())
-            .currency(request.currency())
-            .speakers(speakerCommands)
-            .build();
+        SaveDraftCommand command = workshopMapper.toCommand(
+            request,
+            organizationId,
+            callerId
+        );
 
         Workshop workshop = saveDraftUseCase.execute(command);
         WorkshopResponse response = workshopMapper.toResponse(workshop);
@@ -132,8 +114,7 @@ public class AdminWorkshopController {
     public ApiResponse<MediaUploadResponse> uploadMedia(
         @RequestParam("file") MultipartFile file,
         @RequestParam("type") String type,
-        Authentication authentication,
-        HttpServletResponse httpServletResponse
+        Authentication authentication
     ) {
         // Verify caller is an active ORGANIZER with a valid tenant organization
         getVerifiedOrganizationId(authentication);
@@ -179,7 +160,6 @@ public class AdminWorkshopController {
             .contentType(storedMedia.contentType())
             .build();
 
-        httpServletResponse.setStatus(HttpServletResponse.SC_CREATED);
         return ApiResponse.success(response, "Media uploaded successfully.");
     }
 

@@ -147,4 +147,11 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             );
         }
     }
+
+    @Override
+    @Transactional
+    public void deleteById(UUID id) {
+        speakerRepository.deleteByWorkshopId(id);
+        repository.deleteById(id);
+    }
 }

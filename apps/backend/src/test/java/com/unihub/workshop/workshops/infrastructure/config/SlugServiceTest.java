@@ -66,4 +66,16 @@ class SlugServiceTest {
 
         assertThat(slug).matches("^[a-z0-9]+(-[a-z0-9]+)+$");
     }
+
+    @Test
+    @DisplayName(
+        "Guarantees slug length does not exceed 255 chars even with a 255-character title"
+    )
+    void shouldNeverExceedDatabaseColumnLength_withMaxLengthTitle() {
+        String longTitle = "a".repeat(255);
+        String slug = slugService.generateSlug(longTitle);
+
+        assertThat(slug.length()).isLessThanOrEqualTo(255);
+        assertThat(slug).matches("^[a-z0-9]+(-[a-z0-9]+)+$");
+    }
 }

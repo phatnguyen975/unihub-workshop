@@ -210,4 +210,20 @@ class MinioMediaStorageAdapterTest {
         assertThat(adapter.extractFileKeyFromUrl(null)).isNull();
         assertThat(adapter.extractFileKeyFromUrl("")).isNull();
     }
+
+    @Test
+    @DisplayName(
+        "extractFileKeyFromUrl accurately parses key from CDN and virtual-hosted S3 URLs"
+    )
+    void shouldExtractFileKeyFromVirtualHostedAndCdnUrls() {
+        String virtualHostKey = adapter.extractFileKeyFromUrl(
+            "https://unihub-media.s3.amazonaws.com/workshops/covers/cover-1.jpg"
+        );
+        assertThat(virtualHostKey).isEqualTo("workshops/covers/cover-1.jpg");
+
+        String cdnKey = adapter.extractFileKeyFromUrl(
+            "https://media.unihub.edu.vn/speakers/avatars/speaker-1.png"
+        );
+        assertThat(cdnKey).isEqualTo("speakers/avatars/speaker-1.png");
+    }
 }

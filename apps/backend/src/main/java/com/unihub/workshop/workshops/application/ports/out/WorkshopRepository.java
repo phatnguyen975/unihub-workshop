@@ -22,4 +22,6 @@ public interface WorkshopRepository {
         Instant endsAt,
         UUID excludeWorkshopId
     );
+
+    void deleteById(UUID id);
 }

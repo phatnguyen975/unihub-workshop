@@ -157,7 +157,7 @@
 
 ### 2.1 `workshop-creation-and-draft-management`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Enables authenticated `ORGANIZER` users to create and manage workshops in `DRAFT` status via a unified Save Draft endpoint (`POST /api/v1/admin/workshops/drafts`), upload workshop and speaker media assets (`POST /api/v1/admin/workshops/media/upload`), view workshop details for editing/previewing (`GET /api/v1/admin/workshops/{id}`), and hard-delete drafts (`DELETE /api/v1/admin/workshops/{id}`). On save, if `id` is null, a new draft is created; if `id` is provided, modified fields on the existing draft are updated under optimistic concurrency control (`version`). In `DRAFT`, most fields are optional (`description`, `cover_image_url`, `location`, `starts_at`, `ends_at`, `capacity`), allowing progressive drafting. The `slug` is automatically generated from `title` (supporting Vietnamese and English transliteration) and kept synchronized whenever `title` changes while in `DRAFT`. Media assets uploaded to MinIO are cleaned up when replaced on update or when a draft is deleted. The workshop is not visible to students, is not indexed in Elasticsearch, and generates no external domain events until published. Deletion of `DRAFT` workshops is the only hard-delete permitted in the system, cascading to attached speakers via `ON DELETE CASCADE`. When speakers are included (as an array), each speaker's email is validated, intra-request duplicate emails are rejected, and the system verifies that no speaker email overlaps with any other active (non-`CANCELED`, non-`DRAFT`) workshop in the same time window. A speaker overlap returns `422 Unprocessable Entity`.
 
@@ -173,7 +173,7 @@
 
 ### 2.2 `workshop-publishing-and-update`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Manages the `DRAFT` → `PUBLISHED` state transition (publishing via `PATCH /api/v1/admin/workshops/{id}/publish`) and the rules governing updates to an already `PUBLISHED` workshop (`PUT /api/v1/admin/workshops/{id}`). Modifications to workshops in `DRAFT` status belong exclusively to Feature 2.1 via `POST /api/v1/admin/workshops/drafts`. Publishing triggers a `WorkshopPublishedEvent` into the transactional outbox. This event is externalized by the Spring Modulith Event Registry to RabbitMQ, and the `search_sync` background worker consumes it to index the workshop in Elasticsearch — this is the mechanism by which a newly published workshop becomes searchable. Once published, core immutable fields (e.g., `price`, `currency`) cannot be changed, and `capacity` cannot be reduced below the current `CONFIRMED` + `PENDING` registration count. Non-core fields (e.g., `description`, `cover_image_url`) remain editable and emit a `WorkshopUpdatedEvent` for Elasticsearch re-synchronization via the same outbox → RabbitMQ → `search_sync` worker path. Optimistic locking (`@Version`) prevents lost updates from concurrent organizer edits, returning `409 Conflict` on version mismatch.
 

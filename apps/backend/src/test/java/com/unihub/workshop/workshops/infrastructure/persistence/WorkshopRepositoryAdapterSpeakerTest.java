@@ -182,4 +182,15 @@ class WorkshopRepositoryAdapterSpeakerTest {
             endsAt
         );
     }
+
+    @Test
+    @DisplayName("deleteById deletes workshop speakers and workshop entity")
+    void shouldDeleteByIdAndAssociatedSpeakers() {
+        UUID workshopId = UUID.randomUUID();
+
+        adapter.deleteById(workshopId);
+
+        verify(speakerJpaRepository).deleteByWorkshopId(workshopId);
+        verify(workshopJpaRepository).deleteById(workshopId);
+    }
 }

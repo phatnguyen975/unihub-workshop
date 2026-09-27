@@ -18,16 +18,12 @@ import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
-import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
-import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
-import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mapstruct.factory.Mappers;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,7 +33,6 @@ class AdminWorkshopControllerMediaTest {
 
     private MockMvc mockMvc;
     private MediaStoragePort mediaStoragePort;
-    private SaveDraftUseCase saveDraftUseCase;
 
     private static final UUID CALLER_ID = UUID.randomUUID();
     private static final UUID ORG_ID = UUID.randomUUID();
@@ -86,18 +81,12 @@ class AdminWorkshopControllerMediaTest {
 
     @BeforeEach
     void setUp() {
-        saveDraftUseCase = mock(SaveDraftUseCase.class);
         mediaStoragePort = mock(MediaStoragePort.class);
-        WorkshopPresentationMapper mapper = Mappers.getMapper(
-            WorkshopPresentationMapper.class
-        );
 
-        AdminWorkshopController controller = new AdminWorkshopController(
-            saveDraftUseCase,
-            mock(GetWorkshopUseCase.class),
-            mapper,
-            mediaStoragePort
-        );
+        AdminWorkshopController controller =
+            AdminWorkshopControllerTestBuilder.builder()
+                .withMediaStoragePort(mediaStoragePort)
+                .build();
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(
