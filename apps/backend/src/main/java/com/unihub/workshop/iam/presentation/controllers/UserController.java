@@ -4,6 +4,7 @@ import com.unihub.workshop.iam.application.ports.in.ChangeUserPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.GetUserProfileUseCase;
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileCommand;
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileUseCase;
+import com.unihub.workshop.iam.application.ports.in.UploadUserAvatarUseCase;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.presentation.dto.ChangePasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.UpdateProfileRequest;
@@ -15,12 +16,16 @@ import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -29,6 +34,7 @@ public class UserController {
 
     private final GetUserProfileUseCase getUserProfileUseCase;
     private final UpdateUserProfileUseCase updateUserProfileUseCase;
+    private final UploadUserAvatarUseCase uploadUserAvatarUseCase;
     private final ChangeUserPasswordUseCase changeUserPasswordUseCase;
     private final UserPresentationMapper userMapper;
 
@@ -59,7 +65,23 @@ public class UserController {
         );
     }
 
-    @PatchMapping("/me/password")
+    @PostMapping(
+        value = "/me/avatar",
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ApiResponse<UserProfileResponse> uploadMyAvatar(
+        Authentication authentication,
+        @RequestParam("file") MultipartFile file
+    ) {
+        UUID userId = SecurityContextUtils.extractUserId(authentication);
+        User updated = uploadUserAvatarUseCase.uploadAvatar(userId, file);
+        return ApiResponse.success(
+            userMapper.toProfileResponse(updated),
+            "Avatar updated successfully."
+        );
+    }
+
+    @PostMapping("/me/password")
     public ApiResponse<Void> changeMyPassword(
         Authentication authentication,
         @Valid @RequestBody ChangePasswordRequest request
