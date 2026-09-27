@@ -57,7 +57,7 @@ This feature provides authenticated users of any role (`STUDENT`, `ORGANIZER`, `
 - **FR-15:** The system SHALL accept a multipart/form-data request at `POST /api/v1/users/me/avatar` containing a binary `file` parameter.
 - **FR-16:** The system SHALL validate that `file` is non-empty, does not exceed 5MB (5,242,880 bytes), and has a MIME type of `image/jpeg`, `image/jpg`, `image/png`, or `image/webp` (supported file extensions: `.jpg`, `.jpeg`, `.png`, `.webp`).
 - **FR-17:** The system SHALL reject avatar upload requests that fail validation with `422 Unprocessable Content`.
-- **FR-18:** The system SHALL stream the validated file to MinIO object storage in bucket `unihub-media` using the shared `MediaStoragePort` with `MediaType.USER_AVATAR` (partition key `users/avatars/{uuid}.{ext}`) and obtain the public URL.
+- **FR-18:** The system SHALL stream the validated file to MinIO object storage in bucket `unihub-media` using the shared `MediaStoragePort` with `MediaAssetType.USER_AVATAR` (partition key `users/avatars/{uuid}.{ext}`) and obtain the public URL.
 - **FR-19:** The system SHALL atomically update the caller's `avatar_url` in the database to the new MinIO URL, with `updated_at = NOW()` and `updated_by` set to the caller's UUID.
 - **FR-20:** If the user previously had an avatar stored in the system's MinIO storage, the system SHALL delete the previous avatar object from MinIO upon successful upload of the new avatar.
 - **FR-21:** The system SHALL return the full updated profile response (`ApiResponse<UserProfileResponse>`) reflecting the new `avatarUrl`.
@@ -95,7 +95,7 @@ This feature provides authenticated users of any role (`STUDENT`, `ORGANIZER`, `
 - **BR-08 (Password Strength Policy Consistency):** The `newPassword` strength requirements (8–255 chars, mixed case, digit, special character) must be identical to those enforced in F-1.1 (registration) and F-1.4 (password reset) to avoid inconsistent security posture across flows.
 - **BR-09 (Partial Update — fullName Non-Nullable):** `fullName` may not be set to `null` or empty string via the profile update endpoint, because the database schema defines `full_name VARCHAR(200) NOT NULL` and it is a required display field system-wide. `phoneNumber` may be cleared by passing `null`. Source: `docs/database-schema.md §Table: users`.
 - **BR-10 (Audit Trail):** Successful profile update, avatar upload, and password change mutations must write `updated_at = NOW()` and `updated_by = callerId` to maintain a complete, attributable audit trail. Source: `docs/database-schema.md §Table: users`.
-- **BR-11 (Avatar Upload & Storage Partitioning):** Avatar files must be stored in MinIO bucket `unihub-media` using `MediaType.USER_AVATAR` (under `users/avatars/{uuid}.{ext}`) via the shared `MediaStoragePort`. Old avatar files must be purged from MinIO via `MediaStoragePort` upon successful replacement. Source: ADR-032.
+- **BR-11 (Avatar Upload & Storage Partitioning):** Avatar files must be stored in MinIO bucket `unihub-media` using `MediaAssetType.USER_AVATAR` (under `users/avatars/{uuid}.{ext}`) via the shared `MediaStoragePort`. Old avatar files must be purged from MinIO via `MediaStoragePort` upon successful replacement. Source: ADR-032.
 
 ## 5. State Transitions
 

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import com.unihub.workshop.iam.application.ports.in.ChangeUserPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.GetUserProfileUseCase;
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileUseCase;
+import com.unihub.workshop.iam.application.ports.in.UploadUserAvatarUseCase;
 import com.unihub.workshop.iam.presentation.mapper.UserPresentationMapper;
 import com.unihub.workshop.iam.presentation.mapper.UserPresentationMapperImpl;
 
@@ -15,6 +16,9 @@ public class UserControllerTestBuilder {
     );
     private UpdateUserProfileUseCase updateUserProfileUseCase = mock(
         UpdateUserProfileUseCase.class
+    );
+    private UploadUserAvatarUseCase uploadUserAvatarUseCase = mock(
+        UploadUserAvatarUseCase.class
     );
     private ChangeUserPasswordUseCase changeUserPasswordUseCase = mock(
         ChangeUserPasswordUseCase.class
@@ -40,6 +44,13 @@ public class UserControllerTestBuilder {
         return this;
     }
 
+    public UserControllerTestBuilder withUploadUserAvatarUseCase(
+        UploadUserAvatarUseCase uploadUserAvatarUseCase
+    ) {
+        this.uploadUserAvatarUseCase = uploadUserAvatarUseCase;
+        return this;
+    }
+
     public UserControllerTestBuilder withChangeUserPasswordUseCase(
         ChangeUserPasswordUseCase changeUserPasswordUseCase
     ) {
@@ -58,6 +69,7 @@ public class UserControllerTestBuilder {
         return new UserController(
             getUserProfileUseCase,
             updateUserProfileUseCase,
+            uploadUserAvatarUseCase,
             changeUserPasswordUseCase,
             userMapper
         );

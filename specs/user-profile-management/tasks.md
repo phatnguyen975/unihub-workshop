@@ -106,14 +106,14 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 ### Phase 4: Avatar Upload & Storage Integration — Caller can upload and replace their avatar via dedicated endpoint
 
-- [ ] **T4 — A caller can upload and replace their avatar via `POST /api/v1/users/me/avatar` with old avatar cleanup, and remove `avatarUrl` from `PATCH /api/v1/users/me`**
+- [x] **T4 — A caller can upload and replace their avatar via `POST /api/v1/users/me/avatar` with old avatar cleanup, and remove `avatarUrl` from `PATCH /api/v1/users/me`**
   - **Size:** M
   - **Depends on:** T1, `com.unihub.workshop.shared.storage.MediaStoragePort` (established in Feature 2.1 T4)
   - **Layers touched:** Domain, Application (in port, use-case impl), Infrastructure (shared storage port), Presentation (controller handler)
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/iam/domain/model/User.java` — add `updateAvatar(String newAvatarUrl)` domain method
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/UploadUserAvatarUseCase.java` — NEW inbound port: `User uploadAvatar(UUID userId, MultipartFile file)`
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/UploadUserAvatarUseCaseImpl.java` — NEW: validate file size (<= 5MB), MIME type, and magic bytes via `MediaValidationUtils` -> upload to MinIO under `users/avatars/{uuid}.{ext}` using `MediaStoragePort` with `MediaType.USER_AVATAR` -> call `user.updateAvatar(newUrl)` -> save to DB via `userRepository.save()` -> if previous avatar was in MinIO, delete old file via `mediaStoragePort.deleteByUrl(oldAvatarUrl)` -> return updated User
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/UploadUserAvatarUseCaseImpl.java` — NEW: validate file size (<= 5MB), MIME type, and magic bytes via `MediaValidationUtils` -> upload to MinIO under `users/avatars/{uuid}.{ext}` using `MediaStoragePort` with `MediaAssetType.USER_AVATAR` -> call `user.updateAvatar(newUrl)` -> save to DB via `userRepository.save()` -> if previous avatar was in MinIO, delete old file via `mediaStoragePort.deleteByUrl(oldAvatarUrl)` -> return updated User
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/UpdateProfileRequest.java` — UPDATE: remove `avatarUrl` field; only `fullName` and `phoneNumber` remain
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/UpdateUserProfileUseCaseImpl.java` — UPDATE: remove `avatarUrl` from command and update logic
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/UserController.java` — ADD `POST /me/avatar` handler (`@RequestParam("file") MultipartFile file`); returns `ApiResponse<UserProfileResponse>`
@@ -130,11 +130,11 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1, T2, T3, T4 are checked off.
-- [ ] Every acceptance criterion verified end-to-end by controller MockMvc tests and use-case unit tests.
-- [ ] `ModulithArchitectureTest` passes — `UserController` in the `iam` module does not breach module boundaries.
-- [ ] No regression in existing `AuthController` test suite.
-- [ ] Ready for `/review user-profile-management`.
+- [x] All tasks T1, T2, T3, T4 are checked off.
+- [x] Every acceptance criterion verified end-to-end by controller MockMvc tests and use-case unit tests.
+- [x] `ModulithArchitectureTest` passes — `UserController` in the `iam` module does not breach module boundaries.
+- [x] No regression in existing `AuthController` test suite.
+- [x] Ready for `/review user-profile-management`.
 
 ## Risks and Mitigations
 

@@ -1,6 +1,5 @@
 package com.unihub.workshop.shared.exception;
 
-import java.util.Map;
 import org.springframework.http.HttpStatus;
 
 public class ServiceUnavailableException extends AppException {
@@ -63,25 +62,6 @@ public class ServiceUnavailableException extends AppException {
         Integer retryAfterSeconds
     ) {
         super(HttpStatus.SERVICE_UNAVAILABLE, type, message);
-        this.retryAfterSeconds = retryAfterSeconds;
-    }
-
-    public ServiceUnavailableException(
-        String type,
-        String message,
-        Map<String, Object> properties
-    ) {
-        super(HttpStatus.SERVICE_UNAVAILABLE, type, message, properties);
-        this.retryAfterSeconds = null;
-    }
-
-    public ServiceUnavailableException(
-        String type,
-        String message,
-        Map<String, Object> properties,
-        Integer retryAfterSeconds
-    ) {
-        super(HttpStatus.SERVICE_UNAVAILABLE, type, message, properties);
         this.retryAfterSeconds = retryAfterSeconds;
     }
 

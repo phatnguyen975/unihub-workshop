@@ -71,11 +71,7 @@ class UserTest {
             orgId
         );
 
-        User updated = original.updateProfile(
-            "Alice T. Smith",
-            "+84912345678",
-            "https://cdn.unihub.vn/avatar.jpg"
-        );
+        User updated = original.updateProfile("Alice T. Smith", "+84912345678");
 
         assertThat(updated.id()).isEqualTo(original.id());
         assertThat(updated.email()).isEqualTo(original.email());
@@ -91,15 +87,12 @@ class UserTest {
 
         assertThat(updated.fullName()).isEqualTo("Alice T. Smith");
         assertThat(updated.phoneNumber()).isEqualTo("+84912345678");
-        assertThat(updated.avatarUrl()).isEqualTo(
-            "https://cdn.unihub.vn/avatar.jpg"
-        );
         assertThat(updated.updatedAt()).isNotNull();
         assertThat(updated.updatedBy()).isEqualTo(original.id());
     }
 
     @Test
-    void updateProfileShouldAllowNullPhoneNumberAndAvatarUrl() {
+    void updateProfileShouldAllowNullPhoneNumber() {
         UUID id = UUID.randomUUID();
         User original = new User(
             id,
@@ -120,11 +113,44 @@ class UserTest {
             null
         );
 
-        User updated = original.updateProfile("Alice Smith", null, null);
+        User updated = original.updateProfile("Alice Smith", null);
 
         assertThat(updated.fullName()).isEqualTo("Alice Smith");
         assertThat(updated.phoneNumber()).isNull();
-        assertThat(updated.avatarUrl()).isNull();
+        assertThat(updated.avatarUrl()).isEqualTo(
+            "https://cdn.unihub.vn/avatar.jpg"
+        );
+    }
+
+    @Test
+    void updateAvatarShouldUpdateAvatarUrlAndAuditFields() {
+        UUID id = UUID.randomUUID();
+        User original = new User(
+            id,
+            null,
+            UserRole.STUDENT,
+            "student@university.edu",
+            "+84912345678",
+            "hash",
+            "Alice Smith",
+            "https://cdn.unihub.vn/old.jpg",
+            true,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        User updated = original.updateAvatar("https://cdn.unihub.vn/new.png");
+
+        assertThat(updated.avatarUrl()).isEqualTo(
+            "https://cdn.unihub.vn/new.png"
+        );
+        assertThat(updated.updatedAt()).isNotNull();
+        assertThat(updated.updatedBy()).isEqualTo(id);
     }
 
     @Test

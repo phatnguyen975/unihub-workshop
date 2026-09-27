@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.out.SlugGeneratorPort;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
@@ -32,6 +33,9 @@ class SaveDraftUseCaseImplSpeakerTest {
 
     @Mock
     private SlugGeneratorPort slugGeneratorPort;
+
+    @Mock
+    private MediaStoragePort mediaStoragePort;
 
     @InjectMocks
     private SaveDraftUseCaseImpl useCase;

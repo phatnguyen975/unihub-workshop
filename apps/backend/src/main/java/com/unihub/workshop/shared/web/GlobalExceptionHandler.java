@@ -402,7 +402,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "A version conflict occurred. The resource has been modified by another transaction.",
             request.getRequestURI()
         );
-        problem.setProperty("errorIdentifier", "VERSION_CONFLICT");
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 

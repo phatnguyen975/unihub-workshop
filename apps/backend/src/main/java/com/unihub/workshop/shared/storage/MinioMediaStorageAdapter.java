@@ -42,14 +42,14 @@ public class MinioMediaStorageAdapter implements MediaStoragePort {
         InputStream inputStream,
         long size,
         String contentType,
-        MediaType mediaType,
+        MediaAssetType assetType,
         String extension
     ) {
         String normalizedExt = extension.startsWith(".")
             ? extension
             : "." + extension;
         String fileKey =
-            mediaType.getFolderPrefix() +
+            assetType.getFolderPrefix() +
             "/" +
             UUID.randomUUID() +
             normalizedExt;
@@ -71,7 +71,7 @@ public class MinioMediaStorageAdapter implements MediaStoragePort {
             return new StoredMedia(
                 fileKey,
                 publicUrl,
-                mediaType,
+                assetType,
                 size,
                 contentType
             );

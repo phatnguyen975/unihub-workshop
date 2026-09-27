@@ -55,7 +55,7 @@ class MinioMediaStorageAdapterTest {
             is,
             content.length,
             "image/jpeg",
-            MediaType.COVER_IMAGE,
+            MediaAssetType.COVER_IMAGE,
             ".jpg"
         );
 
@@ -76,7 +76,7 @@ class MinioMediaStorageAdapterTest {
         assertThat(result.publicUrl()).isEqualTo(
             "http://localhost:9000/unihub-media/" + captured.key()
         );
-        assertThat(result.mediaType()).isEqualTo(MediaType.COVER_IMAGE);
+        assertThat(result.assetType()).isEqualTo(MediaAssetType.COVER_IMAGE);
         assertThat(result.size()).isEqualTo(content.length);
         assertThat(result.contentType()).isEqualTo("image/jpeg");
     }
@@ -99,7 +99,7 @@ class MinioMediaStorageAdapterTest {
                 is,
                 content.length,
                 "image/jpeg",
-                MediaType.SPEAKER_AVATAR,
+                MediaAssetType.SPEAKER_AVATAR,
                 ".png"
             )
         )

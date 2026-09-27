@@ -70,8 +70,6 @@ class UpdateUserProfileUseCaseImplTest {
             "Alice Thu Nguyen",
             true,
             null,
-            false,
-            null,
             false
         );
 
@@ -107,9 +105,7 @@ class UpdateUserProfileUseCaseImplTest {
             null,
             false,
             null,
-            true,
-            null,
-            false
+            true
         );
 
         useCase.updateProfile(USER_ID, command);
@@ -126,37 +122,7 @@ class UpdateUserProfileUseCaseImplTest {
     }
 
     @Test
-    void shouldClearAvatarUrl_whenAvatarUrlProvidedAsNull() {
-        User existing = createSampleUser();
-        when(userRepository.findById(USER_ID)).thenReturn(
-            Optional.of(existing)
-        );
-        when(userRepository.save(any(User.class))).thenAnswer(invocation ->
-            invocation.getArgument(0)
-        );
-
-        UpdateUserProfileCommand command = new UpdateUserProfileCommand(
-            null,
-            false,
-            null,
-            false,
-            null,
-            true
-        );
-
-        useCase.updateProfile(USER_ID, command);
-
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(captor.capture());
-        User saved = captor.getValue();
-
-        assertThat(saved.fullName()).isEqualTo("Alice Smith");
-        assertThat(saved.phoneNumber()).isEqualTo("+84912345678");
-        assertThat(saved.avatarUrl()).isNull();
-    }
-
-    @Test
-    void shouldUpdateAllThreeFields_whenAllProvided() {
+    void shouldUpdateBothFields_whenBothProvided() {
         User existing = createSampleUser();
         when(userRepository.findById(USER_ID)).thenReturn(
             Optional.of(existing)
@@ -169,8 +135,6 @@ class UpdateUserProfileUseCaseImplTest {
             "New Name",
             true,
             "+84987654321",
-            true,
-            "https://cdn.unihub.vn/new.jpg",
             true
         );
 
@@ -183,15 +147,13 @@ class UpdateUserProfileUseCaseImplTest {
         assertThat(saved.fullName()).isEqualTo("New Name");
         assertThat(saved.phoneNumber()).isEqualTo("+84987654321");
         assertThat(saved.avatarUrl()).isEqualTo(
-            "https://cdn.unihub.vn/new.jpg"
+            "https://cdn.unihub.vn/avatar.jpg"
         );
     }
 
     @Test
     void shouldThrowValidationException_whenNoFieldsProvided() {
         UpdateUserProfileCommand command = new UpdateUserProfileCommand(
-            null,
-            false,
             null,
             false,
             null,
@@ -213,8 +175,6 @@ class UpdateUserProfileUseCaseImplTest {
             "New Name",
             true,
             null,
-            false,
-            null,
             false
         );
 
@@ -228,8 +188,6 @@ class UpdateUserProfileUseCaseImplTest {
         UpdateUserProfileCommand command = new UpdateUserProfileCommand(
             "New Name",
             true,
-            null,
-            false,
             null,
             false
         );
@@ -267,8 +225,6 @@ class UpdateUserProfileUseCaseImplTest {
             "New Name",
             true,
             null,
-            false,
-            null,
             false
         );
 
@@ -288,8 +244,6 @@ class UpdateUserProfileUseCaseImplTest {
             null,
             true,
             null,
-            false,
-            null,
             false
         );
 
@@ -308,8 +262,6 @@ class UpdateUserProfileUseCaseImplTest {
         UpdateUserProfileCommand command = new UpdateUserProfileCommand(
             "   ",
             true,
-            null,
-            false,
             null,
             false
         );

@@ -11,7 +11,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class MediaTypeTest {
+class MediaAssetTypeTest {
 
     @ParameterizedTest
     @CsvSource({
@@ -23,16 +23,16 @@ class MediaTypeTest {
         "user_avatar, USER_AVATAR, users/avatars",
     })
     @DisplayName(
-        "Parses valid media type case-insensitively and maps to correct storage folder"
+        "Parses valid media asset type case-insensitively and maps to correct storage folder"
     )
-    void shouldParseValidMediaType(
+    void shouldParseValidMediaAssetType(
         String input,
-        MediaType expectedType,
+        MediaAssetType expectedType,
         String expectedFolder
     ) {
-        MediaType mediaType = MediaType.fromString(input);
-        assertThat(mediaType).isEqualTo(expectedType);
-        assertThat(mediaType.getFolderPrefix()).isEqualTo(expectedFolder);
+        MediaAssetType assetType = MediaAssetType.fromString(input);
+        assertThat(assetType).isEqualTo(expectedType);
+        assertThat(assetType.getFolderPrefix()).isEqualTo(expectedFolder);
     }
 
     @ParameterizedTest
@@ -40,7 +40,7 @@ class MediaTypeTest {
     @ValueSource(strings = { "   ", "\t" })
     @DisplayName("Throws BadRequestException when media type is null or blank")
     void shouldRejectNullOrBlank(String input) {
-        assertThatThrownBy(() -> MediaType.fromString(input))
+        assertThatThrownBy(() -> MediaAssetType.fromString(input))
             .isInstanceOf(BadRequestException.class)
             .hasMessage("Media type is required");
     }
@@ -50,7 +50,7 @@ class MediaTypeTest {
         "Throws BadRequestException listing all allowed media types when invalid"
     )
     void shouldRejectInvalidMediaTypeAndListAllAllowed() {
-        assertThatThrownBy(() -> MediaType.fromString("UNKNOWN_TYPE"))
+        assertThatThrownBy(() -> MediaAssetType.fromString("UNKNOWN_TYPE"))
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining(
                 "Invalid media type: UNKNOWN_TYPE. Allowed: COVER_IMAGE, SPEAKER_AVATAR, USER_AVATAR"

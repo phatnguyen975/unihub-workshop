@@ -11,6 +11,7 @@ import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.out.SlugGeneratorPort;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
@@ -35,6 +36,9 @@ class SaveDraftUseCaseImplTest {
 
     @Mock
     private SlugGeneratorPort slugGeneratorPort;
+
+    @Mock
+    private MediaStoragePort mediaStoragePort;
 
     @InjectMocks
     private SaveDraftUseCaseImpl useCase;

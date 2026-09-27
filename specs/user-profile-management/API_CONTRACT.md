@@ -206,7 +206,7 @@ Updates `full_name` and/or `phone_number` on the caller's `users` record. Sets `
 
 ### POST /api/v1/users/me/avatar
 
-**Description:** Uploads and sets the caller's avatar image via single-step direct upload. The image file is validated via `MediaValidationUtils` and streamed to MinIO (`unihub-media`) using `MediaType.USER_AVATAR` under `users/avatars/{uuid}.{ext}` via `MediaStoragePort`, the previous avatar in MinIO is deleted (if present), and `users.avatar_url` is updated in the database. Returns the full updated profile.  
+**Description:** Uploads and sets the caller's avatar image via single-step direct upload. The image file is validated via `MediaValidationUtils` and streamed to MinIO (`unihub-media`) using `MediaAssetType.USER_AVATAR` under `users/avatars/{uuid}.{ext}` via `MediaStoragePort`, the previous avatar in MinIO is deleted (if present), and `users.avatar_url` is updated in the database. Returns the full updated profile.  
 **Required Role / Auth:** Authenticated (`STUDENT`, `ORGANIZER`, or `STAFF`)  
 **Idempotency Requirement:** Not Required — each upload generates a unique file key and replaces the current avatar.
 
@@ -287,7 +287,7 @@ Updates `full_name` and/or `phone_number` on the caller's `users` record. Sets `
 
 #### Side Effects
 
-1. Streams new avatar image to MinIO bucket `unihub-media` using `MediaType.USER_AVATAR` under key `users/avatars/{uuid}.{ext}` via `MediaStoragePort`.
+1. Streams new avatar image to MinIO bucket `unihub-media` using `MediaAssetType.USER_AVATAR` under key `users/avatars/{uuid}.{ext}` via `MediaStoragePort`.
 2. If the user previously had an avatar URL hosted in MinIO, deletes the old object from MinIO via `MediaStoragePort.deleteByUrl(oldAvatarUrl)`.
 3. Updates `users.avatar_url` in the database, with `updated_at = NOW()` and `updated_by = callerId`.
 

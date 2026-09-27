@@ -4,14 +4,14 @@ import com.unihub.workshop.shared.exception.BadRequestException;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-public enum MediaType {
+public enum MediaAssetType {
     COVER_IMAGE("workshops/covers"),
     SPEAKER_AVATAR("speakers/avatars"),
     USER_AVATAR("users/avatars");
 
     private final String folderPrefix;
 
-    MediaType(String folderPrefix) {
+    MediaAssetType(String folderPrefix) {
         this.folderPrefix = folderPrefix;
     }
 
@@ -19,12 +19,12 @@ public enum MediaType {
         return folderPrefix;
     }
 
-    public static MediaType fromString(String value) {
+    public static MediaAssetType fromString(String value) {
         if (value == null || value.isBlank()) {
             throw new BadRequestException("Media type is required");
         }
         try {
-            return MediaType.valueOf(value.trim().toUpperCase());
+            return MediaAssetType.valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             String allowed = Arrays.stream(values())
                 .map(Enum::name)

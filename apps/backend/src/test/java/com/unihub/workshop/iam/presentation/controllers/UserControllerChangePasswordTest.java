@@ -3,7 +3,7 @@ package com.unihub.workshop.iam.presentation.controllers;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.unihub.workshop.iam.application.ports.in.ChangeUserPasswordUseCase;
@@ -62,7 +62,7 @@ class UserControllerChangePasswordTest {
     void shouldReturn200_whenPasswordChangedSuccessfully() throws Exception {
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -102,7 +102,7 @@ class UserControllerChangePasswordTest {
 
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -140,7 +140,7 @@ class UserControllerChangePasswordTest {
 
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -177,7 +177,7 @@ class UserControllerChangePasswordTest {
 
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -205,7 +205,7 @@ class UserControllerChangePasswordTest {
     void shouldReturn422_whenFieldsAreBlank() throws Exception {
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -240,7 +240,7 @@ class UserControllerChangePasswordTest {
 
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -266,7 +266,7 @@ class UserControllerChangePasswordTest {
     void shouldReturn400_whenSidMissingFromToken() throws Exception {
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(null))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -291,7 +291,7 @@ class UserControllerChangePasswordTest {
     void shouldReturn401_whenUnauthenticated() throws Exception {
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         """
@@ -315,7 +315,7 @@ class UserControllerChangePasswordTest {
     void shouldReturn400_whenRequestBodyIsMissing() throws Exception {
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
             )
@@ -332,7 +332,7 @@ class UserControllerChangePasswordTest {
     void shouldReturn400_whenRequestBodyIsMalformedJson() throws Exception {
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{ \"currentPassword\": \"abc\", }")
@@ -350,7 +350,7 @@ class UserControllerChangePasswordTest {
     void shouldReturn415_whenUnsupportedMediaType() throws Exception {
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.TEXT_PLAIN)
                     .content("currentPassword=OldPassword123!")
@@ -378,7 +378,7 @@ class UserControllerChangePasswordTest {
 
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
@@ -409,7 +409,7 @@ class UserControllerChangePasswordTest {
 
         mockMvc
             .perform(
-                patch("/api/v1/users/me/password")
+                post("/api/v1/users/me/password")
                     .principal(createAuth(CURRENT_SESSION_ID.toString()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(

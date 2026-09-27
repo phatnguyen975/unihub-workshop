@@ -7,8 +7,4 @@ public class BadRequestException extends AppException {
     public BadRequestException(String message) {
         super(HttpStatus.BAD_REQUEST, "urn:unihub:error:bad-request", message);
     }
-
-    public BadRequestException(String type, String message) {
-        super(HttpStatus.BAD_REQUEST, type, message);
-    }
 }

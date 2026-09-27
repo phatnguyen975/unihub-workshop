@@ -70,8 +70,8 @@ public class UserController {
         consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
     public ApiResponse<UserProfileResponse> uploadMyAvatar(
-        Authentication authentication,
-        @RequestParam("file") MultipartFile file
+        @RequestParam("file") MultipartFile file,
+        Authentication authentication
     ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         User updated = uploadUserAvatarUseCase.uploadAvatar(userId, file);

@@ -1,24 +1,38 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
+import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.exception.InternalServerException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
+import com.unihub.workshop.shared.storage.MediaAssetType;
+import com.unihub.workshop.shared.storage.MediaStoragePort;
+import com.unihub.workshop.shared.storage.MediaValidationUtils;
+import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.domain.model.Workshop;
+import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/admin/workshops")
@@ -28,6 +42,7 @@ public class AdminWorkshopController {
 
     private final SaveDraftUseCase saveDraftUseCase;
     private final WorkshopPresentationMapper workshopMapper;
+    private final MediaStoragePort mediaStoragePort;
 
     @PostMapping("/drafts")
     public ApiResponse<WorkshopResponse> saveDraft(
@@ -89,6 +104,65 @@ public class AdminWorkshopController {
             response,
             "Workshop draft updated successfully."
         );
+    }
+
+    @PostMapping(
+        value = "/media/upload",
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<MediaUploadResponse> uploadMedia(
+        @RequestParam("file") MultipartFile file,
+        @RequestParam("type") String type,
+        Authentication authentication,
+        HttpServletResponse httpServletResponse
+    ) {
+        // Verify caller is an active ORGANIZER with a valid tenant organization
+        getVerifiedOrganizationId(authentication);
+
+        if (type == null || type.isBlank()) {
+            throw new BadRequestException("Media type is required");
+        }
+
+        String normalizedType = type.trim().toUpperCase(Locale.ROOT);
+        if (
+            !"COVER_IMAGE".equals(normalizedType) &&
+            !"SPEAKER_AVATAR".equals(normalizedType)
+        ) {
+            throw new BadRequestException(
+                "Invalid media type. Allowed values: COVER_IMAGE, SPEAKER_AVATAR"
+            );
+        }
+
+        MediaAssetType assetType = MediaAssetType.valueOf(normalizedType);
+        String extension = MediaValidationUtils.validateImage(file);
+
+        StoredMedia storedMedia;
+        try {
+            storedMedia = mediaStoragePort.upload(
+                file.getInputStream(),
+                file.getSize(),
+                file.getContentType(),
+                assetType,
+                extension
+            );
+        } catch (IOException e) {
+            throw new InternalServerException(
+                "Failed to read uploaded file stream",
+                e
+            );
+        }
+
+        MediaUploadResponse response = MediaUploadResponse.builder()
+            .url(storedMedia.publicUrl())
+            .fileKey(storedMedia.fileKey())
+            .type(storedMedia.assetType().name())
+            .size(storedMedia.size())
+            .contentType(storedMedia.contentType())
+            .build();
+
+        httpServletResponse.setStatus(HttpServletResponse.SC_CREATED);
+        return ApiResponse.success(response, "Media uploaded successfully.");
     }
 
     private UUID getVerifiedOrganizationId(Authentication authentication) {

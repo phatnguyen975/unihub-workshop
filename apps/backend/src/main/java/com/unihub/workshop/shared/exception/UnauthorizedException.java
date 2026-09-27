@@ -11,8 +11,4 @@ public class UnauthorizedException extends AppException {
             message
         );
     }
-
-    public UnauthorizedException(String type, String message) {
-        super(HttpStatus.UNAUTHORIZED, type, message);
-    }
 }

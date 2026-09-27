@@ -5,6 +5,7 @@ import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.out.SlugGeneratorPort;
@@ -20,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
 
     private final WorkshopRepository workshopRepository;
     private final SlugGeneratorPort slugGeneratorPort;
+    private final MediaStoragePort mediaStoragePort;
 
     @Override
     @Transactional
@@ -433,7 +436,50 @@ public class SaveDraftUseCaseImpl implements SaveDraftUseCase {
             domainSpeakers
         );
 
-        return workshopRepository.save(updated);
+        Workshop saved = workshopRepository.save(updated);
+        cleanupOrphanedMedia(existing, coverImageUrl, domainSpeakers);
+        return saved;
+    }
+
+    private void cleanupOrphanedMedia(
+        Workshop existing,
+        String newCoverImageUrl,
+        List<Speaker> newSpeakers
+    ) {
+        if (
+            existing.coverImageUrl() != null &&
+            !existing.coverImageUrl().isBlank()
+        ) {
+            if (
+                newCoverImageUrl == null ||
+                !existing.coverImageUrl().equals(newCoverImageUrl)
+            ) {
+                mediaStoragePort.deleteByUrl(existing.coverImageUrl());
+            }
+        }
+
+        if (
+            newSpeakers != null &&
+            existing.speakers() != null &&
+            !existing.speakers().isEmpty()
+        ) {
+            Set<String> retainedAvatars = newSpeakers
+                .stream()
+                .map(Speaker::avatarUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .collect(Collectors.toSet());
+
+            for (Speaker oldSpeaker : existing.speakers()) {
+                String oldAvatar = oldSpeaker.avatarUrl();
+                if (
+                    oldAvatar != null &&
+                    !oldAvatar.isBlank() &&
+                    !retainedAvatars.contains(oldAvatar)
+                ) {
+                    mediaStoragePort.deleteByUrl(oldAvatar);
+                }
+            }
+        }
     }
 
     private Workshop createDraft(

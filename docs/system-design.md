@@ -421,7 +421,7 @@ sequenceDiagram
 
   Note over Organizer,Notify: PUBLISH OPERATION
   Organizer->>Web: Click "Publish Workshop"
-  Web->>GW: PATCH /api/v1/workshops/{id}/publish
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/publish
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -448,7 +448,7 @@ sequenceDiagram
 
   Note over Organizer,Notify: UPDATE OPERATION
   Organizer->>Web: Click "Save Changes"
-  Web->>GW: PUT /api/v1/workshops/{id}
+  Web->>GW: PUT /api/v1/admin/workshops/{id}
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -480,18 +480,16 @@ sequenceDiagram
           GW-->>Web: 200 OK
         end
       else current_status == DRAFT
-        API->>DB: Update Workshop Details (all fields allowed, Optimistic Locking check)
-        Note over API,DB: DRAFT changes do not generate outbox events
-        DB-->>API: Transaction committed (Optimistic Locking check)
-        API-->>GW: 200 OK
-        GW-->>Web: 200 OK
+        API-->>GW: 422 Unprocessable Entity (Draft modifications must use POST /api/v1/admin/workshops/drafts)
+        GW-->>Web: 422 Unprocessable Entity
+        Web-->>Organizer: 422 Unprocessable Entity
       end
     end
   end
 
   Note over Organizer,Notify: RESCHEDULE OPERATION
   Organizer->>Web: Change Date/Time & Click "Reschedule"
-  Web->>GW: PATCH /api/v1/workshops/{id}/reschedule
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/reschedule
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -534,7 +532,7 @@ sequenceDiagram
 
   Note over Organizer,Notify: CANCEL OPERATION
   Organizer->>Web: Click "Cancel Workshop"
-  Web->>GW: PATCH /api/v1/workshops/{id}/cancel
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/cancel
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -545,8 +543,8 @@ sequenceDiagram
   else Authorized
     API->>DB: Select current_status from workshops
     DB-->>API: current_status: STATUS
-    alt current_status == CANCELED or current_status == COMPLETED
-      API-->>GW: 422 Unprocessable Entity (Invalid State)
+    alt current_status == CANCELED or current_status == COMPLETED or current_status == DRAFT
+      API-->>GW: 422 Unprocessable Entity (Drafts must be deleted via DELETE endpoint - terminal workshops cannot be canceled)
       GW-->>Web: 422 Unprocessable Entity
       Web-->>Organizer: 422 Unprocessable Entity
     else

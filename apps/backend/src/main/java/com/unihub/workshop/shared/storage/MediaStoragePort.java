@@ -5,20 +5,20 @@ import java.util.Collection;
 
 public interface MediaStoragePort {
     /**
-     * Streams media content to object storage under the partitioned prefix for the given media type.
+     * Streams media content to object storage under the partitioned prefix for the given media asset type.
      *
      * @param inputStream the media binary stream
      * @param size size in bytes
      * @param contentType MIME type (e.g. "image/jpeg")
-     * @param mediaType media category determining storage folder partition
+     * @param assetType media category determining storage folder partition
      * @param extension file extension including leading dot (e.g. ".jpg")
-     * @return StoredMedia containing fileKey, publicUrl, size, contentType, and mediaType
+     * @return StoredMedia containing fileKey, publicUrl, size, contentType, and assetType
      */
     StoredMedia upload(
         InputStream inputStream,
         long size,
         String contentType,
-        MediaType mediaType,
+        MediaAssetType assetType,
         String extension
     );
 

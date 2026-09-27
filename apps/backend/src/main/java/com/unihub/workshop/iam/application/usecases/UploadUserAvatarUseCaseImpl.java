@@ -5,8 +5,8 @@ import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.UnauthorizedException;
+import com.unihub.workshop.shared.storage.MediaAssetType;
 import com.unihub.workshop.shared.storage.MediaStoragePort;
-import com.unihub.workshop.shared.storage.MediaType;
 import com.unihub.workshop.shared.storage.MediaValidationUtils;
 import com.unihub.workshop.shared.storage.StoredMedia;
 import java.io.IOException;
@@ -51,7 +51,7 @@ public class UploadUserAvatarUseCaseImpl implements UploadUserAvatarUseCase {
                 inputStream,
                 file.getSize(),
                 file.getContentType(),
-                MediaType.USER_AVATAR,
+                MediaAssetType.USER_AVATAR,
                 extension
             );
         } catch (IOException e) {

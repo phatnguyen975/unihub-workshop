@@ -134,7 +134,7 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
 
 ### Phase 4: Media Upload & Storage Integration
 
-- [ ] **T4 — Shared Media Storage Port & Workshop Media Upload & Cleanup Integration**
+- [x] **T4 — Shared Media Storage Port & Workshop Media Upload & Cleanup Integration**
   - **Size:** M
   - **Depends on:** T3
   - **Layers touched:** Shared Kernel (`shared/storage`), Application (`workshops`), Presentation (`workshops`)
@@ -142,7 +142,7 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
     - `apps/backend/src/main/java/com/unihub/workshop/shared/storage/MediaStoragePort.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/shared/storage/MinioMediaStorageAdapter.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/shared/storage/MediaValidationUtils.java` _(new: validate file size <= 5MB, MIME types: image/jpeg, image/jpg, image/png, image/webp, extensions: .jpg, .jpeg, .png, .webp)_
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/storage/MediaType.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/storage/MediaAssetType.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopController.java` _(extended — media upload handler)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/MediaUploadResponse.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/SaveDraftUseCaseImpl.java` _(extended — media cleanup on update)_
@@ -159,10 +159,10 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
 
 #### Checkpoint: Phase 4
 
-- [ ] T4 acceptance criteria are all verified end-to-end.
-- [ ] MinIO key partitioning matches `workshops/covers/` and `speakers/avatars/`.
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Full unit test suite (T1 + T2 + T3 + T4) is green.
+- [x] T4 acceptance criteria are all verified end-to-end.
+- [x] MinIO key partitioning matches `workshops/covers/` and `speakers/avatars/`.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Full unit test suite (T1 + T2 + T3 + T4) is green.
 
 ### Phase 5: Workshop Details for Organizer
 
