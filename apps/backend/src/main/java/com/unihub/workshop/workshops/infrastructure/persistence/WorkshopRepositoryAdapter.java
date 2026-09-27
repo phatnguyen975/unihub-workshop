@@ -2,7 +2,6 @@ package com.unihub.workshop.workshops.infrastructure.persistence;
 
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
-import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.WorkshopPersistenceMapper;
 import java.time.Instant;
@@ -62,19 +61,7 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
                 }
             }
 
-            List<WorkshopSpeakerJpaEntity> persistedSpeakers =
-                speakerRepository.findByWorkshopIdOrderBySortOrderAsc(
-                    saved.getId()
-                );
-            List<Speaker> domainSpeakers = mapper.toSpeakerDomainList(
-                persistedSpeakers
-            );
-
-            return mapper
-                .toDomain(saved)
-                .toBuilder()
-                .speakers(domainSpeakers)
-                .build();
+            return mapToDomainWithSpeakers(saved);
         } catch (OptimisticLockingFailureException ex) {
             throw new ConflictException(
                 "Workshop version conflict occurred while saving: " +
@@ -86,17 +73,7 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Workshop> findById(UUID id) {
-        return repository.findById(id).map(entity -> {
-            List<WorkshopSpeakerJpaEntity> speakers =
-                speakerRepository.findByWorkshopIdOrderBySortOrderAsc(
-                    entity.getId()
-                );
-            return mapper
-                .toDomain(entity)
-                .toBuilder()
-                .speakers(mapper.toSpeakerDomainList(speakers))
-                .build();
-        });
+        return repository.findById(id).map(this::mapToDomainWithSpeakers);
     }
 
     @Override
@@ -107,17 +84,19 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     ) {
         return repository
             .findByIdAndOrganizationId(id, organizationId)
-            .map(entity -> {
-                List<WorkshopSpeakerJpaEntity> speakers =
-                    speakerRepository.findByWorkshopIdOrderBySortOrderAsc(
-                        entity.getId()
-                    );
-                return mapper
-                    .toDomain(entity)
-                    .toBuilder()
-                    .speakers(mapper.toSpeakerDomainList(speakers))
-                    .build();
-            });
+            .map(this::mapToDomainWithSpeakers);
+    }
+
+    private Workshop mapToDomainWithSpeakers(WorkshopJpaEntity entity) {
+        List<WorkshopSpeakerJpaEntity> speakers =
+            speakerRepository.findByWorkshopIdOrderBySortOrderAsc(
+                entity.getId()
+            );
+        return mapper
+            .toDomain(entity)
+            .toBuilder()
+            .speakers(mapper.toSpeakerDomainList(speakers))
+            .build();
     }
 
     @Override

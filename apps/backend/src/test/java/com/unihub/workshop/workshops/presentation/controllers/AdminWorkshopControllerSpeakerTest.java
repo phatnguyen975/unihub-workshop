@@ -12,6 +12,7 @@ import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
+import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.domain.model.Speaker;
@@ -54,6 +55,7 @@ class AdminWorkshopControllerSpeakerTest {
 
         AdminWorkshopController controller = new AdminWorkshopController(
             saveDraftUseCase,
+            mock(GetWorkshopUseCase.class),
             mapper,
             mock(MediaStoragePort.class)
         );

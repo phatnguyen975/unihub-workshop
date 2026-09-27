@@ -8,6 +8,7 @@ import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.storage.MediaValidationUtils;
 import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
+import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.domain.model.Workshop;
@@ -26,6 +27,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,8 +44,23 @@ import org.springframework.web.multipart.MultipartFile;
 public class AdminWorkshopController {
 
     private final SaveDraftUseCase saveDraftUseCase;
+    private final GetWorkshopUseCase getWorkshopUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
+
+    @GetMapping("/{id}")
+    public ApiResponse<WorkshopResponse> getWorkshop(
+        @PathVariable UUID id,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+        Workshop workshop = getWorkshopUseCase.execute(id, organizationId);
+        WorkshopResponse response = workshopMapper.toResponse(workshop);
+        return ApiResponse.success(
+            response,
+            "Workshop retrieved successfully."
+        );
+    }
 
     @PostMapping("/drafts")
     public ApiResponse<WorkshopResponse> saveDraft(

@@ -166,15 +166,14 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
 
 ### Phase 5: Workshop Details for Organizer
 
-- [ ] **T5 — ORGANIZER can retrieve full workshop details via `GET /api/v1/admin/workshops/{id}`**
+- [x] **T5 — ORGANIZER can retrieve full workshop details via `GET /api/v1/admin/workshops/{id}`**
   - **Size:** S
   - **Depends on:** T4
   - **Layers touched:** Application, Infrastructure, Presentation
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/in/GetWorkshopUseCase.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/GetWorkshopUseCaseImpl.java` _(new)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopRepository.java` _(extended — `findByIdWithSpeakers`)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopRepositoryAdapter.java` _(extended)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopRepository.java` _(existing — `findById` loads complete aggregate with speakers)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopController.java` _(extended — GET handler)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/GetWorkshopUseCaseImplTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopControllerGetTest.java` _(new)_
@@ -186,10 +185,10 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
 
 #### Checkpoint: Phase 5
 
-- [ ] T5 acceptance criteria are all verified end-to-end.
-- [ ] Query uses eager join fetch to prevent N+1 queries when loading speakers.
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Full unit test suite (T1 through T5) is green.
+- [x] T5 acceptance criteria are all verified end-to-end.
+- [x] Query uses eager join fetch to prevent N+1 queries when loading speakers.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Full unit test suite (T1 through T5) is green.
 
 ### Phase 6: Delete Draft Workshop
 

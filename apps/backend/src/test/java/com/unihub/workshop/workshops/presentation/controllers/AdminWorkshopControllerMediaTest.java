@@ -18,6 +18,7 @@ import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
+import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import java.io.InputStream;
@@ -93,6 +94,7 @@ class AdminWorkshopControllerMediaTest {
 
         AdminWorkshopController controller = new AdminWorkshopController(
             saveDraftUseCase,
+            mock(GetWorkshopUseCase.class),
             mapper,
             mediaStoragePort
         );
