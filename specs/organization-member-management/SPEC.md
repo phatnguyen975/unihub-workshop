@@ -29,8 +29,8 @@ All operations are strictly scoped to the calling organizer's organization (`jwt
 - **FR-01:** The system SHALL return a cursor-paginated list of users whose `organization_id` matches the caller's `org` claim, strictly excluding the caller themselves from the result set.
 - **FR-02:** The system SHALL support filtering the member list by `role` (`ORGANIZER`, `STAFF`, or `STUDENT`).
 - **FR-03:** The system SHALL support filtering the member list by active status (`isActive = true` or `false`).
-- **FR-04:** The system SHALL support a `search` keyword parameter that performs a case-insensitive partial match (`ILIKE`) across `full_name`, `email`, and `phone_number`.
-- **FR-05:** The system SHALL allow combining multiple filters (`role`, `isActive`, `search`) conjunctively (logical `AND`).
+- **FR-04:** The system SHALL support a `q` keyword parameter that performs a case-insensitive partial match (`ILIKE`) across `full_name`, `email`, and `phone_number`.
+- **FR-05:** The system SHALL allow combining multiple filters (`role`, `isActive`, `q`) conjunctively (logical `AND`).
 - **FR-06:** The system SHALL order member list results by `created_at DESC`, then `id DESC` as a tie-breaker, to guarantee deterministic cursor pagination.
 - **FR-07:** The system SHALL default pagination page size (`size`) to 20 items per page, allow a maximum size of 100, and reject requests exceeding 100 with `400 Bad Request`.
 - **FR-08:** The list query SHALL be routed to the **PostgreSQL read replica** to preserve primary database write capacity.
@@ -159,7 +159,7 @@ And u-1, u-2, and u-4 are excluded
 
 ```gherkin
 Given an active member with full_name = "Nguyen Van Binh" and email = "binh.nv@example.com"
-When the ORGANIZER calls GET /api/v1/admin/organizations/users?search=van+binh
+When the ORGANIZER calls GET /api/v1/admin/organizations/users?q=van+binh
 Then the response status is 200 OK
 And the data items include "Nguyen Van Binh"
 ```

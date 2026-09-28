@@ -95,6 +95,19 @@ This feature allows an authenticated **ORGANIZER** to compose a workshop increme
 
 - **FR-47:** The system SHALL accept optional speaker metadata `bio` (max 2000 chars), `avatar_url` (valid HTTP/HTTPS URL, max 2048 chars), `linkedin_url` (valid HTTP/HTTPS URL, max 2048 chars), and `sort_order` (non-negative integer, default 0) for each speaker entry in the Save as Draft request, normalizing blank string values to `null`.
 
+### 3.11 List Workshops for Organizer
+
+- **FR-48:** The system SHALL provide a paginated list of workshops owned by the caller's organization when `GET /api/v1/admin/workshops` is called by an authenticated user with `role = ORGANIZER`.
+- **FR-49:** The system SHALL filter the returned workshops strictly by `organization_id == jwt.org`, ensuring zero cross-tenant visibility (IDOR-proof).
+- **FR-50:** The system SHALL support an optional query parameter `status` (`DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED`). When omitted, workshops across all statuses within the caller's organization SHALL be returned.
+- **FR-51:** The system SHALL support an optional query parameter `q` (case-insensitive substring match against `title`, `slug`, `location`, and `description`).
+- **FR-52:** The system SHALL support optional query parameters `from` and `to` (ISO 8601 timestamps) to filter workshops whose `starts_at` falls within the specified range.
+- **FR-53:** The system SHALL support keyset cursor pagination with `cursor` and `size` (default: 20, max: 100), returning an envelope with `items` and cursor container `cursor: { nextCursor, hasMore }` conforming to `docs/api-standards.md`.
+- **FR-54:** The system SHALL reject requests to `GET /api/v1/admin/workshops` with `403 Forbidden` if the caller does not have `role = ORGANIZER`.
+- **FR-55:** The system SHALL execute workshop listing queries against the PostgreSQL Read Replica (via `@Transactional(readOnly = true)`) to reduce primary DB load. The listing is a standalone HTTP request with no shared transaction boundary from any preceding write; per `docs/database-schema.md`, eventual consistency is acceptable for browsing queries and replica reads.
+- **FR-56:** The system SHALL support an optional query parameter `priceType` (`FREE`, `PAID`). When `priceType = FREE`, the system SHALL return only workshops with `price = 0` (or `price IS NULL`). When `priceType = PAID`, the system SHALL return only workshops with `price > 0`. When omitted, workshops of both free and paid pricing SHALL be returned.
+- **FR-57:** The system SHALL support an optional query parameter `sort` with allowed values `price,asc` (price ascending), `price,desc` (price descending), `capacity,asc` (capacity ascending), `capacity,desc` (capacity descending), `createdAt,desc` (newest first, default), `createdAt,asc`, `startsAt,asc`, and `startsAt,desc`. When omitted, the listing SHALL default to `createdAt,desc`.
+
 ## 4. Business Rules
 
 - **BR-01:** An ORGANIZER is only permitted to manage workshops that belong to their own organization (`organization_id`). Cross-organization access is never permitted, even for read-only operations. _(Source: `docs/system-design.md` — RBAC rules; `docs/adrs.md` — ADR-006)_
@@ -113,6 +126,7 @@ This feature allows an authenticated **ORGANIZER** to compose a workshop increme
 - **BR-14:** `capacity`, when supplied, must be a positive integer in range `[1, 1000000]`. _(Source: `docs/database-schema.md` — CHECK constraint)_
 - **BR-15:** Media upload is stateless with respect to the database; it does not persist workshop records or modify database entities. URLs returned from media upload must be included in the Save Draft payload to be persisted. _(Source: ADR-032)_
 - **BR-16:** Media files uploaded to MinIO bucket `unihub-media` must follow strict key partitioning (`workshops/covers/{uuid}.{ext}` for cover images and `speakers/avatars/{uuid}.{ext}` for speaker portraits). Stale or deleted assets must be cleaned up from MinIO. _(Source: ADR-032)_
+- **BR-17:** Organizer workshop listing (`GET /api/v1/admin/workshops`) routes to the PostgreSQL Read Replica via `@Transactional(readOnly = true)`. This is a browsing query (not a check-then-act or idempotency-sensitive operation) so eventual consistency is acceptable per `docs/database-schema.md`. Tenant isolation is still strictly enforced — all results are scoped to the caller's organization (`jwt.org`).
 
 ## 5. State Transitions
 
@@ -386,6 +400,123 @@ Then the system returns HTTP 403 Forbidden
 ```
 
 _Satisfies: FR-02_
+
+### Scenario 22: ORGANIZER retrieves paginated list of workshops for their organization
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT (role = ORGANIZER, org = org-A)
+And org-A owns 3 workshops in statuses DRAFT, PUBLISHED, and COMPLETED
+And org-B owns 2 workshops
+When they send a request to GET /api/v1/admin/workshops
+Then the system returns HTTP 200 OK
+And the response envelope contains only the 3 workshops belonging to org-A
+And no workshops belonging to org-B are returned
+And "data.cursor.hasMore" is false and "data.cursor.nextCursor" is null
+```
+
+_Satisfies: FR-48, FR-49, FR-53, FR-55, BR-01, BR-17_
+
+### Scenario 23: ORGANIZER filters workshops by status
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT (role = ORGANIZER, org = org-A)
+And org-A owns 2 workshops with status = DRAFT and 1 workshop with status = PUBLISHED
+When they send a request to GET /api/v1/admin/workshops?status=DRAFT
+Then the system returns HTTP 200 OK
+And the response contains exactly the 2 DRAFT workshops
+And no workshops with status != DRAFT are included
+```
+
+_Satisfies: FR-50_
+
+### Scenario 24: ORGANIZER searches workshops using query parameter q (matching title, slug, location, description)
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT (role = ORGANIZER, org = org-A)
+And org-A owns workshops:
+  | title                   | slug                   | location    | description             |
+  | Advanced Spring Boot    | advanced-spring-boot   | Hall A      | Java backend framework  |
+  | React Native Deep Dive  | react-native-deep-dive | Lab 3       | Mobile app dev          |
+  | Cloud Native Kubernetes | cloud-native-k8s       | Auditorium  | Container orchestration |
+When they send a request to GET /api/v1/admin/workshops?q=spring
+Then the system returns HTTP 200 OK
+And the response contains only "Advanced Spring Boot"
+When they send a request to GET /api/v1/admin/workshops?q=auditorium
+Then the system returns HTTP 200 OK
+And the response contains only "Cloud Native Kubernetes"
+When they send a request to GET /api/v1/admin/workshops?q=backend
+Then the system returns HTTP 200 OK
+And the response contains only "Advanced Spring Boot"
+```
+
+_Satisfies: FR-51_
+
+### Scenario 25: ORGANIZER filters workshops by start date range
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT (role = ORGANIZER, org = org-A)
+And org-A owns a workshop starting on "2026-10-15T09:00:00Z" and another starting on "2026-11-20T09:00:00Z"
+When they send a request to GET /api/v1/admin/workshops?from=2026-10-01T00:00:00Z&to=2026-10-31T23:59:59Z
+Then the system returns HTTP 200 OK
+And the response contains only the workshop starting on "2026-10-15T09:00:00Z"
+```
+
+_Satisfies: FR-52_
+
+### Scenario 26: Listing workshops is rejected for non-ORGANIZER roles
+
+```gherkin
+Given an authenticated user with a valid JWT with role = STUDENT or role = STAFF
+When they send a request to GET /api/v1/admin/workshops
+Then the system returns HTTP 403 Forbidden
+```
+
+_Satisfies: FR-54_
+
+### Scenario 27: ORGANIZER filters workshops by priceType (FREE vs PAID)
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT (role = ORGANIZER, org = org-A)
+And org-A owns a free workshop (price = 0) and a paid workshop (price = 50.00)
+When they send a request to GET /api/v1/admin/workshops?priceType=FREE
+Then the system returns HTTP 200 OK
+And the response contains only the free workshop
+When they send a request to GET /api/v1/admin/workshops?priceType=PAID
+Then the system returns HTTP 200 OK
+And the response contains only the paid workshop
+```
+
+_Satisfies: FR-56_
+
+### Scenario 28: ORGANIZER sorts workshops by capacity ascending / descending
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT (role = ORGANIZER, org = org-A)
+And org-A owns Workshop A with capacity = 50 and Workshop B with capacity = 200
+When they send a request to GET /api/v1/admin/workshops?sort=capacity,asc
+Then the system returns HTTP 200 OK
+And Workshop A appears before Workshop B in the items list
+When they send a request to GET /api/v1/admin/workshops?sort=capacity,desc
+Then the system returns HTTP 200 OK
+And Workshop B appears before Workshop A in the items list
+```
+
+_Satisfies: FR-57_
+
+### Scenario 29: ORGANIZER sorts workshops by price ascending / descending
+
+```gherkin
+Given an authenticated ORGANIZER with a valid JWT (role = ORGANIZER, org = org-A)
+And org-A owns Workshop A with price = 10.00 and Workshop B with price = 50.00
+When they send a request to GET /api/v1/admin/workshops?sort=price,asc
+Then the system returns HTTP 200 OK
+And Workshop A appears before Workshop B in the items list
+When they send a request to GET /api/v1/admin/workshops?sort=price,desc
+Then the system returns HTTP 200 OK
+And Workshop B appears before Workshop A in the items list
+```
+
+_Satisfies: FR-57_
 
 ## 8. Out of Scope
 

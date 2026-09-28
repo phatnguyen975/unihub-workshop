@@ -63,4 +63,16 @@ public interface WorkshopSpeakerJpaRepository
         @Param("endsAt") Instant endsAt,
         @Param("excludeWorkshopId") UUID excludeWorkshopId
     );
+
+    @Query(
+        """
+        SELECT s.workshopId, COUNT(s.id)
+        FROM WorkshopSpeakerJpaEntity s
+        WHERE s.workshopId IN :workshopIds
+        GROUP BY s.workshopId
+        """
+    )
+    List<Object[]> countSpeakersByWorkshopIds(
+        @Param("workshopIds") Collection<UUID> workshopIds
+    );
 }

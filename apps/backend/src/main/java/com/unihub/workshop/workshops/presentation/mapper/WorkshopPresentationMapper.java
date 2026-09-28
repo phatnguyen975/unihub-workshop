@@ -1,12 +1,16 @@
 package com.unihub.workshop.workshops.presentation.mapper;
 
+import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
+import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerResponse;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
+import com.unihub.workshop.workshops.presentation.dto.WorkshopSummaryResponse;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -16,6 +20,14 @@ public interface WorkshopPresentationMapper {
     WorkshopResponse toResponse(Workshop workshop);
 
     SpeakerResponse toSpeakerResponse(Speaker speaker);
+
+    WorkshopSummaryResponse toSummaryResponse(WorkshopSummary summary);
+
+    default PageResponse<WorkshopSummaryResponse> toPageResponse(
+        CursorPage<WorkshopSummary> page
+    ) {
+        return PageResponse.from(page, this::toSummaryResponse);
+    }
 
     @Mapping(target = "id", source = "request.id")
     @Mapping(target = "version", source = "request.version")

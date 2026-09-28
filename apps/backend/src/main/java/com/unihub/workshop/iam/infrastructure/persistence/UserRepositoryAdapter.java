@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -116,7 +116,7 @@ public class UserRepositoryAdapter implements UserRepository {
         UUID callerId,
         UserRole role,
         Boolean isActive,
-        String search,
+        String q,
         String cursor,
         int size
     ) {
@@ -129,9 +129,9 @@ public class UserRepositoryAdapter implements UserRepository {
                 String decoded = new String(
                     Base64.getDecoder().decode(trimmedCursor)
                 );
-                CursorData cursorData = objectMapper.readValue(
+                UserCursor cursorData = objectMapper.readValue(
                     decoded,
-                    CursorData.class
+                    UserCursor.class
                 );
                 if (
                     cursorData == null ||
@@ -151,7 +151,7 @@ public class UserRepositoryAdapter implements UserRepository {
         }
 
         String roleStr = role != null ? role.name() : null;
-        String sanitizedSearch = sanitizeSearch(search);
+        String sanitizedQ = sanitizeQuery(q);
         PageRequest pageable = PageRequest.of(0, size + 1);
         List<UserJpaEntity> entities =
             cursorTime == null
@@ -160,7 +160,7 @@ public class UserRepositoryAdapter implements UserRepository {
                       callerId,
                       roleStr,
                       isActive,
-                      sanitizedSearch,
+                      sanitizedQ,
                       pageable
                   )
                 : repository.findNextPage(
@@ -168,7 +168,7 @@ public class UserRepositoryAdapter implements UserRepository {
                       callerId,
                       roleStr,
                       isActive,
-                      sanitizedSearch,
+                      sanitizedQ,
                       cursorTime,
                       cursorId,
                       pageable
@@ -185,7 +185,7 @@ public class UserRepositoryAdapter implements UserRepository {
         if (hasMore && !pageEntities.isEmpty()) {
             UserJpaEntity lastItem = pageEntities.get(pageEntities.size() - 1);
             try {
-                CursorData nextCursorData = new CursorData(
+                UserCursor nextCursorData = new UserCursor(
                     lastItem.getCreatedAt(),
                     lastItem.getId()
                 );
@@ -201,13 +201,13 @@ public class UserRepositoryAdapter implements UserRepository {
         return new CursorPage<>(items, nextCursor, hasMore);
     }
 
-    private record CursorData(Instant createdAt, UUID id) {}
+    private record UserCursor(Instant createdAt, UUID id) {}
 
-    private String sanitizeSearch(String search) {
-        if (search == null) {
+    private String sanitizeQuery(String query) {
+        if (query == null) {
             return null;
         }
-        return search
+        return query
             .replace("\\", "\\\\")
             .replace("%", "\\%")
             .replace("_", "\\_");

@@ -12,7 +12,6 @@ import com.unihub.workshop.iam.application.ports.in.ResetPasswordUseCase;
 import com.unihub.workshop.iam.application.ports.in.RevokeAllOtherSessionsUseCase;
 import com.unihub.workshop.iam.application.ports.in.RevokeSessionUseCase;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.presentation.dto.ActivateAccountRequest;
 import com.unihub.workshop.iam.presentation.dto.ChangeTemporaryPasswordRequest;
 import com.unihub.workshop.iam.presentation.dto.LoginRequest;
@@ -25,9 +24,10 @@ import com.unihub.workshop.iam.presentation.dto.RegisterRequest;
 import com.unihub.workshop.iam.presentation.dto.RegisterResponse;
 import com.unihub.workshop.iam.presentation.dto.ResendOtpRequest;
 import com.unihub.workshop.iam.presentation.dto.ResetPasswordRequest;
-import com.unihub.workshop.iam.presentation.dto.SessionCursor;
-import com.unihub.workshop.iam.presentation.dto.SessionResponse;
+import com.unihub.workshop.iam.presentation.dto.SessionItemResponse;
 import com.unihub.workshop.iam.presentation.mapper.AuthPresentationMapper;
+import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.shared.security.PublicKeyService;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
@@ -207,7 +207,7 @@ public class AuthController {
     }
 
     @GetMapping("/sessions")
-    public ApiResponse<SessionResponse> getActiveSessions(
+    public ApiResponse<PageResponse<SessionItemResponse>> getActiveSessions(
         @RequestParam(required = false) String cursor,
         @RequestParam(required = false, defaultValue = "20") Integer size,
         Authentication authentication
@@ -224,13 +224,14 @@ public class AuthController {
                 cursor,
                 size
             );
-        List<SessionResponse.SessionItem> items = authMapper.toSessionItemList(
+        List<SessionItemResponse> items = authMapper.toSessionItemList(
             page.items()
         );
 
-        SessionResponse response = new SessionResponse(
+        PageResponse<SessionItemResponse> response = PageResponse.of(
             items,
-            new SessionCursor(page.nextCursor(), page.hasMore())
+            page.nextCursor(),
+            page.hasMore()
         );
 
         return ApiResponse.success(response, "Active sessions retrieved");

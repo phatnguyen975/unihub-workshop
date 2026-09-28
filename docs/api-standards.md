@@ -11,9 +11,12 @@ We use URI path versioning (e.g., `/api/v1/...`) because it is explicit, cache-f
 > [!NOTE]
 > This document defines global API patterns. Endpoint-level schemas and examples are the source of truth in the live OpenAPI/Swagger spec at `/swagger-ui.html`.
 
-### Pagination & Filtering
+### Pagination, Search & Filtering
 
-All collection endpoints use cursor-based (keyset) pagination to guarantee stable `O(1)` performance at scale and prevent data drift under concurrent writes. Clients pass a `?cursor=` query parameter to fetch the next window and may pass `?size=` to control batch size (e.g., `?cursor=...&size=20`); filters remain optional query parameters. The backend must enforce a default page size (usually 20) and a strict hard-cap maximum (e.g., 100) to protect database performance from oversized requests.
+- **Pagination:** All collection endpoints use cursor-based (keyset) pagination to guarantee stable `O(1)` performance at scale and prevent data drift under concurrent writes. Clients pass a `?cursor=` query parameter to fetch the next window and may pass `?size=` to control batch size (e.g., `?cursor=...&size=20`). The backend must enforce a default page size (usually 20) and a strict hard-cap maximum (e.g., 100) to protect database performance from oversized requests. No alias parameter names (e.g., `limit`, `page`) are allowed.
+- **Search (Free-text / Keyword):** Endpoints that support free-text or partial keyword matching across multiple attributes (e.g., title, name, description, email) MUST standardize on `?q={keyword}` (max 100 or 200 characters as declared in the feature spec). Parameter names like `search`, `keyword`, or `query` are prohibited.
+- **Structured Filtering:** Exact or structured property filters MUST use the specific field name (e.g., `?status=`, `?role=`, `?priceType=`, `?from=`, `?to=`).
+- **Sorting:** Endpoints that support sorting MUST use `?sort={field},{direction}` (e.g., `?sort=createdAt,desc`).
 
 ### CORS Policy (Web Portal)
 

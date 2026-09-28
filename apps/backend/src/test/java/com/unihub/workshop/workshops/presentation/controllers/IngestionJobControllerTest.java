@@ -7,9 +7,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.unihub.workshop.WorkshopApplication;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.security.RedisJtiValidator;
 import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
-import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobOutcome;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import java.time.Instant;

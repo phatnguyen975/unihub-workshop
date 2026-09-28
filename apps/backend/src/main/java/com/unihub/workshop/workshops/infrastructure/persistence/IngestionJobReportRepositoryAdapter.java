@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
-import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.IngestionJobReportPersistenceMapper;
 import java.nio.charset.StandardCharsets;
@@ -37,7 +37,7 @@ public class IngestionJobReportRepositoryAdapter
     public CursorPage<IngestionJobReport> findByOrganizationId(
         UUID organizationId,
         String cursor,
-        int limit
+        int size
     ) {
         Instant cursorTime = null;
         UUID cursorId = null;
@@ -49,9 +49,9 @@ public class IngestionJobReportRepositoryAdapter
                     Base64.getDecoder().decode(trimmedCursor),
                     StandardCharsets.UTF_8
                 );
-                CursorData cursorData = objectMapper.readValue(
+                IngestionJobCursor cursorData = objectMapper.readValue(
                     decoded,
-                    CursorData.class
+                    IngestionJobCursor.class
                 );
                 if (
                     cursorData == null ||
@@ -70,7 +70,7 @@ public class IngestionJobReportRepositoryAdapter
             }
         }
 
-        Pageable pageable = PageRequest.of(0, limit + 1);
+        Pageable pageable = PageRequest.of(0, size + 1);
         List<IngestionJobReportJpaEntity> entities =
             cursorTime == null
                 ? repository.findFirstPage(organizationId, pageable)
@@ -81,9 +81,9 @@ public class IngestionJobReportRepositoryAdapter
                       pageable
                   );
 
-        boolean hasMore = entities.size() > limit;
+        boolean hasMore = entities.size() > size;
         List<IngestionJobReportJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, limit)
+            ? entities.subList(0, size)
             : entities;
 
         List<IngestionJobReport> items = mapper.toDomainList(pageEntities);
@@ -94,7 +94,7 @@ public class IngestionJobReportRepositoryAdapter
                 pageEntities.size() - 1
             );
             try {
-                CursorData nextCursorData = new CursorData(
+                IngestionJobCursor nextCursorData = new IngestionJobCursor(
                     lastItem.getCompletedAt(),
                     lastItem.getId()
                 );
@@ -120,4 +120,6 @@ public class IngestionJobReportRepositoryAdapter
             .findByIdAndOrganizationId(id, organizationId)
             .map(mapper::toDomain);
     }
+
+    private record IngestionJobCursor(Instant completedAt, UUID id) {}
 }

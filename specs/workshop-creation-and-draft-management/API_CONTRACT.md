@@ -6,12 +6,20 @@
 
 ## 1. Overview
 
-This contract defines the four endpoints exposed by the `workshops` module for Feature 2.1 — Workshop Creation and Draft Management: uploading workshop media assets (`POST /api/v1/admin/workshops/media/upload`), saving a workshop as a draft (create or update via `POST /api/v1/admin/workshops/drafts`), retrieving workshop details for viewing or edit form hydration (`GET /api/v1/admin/workshops/{id}`), and permanently deleting a draft (`DELETE /api/v1/admin/workshops/{id}`). All endpoints are ORGANIZER-only. This contract traces directly to `SPEC.md` for this feature and conforms in full to `docs/api-standards.md`.
+This contract defines the five endpoints exposed by the `workshops` module for Feature 2.1 — Workshop Creation and Draft Management:
+
+1. `POST /api/v1/admin/workshops/media/upload` — Uploading workshop media assets (cover images, speaker portraits)
+2. `POST /api/v1/admin/workshops/drafts` — Saving a workshop as a draft (unified create or update)
+3. `GET /api/v1/admin/workshops/{id}` — Retrieving workshop details for viewing or edit form hydration
+4. `DELETE /api/v1/admin/workshops/{id}` — Permanently deleting a draft
+5. `GET /api/v1/admin/workshops` — Retrieving a paginated, filterable list of workshops owned by the caller's organization
+
+All endpoints are strictly ORGANIZER-only. This contract traces directly to `SPEC.md` for this feature and conforms in full to `docs/api-standards.md`.
 
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** All endpoints are prefixed with `/api/v1/`. Resources are named with plural nouns following RESTful conventions. _(Source: `docs/api-standards.md`)_
-- **Pagination convention:** No collection endpoint exists in this feature; pagination is not applicable.
+- **Pagination convention:** `GET /api/v1/admin/workshops` uses keyset cursor pagination (`cursor`, `size` with default 20, max 100) per `docs/api-standards.md`. Responses return `{ "items": [...], "cursor": { "nextCursor": "...", "hasMore": boolean } }`. Single-resource endpoints do not paginate.
 - **Success response shape:** Unified `ApiResponse<T>` envelope — `{ "success": true, "message": "...", "data": { ... }, "metadata": { "processedBy": "...", "traceId": "..." } }`. `204 No Content` responses carry no body. Null fields dropped via non-null serialization (`@JsonInclude(Include.NON_NULL)`). _(Source: `docs/api-standards.md`)_
 - **Error response format:** RFC 7807 Problem Details wrapped inside the standard response envelope with `success = false`, `error` object (`type`, `title`, `status`, `detail`, `instance`, and optional `validationErrors`), and `metadata` (`processedBy`, `traceId`) with `Content-Type: application/problem+json`. _(Source: `docs/api-standards.md`)_
 - **Idempotency-key convention:** Not applicable for this feature (see per-endpoint decisions below).
@@ -464,9 +472,97 @@ On success: all `workshop_speakers` rows associated with the deleted workshop ar
 - **Satisfies:** FR-01, FR-02, FR-43, FR-44, FR-45, FR-46, BR-09, BR-16
 - **Scenarios:** 18, 19, 20, 21
 
+### GET /api/v1/admin/workshops
+
+**Description:** Retrieves a paginated list of workshops owned by the caller's organization (`organization_id == jwt.org`), with optional filters for status, price type (`FREE` vs `PAID`), keyword search `q` (across `title`, `slug`, `location`, and `description`), date range, and sorting (by `capacity`, `price`, `createdAt`, or `startsAt`). Ensures strict tenant isolation and read-after-write consistency by querying the PostgreSQL Primary DB (`@Transactional(readOnly = true)`).  
+**Required Role / Auth:** `ORGANIZER` — JWT with `role = ORGANIZER` and non-null `org`.  
+**Idempotency Requirement:** Not Required (safe, read-only GET operation).
+
+#### Request
+
+**Headers:**
+
+| Header          | Required | Description        |
+| :-------------- | :------- | :----------------- |
+| `Authorization` | Yes      | `Bearer <JWT>`     |
+| `Accept`        | No       | `application/json` |
+
+**Query Parameters:**
+
+| Parameter   | Type    | Required | Default          | Description                                                                                                                                                          |
+| :---------- | :------ | :------- | :--------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`    | String  | No       | _(all)_          | Workshop status filter: `DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED`. If omitted, all statuses returned.                                                            |
+| `priceType` | String  | No       | _(all)_          | Pricing filter: `FREE` (price = 0) or `PAID` (price > 0). If omitted, both free and paid workshops returned.                                                         |
+| `q`         | String  | No       | —                | Case-insensitive partial matching across workshop `title`, `slug`, `location`, and `description` (max 100 characters).                                               |
+| `from`      | String  | No       | —                | ISO 8601 UTC timestamp (`YYYY-MM-DDTHH:mm:ssZ`). Filters workshops where `starts_at >= from`.                                                                        |
+| `to`        | String  | No       | —                | ISO 8601 UTC timestamp (`YYYY-MM-DDTHH:mm:ssZ`). Filters workshops where `starts_at <= to`.                                                                          |
+| `sort`      | String  | No       | `createdAt,desc` | Sort field and direction. Supported: `capacity,asc`, `capacity,desc`, `price,asc`, `price,desc`, `createdAt,desc`, `createdAt,asc`, `startsAt,asc`, `startsAt,desc`. |
+| `cursor`    | String  | No       | —                | Keyset pagination cursor (opaque Base64-encoded string representing the last item from the previous page).                                                           |
+| `size`      | Integer | No       | `20`             | Number of workshops per page. Min: 1, Max: 100.                                                                                                                      |
+
+#### Response
+
+**Success — 200 OK:**
+
+```json
+{
+  "success": true,
+  "message": "Workshops retrieved successfully.",
+  "data": {
+    "items": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "slug": "introduction-to-ai-a1b2",
+        "title": "Introduction to AI",
+        "description": "Comprehensive introduction to artificial intelligence.",
+        "coverImageUrl": "http://localhost:9000/unihub-media/workshops/covers/550e8400-e29b-41d4-a716-446655440000.jpg",
+        "location": "Auditorium B",
+        "timezone": "Asia/Ho_Chi_Minh",
+        "startsAt": "2026-10-15T09:00:00Z",
+        "endsAt": "2026-10-15T12:00:00Z",
+        "capacity": 100,
+        "price": 0.0,
+        "currency": "USD",
+        "status": "DRAFT",
+        "version": 0,
+        "speakerCount": 2,
+        "createdAt": "2026-09-25T10:00:00Z",
+        "updatedAt": "2026-09-25T10:30:00Z"
+      }
+    ],
+    "cursor": {
+      "nextCursor": "eyJjcmVhdGVkQXQiOiIyMDI2LTA5LTI1VDEwOjAwOjAwWiIsImlkIjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIn0=",
+      "hasMore": false
+    }
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+**Error Responses:**
+
+| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                                     |
+| :-------------------------- | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------ |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Invalid `status` or `priceType` enum, unsupported `sort` parameter, invalid ISO 8601 date, or invalid `size`. |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                                         |
+| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Forbidden             | Caller `role` is not `ORGANIZER`, or caller has no associated `org` claim.                                    |
+| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                                                                  |
+
+#### Side Effects
+
+None. This is a read-only query that hits the PostgreSQL Primary DB to ensure read-after-write consistency.
+
+#### Spec Traceability
+
+- **Satisfies:** FR-01, FR-02, FR-48, FR-49, FR-50, FR-51, FR-52, FR-53, FR-54, FR-55, FR-56, FR-57, BR-01, BR-17
+- **Scenarios:** 20, 21, 22, 23, 24, 25, 26, 27, 28, 29
+
 ## 4. Rate Limiting Behavior
 
-All four endpoints in this contract fall under the **Default Tier** of the Bucket4j + Redis Token Bucket enforced at the Core Backend Monolith filter layer (not at Nginx). _(Source: `docs/system-design.md` — Rate Limiting Tiers)_
+All five endpoints in this contract fall under the **Default Tier** of the Bucket4j + Redis Token Bucket enforced at the Core Backend Monolith filter layer (not at Nginx). _(Source: `docs/system-design.md` — Rate Limiting Tiers)_
 
 | Endpoint                                    | Tier    |  Capacity  | Refill Rate  | Key                               |
 | :------------------------------------------ | :------ | :--------: | :----------: | :-------------------------------- |
@@ -474,6 +570,7 @@ All four endpoints in this contract fall under the **Default Tier** of the Bucke
 | `POST /api/v1/admin/workshops/drafts`       | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
 | `GET /api/v1/admin/workshops/{id}`          | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
 | `DELETE /api/v1/admin/workshops/{id}`       | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
+| `GET /api/v1/admin/workshops`               | Default | 100 tokens | 100 per 60 s | `jwt.sub`                         |
 
 The Default Tier is appropriate because:
 
@@ -524,6 +621,7 @@ No endpoint in this contract requires an idempotency key:
 - **`POST /api/v1/admin/workshops/drafts` (update):** Protected by optimistic locking (`version`). A retried update with the same `version` will succeed only once; subsequent retries will receive `409 Conflict` (version mismatch), preventing accidental double-update.
 - **`GET /api/v1/admin/workshops/{id}`:** Read-only; naturally idempotent.
 - **`DELETE /api/v1/admin/workshops/{id}`:** Hard delete; second call returns `404`, which is an acceptable safe outcome.
+- **`GET /api/v1/admin/workshops`:** Read-only; naturally idempotent.
 
 ## 6. Cross-Endpoint Consistency Notes
 

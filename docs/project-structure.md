@@ -140,6 +140,7 @@ apps/backend/
 │   │   │       │   ├── database/             # Read-replica dynamic routing datasource configuration
 │   │   │       │   ├── events/               # Transactional Outbox integration events (@Externalized to RabbitMQ)
 │   │   │       │   ├── exception/            # RFC 7807 problem details and domain exception mappers
+│   │   │       │   ├── pagination/           # Canonical cursor-based pagination domain and web contract
 │   │   │       │   ├── ratelimit/            # Token-bucket distributed rate limiting filter via Bucket4j and Redis
 │   │   │       │   ├── realtime/             # Server-Sent Events (SSE) streaming hub, emitter registry, Redis Pub/Sub
 │   │   │       │   │   ├── api/              # Public streaming interfaces
@@ -150,6 +151,7 @@ apps/backend/
 │   │   │       │   ├── resilience/           # Resilience4j circuit breakers and chaos testing adapters
 │   │   │       │   ├── security/             # JWT RS256, JTI blacklist, Public Key distribution, auth utilities
 │   │   │       │   ├── seed/                 # Startup database seeding for organizations and root organizers
+│   │   │       │   ├── storage/              # MinIO (S3-compatible) utils for media assets storage
 │   │   │       │   ├── web/                  # Standard API response envelope and HTTP web formatting
 │   │   │       │   └── package-info.java     # @ApplicationModule(type = OPEN)
 │   │   │       ├── iam/                      # Identity & Access Management (STANDARD REFERENCE TEMPLATE)
@@ -306,15 +308,15 @@ flowchart LR
 
 - **Taxonomy of `infrastructure/` Adapters:** In Clean Architecture, `infrastructure/` houses all **Outbound Adapters** that implement the outbound port interfaces defined in `application/ports/out/`. Depending on the external technologies a module interacts with, `infrastructure/` is organized into standard, single-responsibility subpackages:
 
-| Subpackage              | Technology / Integration                   | Role & Typical Contents                                                                                                        |
-| :---------------------- | :----------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
-| `persistence/`          | Relational DB (Neon PostgreSQL, JPA, JDBC) | Spring Data JPA repositories, JPA `@Entity` classes, database port adapters (`*RepositoryAdapter`), keyset pagination cursors. |
-| `security/` or `cache/` | In-Memory Key-Value Store (Redis)          | Redis JTI token blacklist adapters, active session tracker adapters, cache-aside stores.                                       |
-| `storage/`              | Object Storage (MinIO / AWS S3)            | MinIO/S3 client adapters, pre-signed download/upload URL generators, file stream handlers.                                     |
-| `gateway/`              | Third-Party External APIs                  | Payment provider adapters (Stripe SDK), webhook signature verification, external HTTP clients.                                 |
-| `messaging/`            | Asynchronous Message Broker (RabbitMQ)     | AMQP consumers, listener containers, dead-letter queue handlers.                                                               |
-| `search/`               | Search Engine Read Model (Elasticsearch)   | Elasticsearch client adapters, CQRS query repositories, JSON document mappers.                                                 |
-| `config/`               | Module Spring Infrastructure Beans         | `@Configuration` classes configuring module-specific adapters, properties, or third-party client beans.                        |
+| Subpackage              | Technology / Integration                   | Role & Typical Contents                                                                                                                            |
+| :---------------------- | :----------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `persistence/`          | Relational DB (Neon PostgreSQL, JPA, JDBC) | Spring Data JPA repositories, JPA `@Entity` classes, database port adapters (`*RepositoryAdapter` with internal keyset pagination cursor records). |
+| `security/` or `cache/` | In-Memory Key-Value Store (Redis)          | Redis JTI token blacklist adapters, active session tracker adapters, cache-aside stores.                                                           |
+| `storage/`              | Object Storage (MinIO / AWS S3)            | MinIO/S3 client adapters, pre-signed download/upload URL generators, file stream handlers.                                                         |
+| `gateway/`              | Third-Party External APIs                  | Payment provider adapters (Stripe SDK), webhook signature verification, external HTTP clients.                                                     |
+| `messaging/`            | Asynchronous Message Broker (RabbitMQ)     | AMQP consumers, listener containers, dead-letter queue handlers.                                                                                   |
+| `search/`               | Search Engine Read Model (Elasticsearch)   | Elasticsearch client adapters, CQRS query repositories, JSON document mappers.                                                                     |
+| `config/`               | Module Spring Infrastructure Beans         | `@Configuration` classes configuring module-specific adapters, properties, or third-party client beans.                                            |
 
 ### Background Workers (`apps/workers/`)
 

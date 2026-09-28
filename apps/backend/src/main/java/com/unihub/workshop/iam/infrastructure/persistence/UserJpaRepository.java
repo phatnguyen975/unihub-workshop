@@ -80,10 +80,10 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
             AND (:role IS NULL OR u.role = :role)
             AND (:isActive IS NULL OR u.isActive = :isActive)
             AND (
-                :search IS NULL OR :search = ''
-                OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
-                OR LOWER(u.email) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
-                OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\')
+                :q IS NULL OR :q = ''
+                OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
+                OR LOWER(u.email) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
+                OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\')
             )
         ORDER BY u.createdAt DESC, u.id DESC
         """
@@ -93,7 +93,7 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
         @Param("callerId") UUID callerId,
         @Param("role") String role,
         @Param("isActive") Boolean isActive,
-        @Param("search") String search,
+        @Param("q") String q,
         Pageable pageable
     );
 
@@ -105,10 +105,10 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
             AND (:role IS NULL OR u.role = :role)
             AND (:isActive IS NULL OR u.isActive = :isActive)
             AND (
-                :search IS NULL OR :search = ''
-                OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
-                OR LOWER(u.email) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\'
-                OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:search), '%') ESCAPE '\\')
+                :q IS NULL OR :q = ''
+                OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
+                OR LOWER(u.email) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
+                OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\')
             )
             AND (
                 u.createdAt < :cursorTime
@@ -122,7 +122,7 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
         @Param("callerId") UUID callerId,
         @Param("role") String role,
         @Param("isActive") Boolean isActive,
-        @Param("search") String search,
+        @Param("q") String q,
         @Param("cursorTime") Instant cursorTime,
         @Param("cursorId") UUID cursorId,
         Pageable pageable

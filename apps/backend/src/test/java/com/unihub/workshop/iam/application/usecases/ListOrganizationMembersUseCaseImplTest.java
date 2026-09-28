@@ -7,10 +7,10 @@ import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.iam.application.ports.in.ListMembersQuery;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -91,7 +91,7 @@ class ListOrganizationMembersUseCaseImplTest {
             )
         )
             .isInstanceOf(BadRequestException.class)
-            .hasMessage("search parameter cannot exceed 200 characters");
+            .hasMessage("q parameter cannot exceed 200 characters");
     }
 
     @Test

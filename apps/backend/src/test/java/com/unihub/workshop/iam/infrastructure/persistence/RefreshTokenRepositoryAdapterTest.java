@@ -8,11 +8,11 @@ import static org.mockito.Mockito.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapper;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -106,7 +106,7 @@ class RefreshTokenRepositoryAdapterTest {
             new JavaTimeModule()
         );
         String cursorJson = mapper.writeValueAsString(
-            new CursorData(cursorTime, cursorId)
+            new SessionCursor(cursorTime, cursorId)
         );
         String cursor = Base64.getEncoder().encodeToString(
             cursorJson.getBytes()
@@ -184,7 +184,7 @@ class RefreshTokenRepositoryAdapterTest {
             new JavaTimeModule()
         );
         String cursorJson = mapper.writeValueAsString(
-            new CursorData(cursorTime, cursorId)
+            new SessionCursor(cursorTime, cursorId)
         );
         String cursor =
             "   " +
@@ -353,5 +353,5 @@ class RefreshTokenRepositoryAdapterTest {
         return entity;
     }
 
-    private record CursorData(Instant createdAt, UUID id) {}
+    private record SessionCursor(Instant createdAt, UUID id) {}
 }

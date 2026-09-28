@@ -1,15 +1,14 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.workshops.application.ports.in.GetRejectArtifactUrlUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
-import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
-import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse;
-import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.CursorResponse;
-import com.unihub.workshop.workshops.presentation.dto.IngestionJobListResponse.IngestionJobItem;
+import com.unihub.workshop.workshops.presentation.dto.IngestionJobItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.RejectArtifactUrlResponse;
 import com.unihub.workshop.workshops.presentation.mapper.IngestionJobPresentationMapper;
 import java.util.List;
@@ -30,7 +29,7 @@ public class IngestionJobController {
     private final IngestionJobPresentationMapper presentationMapper;
 
     @GetMapping
-    public ApiResponse<IngestionJobListResponse> getIngestionJobs(
+    public ApiResponse<PageResponse<IngestionJobItemResponse>> getIngestionJobs(
         @RequestParam(required = false) String cursor,
         @RequestParam(required = false, defaultValue = "20") Integer size,
         Authentication authentication
@@ -43,18 +42,16 @@ public class IngestionJobController {
             size
         );
 
-        List<IngestionJobItem> items = presentationMapper.toItemList(
+        List<IngestionJobItemResponse> items = presentationMapper.toItemList(
             page.items()
         );
-        CursorResponse cursorResponse = new CursorResponse(
+        PageResponse<IngestionJobItemResponse> response = PageResponse.of(
+            items,
             page.nextCursor(),
             page.hasMore()
         );
 
-        return ApiResponse.success(
-            new IngestionJobListResponse(items, cursorResponse),
-            "Ingestion job reports retrieved"
-        );
+        return ApiResponse.success(response, "Ingestion job reports retrieved");
     }
 
     @GetMapping("/{jobId}/reject-artifact")

@@ -5,11 +5,11 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.InternalServerException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -56,7 +56,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     public CursorPage<ActiveSession> findActiveSessions(
         UUID userId,
         String cursor,
-        int limit
+        int size
     ) {
         Instant cursorTime = null;
         UUID cursorId = null;
@@ -68,9 +68,9 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                     Base64.getDecoder().decode(trimmedCursor),
                     StandardCharsets.UTF_8
                 );
-                CursorData cursorData = objectMapper.readValue(
+                SessionCursor cursorData = objectMapper.readValue(
                     decoded,
-                    CursorData.class
+                    SessionCursor.class
                 );
                 if (
                     cursorData == null ||
@@ -90,7 +90,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         }
 
         Instant now = Instant.now();
-        Pageable pageable = PageRequest.of(0, limit + 1);
+        Pageable pageable = PageRequest.of(0, size + 1);
         List<RefreshTokenJpaEntity> entities =
             cursorTime == null
                 ? repository.findFirstPage(userId, now, pageable)
@@ -102,9 +102,9 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                       pageable
                   );
 
-        boolean hasMore = entities.size() > limit;
+        boolean hasMore = entities.size() > size;
         List<RefreshTokenJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, limit)
+            ? entities.subList(0, size)
             : entities;
 
         List<ActiveSession> items = tokenMapper.toActiveSessionList(
@@ -117,7 +117,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 pageEntities.size() - 1
             );
             try {
-                CursorData nextCursorData = new CursorData(
+                SessionCursor nextCursorData = new SessionCursor(
                     lastItem.getCreatedAt(),
                     lastItem.getId()
                 );
@@ -202,5 +202,5 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
             .toList();
     }
 
-    private record CursorData(Instant createdAt, UUID id) {}
+    private record SessionCursor(Instant createdAt, UUID id) {}
 }

@@ -1,9 +1,9 @@
 package com.unihub.workshop.workshops.application.usecases;
 
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.application.ports.in.ListIngestionJobsUseCase;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
-import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -24,14 +24,15 @@ public class ListIngestionJobsUseCaseImpl implements ListIngestionJobsUseCase {
             throw new BadRequestException("organizationId must not be null");
         }
 
-        int limit = size == null ? 20 : size;
-        if (limit < 1) {
-            throw new BadRequestException("size must be at least 1");
-        }
-        if (limit > 100) {
-            limit = 100;
+        int pageSize = size == null ? 20 : size;
+        if (pageSize < 1 || pageSize > 100) {
+            throw new BadRequestException("size must be between 1 and 100");
         }
 
-        return repository.findByOrganizationId(organizationId, cursor, limit);
+        return repository.findByOrganizationId(
+            organizationId,
+            cursor,
+            pageSize
+        );
     }
 }

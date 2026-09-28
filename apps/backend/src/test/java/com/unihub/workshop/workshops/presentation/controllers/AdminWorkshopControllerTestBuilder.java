@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import org.mapstruct.factory.Mappers;
@@ -17,6 +18,9 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private DeleteDraftUseCase deleteDraftUseCase = mock(
         DeleteDraftUseCase.class
+    );
+    private ListAdminWorkshopsUseCase listAdminWorkshopsUseCase = mock(
+        ListAdminWorkshopsUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -48,6 +52,13 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withListAdminWorkshopsUseCase(
+        ListAdminWorkshopsUseCase listAdminWorkshopsUseCase
+    ) {
+        this.listAdminWorkshopsUseCase = listAdminWorkshopsUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -67,6 +78,7 @@ public class AdminWorkshopControllerTestBuilder {
             saveDraftUseCase,
             getWorkshopUseCase,
             deleteDraftUseCase,
+            listAdminWorkshopsUseCase,
             workshopMapper,
             mediaStoragePort
         );

@@ -6,7 +6,7 @@
 
 ## Overview
 
-This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a complete vertical slice ending in a caller-verifiable capability: T1 establishes the entire `workshops` module skeleton and the Create Draft capability; T2 adds the Update Draft flow with optimistic locking and slug re-generation (no speakers yet); T3 adds Speaker validation and cross-workshop schedule overlap detection; T4 delivers shared media storage and workshop media upload & cleanup; T5 delivers workshop details retrieval for organizers; and T6 delivers draft workshop deletion with media purge. The module's `package-info.java` boundary declaration and shared foundations are owned by T1 as foundations every later task depends on.
+This plan delivers Feature 2.1 across seven tasks (T1 to T7). Each task is a complete vertical slice ending in a caller-verifiable capability: T1 establishes the entire `workshops` module skeleton and the Create Draft capability; T2 adds the Update Draft flow with optimistic locking and slug re-generation (no speakers yet); T3 adds Speaker validation and cross-workshop schedule overlap detection; T4 delivers shared media storage and workshop media upload & cleanup; T5 delivers workshop details retrieval for organizers; T6 delivers draft workshop deletion with media purge; and T7 delivers paginated workshop listing for organizers with status, search, and date filters. The module's `package-info.java` boundary declaration and shared foundations are owned by T1 as foundations every later task depends on.
 
 ## Architecture Decisions for This Plan
 
@@ -211,11 +211,59 @@ This plan delivers Feature 2.1 across six tasks (T1 to T6). Each task is a compl
     - `DELETE /api/v1/admin/workshops/{id}` for a non-existent identifier returns `404 Not Found`. _(FR-45)_
     - `ModulithArchitectureTest` passes.
 
+#### Checkpoint: Phase 6
+
+- [x] T6 acceptance criteria are all verified end-to-end.
+- [x] Hard delete cascades speaker rows and purges media from MinIO.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Full unit test suite (T1 through T6) is green.
+
+### Phase 7: Workshop Listing for Organizer
+
+- [x] **T7 — ORGANIZER can retrieve paginated list of workshops with status, priceType, search (q), date filters, and capacity/price sorting via `GET /api/v1/admin/workshops`**
+  - **Size:** M
+  - **Depends on:** T6
+  - **Layers touched:** Application, Infrastructure, Presentation
+  - **Files:**
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/in/ListAdminWorkshopsUseCase.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/in/ListAdminWorkshopsQuery.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopRepository.java` _(extended — `findAllByOrganizationWithFilters`)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/ListAdminWorkshopsUseCaseImpl.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopJpaRepository.java` _(extended — keyset query / specification with speaker count projection)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopRepositoryAdapter.java` _(extended)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopController.java` _(extended — GET /api/v1/admin/workshops handler)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/WorkshopSummaryResponse.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/PageResponse.java` _(shared pagination envelope)_
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/CursorResponse.java` _(shared cursor metadata)_
+    - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/ListAdminWorkshopsUseCaseImplTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopRepositoryAdapterListTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopControllerListTest.java` _(new)_
+  - **Acceptance Criteria:**
+    - `GET /api/v1/admin/workshops` for an authenticated ORGANIZER returns `200 OK` with paginated list containing only workshops belonging to caller's `organization_id` (`jwt.org`). _(FR-48, FR-49, FR-53, FR-55, BR-01, BR-17)_
+    - Cross-tenant workshops are strictly filtered out (IDOR protection). _(FR-49, BR-01)_
+    - Query param `status=DRAFT` returns only DRAFT workshops. When omitted, workshops across all statuses (`DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED`) are returned. _(FR-50)_
+    - Query param `priceType=FREE` returns only free workshops (`price = 0`), and `priceType=PAID` returns only paid workshops (`price > 0`). When omitted, both are returned. _(FR-56)_
+    - Query param `q=keyword` performs case-insensitive substring matching against `title`, `slug`, `location`, and `description`. _(FR-51)_
+    - Query params `from` and `to` filter workshops where `starts_at` is between the given range. _(FR-52)_
+    - Query param `sort=price,asc` sorts workshops with lowest price first; `sort=price,desc` sorts with highest price first. _(FR-57, Scenario 29)_
+    - Query param `sort=capacity,asc` sorts workshops with lowest capacity first; `sort=capacity,desc` sorts with highest capacity first. When omitted, defaults to `createdAt,desc`. _(FR-57, Scenario 28)_
+    - Keyset cursor pagination correctly returns `items`, `cursor.nextCursor`, and `cursor.hasMore`. _(FR-53)_
+    - Request from non-ORGANIZER (e.g. STUDENT or STAFF) returns `403 Forbidden`. _(FR-54)_
+    - Query executes against Primary DB with `@Transactional(readOnly = true)`. _(FR-55, BR-17)_
+    - `ModulithArchitectureTest` passes.
+
+#### Checkpoint: Phase 7
+
+- [x] T7 acceptance criteria are all verified end-to-end.
+- [x] No N+1 query issue for speaker counts (uses aggregation or projection).
+- [x] `ModulithArchitectureTest` passes.
+- [x] Full unit test suite (T1 through T7) is green.
+
 #### Checkpoint: Feature Complete
 
-- [x] All tasks (T1–T6) are checked off.
+- [x] All tasks (T1–T7) are checked off.
 - [x] Every acceptance criterion across all tasks has been verified end-to-end against a running application.
-- [x] Full unit test suite (T1 through T6) passes with no skips.
+- [x] Full unit test suite (T1 through T7) passes with no skips.
 - [x] `ModulithArchitectureTest` passes.
 - [x] Ready for `/review workshop-creation-and-draft-management`.
 

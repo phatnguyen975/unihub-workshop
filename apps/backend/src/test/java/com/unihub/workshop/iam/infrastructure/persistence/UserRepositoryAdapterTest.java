@@ -8,12 +8,12 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -196,7 +196,7 @@ class UserRepositoryAdapterTest {
             new JavaTimeModule()
         );
         String cursorJson = mapper.writeValueAsString(
-            new CursorData(cursorTime, cursorId)
+            new UserCursor(cursorTime, cursorId)
         );
         String cursor = java.util.Base64.getEncoder().encodeToString(
             cursorJson.getBytes()
@@ -330,5 +330,5 @@ class UserRepositoryAdapterTest {
         return entity;
     }
 
-    private record CursorData(Instant createdAt, UUID id) {}
+    private record UserCursor(Instant createdAt, UUID id) {}
 }

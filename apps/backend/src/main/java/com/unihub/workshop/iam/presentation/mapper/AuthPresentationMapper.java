@@ -6,7 +6,7 @@ import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.presentation.dto.LoginResponse;
 import com.unihub.workshop.iam.presentation.dto.RefreshTokenResponse;
-import com.unihub.workshop.iam.presentation.dto.SessionResponse;
+import com.unihub.workshop.iam.presentation.dto.SessionItemResponse;
 import com.unihub.workshop.iam.presentation.dto.UserProfileResponse;
 import java.util.List;
 import org.mapstruct.Mapper;
@@ -21,9 +21,7 @@ public interface AuthPresentationMapper {
 
     RefreshTokenResponse toRefreshTokenResponse(TokenResult result);
 
-    SessionResponse.SessionItem toSessionItem(ActiveSession session);
+    SessionItemResponse toSessionItem(ActiveSession session);
 
-    List<SessionResponse.SessionItem> toSessionItemList(
-        List<ActiveSession> sessions
-    );
+    List<SessionItemResponse> toSessionItemList(List<ActiveSession> sessions);
 }

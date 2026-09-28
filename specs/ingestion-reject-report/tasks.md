@@ -69,7 +69,8 @@ With the security foundation in place, both business endpoints are implemented i
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/IngestionJobReportJpaEntity.java` _(new — `@Entity` mapping to `ingestion_job_reports`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/IngestionJobReportRepositoryAdapter.java` _(new — implements port, applies keyset cursor)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/IngestionJobController.java` _(new)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/IngestionJobListResponse.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/IngestionJobItemResponse.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/PageResponse.java` _(shared)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/ListIngestionJobsUseCaseImplTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/infrastructure/persistence/IngestionJobReportRepositoryAdapterTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/IngestionJobControllerTest.java` _(new — MockMvc, T1 security wired)_

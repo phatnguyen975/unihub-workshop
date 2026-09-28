@@ -395,6 +395,16 @@ sequenceDiagram
   end
   Note over Web,Organizer: Live preview during form drafting is rendered client-side from form state
 
+  Note over Organizer,Notify: LIST WORKSHOPS FOR ORGANIZER OPERATION
+  Organizer->>Web: Navigate to Workshop Management Dashboard
+  Web->>GW: GET /api/v1/admin/workshops?status={status}&priceType={priceType}&q={q}&from={from}&to={to}&sort={sort}&cursor={cursor}&size={size}
+  GW->>API: Forward Request
+  API->>API: Extract jwt.org & validate ORGANIZER role
+  API->>DB: Query workshops WHERE organization_id = jwt.org AND filters, ORDER BY sort (keyset pagination from Primary DB)
+  DB-->>API: Paginated Workshop records & nextCursor
+  API-->>GW: 200 OK (Workshop Items & Next Cursor)
+  GW-->>Web: 200 OK (Populate Dashboard Table)
+
   Note over Organizer,Notify: DELETE DRAFT OPERATION
   Organizer->>Web: Click "Delete Draft"
   Web->>GW: DELETE /api/v1/admin/workshops/{id}
@@ -608,7 +618,7 @@ sequenceDiagram
   participant ES as Elasticsearch
   participant Refresher as Async Refresher
 
-  Student->>GW: GET /api/v1/workshops/search?q={keyword}
+  Student->>GW: GET /api/v1/workshops?q={keyword}
   GW->>API: Forward Search Request
   API->>Cache: GET search:q:{keyword}
   Cache-->>API: Return {data, soft_ttl, hard_ttl} or Null
@@ -651,6 +661,24 @@ sequenceDiagram
 - **Operational Benefits:** This design eliminates Thread.sleep-based polling and prevents thread pool starvation, reduces end-to-end tail latency during cache churn, and minimizes stampede risk while maintaining eventual freshness. It also simplifies capacity planning and allows the search path to degrade safely when external systems are impaired.
 - **Cache Invalidation:** Writers (publish/reschedule/cancel) invalidate or update the Redis key and, where necessary, emit events to the background refresher to eagerly repopulate critical search slices. Cache updates always reset both TTLs to maintain correct SWR semantics.
 - **Telemetry & Observability:** Instrument refresh attempts, lock acquisition rate, cache hit/stale/miss ratios, ES response latencies, and circuit-breaker state transitions. Alert on elevated lock contention, high stale-serving ratios, or prolonged circuit-open periods to drive operational responses.
+
+### Workshop Catalog Listing & Search: Public vs Organizer Comparison
+
+To prevent architectural drift and maintain clean interface boundaries, the system defines two separate listing interfaces with synchronized naming conventions but different operational scopes:
+
+| Axis                             | Public Catalog / Search (`GET /api/v1/workshops`)                                                                                                                                                             | Organizer Admin Listing (`GET /api/v1/admin/workshops`)                                                                                                                                                                     |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Target Actor**                 | Students & Unauthenticated Public Users                                                                                                                                                                       | Authenticated `ORGANIZER` only (JWT `role = ORGANIZER`)                                                                                                                                                                     |
+| **Tenant Boundary**              | Open across all organizations (university-wide catalog)                                                                                                                                                       | Strictly isolated to caller's organization (`organization_id == jwt.org`, IDOR-proof)                                                                                                                                       |
+| **Status Scope**                 | Fixed to `PUBLISHED` only (`DRAFT`, `COMPLETED`, `CANCELED` are excluded)                                                                                                                                     | Multi-status: `DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED` (all returned if omitted)                                                                                                                                       |
+| **Status Filter (`status`)**     | **Not supported** (cannot query non-published workshops)                                                                                                                                                      | **Supported**: `?status=DRAFT \| PUBLISHED \| COMPLETED \| CANCELED`                                                                                                                                                        |
+| **Search Param (`q`)**           | Triggers Elasticsearch CQRS full-text search across `title`, `description`, `location`, `speakers.name`, and `slug` (multi_match, fuzzy boosting)                                                             | Triggers PostgreSQL Primary DB ILIKE / case-insensitive substring search across `title`, `slug`, `location`, and `description`                                                                                              |
+| **Pricing Filter (`priceType`)** | **Supported**: `?priceType=FREE \| PAID` (`FREE`: price = 0, `PAID`: price > 0)                                                                                                                               | **Supported**: `?priceType=FREE \| PAID` (`FREE`: price = 0, `PAID`: price > 0)                                                                                                                                             |
+| **Date Range (`from`, `to`)**    | **Supported**: `?from={isoUtc}&to={isoUtc}` (matches `starts_at`)                                                                                                                                             | **Supported**: `?from={isoUtc}&to={isoUtc}` (matches `starts_at`)                                                                                                                                                           |
+| **Sorting Param (`sort`)**       | **Default:** `startsAt,asc` (upcoming soonest first)<br>**Supported:** `startsAt,asc\|desc`, `price,asc\|desc`, `capacity,asc\|desc`                                                                          | **Default:** `createdAt,desc` (recently drafted/edited first)<br>**Supported:** `createdAt,desc\|asc`, `price,asc\|desc`, `capacity,asc\|desc`, `startsAt,asc\|desc`                                                        |
+| **Pagination Contract**          | **Keyset pagination:** `?cursor={cursor}&size={size}` (default 20, max 100)<br>**Response:** `data: { items: [...], cursor: { nextCursor, hasMore } }`                                                        | **Keyset pagination:** `?cursor={cursor}&size={size}` (default 20, max 100)<br>**Response:** `data: { items: [...], cursor: { nextCursor, hasMore } }`                                                                      |
+| **Data Store / Consistency**     | Elasticsearch (if `q` present) with Redis SWR Cache; otherwise PostgreSQL Read Replica (eventual consistency)                                                                                                 | PostgreSQL Primary DB (`@Transactional(readOnly = true)`) for immediate read-after-write consistency                                                                                                                        |
+| **Response Item Fields**         | Public Workshop Card: `id`, `slug`, `title`, `description`, `coverImageUrl`, `location`, `startsAt`, `endsAt`, `price`, `currency`, `availableSeats` (from Redis counter), `speakerCount`, `organizationName` | Admin Workshop Summary: `id`, `slug`, `title`, `description`, `coverImageUrl`, `location`, `timezone`, `startsAt`, `endsAt`, `capacity`, `price`, `currency`, `status`, `version`, `speakerCount`, `createdAt`, `updatedAt` |
 
 ### Offline Check-in & Synchronization Flow
 

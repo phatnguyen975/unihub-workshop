@@ -2,6 +2,8 @@ package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.InternalServerException;
+import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.storage.MediaAssetType;
 import com.unihub.workshop.shared.storage.MediaStoragePort;
@@ -10,16 +12,23 @@ import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
+import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.domain.model.Workshop;
+import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
+import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
+import com.unihub.workshop.workshops.presentation.dto.WorkshopSummaryResponse;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -47,8 +56,69 @@ public class AdminWorkshopController {
     private final SaveDraftUseCase saveDraftUseCase;
     private final GetWorkshopUseCase getWorkshopUseCase;
     private final DeleteDraftUseCase deleteDraftUseCase;
+    private final ListAdminWorkshopsUseCase listAdminWorkshopsUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
+
+    @GetMapping
+    public ApiResponse<PageResponse<WorkshopSummaryResponse>> listWorkshops(
+        @RequestParam(name = "status", required = false) String statusStr,
+        @RequestParam(name = "priceType", required = false) String priceType,
+        @RequestParam(name = "q", required = false) String q,
+        @RequestParam(name = "from", required = false) String fromStr,
+        @RequestParam(name = "to", required = false) String toStr,
+        @RequestParam(
+            name = "sort",
+            required = false,
+            defaultValue = "createdAt,desc"
+        ) String sort,
+        @RequestParam(name = "cursor", required = false) String cursor,
+        @RequestParam(
+            name = "size",
+            required = false,
+            defaultValue = "20"
+        ) Integer size,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        WorkshopStatus status = null;
+        if (statusStr != null && !statusStr.isBlank()) {
+            try {
+                status = WorkshopStatus.valueOf(
+                    statusStr.trim().toUpperCase(Locale.ROOT)
+                );
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Invalid status: " + statusStr);
+            }
+        }
+
+        Instant from = parseInstant(fromStr, "from");
+        Instant to = parseInstant(toStr, "to");
+
+        ListAdminWorkshopsQuery query = ListAdminWorkshopsQuery.builder()
+            .organizationId(organizationId)
+            .status(status)
+            .priceType(priceType)
+            .q(q)
+            .from(from)
+            .to(to)
+            .sort(sort)
+            .cursor(cursor)
+            .size(size)
+            .build();
+
+        CursorPage<WorkshopSummary> page = listAdminWorkshopsUseCase.execute(
+            query
+        );
+        PageResponse<WorkshopSummaryResponse> response =
+            workshopMapper.toPageResponse(page);
+
+        return ApiResponse.success(
+            response,
+            "Workshops retrieved successfully."
+        );
+    }
 
     @GetMapping("/{id}")
     public ApiResponse<WorkshopResponse> getWorkshop(
@@ -161,6 +231,23 @@ public class AdminWorkshopController {
             .build();
 
         return ApiResponse.success(response, "Media uploaded successfully.");
+    }
+
+    private Instant parseInstant(String value, String paramName) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new BadRequestException(
+                "Invalid '" +
+                    paramName +
+                    "' timestamp format: " +
+                    value +
+                    ". Expected ISO-8601 UTC timestamp."
+            );
+        }
     }
 
     private UUID getVerifiedOrganizationId(Authentication authentication) {

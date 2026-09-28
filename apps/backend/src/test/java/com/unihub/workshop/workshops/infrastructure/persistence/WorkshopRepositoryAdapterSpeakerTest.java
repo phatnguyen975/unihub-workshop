@@ -9,6 +9,7 @@ import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.WorkshopPersistenceMapper;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,9 @@ class WorkshopRepositoryAdapterSpeakerTest {
     @Mock
     private WorkshopSpeakerJpaRepository speakerJpaRepository;
 
+    @Mock
+    private EntityManager entityManager;
+
     private WorkshopPersistenceMapper mapper;
     private WorkshopRepositoryAdapter adapter;
 
@@ -40,7 +44,8 @@ class WorkshopRepositoryAdapterSpeakerTest {
         adapter = new WorkshopRepositoryAdapter(
             workshopJpaRepository,
             speakerJpaRepository,
-            mapper
+            mapper,
+            entityManager
         );
     }
 
