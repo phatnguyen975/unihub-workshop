@@ -309,6 +309,7 @@ sequenceDiagram
   participant GW as API Gateway (Nginx)
   participant API as Core Backend Monolith
   participant DB as Neon PostgreSQL
+  participant MinIO as MinIO Object Storage
   participant Sweeper as Cron Sweeper
   participant Registry as Spring Modulith Event Registry
   participant Broker as RabbitMQ
@@ -316,20 +317,121 @@ sequenceDiagram
   participant ES as Elasticsearch
   participant Notify as Notification Providers
 
-  Note over Organizer,Notify: CREATE OPERATION
-  Organizer->>Web: Click "Save Draft"
-  Web->>GW: POST /api/v1/workshops
+  Note over Organizer,Notify: MEDIA UPLOAD OPERATION (WORKSHOP COVER OR SPEAKER AVATAR)
+  Organizer->>Web: Select image file (cover or speaker avatar)
+  Web->>GW: POST /api/v1/admin/workshops/media/upload (multipart: file, type)
   GW->>API: Forward Request
-  API->>DB: Verify ownership (Bypassed for Create)
-  API->>DB: Insert Workshop record (Status: DRAFT)
-  DB-->>API: Row persisted
-  API-->>GW: 201 Created (Draft Saved)
-  GW-->>Web: 201 Created
-  Web-->>Organizer: Show Draft Status in UI
+  API->>API: Validate file (size <= 5MB, MIME: JPEG/JPG/PNG/WEBP)
+  API->>MinIO: PutObject to unihub-media (workshops/covers/ or speakers/avatars/)
+  MinIO-->>API: Stored
+  API-->>GW: 201 Created (url, fileKey, type)
+  GW-->>Web: 201 Created (url, fileKey, type)
+  Note over Organizer,Web: Web displays preview immediately, and URL is embedded into subsequent Save Draft payload
+
+  Note over Organizer,Notify: SAVE DRAFT OPERATION (CREATE OR UPDATE DRAFT)
+  Organizer->>Web: Click "Save as Draft"
+  Web->>GW: POST /api/v1/admin/workshops/drafts
+  GW->>API: Forward Request
+  alt payload.id is null (Create New Draft)
+    API->>API: Validate title & optional fields (generate slug from title)
+    opt If speakers provided
+      API->>DB: Check speaker schedule overlap across non-CANCELED, non-DRAFT workshops
+      alt Conflict found
+        API-->>GW: 422 Unprocessable Entity (Speaker Schedule Conflict)
+        GW-->>Web: 422 Unprocessable Entity
+      end
+    end
+    API->>DB: Insert Workshop record (Status: DRAFT, version: 0, organization_id: jwt.org)
+    opt If speakers provided
+      API->>DB: Insert WorkshopSpeaker records
+    end
+    DB-->>API: Persisted
+    API-->>GW: 201 Created (Draft Saved)
+    GW-->>Web: 201 Created
+  else payload.id is provided (Update Existing Draft)
+    API->>DB: Verify ownership (workshop.organization_id == jwt.org)
+    alt Unauthorized
+      API-->>GW: 403 Forbidden
+      GW-->>Web: 403 Forbidden
+    else Authorized
+      API->>DB: Select current_status, version from workshops
+      alt current_status != DRAFT
+        API-->>GW: 422 Unprocessable Entity (Only DRAFT workshops can be modified via Save Draft)
+        GW-->>Web: 422 Unprocessable Entity
+      else
+        API->>API: Verify optimistic locking version & synchronize slug if title changed
+        opt If speakers provided
+          API->>DB: Check speaker schedule overlap (excluding current workshop)
+          alt Conflict found
+            API-->>GW: 422 Unprocessable Entity (Speaker Schedule Conflict)
+            GW-->>Web: 422 Unprocessable Entity
+          end
+        end
+        opt If coverImageUrl changed or speakers removed
+          API->>MinIO: Delete orphaned media objects (old cover or removed speaker avatars)
+        end
+        API->>DB: Update modified fields & replace speakers (version incremented)
+        DB-->>API: Persisted
+        API-->>GW: 200 OK (Draft Updated)
+        GW-->>Web: 200 OK
+      end
+    end
+  end
+  Note over API,DB: DRAFT changes do not emit transactional outbox events
+
+  Note over Organizer,Notify: GET WORKSHOP DETAILS FOR ORGANIZER OPERATION
+  Organizer->>Web: View workshop details / Hydrate edit form
+  Web->>GW: GET /api/v1/admin/workshops/{id}
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
+  alt Unauthorized
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+  else Authorized
+    API->>DB: Query workshop and attached speakers
+    DB-->>API: Workshop details & speakers
+    API-->>GW: 200 OK (Workshop Details)
+    GW-->>Web: 200 OK
+  end
+  Note over Web,Organizer: Live preview during form drafting is rendered client-side from form state
+
+  Note over Organizer,Notify: LIST WORKSHOPS FOR ORGANIZER OPERATION
+  Organizer->>Web: Navigate to Workshop Management Dashboard
+  Web->>GW: GET /api/v1/admin/workshops?status={status}&priceType={priceType}&q={q}&from={from}&to={to}&sort={sort}&cursor={cursor}&size={size}
+  GW->>API: Forward Request
+  API->>API: Extract jwt.org & validate ORGANIZER role
+  API->>DB: Query workshops WHERE organization_id = jwt.org AND filters, ORDER BY sort (keyset pagination from Primary DB)
+  DB-->>API: Paginated Workshop records & nextCursor
+  API-->>GW: 200 OK (Workshop Items & Next Cursor)
+  GW-->>Web: 200 OK (Populate Dashboard Table)
+
+  Note over Organizer,Notify: DELETE DRAFT OPERATION
+  Organizer->>Web: Click "Delete Draft"
+  Web->>GW: DELETE /api/v1/admin/workshops/{id}
+  GW->>API: Forward Request
+  API->>DB: Verify ownership (workshop.organization_id == jwt.org)
+  alt Unauthorized
+    API-->>GW: 403 Forbidden
+    GW-->>Web: 403 Forbidden
+  else Authorized
+    API->>DB: Select current_status from workshops
+    alt current_status != DRAFT
+      API-->>GW: 422 Unprocessable Entity (Only DRAFT workshops can be deleted)
+      GW-->>Web: 422 Unprocessable Entity
+    else
+      API->>DB: Hard delete workshop (workshop_speakers deleted via ON DELETE CASCADE)
+      opt If coverImageUrl or speaker avatarUrls exist in MinIO
+        API->>MinIO: Delete associated media objects from unihub-media
+      end
+      DB-->>API: Deleted
+      API-->>GW: 204 No Content
+      GW-->>Web: 204 No Content
+    end
+  end
 
   Note over Organizer,Notify: PUBLISH OPERATION
   Organizer->>Web: Click "Publish Workshop"
-  Web->>GW: PATCH /api/v1/workshops/{id}/publish
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/publish
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -356,7 +458,7 @@ sequenceDiagram
 
   Note over Organizer,Notify: UPDATE OPERATION
   Organizer->>Web: Click "Save Changes"
-  Web->>GW: PUT /api/v1/workshops/{id}
+  Web->>GW: PUT /api/v1/admin/workshops/{id}
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -388,18 +490,16 @@ sequenceDiagram
           GW-->>Web: 200 OK
         end
       else current_status == DRAFT
-        API->>DB: Update Workshop Details (all fields allowed, Optimistic Locking check)
-        Note over API,DB: DRAFT changes do not generate outbox events
-        DB-->>API: Transaction committed (Optimistic Locking check)
-        API-->>GW: 200 OK
-        GW-->>Web: 200 OK
+        API-->>GW: 422 Unprocessable Entity (Draft modifications must use POST /api/v1/admin/workshops/drafts)
+        GW-->>Web: 422 Unprocessable Entity
+        Web-->>Organizer: 422 Unprocessable Entity
       end
     end
   end
 
   Note over Organizer,Notify: RESCHEDULE OPERATION
   Organizer->>Web: Change Date/Time & Click "Reschedule"
-  Web->>GW: PATCH /api/v1/workshops/{id}/reschedule
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/reschedule
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -442,7 +542,7 @@ sequenceDiagram
 
   Note over Organizer,Notify: CANCEL OPERATION
   Organizer->>Web: Click "Cancel Workshop"
-  Web->>GW: PATCH /api/v1/workshops/{id}/cancel
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/cancel
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -453,8 +553,8 @@ sequenceDiagram
   else Authorized
     API->>DB: Select current_status from workshops
     DB-->>API: current_status: STATUS
-    alt current_status == CANCELED or current_status == COMPLETED
-      API-->>GW: 422 Unprocessable Entity (Invalid State)
+    alt current_status == CANCELED or current_status == COMPLETED or current_status == DRAFT
+      API-->>GW: 422 Unprocessable Entity (Drafts must be deleted via DELETE endpoint - terminal workshops cannot be canceled)
       GW-->>Web: 422 Unprocessable Entity
       Web-->>Organizer: 422 Unprocessable Entity
     else
@@ -502,6 +602,8 @@ sequenceDiagram
 - **Automated Event Completion Sweeper:** A dedicated `Sweeper` cron component runs hourly. It queries the database for expired `PUBLISHED` workshops, marks them `COMPLETED`, and writes `WorkshopCompletedEvent` entries into the transactional outbox for downstream processing.
 - **Granular Asynchronous Branching:** The `Registry` component (not the API) extracts committed outbox rows and externalizes them to the message broker. Background workers synchronize to Elasticsearch on publication, updates, rescheduling, and completion events (keeping `DRAFT` items completely isolated); mass notification flows are executed only for disruptive events (Rescheduled, Canceled).
 - **Strict Reschedule Guarantees:** The reschedule endpoint is explicitly blocked for `DRAFT`, `COMPLETED`, or `CANCELED` states. Rescheduling requires a `PUBLISHED` workshop, validates that proposed times are future and form a valid range, and runs a PostgreSQL-level resource collision check (location and speaker availability) to prevent double-booking. Any validation failure returns `422 Unprocessable Entity` and the transaction is not committed.
+- **Decoupled Media Upload & Storage Partitioning:** Workshop cover images and speaker portraits are uploaded via `POST /api/v1/admin/workshops/media/upload` directly to MinIO bucket `unihub-media` under `workshops/covers/{uuid}.{ext}` and `speakers/avatars/{uuid}.{ext}`. The upload endpoint is decoupled from Save Draft so large binary transfers do not tie up database transactions. The frontend receives the public URL, shows an immediate preview, and sends the URL in the subsequent draft payload. When drafts are updated or hard-deleted, orphaned media files in MinIO are cleaned up.
+- **Client-Side Live Preview vs Server-Side Details:** Live preview during in-progress draft authoring is handled entirely on the frontend using local form state. `GET /api/v1/admin/workshops/{id}` retrieves full workshop details for viewing or form re-hydration, strictly scoped to the caller's organization (`jwt.org`).
 
 ### Workshop Search & Cache-Aside Flow
 
@@ -516,7 +618,7 @@ sequenceDiagram
   participant ES as Elasticsearch
   participant Refresher as Async Refresher
 
-  Student->>GW: GET /api/v1/workshops/search?q={keyword}
+  Student->>GW: GET /api/v1/workshops?q={keyword}
   GW->>API: Forward Search Request
   API->>Cache: GET search:q:{keyword}
   Cache-->>API: Return {data, soft_ttl, hard_ttl} or Null
@@ -560,6 +662,24 @@ sequenceDiagram
 - **Cache Invalidation:** Writers (publish/reschedule/cancel) invalidate or update the Redis key and, where necessary, emit events to the background refresher to eagerly repopulate critical search slices. Cache updates always reset both TTLs to maintain correct SWR semantics.
 - **Telemetry & Observability:** Instrument refresh attempts, lock acquisition rate, cache hit/stale/miss ratios, ES response latencies, and circuit-breaker state transitions. Alert on elevated lock contention, high stale-serving ratios, or prolonged circuit-open periods to drive operational responses.
 
+### Workshop Catalog Listing & Search: Public vs Organizer Comparison
+
+To prevent architectural drift and maintain clean interface boundaries, the system defines two separate listing interfaces with synchronized naming conventions but different operational scopes:
+
+| Axis                             | Public Catalog / Search (`GET /api/v1/workshops`)                                                                                                                                                             | Organizer Admin Listing (`GET /api/v1/admin/workshops`)                                                                                                                                                                     |
+| :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Target Actor**                 | Students & Unauthenticated Public Users                                                                                                                                                                       | Authenticated `ORGANIZER` only (JWT `role = ORGANIZER`)                                                                                                                                                                     |
+| **Tenant Boundary**              | Open across all organizations (university-wide catalog)                                                                                                                                                       | Strictly isolated to caller's organization (`organization_id == jwt.org`, IDOR-proof)                                                                                                                                       |
+| **Status Scope**                 | Fixed to `PUBLISHED` only (`DRAFT`, `COMPLETED`, `CANCELED` are excluded)                                                                                                                                     | Multi-status: `DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED` (all returned if omitted)                                                                                                                                       |
+| **Status Filter (`status`)**     | **Not supported** (cannot query non-published workshops)                                                                                                                                                      | **Supported**: `?status=DRAFT \| PUBLISHED \| COMPLETED \| CANCELED`                                                                                                                                                        |
+| **Search Param (`q`)**           | Triggers Elasticsearch CQRS full-text search across `title`, `description`, `location`, `speakers.name`, and `slug` (multi_match, fuzzy boosting)                                                             | Triggers PostgreSQL Primary DB ILIKE / case-insensitive substring search across `title`, `slug`, `location`, and `description`                                                                                              |
+| **Pricing Filter (`priceType`)** | **Supported**: `?priceType=FREE \| PAID` (`FREE`: price = 0, `PAID`: price > 0)                                                                                                                               | **Supported**: `?priceType=FREE \| PAID` (`FREE`: price = 0, `PAID`: price > 0)                                                                                                                                             |
+| **Date Range (`from`, `to`)**    | **Supported**: `?from={isoUtc}&to={isoUtc}` (matches `starts_at`)                                                                                                                                             | **Supported**: `?from={isoUtc}&to={isoUtc}` (matches `starts_at`)                                                                                                                                                           |
+| **Sorting Param (`sort`)**       | **Default:** `startsAt,asc` (upcoming soonest first)<br>**Supported:** `startsAt,asc\|desc`, `price,asc\|desc`, `capacity,asc\|desc`                                                                          | **Default:** `createdAt,desc` (recently drafted/edited first)<br>**Supported:** `createdAt,desc\|asc`, `price,asc\|desc`, `capacity,asc\|desc`, `startsAt,asc\|desc`                                                        |
+| **Pagination Contract**          | **Keyset pagination:** `?cursor={cursor}&size={size}` (default 20, max 100)<br>**Response:** `data: { items: [...], cursor: { nextCursor, hasMore } }`                                                        | **Keyset pagination:** `?cursor={cursor}&size={size}` (default 20, max 100)<br>**Response:** `data: { items: [...], cursor: { nextCursor, hasMore } }`                                                                      |
+| **Data Store / Consistency**     | Elasticsearch (if `q` present) with Redis SWR Cache; otherwise PostgreSQL Read Replica (eventual consistency)                                                                                                 | PostgreSQL Primary DB (`@Transactional(readOnly = true)`) for immediate read-after-write consistency                                                                                                                        |
+| **Response Item Fields**         | Public Workshop Card: `id`, `slug`, `title`, `description`, `coverImageUrl`, `location`, `startsAt`, `endsAt`, `price`, `currency`, `availableSeats` (from Redis counter), `speakerCount`, `organizationName` | Admin Workshop Summary: `id`, `slug`, `title`, `description`, `coverImageUrl`, `location`, `timezone`, `startsAt`, `endsAt`, `capacity`, `price`, `currency`, `status`, `version`, `speakerCount`, `createdAt`, `updatedAt` |
+
 ### Offline Check-in & Synchronization Flow
 
 This sequence illustrates offline capture, local persistence, and server-authoritative reconciliation. It enforces zero-trust by verifying QR signatures on-device, then reconciles sync batches using workshop-scoped bulk fetch and bulk upsert operations to eliminate N+1 queries. Database-level unique constraints and atomic upsert mechanisms deterministically resolve micro-second double-scan races.
@@ -571,6 +691,8 @@ sequenceDiagram
   participant GW as API Gateway
   participant API as Core Backend Monolith
   participant DB as Neon PostgreSQL
+  participant Redis as Redis Pub/Sub
+  participant Client as Web / Mobile (SSE)
 
   Staff->>Mobile: Point camera at Student's QR Code
   Mobile->>Mobile: Verify QR payload signature using local Public Key
@@ -608,7 +730,7 @@ sequenceDiagram
     opt New check-ins persisted
       API->>Redis: Publish attendance.updated to unihub:stream:workshop:{workshopId}
       Redis->>API: Distribute to active SSE connections
-      API-->>Web / Mobile: SSE Event (attendance.updated)
+      API-->>Client: SSE Event (attendance.updated)
     end
     API-->>GW: 207 Multi-Status
     GW-->>Mobile: 207 Multi-Status
@@ -763,6 +885,7 @@ JWTs are strictly signed using **Asymmetric Cryptography (for example, RS256)**.
 - **Organization Member Management & Status Gating:** Organizers manage organization users via `GET /api/v1/admin/organizations/users` (keyset cursor pagination, excluding the active organizer) and can deactivate/ban accounts via `PATCH /api/v1/admin/organizations/users/{userId}/status`. Deactivation immediately revokes all refresh tokens and blacklists active JTIs in Redis across all devices.
 - **Explicit Staff Assignment & Conflict Prevention:** `STAFF` access is scoped by explicit assignment. A bridging table (`workshop_assignments`) maps `STAFF` to specific workshops. Organizers query available staff without schedule conflicts (`GET /api/v1/workshops/{id}/staff/available`, ignoring canceled workshops) and perform batch assignments (`POST /api/v1/workshops/{id}/staff`). Unassigned `STAFF` cannot scan or sync attendance for other workshops, even within the same organization.
 - **Active Session Tracking & Revocation:** Users of any role can inspect their active login sessions (`GET /api/v1/auth/sessions`) with device info and IP addresses, and revoke individual sessions (`DELETE /api/v1/auth/sessions/{id}`) or all other remote sessions (`DELETE /api/v1/auth/sessions`), immediately invalidating tokens via Redis blacklist. The caller's current session is identified across stateless backend nodes using the `sid` claim in the access token. Remote session revocation pairs PostgreSQL `revoked_at` updates with centralized Redis `jti` blacklisting via temporary `session:jti:{sessionId}` tracking, guaranteeing immediate revocation across all horizontally scaled backend instances.
+- **Self-Service Profile & Avatar Management:** Authenticated users of any role can manage personal details (`fullName`, `phoneNumber`) via `PATCH /api/v1/users/me`. Avatar updates use a dedicated single-step endpoint (`POST /api/v1/users/me/avatar`) that streams the image file directly to MinIO (`users/avatars/{uuid}.{ext}`), updates `users.avatar_url`, and purges the previous avatar from MinIO. `avatarUrl` is strictly omitted from the `PATCH /api/v1/users/me` request body to prevent stale or unvalidated URL injections.
 
 ### Multi-Layer Enforcement Points
 
@@ -776,7 +899,7 @@ JWTs are strictly signed using **Asymmetric Cryptography (for example, RS256)**.
 sequenceDiagram
   actor Organizer
   participant Web as Web App
-  participant API as API Gateway / Spring Security
+  participant API as "API Gateway / Spring Security"
   participant Redis as Redis (Token Revocation)
   participant Service as Workshop Service
   participant DB as Neon PostgreSQL
@@ -1008,7 +1131,7 @@ The platform uses a **lock-free atomic pre-check via Redis**. The Core Backend M
 ```mermaid
 flowchart TD
   API[Backend API receives request] --> Decr["Redis Atomic DECR (capacity)"]
-  Decr --> Decision{Is Capacity >= 0?}
+  Decr --> Decision{"Is Capacity >= 0?"}
   Decision -->|Yes| DB[Proceed to PostgreSQL transaction]
   Decision -->|No| Conflict[Return 409 Conflict]
 ```
@@ -1028,7 +1151,7 @@ flowchart TD
   Cron[Capacity Reconciliation Job - every 5 min] --> Query["Database: SELECT capacity, COUNT(CONFIRMED + PENDING)\n FROM workshops JOIN registrations"]
   Query --> Compute["Compute: available = capacity - occupied"]
   Compute --> Compare["Compare with Redis GET capacity:{workshopId}"]
-  Compare --> Drift{Counter drifted?}
+  Compare --> Drift{"Counter drifted?"}
   Drift -->|Yes| Reset["Redis SET capacity:{workshopId} = computed_available"]
   Drift -->|No| Skip[No-op]
   Reset --> Log[Emit drift_detected metric to Micrometer]

@@ -36,6 +36,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/ListOrganizationMembersUseCaseImpl.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/OrganizationController.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/MemberSummaryResponse.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/PageResponse.java` _(shared)_
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ListOrganizationMembersUseCaseImplTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/OrganizationControllerListTest.java`
   - **Files (modified):**
@@ -45,7 +46,7 @@ Each task spans all required architectural layers (Domain $\rightarrow$ Applicat
   - **Acceptance Criteria:**
     - `GET /api/v1/admin/organizations/users` with no filters returns `200 OK` containing members of the caller's organization across all roles (`ORGANIZER`, `STAFF`, `STUDENT`), strictly excluding the calling organizer (`user_id != currentUserId`). _(FR-01; SPEC Scenario 1)_
     - `GET /api/v1/admin/organizations/users?role=STUDENT&isActive=true` filters members matching both conditions conjunctively. _(FR-02, FR-03, FR-05; SPEC Scenario 2)_
-    - `GET /api/v1/admin/organizations/users?search=keyword` performs a case-insensitive partial match across `full_name`, `email`, and `phone_number`. _(FR-04; SPEC Scenario 3)_
+    - `GET /api/v1/admin/organizations/users?q=keyword` performs a case-insensitive partial match across `full_name`, `email`, and `phone_number`. _(FR-04; SPEC Scenario 3)_
     - Keyset pagination with `size=20` returns 20 items, `cursor.hasMore=true`, and an opaque Base64 `cursor.nextCursor`. Querying with `cursor=<nextCursor>` returns the next page. _(FR-06, FR-07; SPEC Scenario 4)_
     - `size > 100` returns `400 Bad Request` (`urn:unihub:error:bad-request`). _(FR-07; SPEC Scenario 5)_
     - Unauthenticated requests return `401 Unauthorized` (`urn:unihub:error:unauthorized`). Non-organizer callers return `403 Forbidden` (`urn:unihub:error:forbidden`). _(FR-25, FR-26; SPEC Scenarios 16, 17)_

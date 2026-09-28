@@ -1,21 +1,26 @@
 package com.unihub.workshop.iam.infrastructure.persistence;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +30,7 @@ public class UserRepositoryAdapter implements UserRepository {
 
     private final UserJpaRepository repository;
     private final UserPersistenceMapper userMapper;
-    private final ObjectMapper objectMapper = new ObjectMapper()
-        .registerModule(new JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private final EntityManager entityManager;
 
     @Override
     @Transactional
@@ -116,98 +119,105 @@ public class UserRepositoryAdapter implements UserRepository {
         UUID callerId,
         UserRole role,
         Boolean isActive,
-        String search,
+        String q,
         String cursor,
         int size
     ) {
-        Instant cursorTime = null;
-        UUID cursorId = null;
-
-        if (cursor != null && !cursor.isBlank()) {
-            try {
-                String trimmedCursor = cursor.trim();
-                String decoded = new String(
-                    Base64.getDecoder().decode(trimmedCursor)
-                );
-                CursorData cursorData = objectMapper.readValue(
-                    decoded,
-                    CursorData.class
-                );
-                if (
-                    cursorData == null ||
-                    cursorData.createdAt() == null ||
-                    cursorData.id() == null
-                ) {
-                    throw new BadRequestException("Invalid cursor format");
-                }
-                cursorTime = cursorData.createdAt();
-                cursorId = cursorData.id();
-            } catch (Exception e) {
-                if (e instanceof BadRequestException) {
-                    throw (BadRequestException) e;
-                }
-                throw new BadRequestException("Invalid cursor format");
-            }
+        KeysetCursor cursorData = KeysetCursorCodec.decode(cursor, "createdAt");
+        if (cursorData != null && cursorData.asInstant() == null) {
+            throw new BadRequestException("Invalid cursor format");
         }
 
-        String roleStr = role != null ? role.name() : null;
-        String sanitizedSearch = sanitizeSearch(search);
-        PageRequest pageable = PageRequest.of(0, size + 1);
-        List<UserJpaEntity> entities =
-            cursorTime == null
-                ? repository.findFirstPage(
-                      organizationId,
-                      callerId,
-                      roleStr,
-                      isActive,
-                      sanitizedSearch,
-                      pageable
-                  )
-                : repository.findNextPage(
-                      organizationId,
-                      callerId,
-                      roleStr,
-                      isActive,
-                      sanitizedSearch,
-                      cursorTime,
-                      cursorId,
-                      pageable
-                  );
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<UserJpaEntity> cq = cb.createQuery(UserJpaEntity.class);
+        Root<UserJpaEntity> root = cq.from(UserJpaEntity.class);
 
-        boolean hasMore = entities.size() > size;
-        List<UserJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, size)
-            : entities;
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.equal(root.get("organizationId"), organizationId));
+        if (callerId != null) {
+            predicates.add(cb.notEqual(root.get("id"), callerId));
+        }
+        if (role != null) {
+            predicates.add(cb.equal(root.get("role"), role.name()));
+        }
+        if (isActive != null) {
+            predicates.add(cb.equal(root.get("isActive"), isActive));
+        }
+        if (q != null && !q.isBlank()) {
+            String sanitized = sanitizeQuery(q.trim().toLowerCase());
+            String pattern = "%" + sanitized + "%";
+            Predicate nameMatch = cb.like(
+                cb.lower(root.get("fullName")),
+                pattern,
+                '\\'
+            );
+            Predicate emailMatch = cb.like(
+                cb.lower(root.get("email")),
+                pattern,
+                '\\'
+            );
+            Predicate phoneMatch = cb.and(
+                cb.isNotNull(root.get("phoneNumber")),
+                cb.like(cb.lower(root.get("phoneNumber")), pattern, '\\')
+            );
+            predicates.add(cb.or(nameMatch, emailMatch, phoneMatch));
+        }
 
-        List<User> items = userMapper.toDomainList(pageEntities);
+        Path<Instant> createdAtPath = root.get("createdAt");
+        Path<UUID> idPath = root.get("id");
+
+        if (cursorData != null) {
+            predicates.add(
+                JpaKeysetPagination.buildKeysetPredicate(
+                    cb,
+                    createdAtPath,
+                    cursorData.asInstant(),
+                    true,
+                    createdAtPath,
+                    cursorData.asInstant(),
+                    idPath,
+                    cursorData.id()
+                )
+            );
+        }
+
+        cq.where(predicates.toArray(new Predicate[0]));
+        JpaKeysetPagination.applyOrders(
+            cb,
+            cq,
+            createdAtPath,
+            true,
+            null,
+            idPath
+        );
+
+        JpaKeysetPagination.KeysetSlice<UserJpaEntity> slice =
+            JpaKeysetPagination.execute(entityManager, cq, size);
+
+        List<User> items = userMapper.toDomainList(slice.items());
 
         String nextCursor = null;
-        if (hasMore && !pageEntities.isEmpty()) {
-            UserJpaEntity lastItem = pageEntities.get(pageEntities.size() - 1);
-            try {
-                CursorData nextCursorData = new CursorData(
-                    lastItem.getCreatedAt(),
-                    lastItem.getId()
-                );
-                String json = objectMapper.writeValueAsString(nextCursorData);
-                nextCursor = Base64.getEncoder().encodeToString(
-                    json.getBytes()
-                );
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to encode next cursor", e);
-            }
+        if (slice.hasMore() && !slice.items().isEmpty()) {
+            UserJpaEntity lastItem = slice
+                .items()
+                .get(slice.items().size() - 1);
+            nextCursor = KeysetCursorCodec.encode(
+                KeysetCursor.of(
+                    lastItem.getId(),
+                    "createdAt",
+                    lastItem.getCreatedAt().toString()
+                )
+            );
         }
 
-        return new CursorPage<>(items, nextCursor, hasMore);
+        return new CursorPage<>(items, nextCursor, slice.hasMore());
     }
 
-    private record CursorData(Instant createdAt, UUID id) {}
-
-    private String sanitizeSearch(String search) {
-        if (search == null) {
+    private String sanitizeQuery(String query) {
+        if (query == null) {
             return null;
         }
-        return search
+        return query
             .replace("\\", "\\\\")
             .replace("%", "\\%")
             .replace("_", "\\_");

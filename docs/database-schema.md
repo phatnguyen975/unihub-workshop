@@ -364,29 +364,29 @@ erDiagram
 
 **Schema Definition Table:**
 
-| Column Name     | Data Type     | Constraints                                                              | Description/UX Logic                                               |
-| :-------------- | :------------ | :----------------------------------------------------------------------- | :----------------------------------------------------------------- |
-| id              | UUID          | PK, NOT NULL, DEFAULT gen_random_uuid()                                  | Workshop identifier.                                               |
-| organization_id | UUID          | FK organizations(id), NOT NULL                                           | Tenant boundary for workshop ownership.                            |
-| title           | VARCHAR(255)  | NOT NULL                                                                 | Display title in web catalog.                                      |
-| slug            | VARCHAR(255)  | NOT NULL, UNIQUE                                                         | URL-safe identifier for SEO-friendly and shareable workshop links. |
-| description     | TEXT          | NOT NULL                                                                 | Long-form details for the workshop page.                           |
-| cover_image_url | TEXT          | NOT NULL                                                                 | Catalog image.                                                     |
-| location        | VARCHAR(255)  | NOT NULL                                                                 | Physical location for the workshop.                                |
-| timezone        | VARCHAR(64)   | NOT NULL                                                                 | IANA time zone (e.g., Asia/Singapore).                             |
-| starts_at       | TIMESTAMPTZ   | NOT NULL                                                                 | Start time.                                                        |
-| ends_at         | TIMESTAMPTZ   | NOT NULL, CHECK (ends_at > starts_at)                                    | End time.                                                          |
-| capacity        | INTEGER       | NOT NULL, CHECK (capacity >= 0)                                          | Maximum seats.                                                     |
-| price           | NUMERIC(10,2) | NOT NULL, DEFAULT 0, CHECK (price >= 0)                                  | Price per seat.                                                    |
-| currency        | CHAR(3)       | NOT NULL, DEFAULT 'USD'                                                  | ISO 4217 currency code.                                            |
-| status          | VARCHAR(20)   | NOT NULL, CHECK (status IN ('DRAFT','PUBLISHED','COMPLETED','CANCELED')) | Workshop lifecycle state.                                          |
-| version         | INTEGER       | NOT NULL, DEFAULT 0                                                      | Optimistic locking version.                                        |
-| published_at    | TIMESTAMPTZ   | NULL                                                                     | Timestamp of publication.                                          |
-| canceled_at     | TIMESTAMPTZ   | NULL                                                                     | Timestamp of cancellation.                                         |
-| created_at      | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                  | Audit timestamp.                                                   |
-| updated_at      | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                  | Audit timestamp.                                                   |
-| created_by      | UUID          | FK users(id), NOT NULL                                                   | Creator (`ORGANIZER`).                                             |
-| updated_by      | UUID          | FK users(id), NOT NULL                                                   | Last editor (`ORGANIZER`).                                         |
+| Column Name     | Data Type     | Constraints                                                               | Description/UX Logic                                                                        |
+| :-------------- | :------------ | :------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------ |
+| id              | UUID          | PK, NOT NULL, DEFAULT gen_random_uuid()                                   | Workshop identifier.                                                                        |
+| organization_id | UUID          | FK organizations(id), NOT NULL                                            | Tenant boundary for workshop ownership.                                                     |
+| title           | VARCHAR(255)  | NOT NULL                                                                  | Display title in web catalog. Mandatory for both DRAFT and PUBLISHED.                       |
+| slug            | VARCHAR(255)  | NOT NULL, UNIQUE                                                          | URL-safe identifier for SEO-friendly and shareable workshop links. Synchronized with title. |
+| description     | TEXT          | NULL                                                                      | Long-form details for the workshop page. Optional in DRAFT; mandatory in PUBLISHED.         |
+| cover_image_url | TEXT          | NULL                                                                      | Catalog image banner. Optional in DRAFT; mandatory in PUBLISHED.                            |
+| location        | VARCHAR(255)  | NULL                                                                      | Physical location for the workshop. Optional in DRAFT; mandatory in PUBLISHED.              |
+| timezone        | VARCHAR(64)   | NOT NULL, DEFAULT 'Asia/Ho_Chi_Minh'                                      | IANA time zone (e.g., Asia/Ho_Chi_Minh, Asia/Singapore).                                    |
+| starts_at       | TIMESTAMPTZ   | NULL                                                                      | Start time. Optional in DRAFT; mandatory in PUBLISHED.                                      |
+| ends_at         | TIMESTAMPTZ   | NULL, CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at > starts_at) | End time. Optional in DRAFT; mandatory in PUBLISHED.                                        |
+| capacity        | INTEGER       | NULL, CHECK (capacity IS NULL OR capacity >= 0)                           | Maximum seats. Optional in DRAFT; mandatory in PUBLISHED (capacity >= 1).                   |
+| price           | NUMERIC(10,2) | NOT NULL, DEFAULT 0, CHECK (price >= 0)                                   | Price per seat. Defaults to 0 (free).                                                       |
+| currency        | CHAR(3)       | NOT NULL, DEFAULT 'USD'                                                   | ISO 4217 currency code.                                                                     |
+| status          | VARCHAR(20)   | NOT NULL, CHECK (status IN ('DRAFT','PUBLISHED','COMPLETED','CANCELED'))  | Workshop lifecycle state. Initialized to 'DRAFT' on creation.                               |
+| version         | INTEGER       | NOT NULL, DEFAULT 0                                                       | Optimistic locking version.                                                                 |
+| published_at    | TIMESTAMPTZ   | NULL                                                                      | Timestamp of publication.                                                                   |
+| canceled_at     | TIMESTAMPTZ   | NULL                                                                      | Timestamp of cancellation.                                                                  |
+| created_at      | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                   | Audit timestamp.                                                                            |
+| updated_at      | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                   | Audit timestamp.                                                                            |
+| created_by      | UUID          | FK users(id), NOT NULL                                                    | Creator (`ORGANIZER`).                                                                      |
+| updated_by      | UUID          | FK users(id), NOT NULL                                                    | Last editor (`ORGANIZER`).                                                                  |
 
 **Indexing Strategy:**
 
@@ -404,20 +404,20 @@ erDiagram
 
 **Schema Definition Table:**
 
-| Column Name  | Data Type    | Constraints                             | Description/UX Logic                               |
-| :----------- | :----------- | :-------------------------------------- | :------------------------------------------------- |
-| id           | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid() | Speaker identifier.                                |
-| workshop_id  | UUID         | FK workshops(id), NOT NULL              | Workshop featuring the speaker.                    |
-| name         | VARCHAR(200) | NOT NULL                                | Speaker display name for the UI.                   |
-| bio          | TEXT         | NULL                                    | Speaker biography shown in the catalog.            |
-| avatar_url   | TEXT         | NULL                                    | Speaker portrait image for the workshop detail UI. |
-| linkedin_url | TEXT         | NULL                                    | Speaker professional profile.                      |
-| email        | CITEXT       | NOT NULL                                | Speaker email for scheduling checks.               |
-| sort_order   | INTEGER      | NOT NULL, DEFAULT 0                     | Display ordering in the UI.                        |
-| created_at   | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                 | Audit timestamp.                                   |
-| updated_at   | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                 | Audit timestamp.                                   |
-| created_by   | UUID         | FK users(id), NOT NULL                  | `ORGANIZER` who created the speaker record.        |
-| updated_by   | UUID         | FK users(id), NOT NULL                  | `ORGANIZER` who last updated the speaker record.   |
+| Column Name  | Data Type    | Constraints                                  | Description/UX Logic                               |
+| :----------- | :----------- | :------------------------------------------- | :------------------------------------------------- |
+| id           | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid()      | Speaker identifier.                                |
+| workshop_id  | UUID         | FK workshops(id) ON DELETE CASCADE, NOT NULL | Workshop featuring the speaker.                    |
+| name         | VARCHAR(200) | NOT NULL                                     | Speaker display name for the UI.                   |
+| bio          | TEXT         | NULL                                         | Speaker biography shown in the catalog.            |
+| avatar_url   | TEXT         | NULL                                         | Speaker portrait image for the workshop detail UI. |
+| linkedin_url | TEXT         | NULL                                         | Speaker professional profile.                      |
+| email        | CITEXT       | NOT NULL                                     | Speaker email for scheduling checks.               |
+| sort_order   | INTEGER      | NOT NULL, DEFAULT 0                          | Display ordering in the UI.                        |
+| created_at   | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                      | Audit timestamp.                                   |
+| updated_at   | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                      | Audit timestamp.                                   |
+| created_by   | UUID         | FK users(id), NOT NULL                       | `ORGANIZER` who created the speaker record.        |
+| updated_by   | UUID         | FK users(id), NOT NULL                       | `ORGANIZER` who last updated the speaker record.   |
 
 **Indexing Strategy:**
 

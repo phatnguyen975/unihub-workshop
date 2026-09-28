@@ -27,10 +27,7 @@ public class RedisJtiBlacklistAdapter implements JtiBlacklistPort {
             meterRegistry
                 .counter("auth.blacklist.redis_unavailable")
                 .increment();
-            throw new ServiceUnavailableException(
-                "urn:unihub:error:service-unavailable",
-                "Redis is unavailable"
-            );
+            throw new ServiceUnavailableException("Redis is unavailable");
         }
     }
 }

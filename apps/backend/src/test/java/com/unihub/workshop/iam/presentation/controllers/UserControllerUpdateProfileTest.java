@@ -351,13 +351,22 @@ class UserControllerUpdateProfileTest {
                         """
                     )
             )
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.avatarUrl").doesNotExist());
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            )
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    Matchers.containsString(
+                        "avatarUrl: Field is immutable or unrecognized"
+                    )
+                )
+            );
     }
 
     @Test
-    void shouldReturn200_whenUpdatingAllThreeFields() throws Exception {
+    void shouldReturn200_whenUpdatingBothFields() throws Exception {
         User updatedUser = new User(
             USER_ID,
             ORG_ID,
@@ -366,7 +375,7 @@ class UserControllerUpdateProfileTest {
             "+84987654321",
             "argon2hash",
             "Alice Thu Nguyen",
-            "https://cdn.unihub.vn/avatars/new.jpg",
+            "https://cdn.unihub.vn/avatars/existing.jpg",
             true,
             false,
             null,
@@ -393,8 +402,7 @@ class UserControllerUpdateProfileTest {
                         """
                         {
                             "fullName": "Alice Thu Nguyen",
-                            "phoneNumber": "+84987654321",
-                            "avatarUrl": "https://cdn.unihub.vn/avatars/new.jpg"
+                            "phoneNumber": "+84987654321"
                         }
                         """
                     )
@@ -405,7 +413,7 @@ class UserControllerUpdateProfileTest {
             .andExpect(jsonPath("$.data.phoneNumber").value("+84987654321"))
             .andExpect(
                 jsonPath("$.data.avatarUrl").value(
-                    "https://cdn.unihub.vn/avatars/new.jpg"
+                    "https://cdn.unihub.vn/avatars/existing.jpg"
                 )
             );
     }

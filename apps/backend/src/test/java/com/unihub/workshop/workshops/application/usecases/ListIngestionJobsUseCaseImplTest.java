@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.shared.exception.AppException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
-import com.unihub.workshop.workshops.domain.model.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import java.util.List;
 import java.util.UUID;
@@ -37,29 +37,16 @@ class ListIngestionJobsUseCaseImplTest {
         AppException ex = assertThrows(AppException.class, () ->
             useCase.execute(orgId, null, 0)
         );
-        assertEquals("size must be at least 1", ex.getMessage());
+        assertEquals("size must be between 1 and 100", ex.getMessage());
     }
 
     @Test
-    void execute_withSizeGreaterThan100_clampsTo100() {
+    void execute_withSizeGreaterThan100_throwsException() {
         UUID orgId = UUID.randomUUID();
-        CursorPage<IngestionJobReport> expected = new CursorPage<>(
-            List.of(),
-            null,
-            false
+        AppException ex = assertThrows(AppException.class, () ->
+            useCase.execute(orgId, null, 500)
         );
-        when(repository.findByOrganizationId(orgId, null, 100)).thenReturn(
-            expected
-        );
-
-        CursorPage<IngestionJobReport> result = useCase.execute(
-            orgId,
-            null,
-            500
-        );
-
-        assertSame(expected, result);
-        verify(repository).findByOrganizationId(orgId, null, 100);
+        assertEquals("size must be between 1 and 100", ex.getMessage());
     }
 
     @Test

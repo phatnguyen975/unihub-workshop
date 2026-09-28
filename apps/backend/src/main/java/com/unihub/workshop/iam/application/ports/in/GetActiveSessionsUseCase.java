@@ -1,7 +1,7 @@
 package com.unihub.workshop.iam.application.ports.in;
 
 import com.unihub.workshop.iam.domain.model.ActiveSession;
-import com.unihub.workshop.iam.domain.model.CursorPage;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.util.UUID;
 
 public interface GetActiveSessionsUseCase {

@@ -66,13 +66,13 @@ This plan delivers the complete active session management capability (Domain 1: 
     - `apps/backend/src/main/java/com/unihub/workshop/iam/infrastructure/persistence/RefreshTokenRepositoryAdapter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/GetActiveSessionsUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/GetActiveSessionsUseCaseImpl.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/SessionResponse.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/SessionCursor.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/SessionItemResponse.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/PageResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/AuthController.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/GetActiveSessionsUseCaseImplTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/AuthControllerGetSessionsTest.java`
   - **Acceptance Criteria:**
-    - `GET /api/v1/auth/sessions` with a valid Bearer token returns `200 OK` wrapped in `ApiResponse<SessionResponse>` with cursor metadata (`nextCursor`, `hasMore`).
+    - `GET /api/v1/auth/sessions` with a valid Bearer token returns `200 OK` wrapped in `ApiResponse<PageResponse<SessionItemResponse>>` with cursor metadata (`nextCursor`, `hasMore`).
     - The returned sessions include only non-expired (`expires_at > NOW()`) and non-revoked (`revoked_at IS NULL`) sessions belonging exclusively to the authenticated user (`user_id = currentUserId`), ordered descending by `created_at DESC, id DESC`.
     - Exactly one session item has `isCurrentSession = true` matching the caller's JWT `sid` claim; all other sessions have `isCurrentSession = false`. If the caller's token has no matching active session in DB, all returned sessions have `isCurrentSession = false`.
     - Keyset cursor pagination correctly decodes Base64 JSON cursor (`createdAt`, `id`), limits results by `size` (default 20, capped at 100), and emits `nextCursor` and `hasMore = true` when additional active sessions exist.

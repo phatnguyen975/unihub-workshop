@@ -7,7 +7,6 @@ import com.unihub.workshop.iam.application.ports.in.ProvisionUserCommand;
 import com.unihub.workshop.iam.application.ports.in.ProvisionUserUseCase;
 import com.unihub.workshop.iam.application.ports.in.UpdateMemberStatusCommand;
 import com.unihub.workshop.iam.application.ports.in.UpdateMemberStatusUseCase;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.presentation.dto.MemberDetailResponse;
@@ -18,6 +17,8 @@ import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusRequest;
 import com.unihub.workshop.iam.presentation.dto.UpdateMemberStatusResponse;
 import com.unihub.workshop.iam.presentation.mapper.OrganizationPresentationMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import jakarta.validation.Valid;
@@ -115,13 +116,13 @@ public class OrganizationController {
     }
 
     @GetMapping("/users")
-    public ApiResponse<MemberSummaryResponse.Page> listMembers(
-        Authentication authentication,
+    public ApiResponse<PageResponse<MemberSummaryResponse>> listMembers(
         @RequestParam(required = false) String role,
         @RequestParam(required = false) Boolean isActive,
-        @RequestParam(required = false) String search,
+        @RequestParam(required = false) String q,
         @RequestParam(required = false) String cursor,
-        @RequestParam(required = false) Integer size
+        @RequestParam(required = false, defaultValue = "20") Integer size,
+        Authentication authentication
     ) {
         UUID callerId = SecurityContextUtils.extractUserId(authentication);
         UUID organizationId = getVerifiedOrganizationId(authentication);
@@ -131,19 +132,19 @@ public class OrganizationController {
             callerId,
             parseRole(role),
             isActive,
-            search,
+            q,
             cursor,
             size
         );
 
         CursorPage<User> page = listOrganizationMembersUseCase.execute(query);
-
         List<MemberSummaryResponse> items =
             organizationMapper.toSummaryResponseList(page.items());
 
-        MemberSummaryResponse.Page response = new MemberSummaryResponse.Page(
+        PageResponse<MemberSummaryResponse> response = PageResponse.of(
             items,
-            new MemberSummaryResponse.Cursor(page.nextCursor(), page.hasMore())
+            page.nextCursor(),
+            page.hasMore()
         );
 
         return ApiResponse.success(response, "Organization members retrieved");

@@ -2,7 +2,6 @@ package com.unihub.workshop.iam.presentation.dto;
 
 import com.unihub.workshop.iam.application.ports.in.UpdateUserProfileCommand;
 import com.unihub.workshop.shared.exception.ValidationException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,16 +17,13 @@ public class UpdateProfileRequest {
     );
     private static final Set<String> ALLOWED_FIELDS = Set.of(
         "fullName",
-        "phoneNumber",
-        "avatarUrl"
+        "phoneNumber"
     );
 
     private final String fullName;
     private final boolean fullNamePresent;
     private final String phoneNumber;
     private final boolean phoneNumberPresent;
-    private final String avatarUrl;
-    private final boolean avatarUrlPresent;
 
     public static UpdateProfileRequest from(Map<String, Object> body) {
         if (body == null) {
@@ -48,14 +44,8 @@ public class UpdateProfileRequest {
 
         boolean hasFullName = body.containsKey("fullName");
         boolean hasPhoneNumber = body.containsKey("phoneNumber");
-        boolean hasAvatarUrl = body.containsKey("avatarUrl");
 
-        if (
-            !hasFullName &&
-            !hasPhoneNumber &&
-            !hasAvatarUrl &&
-            unknownFields.isEmpty()
-        ) {
+        if (!hasFullName && !hasPhoneNumber && unknownFields.isEmpty()) {
             throw new ValidationException(
                 "At least one field must be provided for update."
             );
@@ -105,29 +95,6 @@ public class UpdateProfileRequest {
             }
         }
 
-        String parsedAvatarUrl = null;
-        if (hasAvatarUrl) {
-            Object raw = body.get("avatarUrl");
-            if (raw != null) {
-                if (!(raw instanceof String)) {
-                    errors.add("avatarUrl: Avatar URL must be a string");
-                } else {
-                    String str = ((String) raw).trim();
-                    if (str.length() > 2048) {
-                        errors.add(
-                            "avatarUrl: Avatar URL must not exceed 2048 characters"
-                        );
-                    } else if (!isValidAbsoluteUrl(str)) {
-                        errors.add(
-                            "avatarUrl: Avatar URL must be a well-formed absolute URL"
-                        );
-                    } else {
-                        parsedAvatarUrl = str;
-                    }
-                }
-            }
-        }
-
         if (!errors.isEmpty()) {
             throw new ValidationException("Validation failed", errors);
         }
@@ -136,26 +103,8 @@ public class UpdateProfileRequest {
             parsedFullName,
             hasFullName,
             parsedPhoneNumber,
-            hasPhoneNumber,
-            parsedAvatarUrl,
-            hasAvatarUrl
+            hasPhoneNumber
         );
-    }
-
-    private static boolean isValidAbsoluteUrl(String url) {
-        try {
-            URI uri = URI.create(url);
-            String scheme = uri.getScheme();
-            return (
-                uri.isAbsolute() &&
-                uri.getHost() != null &&
-                !uri.getHost().isBlank() &&
-                ("http".equalsIgnoreCase(scheme) ||
-                    "https".equalsIgnoreCase(scheme))
-            );
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     public UpdateUserProfileCommand toCommand() {
@@ -163,9 +112,7 @@ public class UpdateProfileRequest {
             fullName,
             fullNamePresent,
             phoneNumber,
-            phoneNumberPresent,
-            avatarUrl,
-            avatarUrlPresent
+            phoneNumberPresent
         );
     }
 }

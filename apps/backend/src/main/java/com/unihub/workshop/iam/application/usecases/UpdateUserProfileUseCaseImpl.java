@@ -25,9 +25,7 @@ public class UpdateUserProfileUseCaseImpl implements UpdateUserProfileUseCase {
         }
         if (
             command == null ||
-            (!command.hasFullName() &&
-                !command.hasPhoneNumber() &&
-                !command.hasAvatarUrl())
+            (!command.hasFullName() && !command.hasPhoneNumber())
         ) {
             throw new ValidationException(
                 "At least one field must be provided for update."
@@ -60,17 +58,8 @@ public class UpdateUserProfileUseCaseImpl implements UpdateUserProfileUseCase {
                 ? command.phoneNumber().trim()
                 : null
             : existing.phoneNumber();
-        String newAvatarUrl = command.hasAvatarUrl()
-            ? command.avatarUrl() != null
-                ? command.avatarUrl().trim()
-                : null
-            : existing.avatarUrl();
 
-        User updated = existing.updateProfile(
-            newFullName,
-            newPhoneNumber,
-            newAvatarUrl
-        );
+        User updated = existing.updateProfile(newFullName, newPhoneNumber);
         return userRepository.save(updated);
     }
 }

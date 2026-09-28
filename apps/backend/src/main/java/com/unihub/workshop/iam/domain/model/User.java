@@ -96,14 +96,17 @@ public record User(
             .build();
     }
 
-    public User updateProfile(
-        String newFullName,
-        String newPhoneNumber,
-        String newAvatarUrl
-    ) {
+    public User updateProfile(String newFullName, String newPhoneNumber) {
         return toBuilder()
             .fullName(newFullName != null ? newFullName : fullName)
             .phoneNumber(newPhoneNumber)
+            .updatedAt(Instant.now())
+            .updatedBy(id)
+            .build();
+    }
+
+    public User updateAvatar(String newAvatarUrl) {
+        return toBuilder()
             .avatarUrl(newAvatarUrl)
             .updatedAt(Instant.now())
             .updatedBy(id)

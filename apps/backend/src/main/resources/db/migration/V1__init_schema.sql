@@ -175,8 +175,8 @@ CREATE TABLE user_verification_tokens (
 CREATE INDEX idx_user_verification_tokens_expires_at ON user_verification_tokens (expires_at);
 
 -- Index: Active token lookup by user and type
-CREATE INDEX idx_user_verification_tokens_lookup 
-    ON user_verification_tokens (user_id, token_type, expires_at) 
+CREATE INDEX idx_user_verification_tokens_lookup
+    ON user_verification_tokens (user_id, token_type, expires_at)
     WHERE used_at IS NULL;
 
 CREATE TRIGGER trg_user_verification_tokens_updated_at
@@ -280,13 +280,13 @@ CREATE TABLE workshops (
     organization_id  UUID           NOT NULL,
     title            VARCHAR(255)   NOT NULL,
     slug             VARCHAR(255)   NOT NULL,
-    description      TEXT           NOT NULL,
-    cover_image_url  TEXT           NOT NULL,
-    location         VARCHAR(255)   NOT NULL,
-    timezone         VARCHAR(64)    NOT NULL,
-    starts_at        TIMESTAMPTZ    NOT NULL,
-    ends_at          TIMESTAMPTZ    NOT NULL,
-    capacity         INTEGER        NOT NULL CHECK (capacity >= 0),
+    description      TEXT           NULL,
+    cover_image_url  TEXT           NULL,
+    location         VARCHAR(255)   NULL,
+    timezone         VARCHAR(64)    NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+    starts_at        TIMESTAMPTZ    NULL,
+    ends_at          TIMESTAMPTZ    NULL,
+    capacity         INTEGER        NULL CHECK (capacity IS NULL OR capacity >= 0),
     price            NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
     currency         CHAR(3)        NOT NULL DEFAULT 'USD',
     status           VARCHAR(20)    NOT NULL CHECK (status IN ('DRAFT', 'PUBLISHED', 'COMPLETED', 'CANCELED')),
@@ -300,7 +300,7 @@ CREATE TABLE workshops (
 
     CONSTRAINT pk_workshops PRIMARY KEY (id),
     CONSTRAINT uq_workshops_slug UNIQUE (slug),
-    CONSTRAINT chk_workshops_ends_after_starts CHECK (ends_at > starts_at),
+    CONSTRAINT chk_workshops_ends_after_starts CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at > starts_at),
     CONSTRAINT fk_workshops_organization FOREIGN KEY (organization_id) REFERENCES organizations (id),
     CONSTRAINT fk_workshops_created_by FOREIGN KEY (created_by) REFERENCES users (id),
     CONSTRAINT fk_workshops_updated_by FOREIGN KEY (updated_by) REFERENCES users (id)
@@ -338,7 +338,7 @@ CREATE TABLE workshop_speakers (
     updated_by   UUID         NOT NULL,
 
     CONSTRAINT pk_workshop_speakers PRIMARY KEY (id),
-    CONSTRAINT fk_workshop_speakers_workshop FOREIGN KEY (workshop_id) REFERENCES workshops (id),
+    CONSTRAINT fk_workshop_speakers_workshop FOREIGN KEY (workshop_id) REFERENCES workshops (id) ON DELETE CASCADE,
     CONSTRAINT fk_workshop_speakers_created_by FOREIGN KEY (created_by) REFERENCES users (id),
     CONSTRAINT fk_workshop_speakers_updated_by FOREIGN KEY (updated_by) REFERENCES users (id)
 );

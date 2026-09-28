@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -31,42 +30,6 @@ public interface RefreshTokenJpaRepository
     int revokeAllActiveTokensForUser(
         @Param("userId") UUID userId,
         @Param("revokedAt") Instant revokedAt
-    );
-
-    @Query(
-        """
-        SELECT r FROM RefreshTokenJpaEntity r
-        WHERE r.userId = :userId
-            AND r.revokedAt IS NULL
-            AND r.expiresAt > :now
-        ORDER BY r.createdAt DESC, r.id DESC
-        """
-    )
-    List<RefreshTokenJpaEntity> findFirstPage(
-        @Param("userId") UUID userId,
-        @Param("now") Instant now,
-        Pageable pageable
-    );
-
-    @Query(
-        """
-        SELECT r FROM RefreshTokenJpaEntity r
-        WHERE r.userId = :userId
-            AND r.revokedAt IS NULL
-            AND r.expiresAt > :now
-            AND (
-                r.createdAt < :cursorTime
-                OR (r.createdAt = :cursorTime AND r.id < :cursorId)
-            )
-        ORDER BY r.createdAt DESC, r.id DESC
-        """
-    )
-    List<RefreshTokenJpaEntity> findNextPage(
-        @Param("userId") UUID userId,
-        @Param("now") Instant now,
-        @Param("cursorTime") Instant cursorTime,
-        @Param("cursorId") UUID cursorId,
-        Pageable pageable
     );
 
     @Query(

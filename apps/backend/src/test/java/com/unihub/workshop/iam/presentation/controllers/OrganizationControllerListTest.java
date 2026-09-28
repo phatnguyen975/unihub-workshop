@@ -7,9 +7,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.unihub.workshop.iam.application.ports.in.ListMembersQuery;
 import com.unihub.workshop.iam.application.ports.in.ListOrganizationMembersUseCase;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -254,7 +254,7 @@ class OrganizationControllerListTest {
         mockMvc
             .perform(
                 get(
-                    "/api/v1/admin/organizations/users?search=alice&cursor=prevCursor&size=10"
+                    "/api/v1/admin/organizations/users?q=alice&cursor=prevCursor&size=10"
                 ).principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
             )
             .andExpect(status().isOk())
@@ -354,7 +354,7 @@ class OrganizationControllerListTest {
         mockMvc
             .perform(
                 get(
-                    "/api/v1/admin/organizations/users?search=" + longSearch
+                    "/api/v1/admin/organizations/users?q=" + longSearch
                 ).principal(createAuth(CALLER_ID, ORG_ID, "ORGANIZER"))
             )
             .andExpect(status().isBadRequest())

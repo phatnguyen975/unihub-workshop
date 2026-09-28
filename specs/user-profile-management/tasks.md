@@ -48,7 +48,7 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 ### Phase 2: Profile Update — Caller can partially update their own mutable personal fields
 
-- [x] **T2 — A caller can update `fullName`, `phoneNumber`, and/or `avatarUrl` via `PATCH /api/v1/users/me`**
+- [x] **T2 — A caller can update `fullName` and/or `phoneNumber` via `PATCH /api/v1/users/me`**
   - **Size:** M
   - **Depends on:** T1 (requires `UserController`, `UpdateProfileRequest` DTO, `User.updateProfile()`)
   - **Layers touched:** Application (new in port, new use-case impl), Infrastructure (no change), Presentation (new handler added to existing `UserController`)
@@ -56,8 +56,8 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/UpdateUserProfileUseCase.java` — NEW inbound port: `User updateProfile(UUID userId, UpdateUserProfileCommand command)`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/UpdateUserProfileUseCaseImpl.java` — NEW: load → `user.updateProfile(...)` (PATCH semantics: absent = keep existing value) → `userRepository.save(updated)` → return updated User
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/UserController.java` — ADD `PATCH /me` handler; `UpdateProfileRequest.from(body).toCommand()`; returns `ApiResponse<UserProfileResponse>`
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/UpdateUserProfileUseCaseImplTest.java` — NEW: partial update (fullName only), clear phoneNumber (null), clear avatarUrl (null), all three, absent = untouched
-    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerUpdateProfileTest.java` — NEW: MockMvc for 200 OK (partial update preserves organizationId), 422 (blank fullName, invalid phoneNumber, invalid avatarUrl, immutable field `email`), 401
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/UpdateUserProfileUseCaseImplTest.java` — NEW: partial update (fullName only), clear phoneNumber (null), absent = untouched
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerUpdateProfileTest.java` — NEW: MockMvc for 200 OK (partial update preserves organizationId), 422 (blank fullName, invalid phoneNumber, immutable field `email`), 401
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerTestBuilder.java` — UPDATE: add `UpdateUserProfileUseCase` mock + builder method
   - **Acceptance Criteria:**
     - `PATCH /api/v1/users/me` with `{ "fullName": "Alice Thu Nguyen" }` returns `200 OK` with `data.fullName = "Alice Thu Nguyen"`, `data.phoneNumber` unchanged, and `data.organizationId` still present if the stored user has one. (FR-06, FR-07, FR-09, Scenario 3)
@@ -67,7 +67,7 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
     - `PATCH /api/v1/users/me` with `{ "email": "hack@evil.com" }` returns `422` with `validationErrors` listing `email` as an unrecognized/immutable field. (FR-08, FR-11, Scenario 7)
     - `PATCH /api/v1/users/me` without a request body returns `400` with `error.type = urn:unihub:error:bad-request`. (FR-12, Scenario 8)
     - After a successful update, the stored user record's `updated_at` reflects the current timestamp and `updated_by` reflects the caller's UUID. (FR-14)
-    - `PATCH /api/v1/users/me` without an `Authorization` header returns `401`. (FR-28)
+    - `PATCH /api/v1/users/me` without an `Authorization` header returns `401`. (FR-35)
     - Full test suite passes, including `ModulithArchitectureTest`.
 
 #### Checkpoint: Phase 2
@@ -76,7 +76,7 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
 
 ### Phase 3: Password Change — Caller can change their own password with automatic remote session revocation
 
-- [x] **T3 — A caller can change their own password via `PATCH /api/v1/users/me/password`, with fail-closed Redis session revocation of all remote sessions**
+- [x] **T3 — A caller can change their own password via `POST /api/v1/users/me/password`, with fail-closed Redis session revocation of all remote sessions**
   - **Size:** M
   - **Depends on:** T1 (requires `UserController`, `UserRepository.findById`, `UserRepository.save`)
   - **Layers touched:** Application (new in port, new use-case impl with fail-closed orchestration), Infrastructure (no new adapter), Presentation (new handler + new request DTO)
@@ -84,24 +84,53 @@ This plan builds Feature 1.8 (User Profile Management) in three vertical slices,
     - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/ChangePasswordRequest.java` — NEW: `{ currentPassword (NotBlank), newPassword (NotBlank) }`; strength validation done at use-case level
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/ChangeUserPasswordUseCase.java` — NEW inbound port: `void changePassword(UUID userId, UUID currentSessionId, String currentPassword, String newPassword)`
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/ChangeUserPasswordUseCaseImpl.java` — NEW: (1) load user; (2) Argon2 verify currentPassword → 422 on failure; (3) enforce newPassword ≠ currentPassword and strength policy → 422 on failure; (4) fetch remote sessions via `findActiveRemoteSessions`; (5) for each: `getActiveJti` → `blacklistJti` → `removeSession` (Redis fail-closed — `ServiceUnavailableException` on `RedisConnectionFailureException`); (6) `@Transactional`: `user.updatePassword(encode(newPassword))` + `save` + `revokeAllOtherActiveSessions`
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/UserController.java` — ADD `PATCH /me/password` handler; extracts `sid` from `JwtAuthenticatedPrincipal`; calls `ChangeUserPasswordUseCase`; returns `ApiResponse<Void>` with message; maps `ServiceUnavailableException` → 503 + `Retry-After` header
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/UserController.java` — ADD `POST /me/password` handler; extracts `sid` from `JwtAuthenticatedPrincipal`; calls `ChangeUserPasswordUseCase`; returns `ApiResponse<Void>` with message; maps `ServiceUnavailableException` → 503 + `Retry-After` header
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/ChangeUserPasswordUseCaseImplTest.java` — NEW: happy path, wrong currentPassword → 422, same password → 422, weak newPassword → 422, no remote sessions (no Redis writes, no revocations), Redis unavailable → 503 (DB not mutated), Mockito `InOrder` assertion: Redis before DB
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerChangePasswordTest.java` — NEW: MockMvc for 200 OK (data absent, message present, no Retry-After), 422 (wrong password, same, weak, blank), 503 (Redis down, Retry-After header present), 401
     - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerTestBuilder.java` — UPDATE: add `ChangeUserPasswordUseCase` mock + builder method
   - **Acceptance Criteria:**
-    - `PATCH /api/v1/users/me/password` with valid `currentPassword` and a strength-conforming `newPassword` returns `200 OK` with `success: true`, `message: "Password changed successfully."`, and no `data` key in the JSON. (FR-15, FR-20, FR-23, Scenario 9)
-    - After success, all remote sessions have `revoked_at` set and their `jti` values are in the Redis blacklist; the caller's current session (`sid`) is untouched. (FR-21, FR-22, FR-23, Scenario 9)
-    - `PATCH /api/v1/users/me/password` with incorrect `currentPassword` returns `422` with `validationErrors[0].field = "currentPassword"`. (FR-16, FR-17, Scenario 10)
-    - `PATCH /api/v1/users/me/password` with `newPassword == currentPassword` returns `422`. (FR-18, Scenario 11)
-    - `PATCH /api/v1/users/me/password` with `newPassword = "short"` (fails strength) returns `422` with `validationErrors[0].field = "newPassword"`. (FR-19, Scenario 12)
-    - `PATCH /api/v1/users/me/password` when Redis is unreachable returns `503` with a `Retry-After` header; `password_hash` in the database is **not** changed (verified by asserting `userRepository.save` was never called). (FR-24, BR-06, Scenario 13)
-    - `PATCH /api/v1/users/me/password` without a request body returns `400` with `error.type = urn:unihub:error:bad-request`. (FR-27, Scenario 14)
-    - `PATCH /api/v1/users/me/password` without an `Authorization` header returns `401`. (FR-28)
+    - `POST /api/v1/users/me/password` with valid `currentPassword` and a strength-conforming `newPassword` returns `200 OK` with `success: true`, `message: "Password changed successfully."`, and no `data` key in the JSON. (FR-22, FR-26, FR-30, Scenario 11)
+    - After success, all remote sessions have `revoked_at` set and their `jti` values are in the Redis blacklist; the caller's current session (`sid`) is untouched. (FR-28, FR-29, FR-30, Scenario 11)
+    - `POST /api/v1/users/me/password` with incorrect `currentPassword` returns `422` with `validationErrors` mentioning `currentPassword`. (FR-23, FR-24, Scenario 12)
+    - `POST /api/v1/users/me/password` with `newPassword == currentPassword` returns `422`. (FR-25, Scenario 13)
+    - `POST /api/v1/users/me/password` with `newPassword = "short"` (fails strength) returns `422` with `validationErrors` mentioning `newPassword`. (FR-26, Scenario 14)
+    - `POST /api/v1/users/me/password` when Redis is unreachable returns `503` with a `Retry-After` header; `password_hash` in the database is **not** changed (verified by asserting `userRepository.save` was never called). (FR-31, BR-06, Scenario 15)
+    - `POST /api/v1/users/me/password` without a request body returns `400` with `error.type = urn:unihub:error:bad-request`. (FR-34, Scenario 16)
+    - `POST /api/v1/users/me/password` without an `Authorization` header returns `401`. (FR-35)
     - Full test suite passes, including `ModulithArchitectureTest` and all existing `AuthController` tests.
+
+#### Checkpoint: Phase 3
+
+- [x] All tasks T1, T2, T3 are verified end-to-end.
+- [x] `ModulithArchitectureTest` passes.
+
+### Phase 4: Avatar Upload & Storage Integration — Caller can upload and replace their avatar via dedicated endpoint
+
+- [x] **T4 — A caller can upload and replace their avatar via `POST /api/v1/users/me/avatar` with old avatar cleanup, and remove `avatarUrl` from `PATCH /api/v1/users/me`**
+  - **Size:** M
+  - **Depends on:** T1, `com.unihub.workshop.shared.storage.MediaStoragePort` (established in Feature 2.1 T4)
+  - **Layers touched:** Domain, Application (in port, use-case impl), Infrastructure (shared storage port), Presentation (controller handler)
+  - **Files:**
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/domain/model/User.java` — add `updateAvatar(String newAvatarUrl)` domain method
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/ports/in/UploadUserAvatarUseCase.java` — NEW inbound port: `User uploadAvatar(UUID userId, MultipartFile file)`
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/UploadUserAvatarUseCaseImpl.java` — NEW: validate file size (<= 5MB), MIME type, and magic bytes via `MediaValidationUtils` -> upload to MinIO under `users/avatars/{uuid}.{ext}` using `MediaStoragePort` with `MediaAssetType.USER_AVATAR` -> call `user.updateAvatar(newUrl)` -> save to DB via `userRepository.save()` -> if previous avatar was in MinIO, delete old file via `mediaStoragePort.deleteByUrl(oldAvatarUrl)` -> return updated User
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/dto/UpdateProfileRequest.java` — UPDATE: remove `avatarUrl` field; only `fullName` and `phoneNumber` remain
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/usecases/UpdateUserProfileUseCaseImpl.java` — UPDATE: remove `avatarUrl` from command and update logic
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/presentation/controllers/UserController.java` — ADD `POST /me/avatar` handler (`@RequestParam("file") MultipartFile file`); returns `ApiResponse<UserProfileResponse>`
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/usecases/UploadUserAvatarUseCaseImplTest.java` — NEW: happy path (upload + DB update + old avatar purge), file validation errors (too large, invalid type, empty file)
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerAvatarTest.java` — NEW: MockMvc for 200 OK (multipart upload), 422 (invalid file type / size), 401
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerTestBuilder.java` — UPDATE: add `UploadUserAvatarUseCase` mock + builder method
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/presentation/controllers/UserControllerUpdateProfileTest.java` — UPDATE: assert `avatarUrl` in PATCH request is rejected as unrecognized/immutable field (422)
+  - **Acceptance Criteria:**
+    - `POST /api/v1/users/me/avatar` with valid JPEG/JPG/PNG/WebP image (<= 5MB) uploads file to MinIO under `users/avatars/`, updates `avatar_url` in DB, and returns `200 OK` with updated `data.avatarUrl`. (FR-15, FR-18, FR-19, FR-21, Scenario 7, 8)
+    - If user previously had an avatar stored in MinIO, `POST /api/v1/users/me/avatar` purges the previous avatar object from MinIO. (FR-20, BR-11, Scenario 10)
+    - `POST /api/v1/users/me/avatar` with file > 5MB or invalid MIME format (supported: `image/jpeg`, `image/jpg`, `image/png`, `image/webp`) returns `422 Unprocessable Content`. (FR-16, FR-17, Scenario 9)
+    - `PATCH /api/v1/users/me` with `{ "avatarUrl": "https://example.com/avatar.png" }` returns `422 Unprocessable Content` with `avatarUrl` flagged as immutable. (FR-08, BR-01)
+    - `ModulithArchitectureTest` passes.
 
 #### Checkpoint: Feature Complete
 
-- [x] All tasks T1, T2, T3 are checked off.
+- [x] All tasks T1, T2, T3, T4 are checked off.
 - [x] Every acceptance criterion verified end-to-end by controller MockMvc tests and use-case unit tests.
 - [x] `ModulithArchitectureTest` passes — `UserController` in the `iam` module does not breach module boundaries.
 - [x] No regression in existing `AuthController` test suite.

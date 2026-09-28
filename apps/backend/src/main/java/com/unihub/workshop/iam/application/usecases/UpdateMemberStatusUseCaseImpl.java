@@ -103,7 +103,6 @@ public class UpdateMemberStatusUseCaseImpl
                 }
             } catch (Exception e) {
                 throw new ServiceUnavailableException(
-                    "urn:unihub:error:service-unavailable",
                     "Session revocation service is temporarily unavailable. Member status was not changed.",
                     30
                 );

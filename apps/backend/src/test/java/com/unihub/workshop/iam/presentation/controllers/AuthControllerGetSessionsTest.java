@@ -9,8 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.unihub.workshop.iam.application.ports.in.*;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;

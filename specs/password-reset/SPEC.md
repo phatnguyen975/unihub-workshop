@@ -262,7 +262,7 @@ And error type is "urn:unihub:error:bad-request"
 
 ## 8. Out of Scope
 
-- In-session authenticated password change for logged-in users knowing their old password (`PATCH /api/v1/users/me/password` — Feature 1.8).
+- In-session authenticated password change for logged-in users knowing their old password (`POST /api/v1/users/me/password` — Feature 1.8).
 - Initial account registration and student activation (`POST /api/v1/auth/register`, `POST /api/v1/auth/activate` — Feature 1.1).
 - Account provisioning and temporary password creation by Organizers (`POST /api/v1/admin/organizations/users` — Feature 1.5).
 - Captcha or biometric verification.

@@ -6,6 +6,11 @@ spring:
     name: unihub-backend
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 15MB
+      max-request-size: 15MB
   mvc:
     problemdetails:
       enabled: true
@@ -171,3 +176,14 @@ resilience4j:
         permitted-number-of-calls-in-half-open-state: 3
         register-health-indicator: true
         automatic-transition-from-open-to-half-open-enabled: true
+
+# =============================================================================
+# AWS & MinIO Object Storage Configuration
+# =============================================================================
+aws:
+  region: ${AWS_REGION:ap-southeast-1}
+  access-key-id: ${AWS_ACCESS_KEY_ID:}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+  s3:
+    endpoint: ${AWS_S3_ENDPOINT:http://localhost:9000}
+    media-bucket: ${AWS_S3_MEDIA_BUCKET:unihub-media}

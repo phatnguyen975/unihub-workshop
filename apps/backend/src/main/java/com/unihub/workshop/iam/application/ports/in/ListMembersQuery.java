@@ -9,7 +9,7 @@ public record ListMembersQuery(
     UUID callerId,
     UserRole role,
     Boolean isActive,
-    String search,
+    String q,
     String cursor,
     Integer size
 ) {
@@ -25,13 +25,13 @@ public record ListMembersQuery(
         } else if (size < 1 || size > 100) {
             throw new BadRequestException("size must be between 1 and 100");
         }
-        if (search != null) {
-            search = search.trim();
-            if (search.isEmpty()) {
-                search = null;
-            } else if (search.length() > 200) {
+        if (q != null) {
+            q = q.trim();
+            if (q.isEmpty()) {
+                q = null;
+            } else if (q.length() > 200) {
                 throw new BadRequestException(
-                    "search parameter cannot exceed 200 characters"
+                    "q parameter cannot exceed 200 characters"
                 );
             }
         }

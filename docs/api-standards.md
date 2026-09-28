@@ -11,9 +11,29 @@ We use URI path versioning (e.g., `/api/v1/...`) because it is explicit, cache-f
 > [!NOTE]
 > This document defines global API patterns. Endpoint-level schemas and examples are the source of truth in the live OpenAPI/Swagger spec at `/swagger-ui.html`.
 
-### Pagination & Filtering
+### Pagination, Search & Filtering
 
-All collection endpoints use cursor-based (keyset) pagination to guarantee stable `O(1)` performance at scale and prevent data drift under concurrent writes. Clients pass a `?cursor=` query parameter to fetch the next window and may pass `?size=` to control batch size (e.g., `?cursor=...&size=20`); filters remain optional query parameters. The backend must enforce a default page size (usually 20) and a strict hard-cap maximum (e.g., 100) to protect database performance from oversized requests.
+- **Pagination:** All collection endpoints use cursor-based (keyset) pagination to guarantee stable `O(1)` performance at scale and prevent data drift under concurrent writes. Clients pass a `?cursor=` query parameter to fetch the next window and may pass `?size=` to control batch size (e.g., `?cursor=...&size=20`). The backend must enforce a default page size (usually 20) and a strict hard-cap maximum (e.g., 100) to protect database performance from oversized requests. No alias parameter names (e.g., `limit`, `page`) are allowed.
+  - **Universal Keyset Cursor Format:** Keyset cursors are opaque Base64-encoded strings (with URL-safe decoding support) representing a universal, storage-agnostic JSON payload:
+    ```json
+    {
+      "id": "cdaa5550-c106-4412-b4d5-67f0f11c1494",
+      "sortField": "createdAt",
+      "primaryValue": "2026-09-29T03:00:00Z",
+      "secondaryValue": null
+    }
+    ```
+    - `id` (UUID, mandatory): Unique record identifier serving as the deterministic tie-breaker.
+    - `sortField` (string, mandatory): Name of the sorted attribute (e.g., `createdAt`, `startsAt`, `price`, `capacity`, `completedAt`). If a client changes sort parameters between pages while passing a cursor issued for another sort field, the backend strictly rejects the request with RFC 7807 `400 Bad Request` ("Cursor was issued for sort='...' but current request uses sort='...'").
+    - `primaryValue` (string, nullable): Serialized string value of the primary sorted attribute (e.g., ISO-8601 UTC timestamp, numeric decimal string, or null).
+    - `secondaryValue` (string, nullable): Serialized string value of the secondary tie-breaker attribute (typically `createdAt` ISO-8601 UTC timestamp, or null when sorting directly by `createdAt`).
+  - **NULLS LAST & Multi-Column Tie-Breaking Rules:**
+    - Any `NULL` value in the sorted attribute is strictly pushed to the end of the collection (`NULLS LAST`).
+    - When two items have identical or null primary sort values, they are deterministically broken first by secondary timestamp (`createdAt DESC` or `startsAt DESC` so the newest record appears first), and finally by `id DESC`.
+  - **Storage & Engine Agnostic:** The exact same cursor payload contract is shared between relational persistence (PostgreSQL JPA Criteria) and Elasticsearch CQRS search (`search_after: [primaryValue, secondaryValue, id]`), requiring no entity-specific or storage-specific coupling.
+- **Search (Free-text / Keyword):** Endpoints that support free-text or partial keyword matching across multiple attributes (e.g., title, name, description, email) MUST standardize on `?q={keyword}` (max 100 or 200 characters as declared in the feature spec). Parameter names like `search`, `keyword`, or `query` are prohibited.
+- **Structured Filtering:** Exact or structured property filters MUST use the specific field name (e.g., `?status=`, `?role=`, `?priceType=`, `?from=`, `?to=`).
+- **Sorting:** Endpoints that support sorting MUST use `?sort={field},{direction}` (e.g., `?sort=createdAt,desc`).
 
 ### CORS Policy (Web Portal)
 

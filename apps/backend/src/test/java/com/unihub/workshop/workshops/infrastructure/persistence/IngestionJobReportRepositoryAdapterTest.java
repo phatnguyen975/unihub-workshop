@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.unihub.workshop.WorkshopApplication;
 import com.unihub.workshop.shared.exception.BadRequestException;
-import com.unihub.workshop.workshops.domain.model.CursorPage;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.IngestionJobReportPersistenceMapperImpl;
 import java.nio.charset.StandardCharsets;

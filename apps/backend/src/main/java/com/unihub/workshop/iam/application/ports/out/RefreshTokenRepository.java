@@ -1,8 +1,8 @@
 package com.unihub.workshop.iam.application.ports.out;
 
 import com.unihub.workshop.iam.domain.model.ActiveSession;
-import com.unihub.workshop.iam.domain.model.CursorPage;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +18,7 @@ public interface RefreshTokenRepository {
     CursorPage<ActiveSession> findActiveSessions(
         UUID userId,
         String cursor,
-        int limit
+        int size
     );
 
     Optional<RefreshToken> findActiveSessionByIdAndUserId(

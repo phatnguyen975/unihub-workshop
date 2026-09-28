@@ -4,7 +4,5 @@ public record UpdateUserProfileCommand(
     String fullName,
     boolean hasFullName,
     String phoneNumber,
-    boolean hasPhoneNumber,
-    String avatarUrl,
-    boolean hasAvatarUrl
+    boolean hasPhoneNumber
 ) {}

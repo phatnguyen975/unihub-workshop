@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -305,6 +306,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "urn:unihub:error:service-unavailable";
         else if (httpStatus == HttpStatus.UNSUPPORTED_MEDIA_TYPE) type =
             "urn:unihub:error:unsupported-media-type";
+        else if (httpStatus == HttpStatus.CONTENT_TOO_LARGE) type =
+            "urn:unihub:error:content-too-large";
 
         ProblemDetail problem = createProblemDetail(
             httpStatus,
@@ -384,6 +387,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "urn:unihub:error:conflict",
             "Conflict",
             "A data conflict or unique constraint violation occurred.",
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ProblemDetail> handleOptimisticLockingFailure(
+        OptimisticLockingFailureException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problem = createProblemDetail(
+            HttpStatus.CONFLICT,
+            "urn:unihub:error:conflict",
+            "Conflict",
+            "A version conflict occurred. The resource has been modified by another transaction.",
             request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
