@@ -1,13 +1,11 @@
 package com.unihub.workshop.workshops.infrastructure.persistence;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ConflictException;
-import com.unihub.workshop.shared.exception.InternalServerException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
 import com.unihub.workshop.workshops.domain.model.Workshop;
@@ -21,16 +19,15 @@ import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -41,20 +38,37 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkshopRepositoryAdapter implements WorkshopRepository {
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+        "createdAt",
+        "startsAt",
+        "price",
+        "capacity"
+    );
+
     private final WorkshopJpaRepository repository;
     private final WorkshopSpeakerJpaRepository speakerRepository;
     private final WorkshopPersistenceMapper mapper;
     private final EntityManager entityManager;
-    private final ObjectMapper objectMapper = new ObjectMapper()
-        .registerModule(new JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
     @Transactional
     public Workshop save(Workshop workshop) {
         WorkshopJpaEntity entity = mapper.toEntity(workshop);
         try {
-            WorkshopJpaEntity saved = repository.saveAndFlush(entity);
+            boolean exists =
+                entity.getId() != null && repository.existsById(entity.getId());
+            WorkshopJpaEntity saved;
+            if (!exists) {
+                entity.setVersion(null);
+                entityManager.persist(entity);
+                entityManager.flush();
+                if (entity.getVersion() == null) {
+                    entity.setVersion(0);
+                }
+                saved = entity;
+            } else {
+                saved = repository.saveAndFlush(entity);
+            }
 
             if (workshop.speakers() != null) {
                 speakerRepository.deleteByWorkshopId(saved.getId());
@@ -197,7 +211,19 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             sortParts.length > 1 &&
             sortParts[1].trim().equalsIgnoreCase("desc");
 
-        AdminWorkshopCursor cursor = decodeCursor(query.cursor(), sortField);
+        if (!ALLOWED_SORT_FIELDS.contains(sortField)) {
+            throw new BadRequestException(
+                "Invalid sort field: '" +
+                    sortField +
+                    "'. Allowed sort fields: " +
+                    ALLOWED_SORT_FIELDS
+            );
+        }
+
+        KeysetCursor cursor = KeysetCursorCodec.decode(
+            query.cursor(),
+            sortField
+        );
 
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<WorkshopJpaEntity> cq = cb.createQuery(
@@ -216,23 +242,22 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         cq.where(predicates.toArray(new Predicate[0]));
 
         Path<?> sortPath = root.get(sortField);
-        if (isDesc) {
-            cq.orderBy(cb.desc(sortPath), cb.desc(root.get("id")));
-        } else {
-            cq.orderBy(cb.asc(sortPath), cb.asc(root.get("id")));
-        }
+        Path<Instant> createdAtPath = root.get("createdAt");
+        Path<UUID> idPath = root.get("id");
+        JpaKeysetPagination.applyOrders(
+            cb,
+            cq,
+            sortPath,
+            isDesc,
+            createdAtPath,
+            idPath
+        );
 
         int pageSize = query.size() != null ? query.size() : 20;
-        List<WorkshopJpaEntity> entities = entityManager
-            .createQuery(cq)
-            .setMaxResults(pageSize + 1)
-            .getResultList();
+        JpaKeysetPagination.KeysetSlice<WorkshopJpaEntity> slice =
+            JpaKeysetPagination.execute(entityManager, cq, pageSize);
 
-        boolean hasMore = entities.size() > pageSize;
-        List<WorkshopJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, pageSize)
-            : entities;
-
+        List<WorkshopJpaEntity> pageEntities = slice.items();
         Map<UUID, Integer> speakerCounts = fetchSpeakerCounts(pageEntities);
 
         List<WorkshopSummary> items = pageEntities
@@ -241,14 +266,14 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             .toList();
 
         String nextCursor = null;
-        if (hasMore && !pageEntities.isEmpty()) {
+        if (slice.hasMore() && !pageEntities.isEmpty()) {
             nextCursor = encodeCursor(
                 pageEntities.get(pageEntities.size() - 1),
                 sortField
             );
         }
 
-        return new CursorPage<>(items, nextCursor, hasMore);
+        return new CursorPage<>(items, nextCursor, slice.hasMore());
     }
 
     // -------------------------------------------------------------------------
@@ -261,7 +286,7 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         ListAdminWorkshopsQuery query,
         String sortField,
         boolean isDesc,
-        AdminWorkshopCursor cursor
+        KeysetCursor cursor
     ) {
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(
@@ -332,78 +357,54 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         Root<WorkshopJpaEntity> root,
         String sortField,
         boolean isDesc,
-        AdminWorkshopCursor cursor
+        KeysetCursor cursor
     ) {
         Path<UUID> idPath = root.get("id");
-        UUID cursorId = cursor.id();
+        Path<Instant> createdAtPath = root.get("createdAt");
+        Instant secondaryVal = cursor.asSecondaryInstant();
+
         return switch (sortField) {
-            case "price" -> buildKeysetBranch(
+            case "price" -> JpaKeysetPagination.buildKeysetPredicate(
                 cb,
                 root.get("price"),
-                cursor.price(),
+                cursor.asBigDecimal(),
+                isDesc,
+                createdAtPath,
+                secondaryVal,
                 idPath,
-                cursorId,
-                isDesc
+                cursor.id()
             );
-            case "capacity" -> buildKeysetBranch(
+            case "capacity" -> JpaKeysetPagination.buildKeysetPredicate(
                 cb,
                 root.get("capacity"),
-                cursor.capacity(),
+                cursor.asInteger(),
+                isDesc,
+                createdAtPath,
+                secondaryVal,
                 idPath,
-                cursorId,
-                isDesc
+                cursor.id()
             );
-            case "startsAt" -> buildKeysetBranch(
+            case "startsAt" -> JpaKeysetPagination.buildKeysetPredicate(
                 cb,
                 root.get("startsAt"),
-                cursor.startsAt(),
+                cursor.asInstant(),
+                isDesc,
+                createdAtPath,
+                secondaryVal,
                 idPath,
-                cursorId,
-                isDesc
+                cursor.id()
             );
-            default -> buildKeysetBranch(
+            default -> JpaKeysetPagination.buildKeysetPredicate(
                 cb,
-                root.get("createdAt"),
-                cursor.createdAt(),
+                createdAtPath,
+                cursor.asInstant(),
+                isDesc,
+                createdAtPath,
+                cursor.asInstant(),
                 idPath,
-                cursorId,
-                isDesc
+                cursor.id()
             );
         };
-    }
-
-    /**
-     * Builds a keyset (seek) predicate for one sort field, eliminating the
-     * duplicate if/else isDesc block that each switch case previously repeated.
-     *
-     * <p>For descending: {@code (field < val) OR (field = val AND id < cursorId)}
-     * <p>For ascending:  {@code (field > val) OR (field = val AND id > cursorId)}
-     */
-    private <T extends Comparable<? super T>> Predicate buildKeysetBranch(
-        CriteriaBuilder cb,
-        Path<T> fieldPath,
-        T cursorVal,
-        Path<UUID> idPath,
-        UUID cursorId,
-        boolean isDesc
-    ) {
-        if (isDesc) {
-            return cb.or(
-                cb.lessThan(fieldPath, cursorVal),
-                cb.and(
-                    cb.equal(fieldPath, cursorVal),
-                    cb.lessThan(idPath, cursorId)
-                )
-            );
-        } else {
-            return cb.or(
-                cb.greaterThan(fieldPath, cursorVal),
-                cb.and(
-                    cb.equal(fieldPath, cursorVal),
-                    cb.greaterThan(idPath, cursorId)
-                )
-            );
-        }
     }
 
     private Map<UUID, Integer> fetchSpeakerCounts(
@@ -448,137 +449,32 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         );
     }
 
-    /**
-     * Encodes the last item of the current page into a Base64 JSON cursor.
-     * The {@code sortField} is embedded in the token so that {@link #decodeCursor}
-     * can detect cursor/sort mismatches and emit a specific error message.
-     */
     private String encodeCursor(WorkshopJpaEntity entity, String sortField) {
-        AdminWorkshopCursor cursor = switch (sortField) {
-            case "price" -> new AdminWorkshopCursor(
-                entity.getId(),
-                sortField,
-                null,
-                null,
-                entity.getPrice(),
-                null
-            );
-            case "capacity" -> new AdminWorkshopCursor(
-                entity.getId(),
-                sortField,
-                null,
-                null,
-                null,
-                entity.getCapacity()
-            );
-            case "startsAt" -> new AdminWorkshopCursor(
-                entity.getId(),
-                sortField,
-                null,
-                entity.getStartsAt(),
-                null,
-                null
-            );
-            default -> new AdminWorkshopCursor(
-                entity.getId(),
-                sortField,
-                entity.getCreatedAt(),
-                null,
-                null,
-                null
-            );
+        String primaryVal = switch (sortField) {
+            case "price" -> entity.getPrice() != null
+                ? entity.getPrice().toString()
+                : null;
+            case "capacity" -> entity.getCapacity() != null
+                ? entity.getCapacity().toString()
+                : null;
+            case "startsAt" -> entity.getStartsAt() != null
+                ? entity.getStartsAt().toString()
+                : null;
+            default -> entity.getCreatedAt() != null
+                ? entity.getCreatedAt().toString()
+                : null;
         };
-        try {
-            String json = objectMapper.writeValueAsString(cursor);
-            return Base64.getEncoder().encodeToString(
-                json.getBytes(StandardCharsets.UTF_8)
-            );
-        } catch (Exception e) {
-            throw new InternalServerException(
-                "Failed to encode next cursor",
-                e
-            );
-        }
-    }
+        String secondaryVal =
+            entity.getCreatedAt() != null
+                ? entity.getCreatedAt().toString()
+                : null;
 
-    /**
-     * Decodes a Base64 JSON cursor string.
-     *
-     * <ul>
-     *   <li>Null/blank cursor → returns {@code null} (first-page request).</li>
-     *   <li>Structurally corrupt → {@link BadRequestException} with "Invalid cursor format".</li>
-     *   <li>Sort-field mismatch → {@link BadRequestException} with a clear mismatch message,
-     *       so callers can distinguish it from a malformed token.</li>
-     * </ul>
-     */
-    private AdminWorkshopCursor decodeCursor(
-        String cursorStr,
-        String sortField
-    ) {
-        if (cursorStr == null || cursorStr.isBlank()) {
-            return null;
-        }
-        try {
-            byte[] decodedBytes = Base64.getDecoder().decode(cursorStr.trim());
-            String json = new String(decodedBytes, StandardCharsets.UTF_8);
-            AdminWorkshopCursor cursor = objectMapper.readValue(
-                json,
-                AdminWorkshopCursor.class
-            );
-            if (cursor == null || cursor.id() == null) {
-                throw new BadRequestException("Invalid cursor format");
-            }
-            // If the token carries a sortField, use it for mismatch detection.
-            if (
-                cursor.sortField() != null &&
-                !cursor.sortField().equals(sortField)
-            ) {
-                throw new BadRequestException(
-                    "Cursor was issued for sort='" +
-                        cursor.sortField() +
-                        "' but the current request uses sort='" +
-                        sortField +
-                        "'. Discard the cursor and start from page 1."
-                );
-            }
-            // Validate that the expected sort value is present in the token.
-            switch (sortField) {
-                case "price" -> {
-                    if (cursor.price() == null) throw new BadRequestException(
-                        "Invalid cursor format"
-                    );
-                }
-                case "capacity" -> {
-                    if (
-                        cursor.capacity() == null
-                    ) throw new BadRequestException("Invalid cursor format");
-                }
-                case "startsAt" -> {
-                    if (
-                        cursor.startsAt() == null
-                    ) throw new BadRequestException("Invalid cursor format");
-                }
-                default -> {
-                    if (
-                        cursor.createdAt() == null
-                    ) throw new BadRequestException("Invalid cursor format");
-                }
-            }
-            return cursor;
-        } catch (BadRequestException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BadRequestException("Invalid cursor format");
-        }
+        KeysetCursor cursor = new KeysetCursor(
+            entity.getId(),
+            sortField,
+            primaryVal,
+            secondaryVal
+        );
+        return KeysetCursorCodec.encode(cursor);
     }
-
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    private record AdminWorkshopCursor(
-        UUID id,
-        String sortField,
-        Instant createdAt,
-        Instant startsAt,
-        BigDecimal price,
-        Integer capacity
-    ) {}
 }

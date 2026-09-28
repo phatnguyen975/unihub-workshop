@@ -1,24 +1,26 @@
 package com.unihub.workshop.iam.infrastructure.persistence;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.application.ports.out.RefreshTokenRepository;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
-import com.unihub.workshop.shared.exception.InternalServerException;
 import com.unihub.workshop.shared.pagination.CursorPage;
-import java.nio.charset.StandardCharsets;
+import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,9 +30,7 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
 
     private final RefreshTokenJpaRepository repository;
     private final RefreshTokenPersistenceMapper tokenMapper;
-    private final ObjectMapper objectMapper = new ObjectMapper()
-        .registerModule(new JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private final EntityManager entityManager;
 
     @Override
     @Transactional
@@ -52,88 +52,79 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public CursorPage<ActiveSession> findActiveSessions(
         UUID userId,
         String cursor,
         int size
     ) {
-        Instant cursorTime = null;
-        UUID cursorId = null;
-
-        if (cursor != null && !cursor.isBlank()) {
-            try {
-                String trimmedCursor = cursor.trim();
-                String decoded = new String(
-                    Base64.getDecoder().decode(trimmedCursor),
-                    StandardCharsets.UTF_8
-                );
-                SessionCursor cursorData = objectMapper.readValue(
-                    decoded,
-                    SessionCursor.class
-                );
-                if (
-                    cursorData == null ||
-                    cursorData.createdAt() == null ||
-                    cursorData.id() == null
-                ) {
-                    throw new BadRequestException("Invalid cursor format");
-                }
-                cursorTime = cursorData.createdAt();
-                cursorId = cursorData.id();
-            } catch (Exception e) {
-                if (e instanceof BadRequestException) {
-                    throw (BadRequestException) e;
-                }
-                throw new BadRequestException("Invalid cursor format");
-            }
+        KeysetCursor cursorData = KeysetCursorCodec.decode(cursor, "createdAt");
+        if (cursorData != null && cursorData.asInstant() == null) {
+            throw new BadRequestException("Invalid cursor format");
         }
 
         Instant now = Instant.now();
-        Pageable pageable = PageRequest.of(0, size + 1);
-        List<RefreshTokenJpaEntity> entities =
-            cursorTime == null
-                ? repository.findFirstPage(userId, now, pageable)
-                : repository.findNextPage(
-                      userId,
-                      now,
-                      cursorTime,
-                      cursorId,
-                      pageable
-                  );
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<RefreshTokenJpaEntity> cq = cb.createQuery(
+            RefreshTokenJpaEntity.class
+        );
+        Root<RefreshTokenJpaEntity> root = cq.from(RefreshTokenJpaEntity.class);
 
-        boolean hasMore = entities.size() > size;
-        List<RefreshTokenJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, size)
-            : entities;
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.equal(root.get("userId"), userId));
+        predicates.add(cb.isNull(root.get("revokedAt")));
+        predicates.add(cb.greaterThan(root.get("expiresAt"), now));
+
+        Path<Instant> createdAtPath = root.get("createdAt");
+        Path<UUID> idPath = root.get("id");
+
+        if (cursorData != null) {
+            predicates.add(
+                JpaKeysetPagination.buildKeysetPredicate(
+                    cb,
+                    createdAtPath,
+                    cursorData.asInstant(),
+                    true,
+                    createdAtPath,
+                    cursorData.asInstant(),
+                    idPath,
+                    cursorData.id()
+                )
+            );
+        }
+
+        cq.where(predicates.toArray(new Predicate[0]));
+        JpaKeysetPagination.applyOrders(
+            cb,
+            cq,
+            createdAtPath,
+            true,
+            null,
+            idPath
+        );
+
+        JpaKeysetPagination.KeysetSlice<RefreshTokenJpaEntity> slice =
+            JpaKeysetPagination.execute(entityManager, cq, size);
 
         List<ActiveSession> items = tokenMapper.toActiveSessionList(
-            pageEntities
+            slice.items()
         );
 
         String nextCursor = null;
-        if (hasMore && !pageEntities.isEmpty()) {
-            RefreshTokenJpaEntity lastItem = pageEntities.get(
-                pageEntities.size() - 1
+        if (slice.hasMore() && !slice.items().isEmpty()) {
+            RefreshTokenJpaEntity lastItem = slice
+                .items()
+                .get(slice.items().size() - 1);
+            nextCursor = KeysetCursorCodec.encode(
+                KeysetCursor.of(
+                    lastItem.getId(),
+                    "createdAt",
+                    lastItem.getCreatedAt().toString()
+                )
             );
-            try {
-                SessionCursor nextCursorData = new SessionCursor(
-                    lastItem.getCreatedAt(),
-                    lastItem.getId()
-                );
-                String json = objectMapper.writeValueAsString(nextCursorData);
-                nextCursor = Base64.getEncoder().encodeToString(
-                    json.getBytes(StandardCharsets.UTF_8)
-                );
-            } catch (Exception e) {
-                throw new InternalServerException(
-                    "Failed to encode next cursor",
-                    e
-                );
-            }
         }
 
-        return new CursorPage<>(items, nextCursor, hasMore);
+        return new CursorPage<>(items, nextCursor, slice.hasMore());
     }
 
     @Override
@@ -201,6 +192,4 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
             .map(tokenMapper::toDomain)
             .toList();
     }
-
-    private record SessionCursor(Instant createdAt, UUID id) {}
 }

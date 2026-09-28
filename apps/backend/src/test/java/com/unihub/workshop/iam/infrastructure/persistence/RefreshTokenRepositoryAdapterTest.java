@@ -5,14 +5,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.domain.model.ActiveSession;
 import com.unihub.workshop.iam.domain.model.RefreshToken;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapper;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.RefreshTokenPersistenceMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -20,22 +28,28 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.PageRequest;
 
 class RefreshTokenRepositoryAdapterTest {
 
     private RefreshTokenJpaRepository repository;
     private RefreshTokenPersistenceMapper tokenMapper;
+    private EntityManager entityManager;
     private RefreshTokenRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
         repository = mock(RefreshTokenJpaRepository.class);
         tokenMapper = new RefreshTokenPersistenceMapperImpl();
-        adapter = new RefreshTokenRepositoryAdapter(repository, tokenMapper);
+        entityManager = mock(EntityManager.class);
+        adapter = new RefreshTokenRepositoryAdapter(
+            repository,
+            tokenMapper,
+            entityManager
+        );
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldFindActiveSessions_withoutCursor_returnsItemsAndNextCursorWhenHasMore() {
         UUID userId = UUID.randomUUID();
         UUID id1 = UUID.randomUUID();
@@ -68,13 +82,39 @@ class RefreshTokenRepositoryAdapterTest {
             t3
         );
 
-        when(
-            repository.findFirstPage(
-                eq(userId),
-                any(Instant.class),
-                eq(PageRequest.of(0, 3))
-            )
-        ).thenReturn(List.of(e1, e2, e3));
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        CriteriaQuery<RefreshTokenJpaEntity> cq = mock(CriteriaQuery.class);
+        Root<RefreshTokenJpaEntity> root = mock(Root.class);
+        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock(TypedQuery.class);
+        Path<Object> userPath = mock(Path.class);
+        Path<Object> revokedPath = mock(Path.class);
+        Path<Instant> expiresPath = mock(Path.class);
+        Path<Instant> createdAtPath = mock(Path.class);
+        Path<UUID> idPath = mock(Path.class);
+
+        when(entityManager.getCriteriaBuilder()).thenReturn(cb);
+        when(cb.createQuery(RefreshTokenJpaEntity.class)).thenReturn(cq);
+        when(cq.from(RefreshTokenJpaEntity.class)).thenReturn(root);
+
+        lenient().when(root.get("userId")).thenReturn(userPath);
+        lenient().when(root.get("revokedAt")).thenReturn(revokedPath);
+        lenient().when(root.<Instant>get("expiresAt")).thenReturn(expiresPath);
+        lenient()
+            .when(root.<Instant>get("createdAt"))
+            .thenReturn(createdAtPath);
+        lenient().when(root.<UUID>get("id")).thenReturn(idPath);
+
+        lenient()
+            .when(cb.equal(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient().when(cb.isNull(any())).thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.greaterThan(any(), any(Instant.class)))
+            .thenReturn(mock(Predicate.class));
+
+        when(entityManager.createQuery(cq)).thenReturn(typedQuery);
+        when(typedQuery.setMaxResults(3)).thenReturn(typedQuery);
+        when(typedQuery.getResultList()).thenReturn(List.of(e1, e2, e3));
 
         CursorPage<ActiveSession> page = adapter.findActiveSessions(
             userId,
@@ -96,20 +136,14 @@ class RefreshTokenRepositoryAdapterTest {
     }
 
     @Test
-    void shouldFindActiveSessions_withValidCursor_decodesAndQueriesRepository()
-        throws Exception {
+    @SuppressWarnings("unchecked")
+    void shouldFindActiveSessions_withValidCursor_decodesAndQueriesRepository() {
         UUID userId = UUID.randomUUID();
         UUID cursorId = UUID.randomUUID();
         Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
 
-        ObjectMapper mapper = new ObjectMapper().registerModule(
-            new JavaTimeModule()
-        );
-        String cursorJson = mapper.writeValueAsString(
-            new SessionCursor(cursorTime, cursorId)
-        );
-        String cursor = Base64.getEncoder().encodeToString(
-            cursorJson.getBytes()
+        String cursor = KeysetCursorCodec.encode(
+            KeysetCursor.of(cursorId, "createdAt", cursorTime.toString())
         );
 
         UUID id3 = UUID.randomUUID();
@@ -122,15 +156,51 @@ class RefreshTokenRepositoryAdapterTest {
             t3
         );
 
-        when(
-            repository.findNextPage(
-                eq(userId),
-                any(Instant.class),
-                eq(cursorTime),
-                eq(cursorId),
-                eq(PageRequest.of(0, 3))
-            )
-        ).thenReturn(List.of(e3));
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        CriteriaQuery<RefreshTokenJpaEntity> cq = mock(CriteriaQuery.class);
+        Root<RefreshTokenJpaEntity> root = mock(Root.class);
+        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock(TypedQuery.class);
+        Path<Object> userPath = mock(Path.class);
+        Path<Object> revokedPath = mock(Path.class);
+        Path<Instant> expiresPath = mock(Path.class);
+        Path<Instant> createdAtPath = mock(Path.class);
+        Path<UUID> idPath = mock(Path.class);
+
+        when(entityManager.getCriteriaBuilder()).thenReturn(cb);
+        when(cb.createQuery(RefreshTokenJpaEntity.class)).thenReturn(cq);
+        when(cq.from(RefreshTokenJpaEntity.class)).thenReturn(root);
+
+        lenient().when(root.get("userId")).thenReturn(userPath);
+        lenient().when(root.get("revokedAt")).thenReturn(revokedPath);
+        lenient().when(root.<Instant>get("expiresAt")).thenReturn(expiresPath);
+        lenient()
+            .when(root.<Instant>get("createdAt"))
+            .thenReturn(createdAtPath);
+        lenient().when(root.<UUID>get("id")).thenReturn(idPath);
+
+        lenient()
+            .when(cb.equal(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient().when(cb.isNull(any())).thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.greaterThan(any(), any(Instant.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.and(any(Predicate.class), any(Predicate.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.or(any(Predicate.class), any(Predicate.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.lessThan(any(Expression.class), any(Instant.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.lessThan(any(Expression.class), any(UUID.class)))
+            .thenReturn(mock(Predicate.class));
+
+        when(entityManager.createQuery(cq)).thenReturn(typedQuery);
+        when(typedQuery.setMaxResults(3)).thenReturn(typedQuery);
+        when(typedQuery.getResultList()).thenReturn(List.of(e3));
 
         CursorPage<ActiveSession> page = adapter.findActiveSessions(
             userId,
@@ -174,22 +244,16 @@ class RefreshTokenRepositoryAdapterTest {
     }
 
     @Test
-    void shouldFindActiveSessions_withWhitespacePaddedCursor_trimsAndSucceeds()
-        throws Exception {
+    @SuppressWarnings("unchecked")
+    void shouldFindActiveSessions_withWhitespacePaddedCursor_trimsAndSucceeds() {
         UUID userId = UUID.randomUUID();
         UUID cursorId = UUID.randomUUID();
         Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
 
-        ObjectMapper mapper = new ObjectMapper().registerModule(
-            new JavaTimeModule()
+        String cursorJson = KeysetCursorCodec.encode(
+            KeysetCursor.of(cursorId, "createdAt", cursorTime.toString())
         );
-        String cursorJson = mapper.writeValueAsString(
-            new SessionCursor(cursorTime, cursorId)
-        );
-        String cursor =
-            "   " +
-            Base64.getEncoder().encodeToString(cursorJson.getBytes()) +
-            "   ";
+        String cursor = "   " + cursorJson + "   ";
 
         UUID id = UUID.randomUUID();
         RefreshTokenJpaEntity entity = createEntity(
@@ -200,15 +264,51 @@ class RefreshTokenRepositoryAdapterTest {
             Instant.parse("2026-09-04T08:00:00Z")
         );
 
-        when(
-            repository.findNextPage(
-                eq(userId),
-                any(Instant.class),
-                eq(cursorTime),
-                eq(cursorId),
-                eq(PageRequest.of(0, 3))
-            )
-        ).thenReturn(List.of(entity));
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        CriteriaQuery<RefreshTokenJpaEntity> cq = mock(CriteriaQuery.class);
+        Root<RefreshTokenJpaEntity> root = mock(Root.class);
+        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock(TypedQuery.class);
+        Path<Object> userPath = mock(Path.class);
+        Path<Object> revokedPath = mock(Path.class);
+        Path<Instant> expiresPath = mock(Path.class);
+        Path<Instant> createdAtPath = mock(Path.class);
+        Path<UUID> idPath = mock(Path.class);
+
+        when(entityManager.getCriteriaBuilder()).thenReturn(cb);
+        when(cb.createQuery(RefreshTokenJpaEntity.class)).thenReturn(cq);
+        when(cq.from(RefreshTokenJpaEntity.class)).thenReturn(root);
+
+        lenient().when(root.get("userId")).thenReturn(userPath);
+        lenient().when(root.get("revokedAt")).thenReturn(revokedPath);
+        lenient().when(root.<Instant>get("expiresAt")).thenReturn(expiresPath);
+        lenient()
+            .when(root.<Instant>get("createdAt"))
+            .thenReturn(createdAtPath);
+        lenient().when(root.<UUID>get("id")).thenReturn(idPath);
+
+        lenient()
+            .when(cb.equal(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient().when(cb.isNull(any())).thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.greaterThan(any(), any(Instant.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.and(any(Predicate.class), any(Predicate.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.or(any(Predicate.class), any(Predicate.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.lessThan(any(Expression.class), any(Instant.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.lessThan(any(Expression.class), any(UUID.class)))
+            .thenReturn(mock(Predicate.class));
+
+        when(entityManager.createQuery(cq)).thenReturn(typedQuery);
+        when(typedQuery.setMaxResults(3)).thenReturn(typedQuery);
+        when(typedQuery.getResultList()).thenReturn(List.of(entity));
 
         CursorPage<ActiveSession> page = adapter.findActiveSessions(
             userId,
@@ -352,6 +452,4 @@ class RefreshTokenRepositoryAdapterTest {
         entity.setRevokedAt(null);
         return entity;
     }
-
-    private record SessionCursor(Instant createdAt, UUID id) {}
 }

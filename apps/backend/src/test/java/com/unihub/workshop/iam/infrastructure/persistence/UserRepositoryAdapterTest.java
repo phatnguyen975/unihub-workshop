@@ -6,34 +6,47 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.PageRequest;
 
 class UserRepositoryAdapterTest {
 
     private final UserPersistenceMapper userMapper =
         new UserPersistenceMapperImpl();
+    private UserJpaRepository jpaRepo;
+    private EntityManager entityManager;
+    private UserRepositoryAdapter adapter;
+
+    @BeforeEach
+    void setUp() {
+        jpaRepo = mock(UserJpaRepository.class);
+        entityManager = mock(EntityManager.class);
+        adapter = new UserRepositoryAdapter(jpaRepo, userMapper, entityManager);
+    }
 
     @Test
     void shouldFindUserByEmail() {
-        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
-            jpaRepo,
-            userMapper
-        );
-
         UUID userId = UUID.randomUUID();
         UserJpaEntity entity = new UserJpaEntity();
         entity.setId(userId);
@@ -58,12 +71,6 @@ class UserRepositoryAdapterTest {
 
     @Test
     void shouldFindByIdAndOrganizationId() {
-        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
-            jpaRepo,
-            userMapper
-        );
-
         UUID userId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
         UserJpaEntity entity = new UserJpaEntity();
@@ -93,12 +100,6 @@ class UserRepositoryAdapterTest {
 
     @Test
     void shouldActivateUser() {
-        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
-            jpaRepo,
-            userMapper
-        );
-
         UUID userId = UUID.randomUUID();
         adapter.activate(userId);
 
@@ -106,13 +107,8 @@ class UserRepositoryAdapterTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldFindMembersByOrganizationId_withoutCursor_returnsItemsAndNextCursorWhenHasMore() {
-        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
-            jpaRepo,
-            userMapper
-        );
-
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
         UUID id1 = UUID.randomUUID();
@@ -145,16 +141,31 @@ class UserRepositoryAdapterTest {
             t3
         );
 
-        when(
-            jpaRepo.findFirstPage(
-                eq(orgId),
-                eq(callerId),
-                isNull(),
-                isNull(),
-                isNull(),
-                eq(PageRequest.of(0, 3))
-            )
-        ).thenReturn(List.of(e1, e2, e3));
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        CriteriaQuery<UserJpaEntity> cq = mock(CriteriaQuery.class);
+        Root<UserJpaEntity> root = mock(Root.class);
+        TypedQuery<UserJpaEntity> typedQuery = mock(TypedQuery.class);
+        Path<Object> orgPath = mock(Path.class);
+        Path<Object> idPath = mock(Path.class);
+        Path<Object> createdAtPath = mock(Path.class);
+
+        when(entityManager.getCriteriaBuilder()).thenReturn(cb);
+        when(cb.createQuery(UserJpaEntity.class)).thenReturn(cq);
+        when(cq.from(UserJpaEntity.class)).thenReturn(root);
+
+        lenient().when(root.get("organizationId")).thenReturn(orgPath);
+        lenient().when(root.get("id")).thenReturn(idPath);
+        lenient().when(root.get("createdAt")).thenReturn(createdAtPath);
+        lenient()
+            .when(cb.equal(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.notEqual(any(), any()))
+            .thenReturn(mock(Predicate.class));
+
+        when(entityManager.createQuery(cq)).thenReturn(typedQuery);
+        when(typedQuery.setMaxResults(3)).thenReturn(typedQuery);
+        when(typedQuery.getResultList()).thenReturn(List.of(e1, e2, e3));
 
         CursorPage<User> page = adapter.findMembersByOrganizationId(
             orgId,
@@ -173,33 +184,21 @@ class UserRepositoryAdapterTest {
         assertThat(page.nextCursor()).isNotNull();
 
         String decoded = new String(
-            java.util.Base64.getDecoder().decode(page.nextCursor())
+            Base64.getDecoder().decode(page.nextCursor())
         );
         assertThat(decoded).contains(id2.toString());
     }
 
     @Test
-    void shouldFindMembersByOrganizationId_withValidCursor_decodesAndQueriesRepository()
-        throws Exception {
-        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
-            jpaRepo,
-            userMapper
-        );
-
+    @SuppressWarnings("unchecked")
+    void shouldFindMembersByOrganizationId_withValidCursor_decodesAndQueriesRepository() {
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
         UUID cursorId = UUID.randomUUID();
         Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
 
-        ObjectMapper mapper = new ObjectMapper().registerModule(
-            new JavaTimeModule()
-        );
-        String cursorJson = mapper.writeValueAsString(
-            new UserCursor(cursorTime, cursorId)
-        );
-        String cursor = java.util.Base64.getEncoder().encodeToString(
-            cursorJson.getBytes()
+        String cursor = KeysetCursorCodec.encode(
+            KeysetCursor.of(cursorId, "createdAt", cursorTime.toString())
         );
 
         UUID id3 = UUID.randomUUID();
@@ -212,18 +211,62 @@ class UserRepositoryAdapterTest {
             t3
         );
 
-        when(
-            jpaRepo.findNextPage(
-                eq(orgId),
-                eq(callerId),
-                eq("STAFF"),
-                eq(true),
-                eq("staff"),
-                eq(cursorTime),
-                eq(cursorId),
-                eq(PageRequest.of(0, 3))
-            )
-        ).thenReturn(List.of(e3));
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        CriteriaQuery<UserJpaEntity> cq = mock(CriteriaQuery.class);
+        Root<UserJpaEntity> root = mock(Root.class);
+        TypedQuery<UserJpaEntity> typedQuery = mock(TypedQuery.class);
+        Path<Object> orgPath = mock(Path.class);
+        Path<Object> idPath = mock(Path.class);
+        Path<Object> createdAtPath = mock(Path.class);
+        Path<Object> rolePath = mock(Path.class);
+        Path<Object> activePath = mock(Path.class);
+        Path<String> fullNamePath = mock(Path.class);
+        Path<String> emailPath = mock(Path.class);
+        Path<String> phonePath = mock(Path.class);
+
+        when(entityManager.getCriteriaBuilder()).thenReturn(cb);
+        when(cb.createQuery(UserJpaEntity.class)).thenReturn(cq);
+        when(cq.from(UserJpaEntity.class)).thenReturn(root);
+
+        lenient().when(root.get("organizationId")).thenReturn(orgPath);
+        lenient().when(root.get("id")).thenReturn(idPath);
+        lenient().when(root.get("createdAt")).thenReturn(createdAtPath);
+        lenient().when(root.get("role")).thenReturn(rolePath);
+        lenient().when(root.get("isActive")).thenReturn(activePath);
+        lenient().when(root.<String>get("fullName")).thenReturn(fullNamePath);
+        lenient().when(root.<String>get("email")).thenReturn(emailPath);
+        lenient().when(root.<String>get("phoneNumber")).thenReturn(phonePath);
+
+        lenient()
+            .when(cb.equal(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.notEqual(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.like(any(), anyString(), anyChar()))
+            .thenReturn(mock(Predicate.class));
+        lenient().when(cb.lower(any())).thenReturn(mock(Expression.class));
+        lenient().when(cb.isNotNull(any())).thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.and(any(Predicate.class), any(Predicate.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.or(any(Predicate.class), any(Predicate.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.or(any(Predicate[].class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.lessThan(any(Expression.class), any(Instant.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.lessThan(any(Expression.class), any(UUID.class)))
+            .thenReturn(mock(Predicate.class));
+
+        when(entityManager.createQuery(cq)).thenReturn(typedQuery);
+        when(typedQuery.setMaxResults(3)).thenReturn(typedQuery);
+        when(typedQuery.getResultList()).thenReturn(List.of(e3));
 
         CursorPage<User> page = adapter.findMembersByOrganizationId(
             orgId,
@@ -243,12 +286,6 @@ class UserRepositoryAdapterTest {
 
     @Test
     void shouldThrowBadRequestException_whenCursorIsMalformed() {
-        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
-            jpaRepo,
-            userMapper
-        );
-
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
 
@@ -268,28 +305,57 @@ class UserRepositoryAdapterTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldFindMembersByOrganizationId_escapesWildcardCharactersInSearch() {
-        UserJpaRepository jpaRepo = mock(UserJpaRepository.class);
-        UserRepositoryAdapter adapter = new UserRepositoryAdapter(
-            jpaRepo,
-            userMapper
-        );
-
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
 
-        when(
-            jpaRepo.findFirstPage(
-                eq(orgId),
-                eq(callerId),
-                isNull(),
-                isNull(),
-                eq("100\\%\\_test\\\\user"),
-                eq(PageRequest.of(0, 21))
-            )
-        ).thenReturn(List.of());
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        CriteriaQuery<UserJpaEntity> cq = mock(CriteriaQuery.class);
+        Root<UserJpaEntity> root = mock(Root.class);
+        TypedQuery<UserJpaEntity> typedQuery = mock(TypedQuery.class);
 
-        adapter.findMembersByOrganizationId(
+        when(entityManager.getCriteriaBuilder()).thenReturn(cb);
+        when(cb.createQuery(UserJpaEntity.class)).thenReturn(cq);
+        when(cq.from(UserJpaEntity.class)).thenReturn(root);
+
+        Path<Object> orgPath = mock(Path.class);
+        Path<Object> idPath = mock(Path.class);
+        Path<Object> createdAtPath = mock(Path.class);
+        Path<String> fullNamePath = mock(Path.class);
+        Path<String> emailPath = mock(Path.class);
+        Path<String> phonePath = mock(Path.class);
+
+        lenient().when(root.get("organizationId")).thenReturn(orgPath);
+        lenient().when(root.get("id")).thenReturn(idPath);
+        lenient().when(root.get("createdAt")).thenReturn(createdAtPath);
+        lenient().when(root.<String>get("fullName")).thenReturn(fullNamePath);
+        lenient().when(root.<String>get("email")).thenReturn(emailPath);
+        lenient().when(root.<String>get("phoneNumber")).thenReturn(phonePath);
+
+        lenient()
+            .when(cb.equal(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.notEqual(any(), any()))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.like(any(), anyString(), anyChar()))
+            .thenReturn(mock(Predicate.class));
+        lenient().when(cb.lower(any())).thenReturn(mock(Expression.class));
+        lenient().when(cb.isNotNull(any())).thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.and(any(Predicate.class), any(Predicate.class)))
+            .thenReturn(mock(Predicate.class));
+        lenient()
+            .when(cb.or(any(Predicate[].class)))
+            .thenReturn(mock(Predicate.class));
+
+        when(entityManager.createQuery(cq)).thenReturn(typedQuery);
+        when(typedQuery.setMaxResults(21)).thenReturn(typedQuery);
+        when(typedQuery.getResultList()).thenReturn(List.of());
+
+        CursorPage<User> page = adapter.findMembersByOrganizationId(
             orgId,
             callerId,
             null,
@@ -299,13 +365,11 @@ class UserRepositoryAdapterTest {
             20
         );
 
-        verify(jpaRepo).findFirstPage(
-            eq(orgId),
-            eq(callerId),
-            isNull(),
-            isNull(),
-            eq("100\\%\\_test\\\\user"),
-            eq(PageRequest.of(0, 21))
+        assertThat(page.items()).isEmpty();
+        verify(cb, times(3)).like(
+            any(),
+            eq("%100\\%\\_test\\\\user%"),
+            eq('\\')
         );
     }
 
@@ -329,6 +393,4 @@ class UserRepositoryAdapterTest {
         entity.setUpdatedAt(createdAt);
         return entity;
     }
-
-    private record UserCursor(Instant createdAt, UUID id) {}
 }

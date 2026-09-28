@@ -276,7 +276,7 @@ class WorkshopRepositoryAdapterListTest {
         Instant cursorCreatedAt = Instant.parse("2026-09-20T10:00:00Z");
         UUID cursorId = UUID.randomUUID();
         String cursorJson = String.format(
-            "{\"id\":\"%s\",\"sortField\":\"createdAt\",\"createdAt\":\"%s\"}",
+            "{\"id\":\"%s\",\"sortField\":\"createdAt\",\"primaryValue\":\"%s\"}",
             cursorId,
             cursorCreatedAt
         );
@@ -386,7 +386,7 @@ class WorkshopRepositoryAdapterListTest {
         // Cursor issued for sort=capacity,desc
         UUID cursorId = UUID.randomUUID();
         String cursorJson = String.format(
-            "{\"id\":\"%s\",\"sortField\":\"capacity\",\"capacity\":50}",
+            "{\"id\":\"%s\",\"sortField\":\"capacity\",\"primaryValue\":\"50\"}",
             cursorId
         );
         String encodedCursor = Base64.getEncoder().encodeToString(

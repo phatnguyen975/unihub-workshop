@@ -1,22 +1,25 @@
 package com.unihub.workshop.workshops.infrastructure.persistence;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.out.IngestionJobReportRepository;
 import com.unihub.workshop.workshops.domain.model.IngestionJobReport;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.IngestionJobReportPersistenceMapper;
-import java.nio.charset.StandardCharsets;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,9 +31,7 @@ public class IngestionJobReportRepositoryAdapter
 
     private final IngestionJobReportJpaRepository repository;
     private final IngestionJobReportPersistenceMapper mapper;
-    private final ObjectMapper objectMapper = new ObjectMapper()
-        .registerModule(new JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private final EntityManager entityManager;
 
     @Override
     @Transactional(readOnly = true)
@@ -39,75 +40,73 @@ public class IngestionJobReportRepositoryAdapter
         String cursor,
         int size
     ) {
-        Instant cursorTime = null;
-        UUID cursorId = null;
-
-        if (cursor != null && !cursor.isBlank()) {
-            try {
-                String trimmedCursor = cursor.trim();
-                String decoded = new String(
-                    Base64.getDecoder().decode(trimmedCursor),
-                    StandardCharsets.UTF_8
-                );
-                IngestionJobCursor cursorData = objectMapper.readValue(
-                    decoded,
-                    IngestionJobCursor.class
-                );
-                if (
-                    cursorData == null ||
-                    cursorData.completedAt() == null ||
-                    cursorData.id() == null
-                ) {
-                    throw new BadRequestException("Invalid cursor format");
-                }
-                cursorTime = cursorData.completedAt();
-                cursorId = cursorData.id();
-            } catch (Exception e) {
-                if (e instanceof BadRequestException) {
-                    throw (BadRequestException) e;
-                }
-                throw new BadRequestException("Invalid cursor format");
-            }
+        KeysetCursor cursorData = KeysetCursorCodec.decode(
+            cursor,
+            "completedAt"
+        );
+        if (cursorData != null && cursorData.asInstant() == null) {
+            throw new BadRequestException("Invalid cursor format");
         }
 
-        Pageable pageable = PageRequest.of(0, size + 1);
-        List<IngestionJobReportJpaEntity> entities =
-            cursorTime == null
-                ? repository.findFirstPage(organizationId, pageable)
-                : repository.findNextPage(
-                      organizationId,
-                      cursorTime,
-                      cursorId,
-                      pageable
-                  );
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<IngestionJobReportJpaEntity> cq = cb.createQuery(
+            IngestionJobReportJpaEntity.class
+        );
+        Root<IngestionJobReportJpaEntity> root = cq.from(
+            IngestionJobReportJpaEntity.class
+        );
 
-        boolean hasMore = entities.size() > size;
-        List<IngestionJobReportJpaEntity> pageEntities = hasMore
-            ? entities.subList(0, size)
-            : entities;
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.equal(root.get("organizationId"), organizationId));
 
-        List<IngestionJobReport> items = mapper.toDomainList(pageEntities);
+        Path<Instant> completedAtPath = root.get("completedAt");
+        Path<UUID> idPath = root.get("id");
+
+        if (cursorData != null) {
+            predicates.add(
+                JpaKeysetPagination.buildKeysetPredicate(
+                    cb,
+                    completedAtPath,
+                    cursorData.asInstant(),
+                    true,
+                    completedAtPath,
+                    cursorData.asInstant(),
+                    idPath,
+                    cursorData.id()
+                )
+            );
+        }
+
+        cq.where(predicates.toArray(new Predicate[0]));
+        JpaKeysetPagination.applyOrders(
+            cb,
+            cq,
+            completedAtPath,
+            true,
+            null,
+            idPath
+        );
+
+        JpaKeysetPagination.KeysetSlice<IngestionJobReportJpaEntity> slice =
+            JpaKeysetPagination.execute(entityManager, cq, size);
+
+        List<IngestionJobReport> items = mapper.toDomainList(slice.items());
 
         String nextCursor = null;
-        if (hasMore && !pageEntities.isEmpty()) {
-            IngestionJobReportJpaEntity lastItem = pageEntities.get(
-                pageEntities.size() - 1
+        if (slice.hasMore() && !slice.items().isEmpty()) {
+            IngestionJobReportJpaEntity lastItem = slice
+                .items()
+                .get(slice.items().size() - 1);
+            nextCursor = KeysetCursorCodec.encode(
+                KeysetCursor.of(
+                    lastItem.getId(),
+                    "completedAt",
+                    lastItem.getCompletedAt().toString()
+                )
             );
-            try {
-                IngestionJobCursor nextCursorData = new IngestionJobCursor(
-                    lastItem.getCompletedAt(),
-                    lastItem.getId()
-                );
-                String json = objectMapper.writeValueAsString(nextCursorData);
-                nextCursor = Base64.getEncoder().encodeToString(
-                    json.getBytes(StandardCharsets.UTF_8)
-                );
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to encode next cursor", e);
-            }
         }
 
-        return new CursorPage<>(items, nextCursor, hasMore);
+        return new CursorPage<>(items, nextCursor, slice.hasMore());
     }
 
     @Override
@@ -120,6 +119,4 @@ public class IngestionJobReportRepositoryAdapter
             .findByIdAndOrganizationId(id, organizationId)
             .map(mapper::toDomain);
     }
-
-    private record IngestionJobCursor(Instant completedAt, UUID id) {}
 }

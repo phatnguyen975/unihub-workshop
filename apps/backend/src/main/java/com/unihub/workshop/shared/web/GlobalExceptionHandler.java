@@ -306,6 +306,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "urn:unihub:error:service-unavailable";
         else if (httpStatus == HttpStatus.UNSUPPORTED_MEDIA_TYPE) type =
             "urn:unihub:error:unsupported-media-type";
+        else if (httpStatus == HttpStatus.CONTENT_TOO_LARGE) type =
+            "urn:unihub:error:content-too-large";
 
         ProblemDetail problem = createProblemDetail(
             httpStatus,

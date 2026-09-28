@@ -85,6 +85,7 @@ class WorkshopRepositoryAdapterSpeakerTest {
             .build();
 
         WorkshopJpaEntity entity = mapper.toEntity(workshop);
+        when(workshopJpaRepository.existsById(workshopId)).thenReturn(true);
         when(
             workshopJpaRepository.saveAndFlush(any(WorkshopJpaEntity.class))
         ).thenReturn(entity);
@@ -100,6 +101,38 @@ class WorkshopRepositoryAdapterSpeakerTest {
         verify(speakerJpaRepository).saveAllAndFlush(anyList());
         assertThat(result.speakers()).hasSize(1);
         assertThat(result.speakers().get(0).name()).isEqualTo("Alice");
+    }
+
+    @Test
+    @DisplayName("save persists new workshop when not exists in db")
+    void shouldPersistNewWorkshop() {
+        UUID workshopId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        Workshop workshop = Workshop.builder()
+            .id(workshopId)
+            .organizationId(UUID.randomUUID())
+            .title("New Workshop")
+            .slug("new-workshop")
+            .timezone("Asia/Ho_Chi_Minh")
+            .price(BigDecimal.ZERO)
+            .currency("USD")
+            .status(WorkshopStatus.DRAFT)
+            .version(0)
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .createdBy(userId)
+            .updatedBy(userId)
+            .speakers(List.of())
+            .build();
+
+        when(workshopJpaRepository.existsById(workshopId)).thenReturn(false);
+
+        Workshop result = adapter.save(workshop);
+
+        verify(entityManager).persist(any(WorkshopJpaEntity.class));
+        verify(entityManager).flush();
+        assertThat(result.id()).isEqualTo(workshopId);
     }
 
     @Test

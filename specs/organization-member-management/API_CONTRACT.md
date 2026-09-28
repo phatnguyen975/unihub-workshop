@@ -45,13 +45,13 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 **Query Parameters:**
 
-| Parameter  | Type    | Required | Default | Constraints                                  | Description                                                                  |
-| :--------- | :------ | :------: | :-----: | :------------------------------------------- | :--------------------------------------------------------------------------- |
-| `cursor`   | string  |    No    |  none   | Base64 JSON `{"createdAt":"...","id":"..."}` | Opaque cursor returned from previous page. Absent on initial request.        |
-| `size`     | integer |    No    |   20    | Min: 1, Max: 100                             | Number of items per page. Defaults to 20 if omitted.                         |
-| `role`     | string  |    No    |  none   | Enum: `ORGANIZER`, `STAFF`, `STUDENT`        | Filters members by platform role. Case-insensitive.                          |
-| `isActive` | boolean |    No    |  none   | `true` or `false`                            | Filters members by active/banned status.                                     |
-| `q`        | string  |    No    |  none   | Max 200 characters                           | Partial keyword match against `fullName`, `email`, or `phoneNumber` (ILIKE). |
+| Parameter  | Type    | Required | Default | Constraints                                                             | Description                                                                  |
+| :--------- | :------ | :------: | :-----: | :---------------------------------------------------------------------- | :--------------------------------------------------------------------------- |
+| `cursor`   | string  |    No    |  none   | Base64 JSON `{"id":"...","sortField":"createdAt","primaryValue":"..."}` | Opaque keyset cursor returned from previous page. Absent on initial request. |
+| `size`     | integer |    No    |   20    | Min: 1, Max: 100                                                        | Number of items per page. Defaults to 20 if omitted.                         |
+| `role`     | string  |    No    |  none   | Enum: `ORGANIZER`, `STAFF`, `STUDENT`                                   | Filters members by platform role. Case-insensitive.                          |
+| `isActive` | boolean |    No    |  none   | `true` or `false`                                                       | Filters members by active/banned status.                                     |
+| `q`        | string  |    No    |  none   | Max 200 characters                                                      | Partial keyword match against `fullName`, `email`, or `phoneNumber` (ILIKE). |
 
 #### Response
 

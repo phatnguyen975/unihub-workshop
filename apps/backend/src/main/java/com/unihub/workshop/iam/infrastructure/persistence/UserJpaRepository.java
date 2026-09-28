@@ -1,10 +1,8 @@
 package com.unihub.workshop.iam.infrastructure.persistence;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -70,61 +68,5 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
         @Param("id") UUID id,
         @Param("newPasswordHash") String newPasswordHash,
         @Param("now") Instant now
-    );
-
-    @Query(
-        """
-        SELECT u FROM UserJpaEntity u
-        WHERE u.organizationId = :organizationId
-            AND u.id != :callerId
-            AND (:role IS NULL OR u.role = :role)
-            AND (:isActive IS NULL OR u.isActive = :isActive)
-            AND (
-                :q IS NULL OR :q = ''
-                OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
-                OR LOWER(u.email) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
-                OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\')
-            )
-        ORDER BY u.createdAt DESC, u.id DESC
-        """
-    )
-    List<UserJpaEntity> findFirstPage(
-        @Param("organizationId") UUID organizationId,
-        @Param("callerId") UUID callerId,
-        @Param("role") String role,
-        @Param("isActive") Boolean isActive,
-        @Param("q") String q,
-        Pageable pageable
-    );
-
-    @Query(
-        """
-        SELECT u FROM UserJpaEntity u
-        WHERE u.organizationId = :organizationId
-            AND u.id != :callerId
-            AND (:role IS NULL OR u.role = :role)
-            AND (:isActive IS NULL OR u.isActive = :isActive)
-            AND (
-                :q IS NULL OR :q = ''
-                OR LOWER(u.fullName) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
-                OR LOWER(u.email) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\'
-                OR (u.phoneNumber IS NOT NULL AND LOWER(u.phoneNumber) LIKE CONCAT('%', LOWER(:q), '%') ESCAPE '\\')
-            )
-            AND (
-                u.createdAt < :cursorTime
-                OR (u.createdAt = :cursorTime AND u.id < :cursorId)
-            )
-        ORDER BY u.createdAt DESC, u.id DESC
-        """
-    )
-    List<UserJpaEntity> findNextPage(
-        @Param("organizationId") UUID organizationId,
-        @Param("callerId") UUID callerId,
-        @Param("role") String role,
-        @Param("isActive") Boolean isActive,
-        @Param("q") String q,
-        @Param("cursorTime") Instant cursorTime,
-        @Param("cursorId") UUID cursorId,
-        Pageable pageable
     );
 }

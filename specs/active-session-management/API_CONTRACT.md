@@ -38,10 +38,10 @@ This contract specifies the HTTP REST interface for the **Active Session Managem
 
 **Query Parameters:**
 
-| Parameter | Type    | Required | Default | Description                                                                                                                                       |
-| :-------- | :------ | :------: | :-----: | :------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cursor`  | String  |    No    | `null`  | Base64-encoded keyset cursor string representing `{ "createdAt": "...", "id": "..." }`. Leading and trailing whitespace is automatically trimmed. |
-| `size`    | Integer |    No    |  `20`   | Requested page size. Must be an integer between 1 and 100 inclusive.                                                                              |
+| Parameter | Type    | Required | Default | Description                                                                                                                                                                    |
+| :-------- | :------ | :------: | :-----: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor`  | String  |    No    | `null`  | Base64-encoded keyset cursor string representing `{ "id": "...", "sortField": "createdAt", "primaryValue": "..." }`. Leading and trailing whitespace is automatically trimmed. |
+| `size`    | Integer |    No    |  `20`   | Requested page size. Must be an integer between 1 and 100 inclusive.                                                                                                           |
 
 **Request Body:** None.
 
