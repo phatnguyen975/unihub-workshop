@@ -213,6 +213,19 @@ public class UserRepositoryAdapter implements UserRepository {
         return new CursorPage<>(items, nextCursor, slice.hasMore());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findAllById(java.util.Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return repository
+            .findAllById(ids)
+            .stream()
+            .map(userMapper::toDomain)
+            .toList();
+    }
+
     private String sanitizeQuery(String query) {
         if (query == null) {
             return null;

@@ -3,9 +3,11 @@ package com.unihub.workshop.workshops.presentation.mapper;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
+import com.unihub.workshop.workshops.domain.model.AssignedStaff;
 import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
+import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerResponse;
@@ -27,6 +29,14 @@ public interface WorkshopPresentationMapper {
         CursorPage<WorkshopSummary> page
     ) {
         return PageResponse.from(page, this::toSummaryResponse);
+    }
+
+    AssignedStaffItemResponse toAssignedStaffItemResponse(AssignedStaff domain);
+
+    default PageResponse<AssignedStaffItemResponse> toAssignedStaffPageResponse(
+        CursorPage<AssignedStaff> page
+    ) {
+        return PageResponse.from(page, this::toAssignedStaffItemResponse);
     }
 
     @Mapping(target = "id", source = "request.id")

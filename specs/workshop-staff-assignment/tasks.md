@@ -21,15 +21,16 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
 
 ### Phase 1: Read Capabilities & Shared Foundation
 
-- [ ] **T1 — Organizer can list all staff currently assigned to a workshop (across any workshop status)**
+- [x] **T1 — Organizer can list all staff currently assigned to a workshop (across any workshop status)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application (port + use case), Infrastructure (migration, JPA entity, repository adapter, IamApi facade), Presentation (controller, DTOs, mapper)
   - **Files:**
-    - `apps/backend/src/main/resources/db/migration/V3__add_workshop_assignments.sql`
+    - `apps/backend/src/main/resources/db/migration/V1__init_schema.sql` _(updated with keyset pagination index)_
     - `apps/backend/src/main/java/com/unihub/workshop/iam/api/IamApi.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/iam/api/package-info.java` _(new)_
-    - `apps/backend/src/main/java/com/unihub/workshop/iam/api/dto/StaffUserDto.java` _(new — userId, fullName, email, avatarUrl, phoneNumber)_
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/api/dto/package-info.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/api/dto/StaffUserDto.java` _(new — userId, organizationId, role, isActive, fullName, email, avatarUrl, phoneNumber)_
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/facade/IamFacade.java` _(new — implements IamApi)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/package-info.java` _(update allowedDependencies to add `"iam::api"`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/domain/model/WorkshopAssignment.java` _(new domain record)_
@@ -42,10 +43,11 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopAssignmentJpaRepository.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopAssignmentRepositoryAdapter.java` _(new — implements WorkshopAssignmentRepository)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/mapper/WorkshopAssignmentPersistenceMapper.java` _(new)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopStaffController.java` _(new — handles all 4 staff endpoints)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopController.java` _(update — add GET /{id}/staff handler)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/AssignedStaffItemResponse.java` _(new)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/mapper/WorkshopStaffPresentationMapper.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/mapper/WorkshopPresentationMapper.java` _(update — add assigned staff mapping)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/ListAssignedStaffUseCaseImplTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopControllerStaffListTest.java` _(new)_
   - **Acceptance Criteria:**
     - `GET /api/v1/admin/workshops/{id}/staff` with a valid ORGANIZER JWT returns HTTP 200 with `ApiResponse<PageResponse<AssignedStaffItemResponse>>` containing `items: []` and `cursor.hasMore: false` when no staff are assigned. _(FR-04, FR-05, FR-07, Scenario 4)_
     - The same endpoint with 2 staff assigned returns 200 with items containing `userId`, `fullName`, `email`, `avatarUrl` (nullable), `phoneNumber` (nullable), `assignedAt`, and a keyset `cursor`. _(FR-08, Scenario 4)_
@@ -67,7 +69,8 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopAssignmentRepository.java` _(update — add findConflictingStaffUserIds, countActiveAssignmentsForUsers)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopAssignmentRepositoryAdapter.java` _(update — implement new port methods)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/AvailableStaffItemResponse.java` _(new — userId, fullName, email, avatarUrl, phoneNumber, activeAssignmentsCount)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopStaffController.java` _(update — add GET /staff/available handler)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/mapper/WorkshopPresentationMapper.java` _(update — add available staff mapping)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopController.java` _(update — add GET /{id}/staff/available handler)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/ListAvailableStaffUseCaseImplTest.java` _(new)_
   - **Acceptance Criteria:**
     - `GET /api/v1/admin/workshops/{id}/staff/available` with a PUBLISHED workshop (`starts_at` in the future) returns HTTP 200 with `ApiResponse<PageResponse<AvailableStaffItemResponse>>` containing paginated `items` with `userId`, `fullName`, `email`, `avatarUrl`, `phoneNumber`, `activeAssignmentsCount`. _(FR-09, FR-12, FR-15, Scenario 9)_
@@ -100,7 +103,8 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopAssignmentRepositoryAdapter.java` _(update — implement new port methods)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/AssignStaffRequest.java` _(new — staffUserIds: List<UUID>)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/BatchAssignResponse.java` _(new — workshopId, assignedStaffs: List<AssignedStaffItemResponse>)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopStaffController.java` _(update — add POST /staff handler)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/mapper/WorkshopPresentationMapper.java` _(update — add batch assign mapping)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopController.java` _(update — add POST /{id}/staff handler)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/AssignStaffUseCaseImplTest.java` _(new)_
   - **Acceptance Criteria:**
     - `POST /api/v1/admin/workshops/{id}/staff` with valid STAFF user IDs for a PUBLISHED future workshop returns HTTP 201 with `ApiResponse<data>` containing `workshopId` and `assignedStaffs` (array with `userId`, `fullName`, `email`, `avatarUrl`, `phoneNumber`, `assignedAt`). _(FR-16, FR-22, FR-23, Scenario 13)_
@@ -124,7 +128,7 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/RevokeStaffUseCaseImpl.java` _(new — validate workshop status + timing, delete row, publish event)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopAssignmentRepository.java` _(update — add deleteByWorkshopIdAndStaffUserId)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopAssignmentRepositoryAdapter.java` _(update — implement delete method)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopStaffController.java` _(update — add DELETE /staff/{userId} handler)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/AdminWorkshopController.java` _(update — add DELETE /{id}/staff/{userId} handler)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/RevokeStaffUseCaseImplTest.java` _(new)_
   - **Acceptance Criteria:**
     - `DELETE /api/v1/admin/workshops/{id}/staff/{userId}` for a valid PUBLISHED future workshop with an assigned staff member returns HTTP 204 No Content with no body. _(FR-24, FR-28, Scenario 19)_
