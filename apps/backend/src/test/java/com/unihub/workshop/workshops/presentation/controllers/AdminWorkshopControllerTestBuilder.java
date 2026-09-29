@@ -3,6 +3,7 @@ package com.unihub.workshop.workshops.presentation.controllers;
 import static org.mockito.Mockito.mock;
 
 import com.unihub.workshop.shared.storage.MediaStoragePort;
+import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
@@ -29,6 +30,9 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private ListAvailableStaffUseCase listAvailableStaffUseCase = mock(
         ListAvailableStaffUseCase.class
+    );
+    private AssignStaffUseCase assignStaffUseCase = mock(
+        AssignStaffUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -81,6 +85,13 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withAssignStaffUseCase(
+        AssignStaffUseCase assignStaffUseCase
+    ) {
+        this.assignStaffUseCase = assignStaffUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -103,6 +114,7 @@ public class AdminWorkshopControllerTestBuilder {
             listAdminWorkshopsUseCase,
             listAssignedStaffUseCase,
             listAvailableStaffUseCase,
+            assignStaffUseCase,
             workshopMapper,
             mediaStoragePort
         );

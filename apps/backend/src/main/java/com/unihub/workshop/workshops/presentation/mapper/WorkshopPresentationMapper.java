@@ -10,11 +10,13 @@ import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerResponse;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopSummaryResponse;
+import java.util.List;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -49,6 +51,20 @@ public interface WorkshopPresentationMapper {
         CursorPage<AvailableStaff> page
     ) {
         return PageResponse.from(page, this::toAvailableStaffItemResponse);
+    }
+
+    default BatchAssignResponse toBatchAssignResponse(
+        UUID workshopId,
+        List<AssignedStaff> assignedStaffs
+    ) {
+        List<AssignedStaffItemResponse> items =
+            assignedStaffs != null
+                ? assignedStaffs
+                      .stream()
+                      .map(this::toAssignedStaffItemResponse)
+                      .toList()
+                : List.of();
+        return new BatchAssignResponse(workshopId, items);
     }
 
     @Mapping(target = "id", source = "request.id")

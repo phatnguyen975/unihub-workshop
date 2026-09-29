@@ -128,6 +128,66 @@ public class WorkshopAssignmentRepositoryAdapter
     }
 
     @Override
+    @Transactional
+    public List<WorkshopAssignment> saveAll(
+        List<WorkshopAssignment> assignments
+    ) {
+        if (assignments == null || assignments.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<WorkshopAssignmentJpaEntity> entities = assignments
+            .stream()
+            .map(mapper::toEntity)
+            .toList();
+        List<WorkshopAssignmentJpaEntity> saved = repository.saveAllAndFlush(
+            entities
+        );
+        return mapper.toDomainList(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<UUID> findAlreadyAssignedUserIds(
+        UUID workshopId,
+        Collection<UUID> staffUserIds
+    ) {
+        if (
+            workshopId == null || staffUserIds == null || staffUserIds.isEmpty()
+        ) {
+            return Collections.emptySet();
+        }
+        return repository.findAlreadyAssignedUserIds(workshopId, staffUserIds);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<UUID> findScheduleConflictingUserIds(
+        UUID organizationId,
+        UUID targetWorkshopId,
+        Instant startsAt,
+        Instant endsAt,
+        Collection<UUID> staffUserIds
+    ) {
+        if (
+            organizationId == null ||
+            targetWorkshopId == null ||
+            startsAt == null ||
+            endsAt == null ||
+            staffUserIds == null ||
+            staffUserIds.isEmpty()
+        ) {
+            return Collections.emptySet();
+        }
+        return repository.findScheduleConflictingUserIds(
+            organizationId,
+            targetWorkshopId,
+            startsAt,
+            endsAt,
+            staffUserIds
+        );
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Set<UUID> findAssignedStaffUserIds(UUID workshopId) {
         if (workshopId == null) {

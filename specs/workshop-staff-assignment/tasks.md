@@ -90,7 +90,7 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
 
 ### Phase 2: Write Capabilities & Event Publishing
 
-- [ ] **T3 — Organizer can batch-assign one or more STAFF members to a PUBLISHED workshop before it starts (atomic, all-or-nothing)**
+- [x] **T3 — Organizer can batch-assign one or more STAFF members to a PUBLISHED workshop before it starts (atomic, all-or-nothing)**
   - **Size:** M
   - **Depends on:** T1, T2
   - **Layers touched:** Domain (validation logic), Application (command + use case + IamApi call), Infrastructure (repository write + outbox event publish), Presentation (request DTO, response DTO, controller endpoint)

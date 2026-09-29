@@ -10,6 +10,8 @@ import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.storage.MediaValidationUtils;
 import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
+import com.unihub.workshop.workshops.application.ports.in.AssignStaffCommand;
+import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
@@ -25,8 +27,10 @@ import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
+import com.unihub.workshop.workshops.presentation.dto.AssignStaffRequest;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
@@ -37,6 +41,7 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +72,7 @@ public class AdminWorkshopController {
     private final ListAdminWorkshopsUseCase listAdminWorkshopsUseCase;
     private final ListAssignedStaffUseCase listAssignedStaffUseCase;
     private final ListAvailableStaffUseCase listAvailableStaffUseCase;
+    private final AssignStaffUseCase assignStaffUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -203,6 +209,35 @@ public class AdminWorkshopController {
         return ApiResponse.success(
             workshopMapper.toAvailableStaffPageResponse(page),
             "Available staff retrieved successfully."
+        );
+    }
+
+    @PostMapping("/{id}/staff")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<BatchAssignResponse> assignStaff(
+        @PathVariable UUID id,
+        @Valid @RequestBody AssignStaffRequest request,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        AssignStaffCommand command = new AssignStaffCommand(
+            id,
+            organizationId,
+            callerId,
+            request.staffUserIds()
+        );
+
+        List<AssignedStaff> assigned = assignStaffUseCase.execute(command);
+        BatchAssignResponse response = workshopMapper.toBatchAssignResponse(
+            id,
+            assigned
+        );
+
+        return ApiResponse.success(
+            response,
+            "Staff members assigned successfully."
         );
     }
 

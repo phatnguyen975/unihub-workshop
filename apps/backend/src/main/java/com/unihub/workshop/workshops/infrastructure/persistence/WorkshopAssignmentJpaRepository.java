@@ -29,6 +29,40 @@ public interface WorkshopAssignmentJpaRepository
 
     @Query(
         """
+        SELECT wa.staffUserId
+        FROM WorkshopAssignmentJpaEntity wa
+        WHERE wa.workshopId = :workshopId
+            AND wa.staffUserId IN :staffUserIds
+        """
+    )
+    Set<UUID> findAlreadyAssignedUserIds(
+        @Param("workshopId") UUID workshopId,
+        @Param("staffUserIds") Collection<UUID> staffUserIds
+    );
+
+    @Query(
+        """
+        SELECT DISTINCT wa.staffUserId
+        FROM WorkshopAssignmentJpaEntity wa, WorkshopJpaEntity w
+        WHERE wa.workshopId = w.id
+            AND w.organizationId = :organizationId
+            AND w.id != :targetWorkshopId
+            AND w.status != 'CANCELED'
+            AND w.startsAt < :endsAt
+            AND w.endsAt > :startsAt
+            AND wa.staffUserId IN :staffUserIds
+        """
+    )
+    Set<UUID> findScheduleConflictingUserIds(
+        @Param("organizationId") UUID organizationId,
+        @Param("targetWorkshopId") UUID targetWorkshopId,
+        @Param("startsAt") Instant startsAt,
+        @Param("endsAt") Instant endsAt,
+        @Param("staffUserIds") Collection<UUID> staffUserIds
+    );
+
+    @Query(
+        """
         SELECT DISTINCT wa.staffUserId
         FROM WorkshopAssignmentJpaEntity wa, WorkshopJpaEntity w
         WHERE wa.workshopId = w.id
