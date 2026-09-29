@@ -20,6 +20,8 @@ import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffQuery
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffQuery;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.RevokeStaffCommand;
+import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.domain.model.AssignedStaff;
@@ -73,6 +75,7 @@ public class AdminWorkshopController {
     private final ListAssignedStaffUseCase listAssignedStaffUseCase;
     private final ListAvailableStaffUseCase listAvailableStaffUseCase;
     private final AssignStaffUseCase assignStaffUseCase;
+    private final RevokeStaffUseCase revokeStaffUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -239,6 +242,26 @@ public class AdminWorkshopController {
             response,
             "Staff members assigned successfully."
         );
+    }
+
+    @DeleteMapping("/{id}/staff/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeStaff(
+        @PathVariable UUID id,
+        @PathVariable UUID userId,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        RevokeStaffCommand command = new RevokeStaffCommand(
+            id,
+            userId,
+            organizationId,
+            callerId
+        );
+
+        revokeStaffUseCase.execute(command);
     }
 
     @DeleteMapping("/{id}")

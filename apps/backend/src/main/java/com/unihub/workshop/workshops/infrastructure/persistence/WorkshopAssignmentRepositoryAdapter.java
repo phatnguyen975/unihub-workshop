@@ -121,6 +121,20 @@ public class WorkshopAssignmentRepositoryAdapter
 
     @Override
     @Transactional
+    public void deleteByWorkshopIdAndStaffUserId(
+        UUID workshopId,
+        UUID staffUserId
+    ) {
+        if (workshopId != null && staffUserId != null) {
+            repository.deleteByWorkshopIdAndStaffUserId(
+                workshopId,
+                staffUserId
+            );
+        }
+    }
+
+    @Override
+    @Transactional
     public WorkshopAssignment save(WorkshopAssignment assignment) {
         WorkshopAssignmentJpaEntity entity = mapper.toEntity(assignment);
         WorkshopAssignmentJpaEntity saved = repository.saveAndFlush(entity);

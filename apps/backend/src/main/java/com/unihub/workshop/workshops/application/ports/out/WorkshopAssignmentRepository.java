@@ -30,6 +30,11 @@ public interface WorkshopAssignmentRepository {
     boolean existsByWorkshopIdAndStaffUserId(UUID workshopId, UUID staffUserId);
 
     /**
+     * Deletes a staff assignment by workshop ID and staff user ID.
+     */
+    void deleteByWorkshopIdAndStaffUserId(UUID workshopId, UUID staffUserId);
+
+    /**
      * Saves a workshop staff assignment.
      */
     WorkshopAssignment save(WorkshopAssignment assignment);
