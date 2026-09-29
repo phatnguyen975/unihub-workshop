@@ -2,6 +2,7 @@ package com.unihub.workshop.iam.api;
 
 import com.unihub.workshop.iam.api.dto.StaffUserDto;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,4 +26,12 @@ public interface IamApi {
      * @return optional containing StaffUserDto if user exists, empty otherwise
      */
     Optional<StaffUserDto> getStaffUserById(UUID userId);
+
+    /**
+     * Lists all active staff users belonging to the specified organization.
+     *
+     * @param organizationId target organization identifier
+     * @return list of active StaffUserDto records
+     */
+    List<StaffUserDto> listActiveStaffByOrganization(UUID organizationId);
 }

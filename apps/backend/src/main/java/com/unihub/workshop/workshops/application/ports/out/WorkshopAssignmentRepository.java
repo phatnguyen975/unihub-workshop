@@ -2,6 +2,10 @@ package com.unihub.workshop.workshops.application.ports.out;
 
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.domain.model.WorkshopAssignment;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public interface WorkshopAssignmentRepository {
@@ -28,4 +32,28 @@ public interface WorkshopAssignmentRepository {
      * Saves a workshop staff assignment.
      */
     WorkshopAssignment save(WorkshopAssignment assignment);
+
+    /**
+     * Finds the set of staff user IDs already assigned to the given workshop.
+     */
+    Set<UUID> findAssignedStaffUserIds(UUID workshopId);
+
+    /**
+     * Finds staff user IDs in the organization that have an active assignment to another
+     * non-CANCELED workshop overlapping the target time window.
+     */
+    Set<UUID> findScheduleConflictingStaffUserIds(
+        UUID organizationId,
+        UUID targetWorkshopId,
+        Instant startsAt,
+        Instant endsAt
+    );
+
+    /**
+     * Counts active assignments (in non-CANCELED workshops) for the given staff members.
+     */
+    Map<UUID, Integer> countActiveAssignmentsForUsers(
+        UUID organizationId,
+        Collection<UUID> staffUserIds
+    );
 }

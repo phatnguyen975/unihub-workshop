@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.User;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +50,21 @@ public class IamFacade implements IamApi {
             return Optional.empty();
         }
         return userRepository.findById(userId).map(this::toStaffUserDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StaffUserDto> listActiveStaffByOrganization(
+        UUID organizationId
+    ) {
+        if (organizationId == null) {
+            return List.of();
+        }
+        return userRepository
+            .findActiveStaffByOrganizationId(organizationId)
+            .stream()
+            .map(this::toStaffUserDto)
+            .toList();
     }
 
     private StaffUserDto toStaffUserDto(User user) {

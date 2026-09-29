@@ -226,6 +226,22 @@ public class UserRepositoryAdapter implements UserRepository {
             .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findActiveStaffByOrganizationId(UUID organizationId) {
+        if (organizationId == null) {
+            return List.of();
+        }
+        return repository
+            .findByOrganizationIdAndRoleAndIsActiveTrue(
+                organizationId,
+                UserRole.STAFF.name()
+            )
+            .stream()
+            .map(userMapper::toDomain)
+            .toList();
+    }
+
     private String sanitizeQuery(String query) {
         if (query == null) {
             return null;

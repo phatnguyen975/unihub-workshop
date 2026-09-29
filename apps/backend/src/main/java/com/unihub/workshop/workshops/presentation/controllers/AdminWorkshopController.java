@@ -16,13 +16,17 @@ import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuer
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffQuery;
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffQuery;
+import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.domain.model.AssignedStaff;
+import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
@@ -62,6 +66,7 @@ public class AdminWorkshopController {
     private final DeleteDraftUseCase deleteDraftUseCase;
     private final ListAdminWorkshopsUseCase listAdminWorkshopsUseCase;
     private final ListAssignedStaffUseCase listAssignedStaffUseCase;
+    private final ListAvailableStaffUseCase listAvailableStaffUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -166,6 +171,38 @@ public class AdminWorkshopController {
         return ApiResponse.success(
             workshopMapper.toAssignedStaffPageResponse(page),
             "Assigned staff retrieved successfully."
+        );
+    }
+
+    @GetMapping("/{id}/staff/available")
+    public ApiResponse<
+        PageResponse<AvailableStaffItemResponse>
+    > listAvailableStaff(
+        @PathVariable UUID id,
+        @RequestParam(name = "q", required = false) String q,
+        @RequestParam(name = "cursor", required = false) String cursor,
+        @RequestParam(
+            name = "size",
+            required = false,
+            defaultValue = "20"
+        ) Integer size,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+        ListAvailableStaffQuery query = new ListAvailableStaffQuery(
+            id,
+            organizationId,
+            q,
+            cursor,
+            size
+        );
+        CursorPage<AvailableStaff> page = listAvailableStaffUseCase.execute(
+            query
+        );
+
+        return ApiResponse.success(
+            workshopMapper.toAvailableStaffPageResponse(page),
+            "Available staff retrieved successfully."
         );
     }
 

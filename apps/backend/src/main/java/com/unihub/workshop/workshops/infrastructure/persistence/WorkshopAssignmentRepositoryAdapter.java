@@ -15,7 +15,11 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -121,6 +125,65 @@ public class WorkshopAssignmentRepositoryAdapter
         WorkshopAssignmentJpaEntity entity = mapper.toEntity(assignment);
         WorkshopAssignmentJpaEntity saved = repository.saveAndFlush(entity);
         return mapper.toDomain(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<UUID> findAssignedStaffUserIds(UUID workshopId) {
+        if (workshopId == null) {
+            return Collections.emptySet();
+        }
+        return repository.findAssignedStaffUserIds(workshopId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<UUID> findScheduleConflictingStaffUserIds(
+        UUID organizationId,
+        UUID targetWorkshopId,
+        Instant startsAt,
+        Instant endsAt
+    ) {
+        if (
+            organizationId == null ||
+            targetWorkshopId == null ||
+            startsAt == null ||
+            endsAt == null
+        ) {
+            return Collections.emptySet();
+        }
+        return repository.findScheduleConflictingStaffUserIds(
+            organizationId,
+            targetWorkshopId,
+            startsAt,
+            endsAt
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Integer> countActiveAssignmentsForUsers(
+        UUID organizationId,
+        Collection<UUID> staffUserIds
+    ) {
+        if (
+            organizationId == null ||
+            staffUserIds == null ||
+            staffUserIds.isEmpty()
+        ) {
+            return Collections.emptyMap();
+        }
+        List<Object[]> rows = repository.countActiveAssignmentsForUsers(
+            organizationId,
+            staffUserIds
+        );
+        Map<UUID, Integer> result = new java.util.HashMap<>();
+        for (Object[] row : rows) {
+            UUID userId = (UUID) row[0];
+            Number count = (Number) row[1];
+            result.put(userId, count != null ? count.intValue() : 0);
+        }
+        return result;
     }
 
     private String encodeCursor(WorkshopAssignmentJpaEntity entity) {

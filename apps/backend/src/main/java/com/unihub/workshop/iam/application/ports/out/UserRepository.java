@@ -43,4 +43,6 @@ public interface UserRepository {
     void updateIsActive(UUID userId, UUID organizationId, boolean isActive);
 
     List<User> findAllById(Collection<UUID> ids);
+
+    List<User> findActiveStaffByOrganizationId(UUID organizationId);
 }

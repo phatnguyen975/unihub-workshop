@@ -57,7 +57,7 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
     - Missing/invalid JWT returns HTTP 401; wrong role (STUDENT/STAFF) returns HTTP 403. _(FR-01, FR-02, Scenarios 1–2)_
     - `ModulithArchitectureTest` passes (no forbidden cross-module access after adding `iam::api` allowed dependency). _(BR boundary enforcement)_
 
-- [ ] **T2 — Organizer can list available staff eligible for assignment to a PUBLISHED workshop before it starts**
+- [x] **T2 — Organizer can list available staff eligible for assignment to a PUBLISHED workshop before it starts**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application (port + use case), Infrastructure (JPA query + adapter method), Presentation (DTO, mapper method, controller endpoint)
@@ -83,10 +83,10 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
 
 #### Checkpoint: Phase 1
 
-- [ ] Both `GET .../staff` and `GET .../staff/available` endpoints pass all their acceptance criteria end-to-end.
-- [ ] `ListAssignedStaffUseCaseImplTest` and `ListAvailableStaffUseCaseImplTest` are green.
-- [ ] `ModulithArchitectureTest` passes — `workshops` only accesses `iam` via `iam::api` named interface.
-- [ ] Build is clean (no compilation errors or failing tests).
+- [x] Both `GET .../staff` and `GET .../staff/available` endpoints pass all their acceptance criteria end-to-end.
+- [x] `ListAssignedStaffUseCaseImplTest` and `ListAvailableStaffUseCaseImplTest` are green.
+- [x] `ModulithArchitectureTest` passes — `workshops` only accesses `iam` via `iam::api` named interface.
+- [x] Build is clean (no compilation errors or failing tests).
 
 ### Phase 2: Write Capabilities & Event Publishing
 

@@ -7,6 +7,7 @@ import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import org.mapstruct.factory.Mappers;
@@ -25,6 +26,9 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private ListAssignedStaffUseCase listAssignedStaffUseCase = mock(
         ListAssignedStaffUseCase.class
+    );
+    private ListAvailableStaffUseCase listAvailableStaffUseCase = mock(
+        ListAvailableStaffUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -70,6 +74,13 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withListAvailableStaffUseCase(
+        ListAvailableStaffUseCase listAvailableStaffUseCase
+    ) {
+        this.listAvailableStaffUseCase = listAvailableStaffUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -91,6 +102,7 @@ public class AdminWorkshopControllerTestBuilder {
             deleteDraftUseCase,
             listAdminWorkshopsUseCase,
             listAssignedStaffUseCase,
+            listAvailableStaffUseCase,
             workshopMapper,
             mediaStoragePort
         );

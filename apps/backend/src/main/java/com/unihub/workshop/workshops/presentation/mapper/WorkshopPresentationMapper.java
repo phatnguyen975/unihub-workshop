@@ -4,10 +4,12 @@ import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.domain.model.AssignedStaff;
+import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerResponse;
@@ -37,6 +39,16 @@ public interface WorkshopPresentationMapper {
         CursorPage<AssignedStaff> page
     ) {
         return PageResponse.from(page, this::toAssignedStaffItemResponse);
+    }
+
+    AvailableStaffItemResponse toAvailableStaffItemResponse(
+        AvailableStaff domain
+    );
+
+    default PageResponse<AvailableStaffItemResponse> toAvailableStaffPageResponse(
+        CursorPage<AvailableStaff> page
+    ) {
+        return PageResponse.from(page, this::toAvailableStaffItemResponse);
     }
 
     @Mapping(target = "id", source = "request.id")
