@@ -12,6 +12,7 @@ import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseC
 import com.unihub.workshop.workshops.application.ports.in.PublishWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
+import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopUseCase;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import org.mapstruct.factory.Mappers;
 
@@ -41,6 +42,9 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private PublishWorkshopUseCase publishWorkshopUseCase = mock(
         PublishWorkshopUseCase.class
+    );
+    private UpdateWorkshopUseCase updateWorkshopUseCase = mock(
+        UpdateWorkshopUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -114,6 +118,13 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withUpdateWorkshopUseCase(
+        UpdateWorkshopUseCase updateWorkshopUseCase
+    ) {
+        this.updateWorkshopUseCase = updateWorkshopUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -139,6 +150,7 @@ public class AdminWorkshopControllerTestBuilder {
             assignStaffUseCase,
             revokeStaffUseCase,
             publishWorkshopUseCase,
+            updateWorkshopUseCase,
             workshopMapper,
             mediaStoragePort
         );

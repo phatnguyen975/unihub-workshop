@@ -463,4 +463,177 @@ class WorkshopTest {
             .isInstanceOf(ValidationException.class)
             .hasMessageContaining("endsAt must be strictly after startsAt");
     }
+
+    @Test
+    @DisplayName(
+        "updatePublished successfully updates presentation and capacity fields"
+    )
+    void shouldUpdatePublishedWorkshopSuccessfully() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID updaterId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Initial Title",
+            "initial-title",
+            "Initial Desc",
+            "https://example.com/old.png",
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        Workshop updated = published.updatePublished(
+            "New Title",
+            "new-title",
+            "New Description",
+            "https://example.com/new.png",
+            150,
+            updaterId
+        );
+
+        assertThat(updated.title()).isEqualTo("New Title");
+        assertThat(updated.slug()).isEqualTo("new-title");
+        assertThat(updated.description()).isEqualTo("New Description");
+        assertThat(updated.coverImageUrl()).isEqualTo(
+            "https://example.com/new.png"
+        );
+        assertThat(updated.capacity()).isEqualTo(150);
+        assertThat(updated.updatedBy()).isEqualTo(updaterId);
+        assertThat(updated.updatedAt()).isNotNull();
+        assertThat(updated.status()).isEqualTo(WorkshopStatus.PUBLISHED);
+    }
+
+    @Test
+    @DisplayName(
+        "updatePublished retains existing fields when optional fields are null"
+    )
+    void shouldRetainExistingValuesOnPartialUpdate() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID updaterId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Initial Title",
+            "initial-title",
+            "Initial Desc",
+            "https://example.com/old.png",
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        Workshop updated = published.updatePublished(
+            null, // retain title & slug
+            null,
+            null, // retain desc
+            null, // retain coverImageUrl
+            200, // update capacity
+            updaterId
+        );
+
+        assertThat(updated.title()).isEqualTo("Initial Title");
+        assertThat(updated.slug()).isEqualTo("initial-title");
+        assertThat(updated.description()).isEqualTo("Initial Desc");
+        assertThat(updated.coverImageUrl()).isEqualTo(
+            "https://example.com/old.png"
+        );
+        assertThat(updated.capacity()).isEqualTo(200);
+        assertThat(updated.updatedBy()).isEqualTo(updaterId);
+    }
+
+    @Test
+    @DisplayName(
+        "updatePublished throws ValidationException when workshop is in DRAFT status"
+    )
+    void shouldFailToUpdateWhenStatusIsDraft() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop draft = Workshop.createDraft(
+            orgId,
+            "Draft Title",
+            "draft-title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        );
+
+        assertThatThrownBy(() ->
+            draft.updatePublished(
+                "New Title",
+                "new-title",
+                null,
+                null,
+                150,
+                userId
+            )
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("Workshop is in DRAFT status");
+    }
+
+    @Test
+    @DisplayName(
+        "updatePublished throws ValidationException when title is blank or capacity is invalid"
+    )
+    void shouldFailToUpdateWhenFieldsInvalid() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        assertThatThrownBy(() ->
+            published.updatePublished("   ", "title", null, null, 150, userId)
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("title");
+
+        assertThatThrownBy(() ->
+            published.updatePublished("Valid", "valid", null, null, 0, userId)
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("capacity");
+    }
 }

@@ -59,7 +59,7 @@ T1 must complete before T2 because T2's use case validates that the workshop is 
 
 ### Phase 2: Update Published Workshop Flow
 
-- [ ] **T2 — ORGANIZER can partially update a PUBLISHED workshop's presentation and capacity fields and receive the full updated response**
+- [x] **T2 — ORGANIZER can partially update a PUBLISHED workshop's presentation and capacity fields and receive the full updated response**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure (Persistence Adapter, Events), Presentation
@@ -89,10 +89,10 @@ T1 must complete before T2 because T2's use case validates that the workshop is 
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks above are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end.
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] Ready for `/review`.
+- [x] All tasks above are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end.
+- [x] `ModulithArchitectureTest` passes.
+- [x] Ready for `/review`.
 
 ## Risks and Mitigations
 

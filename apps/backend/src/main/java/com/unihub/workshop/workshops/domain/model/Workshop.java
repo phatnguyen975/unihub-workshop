@@ -232,16 +232,16 @@ public record Workshop(
             this.title.length() > 255
         ) {
             errors.add(
-                "title: must not be null or blank, and up to 255 characters"
+                "title must not be null or blank, and up to 255 characters"
             );
         }
 
         if (this.startsAt == null) {
-            errors.add("startsAt: must not be null");
+            errors.add("startsAt must not be null");
         }
 
         if (this.endsAt == null) {
-            errors.add("endsAt: must not be null");
+            errors.add("endsAt must not be null");
         }
 
         if (
@@ -249,7 +249,7 @@ public record Workshop(
             this.endsAt != null &&
             !this.endsAt.isAfter(this.startsAt)
         ) {
-            errors.add("endsAt: endsAt must be strictly after startsAt");
+            errors.add("endsAt endsAt must be strictly after startsAt");
         }
 
         if (
@@ -258,7 +258,7 @@ public record Workshop(
             this.location.length() > 255
         ) {
             errors.add(
-                "location: must not be null or blank, and up to 255 characters"
+                "location must not be null or blank, and up to 255 characters"
             );
         }
 
@@ -268,7 +268,7 @@ public record Workshop(
             this.capacity > 1_000_000
         ) {
             errors.add(
-                "capacity: must not be null and must be between 1 and 1,000,000"
+                "capacity must not be null and must be between 1 and 1,000,000"
             );
         }
 
@@ -288,6 +288,94 @@ public record Workshop(
         return this.toBuilder()
             .status(WorkshopStatus.PUBLISHED)
             .publishedAt(now)
+            .updatedAt(now)
+            .updatedBy(updatedBy)
+            .build();
+    }
+
+    public Workshop updatePublished(
+        String title,
+        String slug,
+        String description,
+        String coverImageUrl,
+        Integer capacity,
+        UUID updatedBy
+    ) {
+        if (this.status != WorkshopStatus.PUBLISHED) {
+            if (this.status == WorkshopStatus.DRAFT) {
+                throw new ValidationException(
+                    "status",
+                    "Workshop is in DRAFT status. Please use POST /api/v1/admin/workshops/drafts to update drafts."
+                );
+            }
+            throw new ValidationException(
+                "status",
+                "Workshops in terminal status (" +
+                    this.status +
+                    ") cannot be updated."
+            );
+        }
+
+        if (title != null && (title.isBlank() || title.length() > 255)) {
+            throw new ValidationException(
+                "title",
+                "title must not be blank and between 1 and 255 characters"
+            );
+        }
+
+        if (description != null && description.length() > 5000) {
+            throw new ValidationException(
+                "description",
+                "description must not exceed 5000 characters"
+            );
+        }
+
+        if (coverImageUrl != null) {
+            if (coverImageUrl.length() > 2048) {
+                throw new ValidationException(
+                    "coverImageUrl",
+                    "coverImageUrl must not exceed 2048 characters"
+                );
+            }
+            if (
+                !coverImageUrl.isBlank() &&
+                !coverImageUrl.startsWith("http://") &&
+                !coverImageUrl.startsWith("https://")
+            ) {
+                throw new ValidationException(
+                    "coverImageUrl",
+                    "coverImageUrl must be a valid HTTP or HTTPS URL"
+                );
+            }
+        }
+
+        if (capacity != null && (capacity < 1 || capacity > 1_000_000)) {
+            throw new ValidationException(
+                "capacity",
+                "capacity must be between 1 and 1,000,000"
+            );
+        }
+
+        Instant now = Instant.now();
+
+        return this.toBuilder()
+            .title(title != null ? title : this.title)
+            .slug(slug != null ? slug : this.slug)
+            .description(
+                description != null
+                    ? description.isBlank()
+                        ? null
+                        : description
+                    : this.description
+            )
+            .coverImageUrl(
+                coverImageUrl != null
+                    ? coverImageUrl.isBlank()
+                        ? null
+                        : coverImageUrl
+                    : this.coverImageUrl
+            )
+            .capacity(capacity != null ? capacity : this.capacity)
             .updatedAt(now)
             .updatedBy(updatedBy)
             .build();
