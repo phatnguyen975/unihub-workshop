@@ -24,7 +24,7 @@ T1 must complete before T2 because T2's use case validates that the workshop is 
 
 ### Phase 1: Core Publish Flow
 
-- [ ] **T1 — ORGANIZER can publish a DRAFT workshop and receive the full `PUBLISHED` response with `publishedAt`**
+- [x] **T1 — ORGANIZER can publish a DRAFT workshop and receive the full `PUBLISHED` response with `publishedAt`**
   - **Size:** M
   - **Depends on:** — (no prior task in this feature)
   - **Layers touched:** Domain, Application, Infrastructure (Events), Presentation
@@ -53,9 +53,9 @@ T1 must complete before T2 because T2's use case validates that the workshop is 
 
 #### Checkpoint: Publish Flow
 
-- [ ] T1 unit tests pass (`./gradlew test --tests "com.unihub.workshop.workshops.application.usecases.PublishWorkshopUseCaseImplTest"` and `WorkshopTest`).
-- [ ] `ModulithArchitectureTest` passes.
-- [ ] No compilation errors or warnings in the `workshops` module.
+- [x] T1 unit tests pass (`./gradlew test --tests "com.unihub.workshop.workshops.application.usecases.PublishWorkshopUseCaseImplTest"` and `WorkshopTest`).
+- [x] `ModulithArchitectureTest` passes.
+- [x] No compilation errors or warnings in the `workshops` module.
 
 ### Phase 2: Update Published Workshop Flow
 

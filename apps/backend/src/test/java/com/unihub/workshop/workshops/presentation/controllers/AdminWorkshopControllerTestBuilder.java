@@ -9,6 +9,7 @@ import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.PublishWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
@@ -37,6 +38,9 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private RevokeStaffUseCase revokeStaffUseCase = mock(
         RevokeStaffUseCase.class
+    );
+    private PublishWorkshopUseCase publishWorkshopUseCase = mock(
+        PublishWorkshopUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -103,6 +107,13 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withPublishWorkshopUseCase(
+        PublishWorkshopUseCase publishWorkshopUseCase
+    ) {
+        this.publishWorkshopUseCase = publishWorkshopUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -127,6 +138,7 @@ public class AdminWorkshopControllerTestBuilder {
             listAvailableStaffUseCase,
             assignStaffUseCase,
             revokeStaffUseCase,
+            publishWorkshopUseCase,
             workshopMapper,
             mediaStoragePort
         );

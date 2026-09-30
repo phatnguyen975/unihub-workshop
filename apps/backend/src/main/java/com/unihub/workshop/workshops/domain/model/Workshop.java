@@ -1,8 +1,10 @@
 package com.unihub.workshop.workshops.domain.model;
 
 import com.unihub.workshop.shared.exception.ConflictException;
+import com.unihub.workshop.shared.exception.ValidationException;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
@@ -210,6 +212,84 @@ public record Workshop(
             .updatedAt(now)
             .updatedBy(updatedBy)
             .speakers(effectiveSpeakers)
+            .build();
+    }
+
+    public Workshop publish(UUID updatedBy) {
+        if (this.status != WorkshopStatus.DRAFT) {
+            throw new ValidationException(
+                "status",
+                "Only workshops in DRAFT status can be published. Current status: " +
+                    this.status
+            );
+        }
+
+        List<String> errors = new ArrayList<>();
+
+        if (
+            this.title == null ||
+            this.title.isBlank() ||
+            this.title.length() > 255
+        ) {
+            errors.add(
+                "title: must not be null or blank, and up to 255 characters"
+            );
+        }
+
+        if (this.startsAt == null) {
+            errors.add("startsAt: must not be null");
+        }
+
+        if (this.endsAt == null) {
+            errors.add("endsAt: must not be null");
+        }
+
+        if (
+            this.startsAt != null &&
+            this.endsAt != null &&
+            !this.endsAt.isAfter(this.startsAt)
+        ) {
+            errors.add("endsAt: endsAt must be strictly after startsAt");
+        }
+
+        if (
+            this.location == null ||
+            this.location.isBlank() ||
+            this.location.length() > 255
+        ) {
+            errors.add(
+                "location: must not be null or blank, and up to 255 characters"
+            );
+        }
+
+        if (
+            this.capacity == null ||
+            this.capacity < 1 ||
+            this.capacity > 1_000_000
+        ) {
+            errors.add(
+                "capacity: must not be null and must be between 1 and 1,000,000"
+            );
+        }
+
+        Instant now = Instant.now();
+        if (this.startsAt != null && !this.startsAt.isAfter(now)) {
+            errors.add("startsAt: Workshop start time must be in the future");
+        }
+
+        if (!errors.isEmpty()) {
+            String primaryMessage =
+                errors.size() == 1
+                    ? errors.get(0)
+                    : "Workshop cannot be published from DRAFT when required fields are missing or invalid.";
+            throw new ValidationException(primaryMessage, errors);
+        }
+
+        return this.toBuilder()
+            .status(WorkshopStatus.PUBLISHED)
+            .publishedAt(now)
+            .updatedAt(now)
+            .updatedBy(updatedBy)
             .build();
     }
 }
