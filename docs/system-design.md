@@ -431,7 +431,7 @@ sequenceDiagram
 
   Note over Organizer,Notify: PUBLISH OPERATION
   Organizer->>Web: Click "Publish Workshop"
-  Web->>GW: PATCH /api/v1/admin/workshops/{id}/publish
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/publish (body: { version })
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -440,19 +440,35 @@ sequenceDiagram
     GW-->>Web: 403 Forbidden
     Web-->>Organizer: 403 Forbidden
   else Authorized
-    API->>DB: Select current_status from workshops
-    DB-->>API: current_status: STATUS
-    alt current_status == DRAFT
-      API->>DB: Update Workshop (Status: PUBLISHED, Optimistic Locking check)
-      API->>DB: Insert WorkshopPublishedEvent into Outbox
-      DB-->>API: Transaction committed (Optimistic Locking check)
+    API->>DB: Select workshop details, current_status, version, starts_at, ends_at, speakers
+    DB-->>API: workshop record
+    alt current_status != DRAFT
+      API-->>GW: 422 Unprocessable Entity (Invalid State Transition - only DRAFT can be published)
+      GW-->>Web: 422 Unprocessable Entity
+      Web-->>Organizer: 422 Unprocessable Entity
+    else payload.version != workshop.version
+      API-->>GW: 409 Conflict (Optimistic locking version mismatch)
+      GW-->>Web: 409 Conflict
+      Web-->>Organizer: 409 Conflict
+    else starts_at <= NOW or ends_at <= starts_at or missing required fields
+      API-->>GW: 422 Unprocessable Entity (Validation failed: schedule must be in future, required fields present)
+      GW-->>Web: 422 Unprocessable Entity
+      Web-->>Organizer: 422 Unprocessable Entity
+    else
+      opt If speakers present
+        API->>DB: Check speaker schedule overlap across active (PUBLISHED, COMPLETED) workshops
+        alt Speaker conflict found
+          API-->>GW: 422 Unprocessable Entity (Speaker Schedule Conflict)
+          GW-->>Web: 422 Unprocessable Entity
+          Web-->>Organizer: 422 Unprocessable Entity
+        end
+      end
+      API->>DB: Update Workshop (Status: PUBLISHED, published_at: NOW, version incremented)
+      API->>DB: Insert WorkshopPublishedEvent into Outbox (@Externalized to unihub.events::search)
+      DB-->>API: Transaction committed
       API-->>GW: 200 OK (Workshop Published)
       GW-->>Web: 200 OK
       Web-->>Organizer: Show Published Status in UI
-    else
-      API-->>GW: 422 Unprocessable Entity (Invalid State Transition)
-      GW-->>Web: 422 Unprocessable Entity
-      Web-->>Organizer: 422 Unprocessable Entity
     end
   end
 
@@ -542,7 +558,7 @@ sequenceDiagram
 
   Note over Organizer,Notify: CANCEL OPERATION
   Organizer->>Web: Click "Cancel Workshop"
-  Web->>GW: PATCH /api/v1/admin/workshops/{id}/cancel
+  Web->>GW: PATCH /api/v1/admin/workshops/{id}/cancel (body: { version, reason? })
   GW->>API: Forward Request
   API->>DB: Verify ownership (workshop.organization_id == jwt.org)
   alt Unauthorized
@@ -551,16 +567,20 @@ sequenceDiagram
     GW-->>Web: 403 Forbidden
     Web-->>Organizer: 403 Forbidden
   else Authorized
-    API->>DB: Select current_status from workshops
-    DB-->>API: current_status: STATUS
+    API->>DB: Select current_status, version from workshops
+    DB-->>API: current_status: STATUS, version: VERSION
     alt current_status == CANCELED or current_status == COMPLETED or current_status == DRAFT
       API-->>GW: 422 Unprocessable Entity (Drafts must be deleted via DELETE endpoint - terminal workshops cannot be canceled)
       GW-->>Web: 422 Unprocessable Entity
       Web-->>Organizer: 422 Unprocessable Entity
+    else payload.version != workshop.version
+      API-->>GW: 409 Conflict (Optimistic locking version mismatch)
+      GW-->>Web: 409 Conflict
+      Web-->>Organizer: 409 Conflict
     else
-      API->>DB: Update Workshop (Status: CANCELED, Optimistic Locking check)
+      API->>DB: Update Workshop (Status: CANCELED, canceled_at: NOW, version incremented)
       API->>DB: Insert WorkshopCanceledEvent into Outbox
-      DB-->>API: Transaction committed (Optimistic Locking check)
+      DB-->>API: Transaction committed
       API-->>GW: 200 OK
       GW-->>Web: 200 OK
       Web-->>Organizer: Show Canceled Status in UI
@@ -609,13 +629,13 @@ sequenceDiagram
 
 To prevent interface bloat, guarantee data integrity, and ensure deterministic downstream side-effects, the table below defines the operational boundary, mutable fields, prohibited fields, and event fan-out across all admin workshop mutation endpoints:
 
-| Operation                         | HTTP Route & Method                             | Permitted Workshop Status                   | Allowed / Mutable Fields                                                                                                                                     | Strictly Prohibited / Immutable Fields (`422`)                                                                                                                                                          | Key Validations & Guardrails                                                                                                                 | Outbox Event & Downstream Side-effects                                                                                                                                                                                     |
-| :-------------------------------- | :---------------------------------------------- | :------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Save Draft**                    | `POST /api/v1/admin/workshops/drafts`           | `DRAFT` only (or new draft if `id` is null) | `title`, `description`, `coverImageUrl`, `location`, `timezone`, `startsAt`, `endsAt`, `capacity`, `price`, `currency`, `speakers`                           | `status` (cannot force status transition), `organization_id` (always bound to `jwt.org`)                                                                                                                | Speaker schedule collision check against active workshops. Synchronizes `slug` from `title`. Cleans up replaced MinIO media.                 | **None** (`DRAFT` state never emits external events).                                                                                                                                                                      |
-| **Publish**                       | `PATCH /api/v1/admin/workshops/{id}/publish`    | `DRAFT` only (`DRAFT` → `PUBLISHED`)        | _None_ (state transition only; body is empty)                                                                                                                | Any field mutation in body                                                                                                                                                                              | Validates mandatory fields: `title`, `startsAt`, `endsAt`, `location`, `capacity >= 1`.                                                      | Emits `WorkshopPublishedEvent` → `search_sync` worker indexes workshop in Elasticsearch.                                                                                                                                   |
-| **Update Published**              | `PUT /api/v1/admin/workshops/{id}`              | `PUBLISHED` only                            | **Presentation & Scaling fields only:**<br>- `title` (syncs `slug`)<br>- `description`<br>- `coverImageUrl`<br>- `capacity` (can be increased or maintained) | **Strictly Prohibited:**<br>- `startsAt`, `endsAt` (must use `/reschedule`)<br>- `price`, `currency` (immutable once on sale)<br>- `status` (must use `/cancel`)<br>- `organization_id`<br>- `speakers` | `capacity >= COUNT(CONFIRMED + PENDING registrations)` (cannot reduce seats below already registered count). Optimistic locking (`version`). | Emits `WorkshopUpdatedEvent` → `search_sync` worker updates Elasticsearch; invalidates Redis search cache. **Never notifies students.**                                                                                    |
-| **Reschedule**<br>_(Feature 2.3)_ | `PATCH /api/v1/admin/workshops/{id}/reschedule` | `PUBLISHED` only (`now < starts_at`)        | **Timeline fields only:**<br>- `startsAt`<br>- `endsAt`                                                                                                      | All presentation fields (`title`, `description`, `capacity`, `price`, `speakers`, etc.)                                                                                                                 | 1. `startsAt > now()` and `endsAt > startsAt`<br>2. Venue/location conflict check<br>3. Speaker schedule conflict check                      | Emits `WorkshopRescheduledEvent` → `search_sync` updates Elasticsearch; **`notifications` worker dispatches mass notification (email + push) to all registered students.**                                                 |
-| **Cancel**                        | `PATCH /api/v1/admin/workshops/{id}/cancel`     | `PUBLISHED` only (`PUBLISHED` → `CANCELED`) | _None_ (state transition only; body is empty or optional reason)                                                                                             | Any field mutation in body                                                                                                                                                                              | Cannot cancel `COMPLETED`, `CANCELED`, or `DRAFT` workshops (`422`).                                                                         | Emits `WorkshopCanceledEvent` → `search_sync` removes from Elasticsearch; zero out Redis capacity counter; cancel registrations; **`notifications` worker dispatches mass cancellation alert to all registered students.** |
+| Operation            | HTTP Route & Method                             | Permitted Workshop Status                   | Allowed / Mutable Fields                                                                                                                                                                | Strictly Prohibited / Immutable Fields (`422`)                                                                                                                                                          | Key Validations & Guardrails                                                                                                                                                                                                                     | Outbox Event & Downstream Side-effects                                                                                                                                                                                     |
+| :------------------- | :---------------------------------------------- | :------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Save Draft**       | `POST /api/v1/admin/workshops/drafts`           | `DRAFT` only (or new draft if `id` is null) | `title`, `description`, `coverImageUrl`, `location`, `timezone`, `startsAt`, `endsAt`, `capacity`, `price`, `currency`, `speakers`                                                      | `status` (cannot force status transition), `organization_id` (always bound to `jwt.org`)                                                                                                                | Speaker schedule collision check against active workshops. Synchronizes `slug` from `title`. Cleans up replaced MinIO media.                                                                                                                     | **None** (`DRAFT` state never emits external events).                                                                                                                                                                      |
+| **Publish**          | `PATCH /api/v1/admin/workshops/{id}/publish`    | `DRAFT` only (`DRAFT` → `PUBLISHED`)        | `version` in request body (`{"version": integer}`) for optimistic concurrency control                                                                                                   | Any presentation or timeline field mutation in body                                                                                                                                                     | 1. Mandatory fields: `title`, `startsAt`, `endsAt`, `location`, `capacity >= 1`<br>2. Temporal validity: `startsAt > now()` and `endsAt > startsAt`<br>3. Speaker conflict re-check across active workshops<br>4. Optimistic locking (`version`) | Emits `WorkshopPublishedEvent` (`@Externalized("unihub.events::search")`) → RabbitMQ queue `q.search` → `search_sync` worker indexes workshop in Elasticsearch.                                                            |
+| **Update Published** | `PUT /api/v1/admin/workshops/{id}`              | `PUBLISHED` only                            | **Presentation & Scaling fields only:**<br>- `title` (syncs `slug`)<br>- `description`<br>- `coverImageUrl`<br>- `capacity` (can be increased or maintained)<br>- `version` (mandatory) | **Strictly Prohibited:**<br>- `startsAt`, `endsAt` (must use `/reschedule`)<br>- `price`, `currency` (immutable once on sale)<br>- `status` (must use `/cancel`)<br>- `organization_id`<br>- `speakers` | 1. `capacity >= COUNT(CONFIRMED + PENDING registrations)` (cannot reduce seats below already registered count)<br>2. Optimistic locking (`version`)<br>3. Replaced `coverImageUrl` media cleanup in MinIO                                        | Emits `WorkshopUpdatedEvent` (`@Externalized("unihub.events::search")`) → RabbitMQ queue `q.search` → `search_sync` worker updates Elasticsearch; invalidates Redis search cache. **Never notifies students.**             |
+| **Reschedule**<br>   | `PATCH /api/v1/admin/workshops/{id}/reschedule` | `PUBLISHED` only (`now < starts_at`)        | **Timeline fields only:**<br>- `startsAt`<br>- `endsAt`                                                                                                                                 | All presentation fields (`title`, `description`, `capacity`, `price`, `speakers`, etc.)                                                                                                                 | 1. `startsAt > now()` and `endsAt > startsAt`<br>2. Venue/location conflict check<br>3. Speaker schedule conflict check                                                                                                                          | Emits `WorkshopRescheduledEvent` → `search_sync` updates Elasticsearch; **`notifications` worker dispatches mass notification (email + push) to all registered students.**                                                 |
+| **Cancel**           | `PATCH /api/v1/admin/workshops/{id}/cancel`     | `PUBLISHED` only (`PUBLISHED` → `CANCELED`) | `version` (mandatory integer) and optional `reason` (string) in request body                                                                                                            | Any presentation, schedule, or pricing field mutation in body                                                                                                                                           | 1. Cannot cancel `COMPLETED`, `CANCELED`, or `DRAFT` workshops (`422`)<br>2. Optimistic locking: `payload.version == workshop.version` (`409 Conflict` on mismatch, `422` if missing)                                                            | Emits `WorkshopCanceledEvent` → `search_sync` removes from Elasticsearch; zero out Redis capacity counter; cancel registrations; **`notifications` worker dispatches mass cancellation alert to all registered students.** |
 
 ### Workshop Search & Cache-Aside Flow
 
