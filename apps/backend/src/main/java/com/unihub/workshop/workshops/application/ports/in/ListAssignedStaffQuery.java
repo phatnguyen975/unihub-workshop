@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.application.ports.in;
 
+import com.unihub.workshop.shared.exception.BadRequestException;
 import java.util.UUID;
 
 public record ListAssignedStaffQuery(
@@ -9,10 +10,10 @@ public record ListAssignedStaffQuery(
     Integer size
 ) {
     public ListAssignedStaffQuery {
-        if (size == null || size <= 0) {
+        if (size == null) {
             size = 20;
-        } else if (size > 100) {
-            size = 100;
+        } else if (size < 1 || size > 100) {
+            throw new BadRequestException("size must be between 1 and 100");
         }
     }
 }

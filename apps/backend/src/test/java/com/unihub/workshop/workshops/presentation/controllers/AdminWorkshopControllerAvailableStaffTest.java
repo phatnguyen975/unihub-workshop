@@ -278,4 +278,38 @@ class AdminWorkshopControllerAvailableStaffTest {
                 )
             );
     }
+
+    @Test
+    @DisplayName("GET /staff/available returns 400 when size is less than 1")
+    void shouldReturn400WhenSizeLessThanOne() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/admin/workshops/{id}/staff/available", WORKSHOP_ID)
+                    .param("size", "0")
+                    .principal(organizerAuth())
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
+
+    @Test
+    @DisplayName(
+        "GET /staff/available returns 400 when size is greater than 100"
+    )
+    void shouldReturn400WhenSizeGreaterThan100() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/admin/workshops/{id}/staff/available", WORKSHOP_ID)
+                    .param("size", "101")
+                    .principal(organizerAuth())
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+    }
 }

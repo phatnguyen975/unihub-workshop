@@ -117,7 +117,7 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
     - Any user ID not existing, not holding `STAFF` role, in a different org, or inactive returns HTTP 422 with `validationErrors`. _(FR-21, FR-22, BR-02, Scenario 18)_
     - Concurrent duplicate requests: the DB `UNIQUE (workshop_id, staff_user_id)` constraint catches any race, returning HTTP 409. _(BR-07, Scenario 23)_
 
-- [ ] **T4 — Organizer can revoke a single staff member's assignment from a PUBLISHED workshop before it starts**
+- [x] **T4 — Organizer can revoke a single staff member's assignment from a PUBLISHED workshop before it starts**
   - **Size:** S
   - **Depends on:** T3
   - **Layers touched:** Application (command + use case), Infrastructure (repository delete + outbox event publish), Presentation (controller endpoint)
@@ -139,11 +139,11 @@ This plan builds Feature 1.6 — Workshop Staff Assignment — into the `worksho
 
 #### Checkpoint: Feature Complete
 
-- [ ] All four tasks (T1–T4) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end.
-- [ ] `ModulithArchitectureTest` passes (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
-- [ ] Full unit test suite for affected test classes is green (`ListAssignedStaffUseCaseImplTest`, `ListAvailableStaffUseCaseImplTest`, `AssignStaffUseCaseImplTest`, `RevokeStaffUseCaseImplTest`).
-- [ ] Ready for `/review workshop-staff-assignment`.
+- [x] All four tasks (T1–T4) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end.
+- [x] `ModulithArchitectureTest` passes (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
+- [x] Full unit test suite for affected test classes is green (`ListAssignedStaffUseCaseImplTest`, `ListAvailableStaffUseCaseImplTest`, `AssignStaffUseCaseImplTest`, `RevokeStaffUseCaseImplTest`).
+- [x] Ready for `/review workshop-staff-assignment`.
 
 ## Risks and Mitigations
 

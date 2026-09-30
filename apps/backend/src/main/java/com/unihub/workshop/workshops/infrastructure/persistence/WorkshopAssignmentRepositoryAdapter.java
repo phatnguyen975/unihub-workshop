@@ -251,7 +251,12 @@ public class WorkshopAssignmentRepositoryAdapter
             organizationId,
             staffUserIds
         );
-        Map<UUID, Integer> result = new java.util.HashMap<>();
+        Map<UUID, Integer> result = new java.util.HashMap<>(
+            staffUserIds.size()
+        );
+        for (UUID userId : staffUserIds) {
+            result.put(userId, 0);
+        }
         for (Object[] row : rows) {
             UUID userId = (UUID) row[0];
             Number count = (Number) row[1];

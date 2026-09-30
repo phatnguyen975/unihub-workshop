@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.presentation.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -29,8 +30,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminWorkshopControllerRevokeStaffTest {
 
@@ -77,7 +76,9 @@ class AdminWorkshopControllerRevokeStaffTest {
     }
 
     @Test
-    @DisplayName("DELETE /staff/{userId} returns 204 No Content with empty body on success")
+    @DisplayName(
+        "DELETE /staff/{userId} returns 204 No Content with empty body on success"
+    )
     void shouldReturn204OnSuccess() throws Exception {
         doNothing().when(revokeStaffUseCase).execute(any());
 
@@ -92,7 +93,9 @@ class AdminWorkshopControllerRevokeStaffTest {
             .andExpect(status().isNoContent())
             .andExpect(content().string(""));
 
-        ArgumentCaptor<RevokeStaffCommand> captor = ArgumentCaptor.forClass(RevokeStaffCommand.class);
+        ArgumentCaptor<RevokeStaffCommand> captor = ArgumentCaptor.forClass(
+            RevokeStaffCommand.class
+        );
         verify(revokeStaffUseCase).execute(captor.capture());
         assertThat(captor.getValue().workshopId()).isEqualTo(WORKSHOP_ID);
         assertThat(captor.getValue().staffUserId()).isEqualTo(STAFF_USER_ID);
@@ -101,10 +104,13 @@ class AdminWorkshopControllerRevokeStaffTest {
     }
 
     @Test
-    @DisplayName("DELETE /staff/{userId} returns 404 when workshop does not exist or staff is not assigned")
+    @DisplayName(
+        "DELETE /staff/{userId} returns 404 when workshop does not exist or staff is not assigned"
+    )
     void shouldReturn404WhenNotFound() throws Exception {
         doThrow(new NotFoundException("Staff assignment not found"))
-            .when(revokeStaffUseCase).execute(any());
+            .when(revokeStaffUseCase)
+            .execute(any());
 
         mockMvc
             .perform(
@@ -116,14 +122,23 @@ class AdminWorkshopControllerRevokeStaffTest {
             )
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.type").value("urn:unihub:error:not-found"));
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:not-found")
+            );
     }
 
     @Test
-    @DisplayName("DELETE /staff/{userId} returns 403 when workshop belongs to different organization")
+    @DisplayName(
+        "DELETE /staff/{userId} returns 403 when workshop belongs to different organization"
+    )
     void shouldReturn403WhenDifferentOrg() throws Exception {
-        doThrow(new ForbiddenException("Cannot access workshop belonging to a different organization"))
-            .when(revokeStaffUseCase).execute(any());
+        doThrow(
+            new ForbiddenException(
+                "Cannot access workshop belonging to a different organization"
+            )
+        )
+            .when(revokeStaffUseCase)
+            .execute(any());
 
         mockMvc
             .perform(
@@ -135,14 +150,23 @@ class AdminWorkshopControllerRevokeStaffTest {
             )
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.type").value("urn:unihub:error:forbidden"));
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:forbidden")
+            );
     }
 
     @Test
-    @DisplayName("DELETE /staff/{userId} returns 409 Conflict when workshop is not PUBLISHED")
+    @DisplayName(
+        "DELETE /staff/{userId} returns 409 Conflict when workshop is not PUBLISHED"
+    )
     void shouldReturn409WhenNotPublished() throws Exception {
-        doThrow(new ConflictException("Workshop must be in PUBLISHED status before revoking staff."))
-            .when(revokeStaffUseCase).execute(any());
+        doThrow(
+            new ConflictException(
+                "Workshop must be in PUBLISHED status before revoking staff."
+            )
+        )
+            .when(revokeStaffUseCase)
+            .execute(any());
 
         mockMvc
             .perform(
@@ -154,18 +178,24 @@ class AdminWorkshopControllerRevokeStaffTest {
             )
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.type").value("urn:unihub:error:conflict"));
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:conflict")
+            );
     }
 
     @Test
-    @DisplayName("DELETE /staff/{userId} returns 422 Unprocessable Content when workshop already started")
+    @DisplayName(
+        "DELETE /staff/{userId} returns 422 Unprocessable Content when workshop already started"
+    )
     void shouldReturn422WhenAlreadyStarted() throws Exception {
         doThrow(
             new ValidationException(
                 "Cannot revoke staff after the workshop has started.",
                 List.of("startsAt: Workshop has already started")
             )
-        ).when(revokeStaffUseCase).execute(any());
+        )
+            .when(revokeStaffUseCase)
+            .execute(any());
 
         mockMvc
             .perform(
@@ -175,9 +205,15 @@ class AdminWorkshopControllerRevokeStaffTest {
                     STAFF_USER_ID
                 ).principal(organizerAuth())
             )
-            .andExpect(status().isUnprocessableEntity())
+            .andExpect(status().isUnprocessableContent())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.error.type").value("urn:unihub:error:validation"))
-            .andExpect(jsonPath("$.error.validationErrors[0]").value("startsAt: Workshop has already started"));
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:validation")
+            )
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    "startsAt: Workshop has already started"
+                )
+            );
     }
 }

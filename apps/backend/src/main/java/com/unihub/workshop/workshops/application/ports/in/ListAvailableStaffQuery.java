@@ -22,10 +22,10 @@ public record ListAvailableStaffQuery(
                 q = null;
             }
         }
-        if (size == null || size <= 0) {
+        if (size == null) {
             size = 20;
-        } else if (size > 100) {
-            size = 100;
+        } else if (size < 1 || size > 100) {
+            throw new BadRequestException("size must be between 1 and 100");
         }
     }
 }

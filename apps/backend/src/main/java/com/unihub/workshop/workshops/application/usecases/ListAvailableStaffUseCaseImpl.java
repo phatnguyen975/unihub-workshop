@@ -36,10 +36,13 @@ public class ListAvailableStaffUseCaseImpl
     private final WorkshopAssignmentRepository assignmentRepository;
     private final IamApi iamApi;
 
+    private static final Comparator<String> NAME_COMPARATOR =
+        Comparator.nullsLast(String::compareToIgnoreCase);
+
     private static final Comparator<StaffUserDto> STAFF_COMPARATOR =
         Comparator.comparing(
             StaffUserDto::fullName,
-            Comparator.nullsLast(String::compareToIgnoreCase)
+            NAME_COMPARATOR
         ).thenComparing(StaffUserDto::userId);
 
     @Override
@@ -183,13 +186,13 @@ public class ListAvailableStaffUseCaseImpl
         }
         String cursorName = cursor.primaryValue();
         UUID cursorId = cursor.id();
-        if (cursorName == null) {
-            return true;
-        }
-        int cmp = staff.fullName().compareToIgnoreCase(cursorName);
+        int cmp = NAME_COMPARATOR.compare(staff.fullName(), cursorName);
         if (cmp > 0) {
             return true;
         } else if (cmp == 0) {
+            if (cursorId == null) {
+                return true;
+            }
             return staff.userId().compareTo(cursorId) > 0;
         }
         return false;

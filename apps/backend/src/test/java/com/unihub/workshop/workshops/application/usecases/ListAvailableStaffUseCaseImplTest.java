@@ -2,6 +2,8 @@ package com.unihub.workshop.workshops.application.usecases;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.iam.api.IamApi;
@@ -11,6 +13,8 @@ import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffQuery;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopAssignmentRepository;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
@@ -341,5 +345,78 @@ class ListAvailableStaffUseCaseImplTest {
 
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).fullName()).isEqualTo("Alice Nguyen");
+    }
+
+    @Test
+    @DisplayName(
+        "Should not throw NullPointerException when staff fullName is null during cursor pagination"
+    )
+    void shouldHandleNullFullNameWithoutThrowingNpeWhenPaginatingWithCursor() {
+        Workshop workshop = publishedWorkshop();
+        when(workshopRepository.findById(workshopId)).thenReturn(
+            Optional.of(workshop)
+        );
+
+        UUID id1 = UUID.randomUUID();
+        UUID idNullName = UUID.randomUUID();
+
+        StaffUserDto staff1 = new StaffUserDto(
+            id1,
+            organizationId,
+            "STAFF",
+            true,
+            "Alice Nguyen",
+            "alice@example.com",
+            null,
+            null
+        );
+        StaffUserDto staffNullName = new StaffUserDto(
+            idNullName,
+            organizationId,
+            "STAFF",
+            true,
+            null,
+            "noname@example.com",
+            null,
+            null
+        );
+
+        when(iamApi.listActiveStaffByOrganization(organizationId)).thenReturn(
+            List.of(staff1, staffNullName)
+        );
+        when(
+            assignmentRepository.findAssignedStaffUserIds(workshopId)
+        ).thenReturn(Set.of());
+        when(
+            assignmentRepository.findScheduleConflictingStaffUserIds(
+                organizationId,
+                workshopId,
+                futureStartsAt,
+                futureEndsAt
+            )
+        ).thenReturn(Set.of());
+        when(
+            assignmentRepository.countActiveAssignmentsForUsers(
+                eq(organizationId),
+                any()
+            )
+        ).thenReturn(Map.of(idNullName, 0));
+
+        String cursor = KeysetCursorCodec.encode(
+            KeysetCursor.of(id1, "fullName", "Alice Nguyen")
+        );
+
+        ListAvailableStaffQuery query = new ListAvailableStaffQuery(
+            workshopId,
+            organizationId,
+            null,
+            cursor,
+            20
+        );
+
+        CursorPage<AvailableStaff> result = useCase.execute(query);
+
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().get(0).userId()).isEqualTo(idNullName);
     }
 }
