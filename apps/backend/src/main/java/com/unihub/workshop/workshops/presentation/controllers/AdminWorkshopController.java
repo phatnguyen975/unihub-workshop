@@ -10,15 +10,29 @@ import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.shared.storage.MediaValidationUtils;
 import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
+import com.unihub.workshop.workshops.application.ports.in.AssignStaffCommand;
+import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffQuery;
+import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffQuery;
+import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.RevokeStaffCommand;
+import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
+import com.unihub.workshop.workshops.domain.model.AssignedStaff;
+import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
+import com.unihub.workshop.workshops.presentation.dto.AssignStaffRequest;
+import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
@@ -29,6 +43,7 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +72,10 @@ public class AdminWorkshopController {
     private final GetWorkshopUseCase getWorkshopUseCase;
     private final DeleteDraftUseCase deleteDraftUseCase;
     private final ListAdminWorkshopsUseCase listAdminWorkshopsUseCase;
+    private final ListAssignedStaffUseCase listAssignedStaffUseCase;
+    private final ListAvailableStaffUseCase listAvailableStaffUseCase;
+    private final AssignStaffUseCase assignStaffUseCase;
+    private final RevokeStaffUseCase revokeStaffUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -132,6 +151,117 @@ public class AdminWorkshopController {
             response,
             "Workshop retrieved successfully."
         );
+    }
+
+    @GetMapping("/{id}/staff")
+    public ApiResponse<
+        PageResponse<AssignedStaffItemResponse>
+    > listAssignedStaff(
+        @PathVariable UUID id,
+        @RequestParam(name = "cursor", required = false) String cursor,
+        @RequestParam(
+            name = "size",
+            required = false,
+            defaultValue = "20"
+        ) Integer size,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+        ListAssignedStaffQuery query = new ListAssignedStaffQuery(
+            id,
+            organizationId,
+            cursor,
+            size
+        );
+        CursorPage<AssignedStaff> page = listAssignedStaffUseCase.execute(
+            query
+        );
+
+        return ApiResponse.success(
+            workshopMapper.toAssignedStaffPageResponse(page),
+            "Assigned staff retrieved successfully."
+        );
+    }
+
+    @GetMapping("/{id}/staff/available")
+    public ApiResponse<
+        PageResponse<AvailableStaffItemResponse>
+    > listAvailableStaff(
+        @PathVariable UUID id,
+        @RequestParam(name = "q", required = false) String q,
+        @RequestParam(name = "cursor", required = false) String cursor,
+        @RequestParam(
+            name = "size",
+            required = false,
+            defaultValue = "20"
+        ) Integer size,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+        ListAvailableStaffQuery query = new ListAvailableStaffQuery(
+            id,
+            organizationId,
+            q,
+            cursor,
+            size
+        );
+        CursorPage<AvailableStaff> page = listAvailableStaffUseCase.execute(
+            query
+        );
+
+        return ApiResponse.success(
+            workshopMapper.toAvailableStaffPageResponse(page),
+            "Available staff retrieved successfully."
+        );
+    }
+
+    @PostMapping("/{id}/staff")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<BatchAssignResponse> assignStaff(
+        @PathVariable UUID id,
+        @Valid @RequestBody AssignStaffRequest request,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        AssignStaffCommand command = new AssignStaffCommand(
+            id,
+            organizationId,
+            callerId,
+            request.staffUserIds()
+        );
+
+        List<AssignedStaff> assigned = assignStaffUseCase.execute(command);
+        BatchAssignResponse response = workshopMapper.toBatchAssignResponse(
+            id,
+            assigned
+        );
+
+        return ApiResponse.success(
+            response,
+            "Staff members assigned successfully."
+        );
+    }
+
+    @DeleteMapping("/{id}/staff/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeStaff(
+        @PathVariable UUID id,
+        @PathVariable UUID userId,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        RevokeStaffCommand command = new RevokeStaffCommand(
+            id,
+            userId,
+            organizationId,
+            callerId
+        );
+
+        revokeStaffUseCase.execute(command);
     }
 
     @DeleteMapping("/{id}")

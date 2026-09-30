@@ -5,6 +5,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Workshops Module",
-    allowedDependencies = { "shared" }
+    allowedDependencies = { "shared", "iam::api" }
 )
 package com.unihub.workshop.workshops;

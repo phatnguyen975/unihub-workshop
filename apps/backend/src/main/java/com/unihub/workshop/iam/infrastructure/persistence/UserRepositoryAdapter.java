@@ -213,6 +213,35 @@ public class UserRepositoryAdapter implements UserRepository {
         return new CursorPage<>(items, nextCursor, slice.hasMore());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findAllById(java.util.Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return repository
+            .findAllById(ids)
+            .stream()
+            .map(userMapper::toDomain)
+            .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findActiveStaffByOrganizationId(UUID organizationId) {
+        if (organizationId == null) {
+            return List.of();
+        }
+        return repository
+            .findByOrganizationIdAndRoleAndIsActiveTrue(
+                organizationId,
+                UserRole.STAFF.name()
+            )
+            .stream()
+            .map(userMapper::toDomain)
+            .toList();
+    }
+
     private String sanitizeQuery(String query) {
         if (query == null) {
             return null;

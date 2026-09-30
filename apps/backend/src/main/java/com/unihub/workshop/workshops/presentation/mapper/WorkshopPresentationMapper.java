@@ -3,14 +3,20 @@ package com.unihub.workshop.workshops.presentation.mapper;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
+import com.unihub.workshop.workshops.domain.model.AssignedStaff;
+import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
+import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
+import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerResponse;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopSummaryResponse;
+import java.util.List;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -27,6 +33,38 @@ public interface WorkshopPresentationMapper {
         CursorPage<WorkshopSummary> page
     ) {
         return PageResponse.from(page, this::toSummaryResponse);
+    }
+
+    AssignedStaffItemResponse toAssignedStaffItemResponse(AssignedStaff domain);
+
+    default PageResponse<AssignedStaffItemResponse> toAssignedStaffPageResponse(
+        CursorPage<AssignedStaff> page
+    ) {
+        return PageResponse.from(page, this::toAssignedStaffItemResponse);
+    }
+
+    AvailableStaffItemResponse toAvailableStaffItemResponse(
+        AvailableStaff domain
+    );
+
+    default PageResponse<AvailableStaffItemResponse> toAvailableStaffPageResponse(
+        CursorPage<AvailableStaff> page
+    ) {
+        return PageResponse.from(page, this::toAvailableStaffItemResponse);
+    }
+
+    default BatchAssignResponse toBatchAssignResponse(
+        UUID workshopId,
+        List<AssignedStaff> assignedStaffs
+    ) {
+        List<AssignedStaffItemResponse> items =
+            assignedStaffs != null
+                ? assignedStaffs
+                      .stream()
+                      .map(this::toAssignedStaffItemResponse)
+                      .toList()
+                : List.of();
+        return new BatchAssignResponse(workshopId, items);
     }
 
     @Mapping(target = "id", source = "request.id")

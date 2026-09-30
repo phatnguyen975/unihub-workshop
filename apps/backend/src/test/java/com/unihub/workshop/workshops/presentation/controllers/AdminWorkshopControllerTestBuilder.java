@@ -3,9 +3,13 @@ package com.unihub.workshop.workshops.presentation.controllers;
 import static org.mockito.Mockito.mock;
 
 import com.unihub.workshop.shared.storage.MediaStoragePort;
+import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import org.mapstruct.factory.Mappers;
@@ -21,6 +25,18 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private ListAdminWorkshopsUseCase listAdminWorkshopsUseCase = mock(
         ListAdminWorkshopsUseCase.class
+    );
+    private ListAssignedStaffUseCase listAssignedStaffUseCase = mock(
+        ListAssignedStaffUseCase.class
+    );
+    private ListAvailableStaffUseCase listAvailableStaffUseCase = mock(
+        ListAvailableStaffUseCase.class
+    );
+    private AssignStaffUseCase assignStaffUseCase = mock(
+        AssignStaffUseCase.class
+    );
+    private RevokeStaffUseCase revokeStaffUseCase = mock(
+        RevokeStaffUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -59,6 +75,34 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withListAssignedStaffUseCase(
+        ListAssignedStaffUseCase listAssignedStaffUseCase
+    ) {
+        this.listAssignedStaffUseCase = listAssignedStaffUseCase;
+        return this;
+    }
+
+    public AdminWorkshopControllerTestBuilder withListAvailableStaffUseCase(
+        ListAvailableStaffUseCase listAvailableStaffUseCase
+    ) {
+        this.listAvailableStaffUseCase = listAvailableStaffUseCase;
+        return this;
+    }
+
+    public AdminWorkshopControllerTestBuilder withAssignStaffUseCase(
+        AssignStaffUseCase assignStaffUseCase
+    ) {
+        this.assignStaffUseCase = assignStaffUseCase;
+        return this;
+    }
+
+    public AdminWorkshopControllerTestBuilder withRevokeStaffUseCase(
+        RevokeStaffUseCase revokeStaffUseCase
+    ) {
+        this.revokeStaffUseCase = revokeStaffUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -79,6 +123,10 @@ public class AdminWorkshopControllerTestBuilder {
             getWorkshopUseCase,
             deleteDraftUseCase,
             listAdminWorkshopsUseCase,
+            listAssignedStaffUseCase,
+            listAvailableStaffUseCase,
+            assignStaffUseCase,
+            revokeStaffUseCase,
             workshopMapper,
             mediaStoragePort
         );

@@ -381,6 +381,8 @@ CREATE TABLE workshop_assignments (
 
 -- Index: look up all workshops assigned to a STAFF member (workload view)
 CREATE INDEX idx_workshop_assignments_staff_user_id ON workshop_assignments (staff_user_id);
+-- Keyset pagination index for workshop staff listing (assigned_at DESC, id DESC)
+CREATE INDEX idx_workshop_assignments_keyset_pagination ON workshop_assignments (workshop_id, assigned_at DESC, id DESC);
 
 CREATE TRIGGER trg_workshop_assignments_updated_at
     BEFORE UPDATE ON workshop_assignments

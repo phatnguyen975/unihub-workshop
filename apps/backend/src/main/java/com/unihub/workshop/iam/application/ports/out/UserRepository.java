@@ -4,6 +4,8 @@ import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,4 +41,8 @@ public interface UserRepository {
     );
 
     void updateIsActive(UUID userId, UUID organizationId, boolean isActive);
+
+    List<User> findAllById(Collection<UUID> ids);
+
+    List<User> findActiveStaffByOrganizationId(UUID organizationId);
 }
