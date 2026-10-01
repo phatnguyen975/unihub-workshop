@@ -380,4 +380,55 @@ public record Workshop(
             .updatedBy(updatedBy)
             .build();
     }
+
+    public Workshop reschedule(
+        Instant newStartsAt,
+        Instant newEndsAt,
+        UUID updatedBy
+    ) {
+        if (this.status != WorkshopStatus.PUBLISHED) {
+            if (this.status == WorkshopStatus.DRAFT) {
+                throw new ValidationException(
+                    "status",
+                    "Workshop is in DRAFT status. Please use the draft endpoint to modify the schedule."
+                );
+            }
+            throw new ValidationException(
+                "status",
+                "Workshops in terminal status (" +
+                    this.status +
+                    ") cannot be rescheduled."
+            );
+        }
+
+        if (newStartsAt == null) {
+            throw new ValidationException("startsAt", "must not be null");
+        }
+
+        if (newEndsAt == null) {
+            throw new ValidationException("endsAt", "must not be null");
+        }
+
+        if (!newEndsAt.isAfter(newStartsAt)) {
+            throw new ValidationException(
+                "endsAt",
+                "endsAt must be strictly after startsAt"
+            );
+        }
+
+        Instant now = Instant.now();
+        if (!newStartsAt.isAfter(now)) {
+            throw new ValidationException(
+                "startsAt",
+                "Workshop start time must be in the future"
+            );
+        }
+
+        return this.toBuilder()
+            .startsAt(newStartsAt)
+            .endsAt(newEndsAt)
+            .updatedAt(now)
+            .updatedBy(updatedBy)
+            .build();
+    }
 }

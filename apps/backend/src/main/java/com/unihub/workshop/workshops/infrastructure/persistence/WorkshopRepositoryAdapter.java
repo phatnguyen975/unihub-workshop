@@ -190,6 +190,42 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<UUID> findCollidingWorkshopAtLocation(
+        String location,
+        Instant startsAt,
+        Instant endsAt,
+        UUID excludeWorkshopId
+    ) {
+        if (
+            location == null ||
+            location.isBlank() ||
+            startsAt == null ||
+            endsAt == null
+        ) {
+            return Optional.empty();
+        }
+        String normalizedLocation = location.trim();
+        List<UUID> collidingIds =
+            excludeWorkshopId != null
+                ? repository.findCollidingWorkshopIdsAtLocationExcludingWorkshop(
+                      normalizedLocation,
+                      startsAt,
+                      endsAt,
+                      excludeWorkshopId
+                  )
+                : repository.findCollidingWorkshopIdsAtLocation(
+                      normalizedLocation,
+                      startsAt,
+                      endsAt
+                  );
+
+        return collidingIds.isEmpty()
+            ? Optional.empty()
+            : Optional.of(collidingIds.get(0));
+    }
+
+    @Override
     @Transactional
     public void deleteById(UUID id) {
         speakerRepository.deleteByWorkshopId(id);

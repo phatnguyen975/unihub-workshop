@@ -26,6 +26,13 @@ public interface WorkshopRepository {
         UUID excludeWorkshopId
     );
 
+    Optional<UUID> findCollidingWorkshopAtLocation(
+        String location,
+        Instant startsAt,
+        Instant endsAt,
+        UUID excludeWorkshopId
+    );
+
     void deleteById(UUID id);
 
     CursorPage<WorkshopSummary> findAllByOrganizationWithFilters(

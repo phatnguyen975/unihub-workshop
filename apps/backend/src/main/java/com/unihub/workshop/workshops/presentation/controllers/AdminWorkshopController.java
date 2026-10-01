@@ -22,6 +22,8 @@ import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffQuer
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.PublishWorkshopCommand;
 import com.unihub.workshop.workshops.application.ports.in.PublishWorkshopUseCase;
+import com.unihub.workshop.workshops.application.ports.in.RescheduleWorkshopCommand;
+import com.unihub.workshop.workshops.application.ports.in.RescheduleWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffCommand;
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
@@ -39,6 +41,7 @@ import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse
 import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.PublishWorkshopRequest;
+import com.unihub.workshop.workshops.presentation.dto.RescheduleWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.UpdateWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
@@ -86,6 +89,7 @@ public class AdminWorkshopController {
     private final RevokeStaffUseCase revokeStaffUseCase;
     private final PublishWorkshopUseCase publishWorkshopUseCase;
     private final UpdateWorkshopUseCase updateWorkshopUseCase;
+    private final RescheduleWorkshopUseCase rescheduleWorkshopUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -372,6 +376,43 @@ public class AdminWorkshopController {
         WorkshopResponse response = workshopMapper.toResponse(updated);
 
         return ApiResponse.success(response, "Workshop updated successfully.");
+    }
+
+    @PatchMapping("/{id}/reschedule")
+    public ApiResponse<WorkshopResponse> rescheduleWorkshop(
+        @PathVariable UUID id,
+        @Valid @RequestBody RescheduleWorkshopRequest request,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        RescheduleWorkshopCommand command = RescheduleWorkshopCommand.builder()
+            .workshopId(id)
+            .organizationId(organizationId)
+            .callerId(callerId)
+            .version(request.version())
+            .startsAt(request.startsAt())
+            .endsAt(request.endsAt())
+            .title(request.title())
+            .description(request.description())
+            .coverImageUrl(request.coverImageUrl())
+            .location(request.location())
+            .capacity(request.capacity())
+            .price(request.price())
+            .currency(request.currency())
+            .speakers(request.speakers())
+            .status(request.status())
+            .requestedOrgId(request.organizationId())
+            .build();
+
+        Workshop rescheduled = rescheduleWorkshopUseCase.execute(command);
+        WorkshopResponse response = workshopMapper.toResponse(rescheduled);
+
+        return ApiResponse.success(
+            response,
+            "Workshop rescheduled successfully."
+        );
     }
 
     @PostMapping(
