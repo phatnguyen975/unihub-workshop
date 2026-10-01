@@ -20,10 +20,14 @@ import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffQuery
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffQuery;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.PublishWorkshopCommand;
+import com.unihub.workshop.workshops.application.ports.in.PublishWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffCommand;
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
+import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopCommand;
+import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopUseCase;
 import com.unihub.workshop.workshops.domain.model.AssignedStaff;
 import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Workshop;
@@ -34,7 +38,9 @@ import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
+import com.unihub.workshop.workshops.presentation.dto.PublishWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
+import com.unihub.workshop.workshops.presentation.dto.UpdateWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopSummaryResponse;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
@@ -53,8 +59,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -76,6 +84,8 @@ public class AdminWorkshopController {
     private final ListAvailableStaffUseCase listAvailableStaffUseCase;
     private final AssignStaffUseCase assignStaffUseCase;
     private final RevokeStaffUseCase revokeStaffUseCase;
+    private final PublishWorkshopUseCase publishWorkshopUseCase;
+    private final UpdateWorkshopUseCase updateWorkshopUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -304,6 +314,64 @@ public class AdminWorkshopController {
             response,
             "Workshop draft updated successfully."
         );
+    }
+
+    @PatchMapping("/{id}/publish")
+    public ApiResponse<WorkshopResponse> publishWorkshop(
+        @PathVariable UUID id,
+        @Valid @RequestBody PublishWorkshopRequest request,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        PublishWorkshopCommand command = PublishWorkshopCommand.builder()
+            .workshopId(id)
+            .organizationId(organizationId)
+            .callerId(callerId)
+            .version(request.version())
+            .build();
+
+        Workshop published = publishWorkshopUseCase.execute(command);
+        WorkshopResponse response = workshopMapper.toResponse(published);
+
+        return ApiResponse.success(
+            response,
+            "Workshop published successfully."
+        );
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<WorkshopResponse> updateWorkshop(
+        @PathVariable UUID id,
+        @Valid @RequestBody UpdateWorkshopRequest request,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        UpdateWorkshopCommand command = UpdateWorkshopCommand.builder()
+            .workshopId(id)
+            .organizationId(organizationId)
+            .callerId(callerId)
+            .version(request.version())
+            .title(request.title())
+            .description(request.description())
+            .coverImageUrl(request.coverImageUrl())
+            .capacity(request.capacity())
+            .startsAt(request.startsAt())
+            .endsAt(request.endsAt())
+            .price(request.price())
+            .currency(request.currency())
+            .status(request.status())
+            .requestedOrgId(request.organizationId())
+            .speakers(request.speakers())
+            .build();
+
+        Workshop updated = updateWorkshopUseCase.execute(command);
+        WorkshopResponse response = workshopMapper.toResponse(updated);
+
+        return ApiResponse.success(response, "Workshop updated successfully.");
     }
 
     @PostMapping(
