@@ -19,7 +19,7 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/reschedule` endp
 
 ### Phase 1: Domain Behavior & Persistence Query
 
-- [ ] **T1 — `Workshop` aggregate gains a `reschedule()` domain method, and the `WorkshopRepository` outbound port gains a campus-wide location collision query**
+- [x] **T1 — `Workshop` aggregate gains a `reschedule()` domain method, and the `WorkshopRepository` outbound port gains a campus-wide location collision query**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application (outbound port), Infrastructure (persistence adapter + JPA repository)
@@ -39,13 +39,13 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/reschedule` endp
 
 #### Checkpoint: Phase 1
 
-- [ ] All Phase 1 unit tests pass (`WorkshopTest` reschedule cases, `WorkshopRepositoryAdapterLocationTest`).
-- [ ] `WorkshopRepository` port interface compiles with the new method signature.
-- [ ] No existing tests in `WorkshopTest` or `WorkshopRepositoryAdapterSpeakerTest` are broken.
+- [x] All Phase 1 unit tests pass (`WorkshopTest` reschedule cases, `WorkshopRepositoryAdapterLocationTest`).
+- [x] `WorkshopRepository` port interface compiles with the new method signature.
+- [x] No existing tests in `WorkshopTest` or `WorkshopRepositoryAdapterSpeakerTest` are broken.
 
 ### Phase 2: Use-Case Orchestration & Outbox Event
 
-- [ ] **T2 — `RescheduleWorkshopUseCaseImpl` orchestrates all guard clauses, conflict checks, and atomic commit with `WorkshopRescheduledEvent` emission**
+- [x] **T2 — `RescheduleWorkshopUseCaseImpl` orchestrates all guard clauses, conflict checks, and atomic commit with `WorkshopRescheduledEvent` emission**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Application (in-port command + use-case interface + use-case impl), Shared Kernel (new domain event)
@@ -69,13 +69,13 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/reschedule` endp
 
 #### Checkpoint: Phase 2
 
-- [ ] All Phase 2 unit tests pass (`RescheduleWorkshopUseCaseImplTest` — all 9 scenarios above).
-- [ ] `WorkshopRescheduledEvent` compiles with `@Externalized("unihub.events::workshop.rescheduled")`.
-- [ ] No existing use-case tests (`PublishWorkshopUseCaseImplTest`, `UpdateWorkshopUseCaseImplTest`) are broken.
+- [x] All Phase 2 unit tests pass (`RescheduleWorkshopUseCaseImplTest` — all 9 scenarios above).
+- [x] `WorkshopRescheduledEvent` compiles with `@Externalized("unihub.events::workshop.rescheduled")`.
+- [x] No existing use-case tests (`PublishWorkshopUseCaseImplTest`, `UpdateWorkshopUseCaseImplTest`) are broken.
 
 ### Phase 3: HTTP Presentation Layer
 
-- [ ] **T3 — `PATCH /api/v1/admin/workshops/{id}/reschedule` endpoint wired in `AdminWorkshopController`, returning `200 OK` with full `WorkshopResponse`**
+- [x] **T3 — `PATCH /api/v1/admin/workshops/{id}/reschedule` endpoint wired in `AdminWorkshopController`, returning `200 OK` with full `WorkshopResponse`**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Presentation (request DTO, controller handler, controller test)
@@ -96,11 +96,11 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/reschedule` endp
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1–T3 are checked off.
-- [ ] All acceptance criteria across T1, T2, and T3 have been verified by their respective unit tests.
-- [ ] `ModulithArchitectureTest` passes (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
-- [ ] No regression in any existing test class in the `workshops` module.
-- [ ] Ready for `/review workshop-rescheduling`.
+- [x] All tasks T1–T3 are checked off.
+- [x] All acceptance criteria across T1, T2, and T3 have been verified by their respective unit tests.
+- [x] `ModulithArchitectureTest` passes (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
+- [x] No regression in any existing test class in the `workshops` module.
+- [x] Ready for `/review workshop-rescheduling`.
 
 ## Risks and Mitigations
 

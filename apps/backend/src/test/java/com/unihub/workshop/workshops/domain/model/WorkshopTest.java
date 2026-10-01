@@ -636,4 +636,271 @@ class WorkshopTest {
             .isInstanceOf(ValidationException.class)
             .hasMessageContaining("capacity");
     }
+
+    @Test
+    @DisplayName(
+        "reschedule updates startsAt, endsAt, updatedAt, updatedBy on PUBLISHED workshop"
+    )
+    void shouldReschedulePublishedWorkshop() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID updaterId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        Instant newStartsAt = Instant.now().plusSeconds(86400 * 5);
+        Instant newEndsAt = newStartsAt.plusSeconds(10800);
+
+        Workshop rescheduled = published.reschedule(
+            newStartsAt,
+            newEndsAt,
+            updaterId
+        );
+
+        assertThat(rescheduled.startsAt()).isEqualTo(newStartsAt);
+        assertThat(rescheduled.endsAt()).isEqualTo(newEndsAt);
+        assertThat(rescheduled.updatedBy()).isEqualTo(updaterId);
+        assertThat(rescheduled.updatedAt()).isNotNull();
+        assertThat(rescheduled.status()).isEqualTo(WorkshopStatus.PUBLISHED);
+    }
+
+    @Test
+    @DisplayName(
+        "reschedule throws ValidationException when workshop is in DRAFT status"
+    )
+    void shouldFailToRescheduleWhenStatusIsDraft() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop draft = Workshop.createDraft(
+            orgId,
+            "Draft Title",
+            "draft-title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        );
+
+        Instant newStartsAt = Instant.now().plusSeconds(86400 * 5);
+        Instant newEndsAt = newStartsAt.plusSeconds(7200);
+
+        assertThatThrownBy(() ->
+            draft.reschedule(newStartsAt, newEndsAt, userId)
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("Workshop is in DRAFT status");
+    }
+
+    @Test
+    @DisplayName(
+        "reschedule throws ValidationException when workshop is in terminal status"
+    )
+    void shouldFailToRescheduleWhenStatusIsTerminal() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop canceled = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        )
+            .publish(userId)
+            .toBuilder()
+            .status(WorkshopStatus.CANCELED)
+            .build();
+
+        Instant newStartsAt = Instant.now().plusSeconds(86400 * 5);
+        Instant newEndsAt = newStartsAt.plusSeconds(7200);
+
+        assertThatThrownBy(() ->
+            canceled.reschedule(newStartsAt, newEndsAt, userId)
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("terminal status");
+    }
+
+    @Test
+    @DisplayName(
+        "reschedule throws ValidationException when startsAt is in the past"
+    )
+    void shouldFailToRescheduleWhenStartsAtInPast() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        Instant pastStartsAt = Instant.now().minusSeconds(3600);
+        Instant newEndsAt = Instant.now().plusSeconds(3600);
+
+        assertThatThrownBy(() ->
+            published.reschedule(pastStartsAt, newEndsAt, userId)
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("future")
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "startsAt: Workshop start time must be in the future"
+                );
+            });
+    }
+
+    @Test
+    @DisplayName(
+        "reschedule throws ValidationException when endsAt is not strictly after startsAt"
+    )
+    void shouldFailToRescheduleWhenEndsAtNotAfterStartsAt() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        Instant newStartsAt = Instant.now().plusSeconds(86400 * 3);
+
+        assertThatThrownBy(() ->
+            published.reschedule(newStartsAt, newStartsAt, userId)
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("endsAt must be strictly after startsAt")
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "endsAt: endsAt must be strictly after startsAt"
+                );
+            });
+
+        assertThatThrownBy(() ->
+            published.reschedule(
+                newStartsAt,
+                newStartsAt.minusSeconds(3600),
+                userId
+            )
+        )
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("endsAt must be strictly after startsAt")
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "endsAt: endsAt must be strictly after startsAt"
+                );
+            });
+    }
+
+    @Test
+    @DisplayName(
+        "reschedule throws ValidationException when startsAt or endsAt is null"
+    )
+    void shouldFailToRescheduleWhenTimesNull() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        Instant future = Instant.now().plusSeconds(86400 * 3);
+
+        assertThatThrownBy(() -> published.reschedule(null, future, userId))
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("must not be null")
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "startsAt: must not be null"
+                );
+            });
+
+        assertThatThrownBy(() -> published.reschedule(future, null, userId))
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("must not be null")
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "endsAt: must not be null"
+                );
+            });
+    }
 }

@@ -10,6 +10,7 @@ import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseC
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.PublishWorkshopUseCase;
+import com.unihub.workshop.workshops.application.ports.in.RescheduleWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopUseCase;
@@ -45,6 +46,9 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private UpdateWorkshopUseCase updateWorkshopUseCase = mock(
         UpdateWorkshopUseCase.class
+    );
+    private RescheduleWorkshopUseCase rescheduleWorkshopUseCase = mock(
+        RescheduleWorkshopUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -125,6 +129,13 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withRescheduleWorkshopUseCase(
+        RescheduleWorkshopUseCase rescheduleWorkshopUseCase
+    ) {
+        this.rescheduleWorkshopUseCase = rescheduleWorkshopUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -151,6 +162,7 @@ public class AdminWorkshopControllerTestBuilder {
             revokeStaffUseCase,
             publishWorkshopUseCase,
             updateWorkshopUseCase,
+            rescheduleWorkshopUseCase,
             workshopMapper,
             mediaStoragePort
         );
