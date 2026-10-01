@@ -103,6 +103,38 @@
       "arguments": {}
     },
     {
+      "source": "unihub.events",
+      "vhost": "/",
+      "destination": "q.search",
+      "destination_type": "queue",
+      "routing_key": "workshop.rescheduled",
+      "arguments": {}
+    },
+    {
+      "source": "unihub.events",
+      "vhost": "/",
+      "destination": "q.notifications",
+      "destination_type": "queue",
+      "routing_key": "workshop.rescheduled",
+      "arguments": {}
+    },
+    {
+      "source": "unihub.events",
+      "vhost": "/",
+      "destination": "q.search",
+      "destination_type": "queue",
+      "routing_key": "workshop.canceled",
+      "arguments": {}
+    },
+    {
+      "source": "unihub.events",
+      "vhost": "/",
+      "destination": "q.notifications",
+      "destination_type": "queue",
+      "routing_key": "workshop.canceled",
+      "arguments": {}
+    },
+    {
       "source": "unihub.dlx",
       "vhost": "/",
       "destination": "q.dlq.unihub",

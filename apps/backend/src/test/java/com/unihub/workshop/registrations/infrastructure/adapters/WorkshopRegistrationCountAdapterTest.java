@@ -1,4 +1,4 @@
-package com.unihub.workshop.workshops.infrastructure.persistence;
+package com.unihub.workshop.registrations.infrastructure.adapters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;

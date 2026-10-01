@@ -221,8 +221,8 @@ class AdminWorkshopControllerUpdatePublishedTest {
             updateWorkshopUseCase.execute(any(UpdateWorkshopCommand.class))
         ).thenThrow(
             new ValidationException(
-                "Prohibited field modification: price cannot be modified via update endpoint.",
-                List.of("price: field is immutable on published workshops")
+                "Field 'price' cannot be modified on a published workshop.",
+                List.of("price: Commercial pricing is immutable once published")
             )
         );
 
@@ -247,7 +247,7 @@ class AdminWorkshopControllerUpdatePublishedTest {
             )
             .andExpect(
                 jsonPath("$.error.detail").value(
-                    "Prohibited field modification: price cannot be modified via update endpoint."
+                    "Field 'price' cannot be modified on a published workshop."
                 )
             );
     }

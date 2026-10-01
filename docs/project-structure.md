@@ -222,6 +222,12 @@ apps/backend/
     - `<Module>Facade.java` (or `<Module>ApiImpl.java`): Implements the `<Module>Api` interface. Lives privately inside `application/facade/` and injects internal use cases or repository ports to satisfy requests, mapping internal types to public DTOs.
   - **Encapsulation Enforcement:** Enforced by Spring Modulith `@ApplicationModule` and static ArchUnit fitness functions in `ModulithArchitectureTest`. Any direct access to another module's `domain/`, `application/`, `infrastructure/`, or `presentation/` breaks the build.
 
+- **Cross-Module SPI Pattern (Inverted Port via Public API):**
+  - When an upstream core module (e.g., `workshops`) requires contextual metrics or assertions (such as active registration counts) from a downstream transactional module (e.g., `registrations`), a direct Facade call from upstream to downstream would introduce **cyclic module dependencies** (e.g., `workshops <-> registrations`), which is strictly prohibited by Spring Modulith.
+  - To preserve an acyclic directed graph (DAG) and prevent database backdoor coupling, the upstream module defines an outbound contract as a Service Provider Interface (SPI / Port) inside its public `<module>/api/` package (e.g., `com.unihub.workshop.workshops.api.WorkshopRegistrationCountPort`).
+  - The downstream module (which naturally depends on the upstream module's API) implements this interface via an infrastructure adapter (e.g., `com.unihub.workshop.registrations.infrastructure.adapters.WorkshopRegistrationCountAdapter`).
+  - This maintains a strictly unidirectional dependency flow (e.g., `registrations -> workshops::api`), eliminates raw SQL cross-table queries, and upholds full data encapsulation.
+
 - **Event Architecture & Categorization:** The UniHub platform classifies events into four explicit, non-overlapping categories to guarantee layer purity, prevent circular dependencies, and support horizontal scaling:
 
 | Event Category                                | Location                  | Purity / Annotations                                         | Scope & Transport                                          | Publishing & Consumption Pattern                                                                                                           |

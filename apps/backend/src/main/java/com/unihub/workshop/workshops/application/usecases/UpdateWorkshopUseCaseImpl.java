@@ -6,10 +6,10 @@ import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.storage.MediaStoragePort;
+import com.unihub.workshop.workshops.api.WorkshopRegistrationCountPort;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopCommand;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.out.SlugGeneratorPort;
-import com.unihub.workshop.workshops.application.ports.out.WorkshopRegistrationCountPort;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -114,8 +116,11 @@ public class UpdateWorkshopUseCaseImpl implements UpdateWorkshopUseCase {
 
         Workshop saved = workshopRepository.save(updated);
 
-        // Media cleanup if cover image was altered
-        cleanupOldCoverImage(existing.coverImageUrl(), command.coverImageUrl());
+        // Media cleanup if cover image was altered (scheduled after transaction commit)
+        scheduleCoverImageCleanup(
+            existing.coverImageUrl(),
+            command.coverImageUrl()
+        );
 
         // Emit outbox event for search synchronization
         eventPublisher.publishEvent(
@@ -144,52 +149,76 @@ public class UpdateWorkshopUseCaseImpl implements UpdateWorkshopUseCase {
     private void validateProhibitedFields(UpdateWorkshopCommand command) {
         List<String> prohibited = new ArrayList<>();
         if (command.price() != null) {
-            prohibited.add("price is immutable on published workshops");
+            prohibited.add(
+                "price: Commercial pricing is immutable once published"
+            );
         }
         if (command.currency() != null) {
-            prohibited.add("currency is immutable on published workshops");
+            prohibited.add("currency: Currency is immutable once published");
         }
         if (command.startsAt() != null) {
             prohibited.add(
-                "startsAt use reschedule endpoint to alter schedule"
+                "startsAt: Use reschedule endpoint to alter schedule"
             );
         }
         if (command.endsAt() != null) {
-            prohibited.add("endsAt use reschedule endpoint to alter schedule");
+            prohibited.add("endsAt: Use reschedule endpoint to alter schedule");
         }
         if (command.status() != null) {
-            prohibited.add("status transitions must use dedicated endpoints");
+            prohibited.add(
+                "status: Status transitions must use dedicated endpoints"
+            );
         }
         if (command.requestedOrgId() != null) {
-            prohibited.add("organizationId is immutable");
+            prohibited.add("organizationId: Organization is immutable");
         }
         if (command.speakers() != null) {
-            prohibited.add("speakers cannot be altered on published workshops");
+            prohibited.add(
+                "speakers: Speakers cannot be altered on published workshops"
+            );
         }
 
         if (!prohibited.isEmpty()) {
-            String primaryField = prohibited.get(0).split(":")[0];
+            String primaryField = prohibited.get(0).split(":")[0].trim();
             throw new ValidationException(
-                "Prohibited field modification: " +
+                "Field '" +
                     primaryField +
-                    " cannot be modified via update endpoint.",
+                    "' cannot be modified on a published workshop.",
                 prohibited
             );
         }
     }
 
-    private void cleanupOldCoverImage(String oldCoverUrl, String newCoverUrl) {
+    private void scheduleCoverImageCleanup(
+        String oldCoverUrl,
+        String newCoverUrl
+    ) {
         if (
             newCoverUrl != null &&
             oldCoverUrl != null &&
             !oldCoverUrl.isBlank() &&
             !oldCoverUrl.equals(newCoverUrl)
         ) {
-            try {
-                mediaStoragePort.deleteByUrl(oldCoverUrl);
-            } catch (Exception e) {
-                // best-effort cleanup, do not fail transaction
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            safeDeleteCoverImage(oldCoverUrl);
+                        }
+                    }
+                );
+            } else {
+                safeDeleteCoverImage(oldCoverUrl);
             }
+        }
+    }
+
+    private void safeDeleteCoverImage(String oldCoverUrl) {
+        try {
+            mediaStoragePort.deleteByUrl(oldCoverUrl);
+        } catch (Exception e) {
+            // best-effort cleanup, do not fail transaction or application flow
         }
     }
 }

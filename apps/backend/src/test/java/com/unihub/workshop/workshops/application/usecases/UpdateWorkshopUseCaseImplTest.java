@@ -15,9 +15,9 @@ import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.storage.MediaStoragePort;
+import com.unihub.workshop.workshops.api.WorkshopRegistrationCountPort;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopCommand;
 import com.unihub.workshop.workshops.application.ports.out.SlugGeneratorPort;
-import com.unihub.workshop.workshops.application.ports.out.WorkshopRegistrationCountPort;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
@@ -195,7 +195,15 @@ class UpdateWorkshopUseCaseImplTest {
 
         assertThatThrownBy(() -> useCase.execute(command))
             .isInstanceOf(ValidationException.class)
-            .hasMessageContaining("price");
+            .hasMessage(
+                "Field 'price' cannot be modified on a published workshop."
+            )
+            .satisfies(e -> {
+                ValidationException ve = (ValidationException) e;
+                assertThat(ve.getValidationErrors()).contains(
+                    "price: Commercial pricing is immutable once published"
+                );
+            });
 
         verifyNoInteractions(eventPublisher);
     }

@@ -249,7 +249,7 @@ public record Workshop(
             this.endsAt != null &&
             !this.endsAt.isAfter(this.startsAt)
         ) {
-            errors.add("endsAt endsAt must be strictly after startsAt");
+            errors.add("endsAt must be strictly after startsAt");
         }
 
         if (

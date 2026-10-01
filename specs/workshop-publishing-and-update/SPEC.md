@@ -129,7 +129,7 @@ stateDiagram-v2
 - **NFR-03 (Primary Routing):** Both publish and update operations MUST route strictly to the Primary database replica per ADR-015 to guarantee immediate read-after-write consistency.
 - **NFR-04 (Decoupled Externalization):** Delivery of domain events to RabbitMQ MUST be managed exclusively by the Spring Modulith Event Registry, never blocking the HTTP request thread with message broker I/O.
 - **NFR-05 (Idempotency Under Concurrent Retries):** Concurrent publish requests with identical version MUST succeed exactly once; the competing concurrent request MUST fail with `409 Conflict` via JPA optimistic locking (`@Version`).
-- **NFR-06 (Modular Purity):** Module `workshops` MUST NOT depend on internal packages of any other module. Active registration count checks MUST be mediated through an internal outbound port and persistence adapter.
+- **NFR-06 (Modular Purity & Acyclic Dependency):** Module `workshops` MUST NOT depend on internal packages or tables of any other module. Active registration count checks MUST be mediated through a public Service Provider Interface (SPI / Port) inside `com.unihub.workshop.workshops.api` (`WorkshopRegistrationCountPort`), implemented by an adapter in the `registrations` module, strictly preserving unidirectional dependency (`registrations -> workshops::api`) and eliminating database backdoor coupling.
 
 ## 7. Acceptance Criteria (Gherkin)
 

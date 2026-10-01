@@ -1,11 +1,18 @@
-package com.unihub.workshop.workshops.infrastructure.persistence;
+package com.unihub.workshop.registrations.infrastructure.adapters;
 
-import com.unihub.workshop.workshops.application.ports.out.WorkshopRegistrationCountPort;
+import com.unihub.workshop.workshops.api.WorkshopRegistrationCountPort;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Downstream persistence adapter implementing the {@link WorkshopRegistrationCountPort} SPI.
+ * <p>
+ * Queries the {@code registrations} table owned by this module to return the active
+ * registration count for a workshop. This honors Bounded Context data ownership and eliminates
+ * cross-module database backdoor access.
+ */
 @Component
 @RequiredArgsConstructor
 public class WorkshopRegistrationCountAdapter
