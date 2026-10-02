@@ -12,6 +12,8 @@ import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.workshops.application.ports.in.AssignStaffCommand;
 import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopCommand;
+import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
@@ -39,6 +41,7 @@ import com.unihub.workshop.workshops.presentation.dto.AssignStaffRequest;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
+import com.unihub.workshop.workshops.presentation.dto.CancelWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.PublishWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.RescheduleWorkshopRequest;
@@ -90,6 +93,7 @@ public class AdminWorkshopController {
     private final PublishWorkshopUseCase publishWorkshopUseCase;
     private final UpdateWorkshopUseCase updateWorkshopUseCase;
     private final RescheduleWorkshopUseCase rescheduleWorkshopUseCase;
+    private final CancelWorkshopUseCase cancelWorkshopUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
 
@@ -413,6 +417,42 @@ public class AdminWorkshopController {
             response,
             "Workshop rescheduled successfully."
         );
+    }
+
+    @PatchMapping("/{id}/cancel")
+    public ApiResponse<WorkshopResponse> cancelWorkshop(
+        @PathVariable UUID id,
+        @Valid @RequestBody CancelWorkshopRequest request,
+        Authentication authentication
+    ) {
+        UUID callerId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+
+        CancelWorkshopCommand command = CancelWorkshopCommand.builder()
+            .workshopId(id)
+            .organizationId(organizationId)
+            .callerId(callerId)
+            .version(request.version())
+            .reason(request.reason())
+            .title(request.title())
+            .description(request.description())
+            .coverImageUrl(request.coverImageUrl())
+            .location(request.location())
+            .timezone(request.timezone())
+            .startsAt(request.startsAt())
+            .endsAt(request.endsAt())
+            .capacity(request.capacity())
+            .price(request.price())
+            .currency(request.currency())
+            .speakers(request.speakers())
+            .status(request.status())
+            .requestedOrgId(request.organizationId())
+            .build();
+
+        Workshop canceled = cancelWorkshopUseCase.execute(command);
+        WorkshopResponse response = workshopMapper.toResponse(canceled);
+
+        return ApiResponse.success(response, "Workshop canceled successfully.");
     }
 
     @PostMapping(

@@ -21,7 +21,7 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/cancel` endpoint
 
 ### Phase 1: Domain Behavior & Event Record
 
-- [ ] **T1 — `Workshop` aggregate gains a `cancel()` domain method, and `WorkshopCanceledEvent` is defined in the shared kernel**
+- [x] **T1 — `Workshop` aggregate gains a `cancel()` domain method, and `WorkshopCanceledEvent` is defined in the shared kernel**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Shared Kernel (event record)
@@ -38,13 +38,13 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/cancel` endpoint
 
 #### Checkpoint: Phase 1
 
-- [ ] All Phase 1 unit tests pass (`WorkshopTest` cancel cases — all 4 scenarios above).
-- [ ] `WorkshopCanceledEvent` compiles with `@Externalized("unihub.events::workshop.canceled")`.
-- [ ] No existing tests in `WorkshopTest` (reschedule, publish, update cases) are broken.
+- [x] All Phase 1 unit tests pass (`WorkshopTest` cancel cases — all 4 scenarios above).
+- [x] `WorkshopCanceledEvent` compiles with `@Externalized("unihub.events::workshop.canceled")`.
+- [x] No existing tests in `WorkshopTest` (reschedule, publish, update cases) are broken.
 
 ### Phase 2: Use-Case Orchestration & Outbox Event
 
-- [ ] **T2 — `CancelWorkshopUseCaseImpl` orchestrates all guard clauses, validates prohibited fields, and atomically commits the cancellation with `WorkshopCanceledEvent` emission**
+- [x] **T2 — `CancelWorkshopUseCaseImpl` orchestrates all guard clauses, validates prohibited fields, and atomically commits the cancellation with `WorkshopCanceledEvent` emission**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Application (inbound port command, use-case interface, use-case impl)
@@ -68,13 +68,13 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/cancel` endpoint
 
 #### Checkpoint: Phase 2
 
-- [ ] All Phase 2 unit tests pass (`CancelWorkshopUseCaseImplTest` — all 11 criteria above verified).
-- [ ] No existing use-case tests (`RescheduleWorkshopUseCaseImplTest`, `PublishWorkshopUseCaseImplTest`, `UpdateWorkshopUseCaseImplTest`) are broken.
-- [ ] `ModulithArchitectureTest` passes with the new application-layer classes.
+- [x] All Phase 2 unit tests pass (`CancelWorkshopUseCaseImplTest` — all 11 criteria above verified).
+- [x] No existing use-case tests (`RescheduleWorkshopUseCaseImplTest`, `PublishWorkshopUseCaseImplTest`, `UpdateWorkshopUseCaseImplTest`) are broken.
+- [x] `ModulithArchitectureTest` passes with the new application-layer classes.
 
 ### Phase 3: HTTP Presentation Layer
 
-- [ ] **T3 — `PATCH /api/v1/admin/workshops/{id}/cancel` endpoint wired in `AdminWorkshopController`, `WorkshopResponse` gains `canceledAt`, returning `200 OK` with the full updated workshop**
+- [x] **T3 — `PATCH /api/v1/admin/workshops/{id}/cancel` endpoint wired in `AdminWorkshopController`, `WorkshopResponse` gains `canceledAt`, returning `200 OK` with the full updated workshop**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Presentation (request DTO, response DTO amendment, controller handler, controller test)
@@ -100,11 +100,11 @@ This plan builds the single `PATCH /api/v1/admin/workshops/{id}/cancel` endpoint
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1–T3 are checked off.
-- [ ] All acceptance criteria across T1, T2, and T3 have been verified by their respective unit tests.
-- [ ] `ModulithArchitectureTest` passes (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
-- [ ] No regression in any existing test class in the `workshops` module.
-- [ ] Ready for `/review workshop-cancellation`.
+- [x] All tasks T1–T3 are checked off.
+- [x] All acceptance criteria across T1, T2, and T3 have been verified by their respective unit tests.
+- [x] `ModulithArchitectureTest` passes (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
+- [x] No regression in any existing test class in the `workshops` module.
+- [x] Ready for `/review workshop-cancellation`.
 
 ## Risks and Mitigations
 

@@ -903,4 +903,225 @@ class WorkshopTest {
                 );
             });
     }
+
+    @Test
+    @DisplayName(
+        "cancel transitions PUBLISHED workshop to CANCELED status when endsAt is in future"
+    )
+    void shouldCancelPublishedWorkshopWhenEndsAtInFuture() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop published = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            "Auditorium A",
+            "UTC",
+            startsAt,
+            endsAt,
+            100,
+            BigDecimal.ZERO,
+            "USD",
+            userId
+        ).publish(userId);
+
+        Instant beforeCancel = Instant.now().minusSeconds(1);
+        Workshop canceled = published.cancel(userId);
+        Instant afterCancel = Instant.now().plusSeconds(1);
+
+        assertThat(canceled.status()).isEqualTo(WorkshopStatus.CANCELED);
+        assertThat(canceled.canceledAt()).isNotNull();
+        assertThat(canceled.canceledAt()).isAfterOrEqualTo(beforeCancel);
+        assertThat(canceled.canceledAt()).isBeforeOrEqualTo(afterCancel);
+        assertThat(canceled.updatedAt()).isEqualTo(canceled.canceledAt());
+        assertThat(canceled.updatedBy()).isEqualTo(userId);
+        assertThat(canceled.version()).isEqualTo(published.version());
+    }
+
+    @Test
+    @DisplayName(
+        "cancel succeeds on PUBLISHED workshop that has already started but not yet concluded"
+    )
+    void shouldCancelPublishedWorkshopWhenAlreadyStartedButNotEnded() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().minusSeconds(1800);
+        Instant endsAt = Instant.now().plusSeconds(5400);
+
+        Workshop published = Workshop.builder()
+            .id(UUID.randomUUID())
+            .organizationId(orgId)
+            .title("Title")
+            .slug("title")
+            .location("Auditorium A")
+            .timezone("UTC")
+            .startsAt(startsAt)
+            .endsAt(endsAt)
+            .capacity(100)
+            .price(BigDecimal.ZERO)
+            .currency("USD")
+            .status(WorkshopStatus.PUBLISHED)
+            .version(2)
+            .createdAt(Instant.now().minusSeconds(86400))
+            .updatedAt(Instant.now().minusSeconds(86400))
+            .createdBy(userId)
+            .updatedBy(userId)
+            .build();
+
+        Workshop canceled = published.cancel(userId);
+
+        assertThat(canceled.status()).isEqualTo(WorkshopStatus.CANCELED);
+        assertThat(canceled.canceledAt()).isNotNull();
+        assertThat(canceled.updatedBy()).isEqualTo(userId);
+    }
+
+    @Test
+    @DisplayName(
+        "cancel throws ValidationException when workshop is in DRAFT status"
+    )
+    void shouldFailToCancelWhenDraft() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        Workshop draft = Workshop.createDraft(
+            orgId,
+            "Title",
+            "title",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            userId
+        );
+
+        assertThatThrownBy(() -> draft.cancel(userId))
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining(
+                "Workshop is in DRAFT status. Please use DELETE /api/v1/admin/workshops/{id} to delete drafts."
+            )
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "status: Workshop is in DRAFT status. Please use DELETE /api/v1/admin/workshops/{id} to delete drafts."
+                );
+            });
+    }
+
+    @Test
+    @DisplayName(
+        "cancel throws ValidationException when workshop is in COMPLETED status"
+    )
+    void shouldFailToCancelWhenCompleted() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().minusSeconds(86400 * 2);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop completed = Workshop.builder()
+            .id(UUID.randomUUID())
+            .organizationId(orgId)
+            .title("Title")
+            .slug("title")
+            .startsAt(startsAt)
+            .endsAt(endsAt)
+            .status(WorkshopStatus.COMPLETED)
+            .version(1)
+            .createdBy(userId)
+            .updatedBy(userId)
+            .build();
+
+        assertThatThrownBy(() -> completed.cancel(userId))
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining(
+                "Workshops in terminal status (COMPLETED) cannot be canceled."
+            )
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "status: Workshops in terminal status (COMPLETED) cannot be canceled."
+                );
+            });
+    }
+
+    @Test
+    @DisplayName(
+        "cancel throws ValidationException when workshop is already in CANCELED status"
+    )
+    void shouldFailToCancelWhenAlreadyCanceled() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().plusSeconds(86400);
+        Instant endsAt = startsAt.plusSeconds(7200);
+
+        Workshop canceled = Workshop.builder()
+            .id(UUID.randomUUID())
+            .organizationId(orgId)
+            .title("Title")
+            .slug("title")
+            .startsAt(startsAt)
+            .endsAt(endsAt)
+            .status(WorkshopStatus.CANCELED)
+            .version(1)
+            .createdBy(userId)
+            .updatedBy(userId)
+            .build();
+
+        assertThatThrownBy(() -> canceled.cancel(userId))
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining(
+                "Workshops in terminal status (CANCELED) cannot be canceled."
+            )
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "status: Workshops in terminal status (CANCELED) cannot be canceled."
+                );
+            });
+    }
+
+    @Test
+    @DisplayName(
+        "cancel throws ValidationException when endsAt is in the past or present"
+    )
+    void shouldFailToCancelWhenEndsAtInPastOrPresent() {
+        UUID orgId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant startsAt = Instant.now().minusSeconds(7200);
+        Instant endsAt = Instant.now().minusSeconds(1800);
+
+        Workshop concluded = Workshop.builder()
+            .id(UUID.randomUUID())
+            .organizationId(orgId)
+            .title("Title")
+            .slug("title")
+            .startsAt(startsAt)
+            .endsAt(endsAt)
+            .status(WorkshopStatus.PUBLISHED)
+            .version(1)
+            .createdBy(userId)
+            .updatedBy(userId)
+            .build();
+
+        assertThatThrownBy(() -> concluded.cancel(userId))
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining(
+                "Workshop has already concluded and cannot be canceled."
+            )
+            .satisfies(ex -> {
+                ValidationException ve = (ValidationException) ex;
+                assertThat(ve.getValidationErrors()).containsExactly(
+                    "ends_at: Workshop has already concluded and cannot be canceled."
+                );
+            });
+    }
 }

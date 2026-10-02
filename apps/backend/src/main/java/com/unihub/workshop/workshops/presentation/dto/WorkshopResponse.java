@@ -22,6 +22,7 @@ public record WorkshopResponse(
     String status,
     Integer version,
     Instant publishedAt,
+    Instant canceledAt,
     Instant createdAt,
     Instant updatedAt,
     List<SpeakerResponse> speakers
