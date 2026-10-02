@@ -431,4 +431,36 @@ public record Workshop(
             .updatedBy(updatedBy)
             .build();
     }
+
+    public Workshop cancel(UUID updatedBy) {
+        if (this.status != WorkshopStatus.PUBLISHED) {
+            if (this.status == WorkshopStatus.DRAFT) {
+                throw new ValidationException(
+                    "status",
+                    "Workshop is in DRAFT status. Please use DELETE /api/v1/admin/workshops/{id} to delete drafts."
+                );
+            }
+            throw new ValidationException(
+                "status",
+                "Workshops in terminal status (" +
+                    this.status +
+                    ") cannot be canceled."
+            );
+        }
+
+        Instant now = Instant.now();
+        if (this.endsAt != null && !this.endsAt.isAfter(now)) {
+            throw new ValidationException(
+                "ends_at",
+                "Workshop has already concluded and cannot be canceled."
+            );
+        }
+
+        return this.toBuilder()
+            .status(WorkshopStatus.CANCELED)
+            .canceledAt(now)
+            .updatedAt(now)
+            .updatedBy(updatedBy)
+            .build();
+    }
 }

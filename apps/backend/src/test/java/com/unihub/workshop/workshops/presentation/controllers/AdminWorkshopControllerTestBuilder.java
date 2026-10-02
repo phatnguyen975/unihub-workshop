@@ -4,6 +4,7 @@ import static org.mockito.Mockito.mock;
 
 import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
@@ -49,6 +50,9 @@ public class AdminWorkshopControllerTestBuilder {
     );
     private RescheduleWorkshopUseCase rescheduleWorkshopUseCase = mock(
         RescheduleWorkshopUseCase.class
+    );
+    private CancelWorkshopUseCase cancelWorkshopUseCase = mock(
+        CancelWorkshopUseCase.class
     );
     private WorkshopPresentationMapper workshopMapper = Mappers.getMapper(
         WorkshopPresentationMapper.class
@@ -136,6 +140,13 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withCancelWorkshopUseCase(
+        CancelWorkshopUseCase cancelWorkshopUseCase
+    ) {
+        this.cancelWorkshopUseCase = cancelWorkshopUseCase;
+        return this;
+    }
+
     public AdminWorkshopControllerTestBuilder withWorkshopMapper(
         WorkshopPresentationMapper workshopMapper
     ) {
@@ -163,6 +174,7 @@ public class AdminWorkshopControllerTestBuilder {
             publishWorkshopUseCase,
             updateWorkshopUseCase,
             rescheduleWorkshopUseCase,
+            cancelWorkshopUseCase,
             workshopMapper,
             mediaStoragePort
         );
