@@ -31,7 +31,7 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
 
 > **Rationale:** T1 is the data producer for both public endpoints. Building it first establishes all five event-to-index lifecycle paths and the Redis capacity counter write, so T2 and T3 have a clear, verified upstream.
 
-- [ ] **T1 — Elasticsearch index is kept in sync with the workshop lifecycle via the `search_sync` RabbitMQ consumer worker**
+- [x] **T1 — Elasticsearch index is kept in sync with the workshop lifecycle via the `search_sync` RabbitMQ consumer worker**
   - **Size:** M
   - **Depends on:** — (no prior task; existing `WorkshopPublishedEvent`, `WorkshopUpdatedEvent`, `WorkshopRescheduledEvent`, `WorkshopCanceledEvent` in `shared/events/` are already present; `WorkshopCompletedEvent` must be added to `shared/events/`)
   - **Layers touched:** Inbound (RabbitMQ listener), Core (sync use case, port interfaces, domain models), Outbound (Elasticsearch client adapter, Redis cache invalidation adapter, worker config)
@@ -67,10 +67,10 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
 
 #### Checkpoint: Phase 1
 
-- [ ] All acceptance criteria for T1 pass; unit tests for `SearchSyncService` and `SearchSyncListener` are green.
-- [ ] `WorkshopCompletedEvent` is present in `apps/backend/src/main/java/com/unihub/workshop/shared/events/` and correctly annotated with `@Externalized`.
-- [ ] `HexagonalArchitectureTest` passes with no violations in the new `search_sync` worker package.
-- [ ] Build is clean; no compilation errors in either `apps/backend/` or `apps/workers/`.
+- [x] All acceptance criteria for T1 pass; unit tests for `SearchSyncService` and `SearchSyncListener` are green.
+- [x] `WorkshopCompletedEvent` is present in `apps/backend/src/main/java/com/unihub/workshop/shared/events/` and correctly annotated with `@Externalized`.
+- [x] `HexagonalArchitectureTest` passes with no violations in the new `search_sync` worker package.
+- [x] Build is clean; no compilation errors in either `apps/backend/` or `apps/workers/`.
 
 ### Phase 2: Public Catalog Listing & Full-Text Search Endpoint
 

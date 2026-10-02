@@ -2,6 +2,7 @@ package com.unihub.workshop.shared.events;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.modulith.events.Externalized;
 
@@ -25,8 +26,28 @@ public record WorkshopPublishedEvent(
     BigDecimal price,
     String currency,
     Instant publishedAt,
+    List<SpeakerPayload> speakers,
     Instant occurredAt
 ) {
+    public record SpeakerPayload(
+        UUID id,
+        String name,
+        String bio,
+        String avatarUrl,
+        String linkedinUrl,
+        String email,
+        Integer sortOrder
+    ) {}
+
+    public WorkshopPublishedEvent {
+        if (speakers == null) {
+            speakers = List.of();
+        }
+        if (occurredAt == null) {
+            occurredAt = Instant.now();
+        }
+    }
+
     public WorkshopPublishedEvent(
         UUID workshopId,
         UUID organizationId,
@@ -41,7 +62,8 @@ public record WorkshopPublishedEvent(
         Integer capacity,
         BigDecimal price,
         String currency,
-        Instant publishedAt
+        Instant publishedAt,
+        List<SpeakerPayload> speakers
     ) {
         this(
             workshopId,
@@ -58,6 +80,7 @@ public record WorkshopPublishedEvent(
             price,
             currency,
             publishedAt,
+            speakers,
             Instant.now()
         );
     }

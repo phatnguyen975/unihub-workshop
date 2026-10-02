@@ -16,8 +16,21 @@ spring:
     port: ${SPRING_RABBITMQ_PORT:5672}
     username: ${SPRING_RABBITMQ_USERNAME}
     password: ${SPRING_RABBITMQ_PASSWORD}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD}
+      timeout: 2s
+      connect-timeout: 2s
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
 
 app:
+  search-sync:
+    index-name: ${SEARCH_SYNC_INDEX_NAME:workshops}
+    queue: ${SEARCH_SYNC_QUEUE:q.search}
+    exchange: ${SEARCH_SYNC_EXCHANGE:unihub.events}
   batch-ingestion:
     cron: ${INGESTION_CRON:0 0 2 * * ?}
     expected-faculties: ${INGESTION_EXPECTED_FACULTIES:Information Technology,Mathematics,Physics,Chemistry}

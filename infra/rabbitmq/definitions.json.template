@@ -135,6 +135,14 @@
       "arguments": {}
     },
     {
+      "source": "unihub.events",
+      "vhost": "/",
+      "destination": "q.search",
+      "destination_type": "queue",
+      "routing_key": "workshop.completed",
+      "arguments": {}
+    },
+    {
       "source": "unihub.dlx",
       "vhost": "/",
       "destination": "q.dlq.unihub",

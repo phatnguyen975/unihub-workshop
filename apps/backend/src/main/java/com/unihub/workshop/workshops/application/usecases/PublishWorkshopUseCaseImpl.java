@@ -107,6 +107,25 @@ public class PublishWorkshopUseCaseImpl implements PublishWorkshopUseCase {
         Workshop published = workshop.publish(command.callerId());
         Workshop saved = workshopRepository.save(published);
 
+        List<WorkshopPublishedEvent.SpeakerPayload> speakerPayloads =
+            saved.speakers() != null
+                ? saved
+                      .speakers()
+                      .stream()
+                      .map(s ->
+                          new WorkshopPublishedEvent.SpeakerPayload(
+                              s.id(),
+                              s.name(),
+                              s.bio(),
+                              s.avatarUrl(),
+                              s.linkedinUrl(),
+                              s.email(),
+                              s.sortOrder()
+                          )
+                      )
+                      .toList()
+                : List.of();
+
         eventPublisher.publishEvent(
             new WorkshopPublishedEvent(
                 saved.id(),
@@ -122,7 +141,8 @@ public class PublishWorkshopUseCaseImpl implements PublishWorkshopUseCase {
                 saved.capacity(),
                 saved.price(),
                 saved.currency(),
-                saved.publishedAt()
+                saved.publishedAt(),
+                speakerPayloads
             )
         );
 
