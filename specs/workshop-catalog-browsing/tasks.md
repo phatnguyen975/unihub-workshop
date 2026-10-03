@@ -41,7 +41,12 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/PublishWorkshopUseCaseImpl.java` _(modify — populate speaker list in published event)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/PublishWorkshopUseCaseImplTest.java` _(modify — verify speakers in published event)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/SearchSyncListener.java` _(new)_
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/mapper/SearchSyncEventMapper.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/dto/WorkshopPublishedEventDto.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/dto/WorkshopUpdatedEventDto.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/dto/WorkshopRescheduledEventDto.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/dto/WorkshopCompletedEventDto.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/dto/WorkshopCanceledEventDto.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/inbound/mapper/SearchSyncEventMapper.java` _(new — MapStruct)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/core/models/WorkshopDocument.java` _(new)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/core/ports/in/SyncWorkshopIndex.java` _(new)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/core/ports/out/WorkshopIndexStore.java` _(new)_
@@ -49,12 +54,16 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/core/ports/out/WorkshopCapacityStore.java` _(new)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/core/usecases/SearchSyncService.java` _(new)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/outbound/elasticsearch/ElasticsearchWorkshopIndexAdapter.java` _(new)_
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/outbound/elasticsearch/WorkshopDocumentMapper.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/outbound/elasticsearch/WorkshopEsDocument.java` _(new)_
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/outbound/elasticsearch/mapper/WorkshopDocumentMapper.java` _(new — MapStruct)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/outbound/cache/RedisSearchCacheInvalidator.java` _(new)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/outbound/cache/RedisWorkshopCapacityAdapter.java` _(new)_
     - `apps/workers/src/main/java/com/unihub/workshop/workers/search_sync/outbound/config/SearchSyncConfig.java` _(new — RabbitMQ queue binding, ES client bean, Redis properties)_
     - `apps/workers/src/test/java/com/unihub/workshop/workers/search_sync/core/usecases/SearchSyncServiceTest.java` _(new)_
     - `apps/workers/src/test/java/com/unihub/workshop/workers/search_sync/inbound/SearchSyncListenerTest.java` _(new)_
+    - `apps/workers/src/test/java/com/unihub/workshop/workers/search_sync/outbound/cache/RedisSearchCacheInvalidatorTest.java` _(new)_
+    - `apps/workers/src/test/java/com/unihub/workshop/workers/search_sync/outbound/cache/RedisWorkshopCapacityAdapterTest.java` _(new)_
+    - `apps/workers/src/test/java/com/unihub/workshop/workers/search_sync/outbound/elasticsearch/ElasticsearchWorkshopIndexAdapterTest.java` _(new)_
   - **Acceptance Criteria:**
     - Given a `WorkshopPublishedEvent` is delivered to the worker via the mocked RabbitMQ channel, when `SearchSyncService` processes it, then `WorkshopIndexStore.upsert()` is called with a `WorkshopDocument` whose `id`, `title`, `slug`, `capacity`, and `speakers` match the event payload, AND `WorkshopCapacityStore.set()` is called with `workshopId` and `capacity`. _(FR-24, FR-26)_
     - Given a `WorkshopUpdatedEvent` is delivered, when `SearchSyncService` processes it, then `WorkshopIndexStore.upsert()` is called with the updated fields AND `SearchCacheInvalidator.invalidateAll()` is called. _(FR-24, FR-27)_
@@ -76,33 +85,40 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
 
 > **Rationale:** T2 introduces the new `search` Spring Modulith module from scratch, so it carries the most new infrastructure (ES query client, SWR cache port/adapter, `search` module scaffold, `ModulithArchitectureTest` enforcement). It is the highest-risk capability and is built early in its own phase to surface any integration problems before T3 builds on top of it.
 
-- [ ] **T2 — Callers can browse and search the catalog of PUBLISHED workshops via `GET /api/v1/workshops`, served from Elasticsearch with SWR Redis cache**
+- [x] **T2 — Callers can browse and search the catalog of PUBLISHED workshops via `GET /api/v1/workshops`, served from Elasticsearch with SWR Redis cache**
   - **Size:** M
   - **Depends on:** T1 (the ES index shape and Redis capacity key format established by T1 are consumed here)
-  - **Layers touched:** Domain (query model, cursor, filter/sort value objects), Application (use case port, `availableSeats` batch port), Infrastructure (ES query adapter + SWR Redis cache adapter + config), Presentation (`WorkshopSearchController`, request/response DTOs, mappers), Config (`search` module `package-info.java`, `application.yml` public-paths + ES properties)
+  - **Layers touched:** Domain (query model, cursor, filter/sort value objects), Application (use case port, `availableSeats` batch port), Infrastructure (ES query adapter + SWR Redis cache adapter + config), Presentation (`WorkshopSearchController`, response DTO, mappers), Config (`search` module `package-info.java`, `application.yml` public-paths + ES properties)
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/search/package-info.java` _(new — `@ApplicationModule(allowedDependencies = {"shared", "workshops::api"})`)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/domain/model/WorkshopSearchResult.java` _(new — catalog card projection)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/domain/model/CatalogQuery.java` _(new — value object: q, priceType, from, to, sort, cursor, size)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/application/ports/in/SearchWorkshopsUseCase.java` _(new)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/application/ports/out/WorkshopSearchRepository.java` _(new — ES query port)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/domain/model/WorkshopCard.java` _(new — catalog card projection domain record)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/application/ports/in/SearchWorkshopsQuery.java` _(new — inbound query with parameter validation & factory: q, priceType, from, to, sort, cursor, size)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/domain/model/SwrCacheEntry.java` _(new — SWR cache wrapper holding CursorPage<WorkshopCard>)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/application/ports/in/SearchWorkshopsUseCase.java` _(new — returns CursorPage<WorkshopCard>)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/application/ports/out/WorkshopSearchRepository.java` _(new — ES query port returning CursorPage<WorkshopCard>, accepts KeysetCursor)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/application/ports/out/SearchCachePort.java` _(new — SWR cache port)_
     - `apps/backend/src/main/java/com/unihub/workshop/search/application/ports/out/WorkshopAvailabilityBatchPort.java` _(new — Redis MGET port)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/application/usecases/SearchWorkshopsUseCaseImpl.java` _(new — SWR logic: cache hit/stale/miss, tryLock, circuit breaker fallback)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/infrastructure/elasticsearch/ElasticsearchWorkshopSearchAdapter.java` _(new — ES Bool Query builder + search_after cursor)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/application/usecases/SearchWorkshopsUseCaseImpl.java` _(new — SWR logic, uses KeysetCursorCodec from shared.pagination)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/infrastructure/elasticsearch/ElasticsearchWorkshopSearchAdapter.java` _(new — ES Bool Query builder + search_after cursor, uses KeysetCursorCodec from shared.pagination)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/infrastructure/elasticsearch/WorkshopEsDocument.java` _(new)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/infrastructure/elasticsearch/mapper/WorkshopEsDocumentMapper.java` _(new — MapStruct)_
     - `apps/backend/src/main/java/com/unihub/workshop/search/infrastructure/cache/RedisSwrCacheAdapter.java` _(new — SWR GET/SET/tryLock with soft+hard TTL)_
     - `apps/backend/src/main/java/com/unihub/workshop/search/infrastructure/cache/RedisWorkshopAvailabilityBatchAdapter.java` _(new — MGET `workshop:{id}:capacity` + DB fallback port call)_
     - `apps/backend/src/main/java/com/unihub/workshop/search/infrastructure/config/SearchModuleConfig.java` _(new — ES client bean, Resilience4j CB instance, SWR TTL properties)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/presentation/controllers/WorkshopSearchController.java` _(new — `GET /api/v1/workshops`)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/presentation/dto/WorkshopCatalogRequest.java` _(new — query param binding + validation)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/presentation/controllers/WorkshopSearchController.java` _(new — `GET /api/v1/workshops`, returns ApiResponse<PageResponse<WorkshopCardResponse>>)_
     - `apps/backend/src/main/java/com/unihub/workshop/search/presentation/dto/WorkshopCardResponse.java` _(new — `PublicWorkshopCard` JSON shape)_
-    - `apps/backend/src/main/java/com/unihub/workshop/search/presentation/mapper/WorkshopSearchPresentationMapper.java` _(new — MapStruct)_
+    - `apps/backend/src/main/java/com/unihub/workshop/search/presentation/mapper/WorkshopSearchPresentationMapper.java` _(new — MapStruct, maps CursorPage to shared PageResponse)_
     - `apps/backend/src/main/resources/application.yml` _(modify — add `/api/v1/workshops` and `/api/v1/workshops/**` to `app.security.public-paths`; add ES host/port/index-name config keys)_
+    - `apps/backend/src/test/java/com/unihub/workshop/search/application/ports/in/SearchWorkshopsQueryTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/search/application/usecases/SearchWorkshopsUseCaseImplTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/search/infrastructure/cache/RedisSwrCacheAdapterTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/search/infrastructure/cache/RedisWorkshopAvailabilityBatchAdapterTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/search/infrastructure/elasticsearch/ElasticsearchWorkshopSearchAdapterTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/search/presentation/controllers/WorkshopSearchControllerTest.java` _(new)_
     - `apps/backend/src/test/java/com/unihub/workshop/ModulithArchitectureTest.java` _(modify — assert `search` module in declared module set; `writeModulesMustNotDependOnCqrsSearch()` rule)_
   - **Acceptance Criteria:**
     - `GET /api/v1/workshops` with no query parameters returns `200 OK` with the standard success envelope; `data.items` is a JSON array and `data.cursor` contains `nextCursor` and `hasMore`. _(FR-01, FR-02, FR-04, FR-13 — Scenario 1)_
-    - `GET /api/v1/workshops?q=machine+learning` returns `200 OK`; the use case invokes `WorkshopSearchRepository.search()` with a `CatalogQuery` that has `q = "machine learning"` (verified via mock). _(FR-03 — Scenario 2)_
+    - `GET /api/v1/workshops?q=machine+learning` returns `200 OK`; the use case invokes `WorkshopSearchRepository.search()` with a `SearchWorkshopsQuery` that has `q = "machine learning"` (verified via mock). _(FR-03 — Scenario 2)_
     - `GET /api/v1/workshops?priceType=FREE` returns `200 OK`; the query passed to ES contains the `priceType` filter (verified via mock on the adapter). _(FR-05 — Scenario 3)_
     - `GET /api/v1/workshops?from=2026-11-01T00:00:00Z&to=2026-11-30T23:59:59Z` returns `200 OK` (from < to). `GET /api/v1/workshops?from=2026-11-01T00:00:00Z` alone returns `200 OK` (one-sided bound). _(FR-05, BR-15 — Scenarios 4, 21)_
     - `GET /api/v1/workshops?from=2026-12-01T00:00:00Z&to=2026-11-01T00:00:00Z` (from >= to) returns `422 Unprocessable Content` with `urn:unihub:error:validation`. _(BR-15 — Scenario 22)_
@@ -117,10 +133,10 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
 
 #### Checkpoint: Phase 2
 
-- [ ] All acceptance criteria for T2 pass; unit tests for `SearchWorkshopsUseCaseImpl` and `WorkshopSearchController` are green.
-- [ ] `GET /api/v1/workshops` is reachable as a public path (no auth error with no `Authorization` header).
-- [ ] `ModulithArchitectureTest` passes with no architecture violations in the new `search` module.
-- [ ] Build is clean in `apps/backend/`.
+- [x] All acceptance criteria for T2 pass; unit tests for `SearchWorkshopsUseCaseImpl` and `WorkshopSearchController` are green.
+- [x] `GET /api/v1/workshops` is reachable as a public path (no auth error with no `Authorization` header).
+- [x] `ModulithArchitectureTest` passes with no architecture violations in the new `search` module.
+- [x] Build is clean in `apps/backend/`.
 
 ### Phase 3: Public Workshop Detail Endpoint
 

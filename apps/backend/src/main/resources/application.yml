@@ -31,10 +31,18 @@ spring:
     port: ${SPRING_RABBITMQ_PORT:5672}
     username: ${SPRING_RABBITMQ_USERNAME}
     password: ${SPRING_RABBITMQ_PASSWORD}
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
 
 app:
   http:
     retry-after-seconds: ${APP_HTTP_RETRY_AFTER_SECONDS:30}
+  search:
+    index-name: ${SEARCH_INDEX_NAME:workshops}
+    swr:
+      soft-ttl-seconds: ${SEARCH_SWR_SOFT_TTL:300}
+      hard-ttl-seconds: ${SEARCH_SWR_HARD_TTL:86400}
+      lock-timeout-seconds: ${SEARCH_SWR_LOCK_TIMEOUT:10}
   security:
     presign-ttl-minutes: 15
     access-token-ttl-minutes: 60
@@ -53,6 +61,8 @@ app:
       - "/api/v1/auth/activate"
       - "/api/v1/auth/otp/resend"
       - "/api/v1/auth/password/**"
+      - "/api/v1/workshops"
+      - "/api/v1/workshops/**"
   otp:
     hmac-secret: ${APP_OTP_HMAC_SECRET:super-secret-hmac-key-for-otp-generation-and-verification-unihub}
     ttl-minutes: ${APP_OTP_TTL_MINUTES:15}

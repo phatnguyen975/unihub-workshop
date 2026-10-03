@@ -1,11 +1,11 @@
 package com.unihub.workshop.workshops.presentation.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.Builder;
 
-@Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WorkshopSummaryResponse(
     UUID id,
     String slug,

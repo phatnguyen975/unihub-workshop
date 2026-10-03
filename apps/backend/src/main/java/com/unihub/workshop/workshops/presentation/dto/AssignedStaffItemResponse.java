@@ -1,13 +1,10 @@
 package com.unihub.workshop.workshops.presentation.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.Builder;
 
-/**
- * Presentation DTO for an item in the assigned staff roster.
- */
-@Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AssignedStaffItemResponse(
     UUID userId,
     String fullName,

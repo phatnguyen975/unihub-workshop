@@ -18,7 +18,7 @@ public class ValidationException extends AppException {
     }
 
     public ValidationException(String field, String message) {
-        this(message, List.of((field != null ? field + ": " : "") + message));
+        this(message, List.of(formatValidationError(field, message)));
     }
 
     public ValidationException(String message, List<String> validationErrors) {
@@ -51,5 +51,20 @@ public class ValidationException extends AppException {
         );
         this.validationErrors =
             validationErrors != null ? validationErrors : List.of();
+    }
+
+    private static String formatValidationError(String field, String message) {
+        if (field == null || field.isBlank()) {
+            return message != null ? message : "Validation failed.";
+        }
+        if (message == null || message.isBlank()) {
+            return field.trim() + ": is invalid";
+        }
+        String trimmedField = field.trim();
+        String trimmedMessage = message.trim();
+        if (trimmedMessage.startsWith(trimmedField + ":")) {
+            return trimmedMessage;
+        }
+        return trimmedField + ": " + trimmedMessage;
     }
 }

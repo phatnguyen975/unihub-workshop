@@ -75,7 +75,7 @@ class SecurityConfigTest {
             return "ok";
         }
 
-        @GetMapping("/api/v1/workshops")
+        @GetMapping("/api/v1/dummy/authenticated")
         public String authEndpoint() {
             return "ok";
         }
@@ -89,7 +89,7 @@ class SecurityConfigTest {
     @Test
     void shouldReturn401_whenNoTokenProvided() throws Exception {
         mockMvc
-            .perform(get("/api/v1/workshops"))
+            .perform(get("/api/v1/dummy/authenticated"))
             .andExpect(status().isUnauthorized());
     }
 

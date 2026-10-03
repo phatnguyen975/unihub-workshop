@@ -8,9 +8,9 @@ import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", imports = { List.class })
 public interface WorkshopPersistenceMapper {
-    @Mapping(target = "speakers", expression = "java(java.util.List.of())")
+    @Mapping(target = "speakers", expression = "java(List.of())")
     Workshop toDomain(WorkshopJpaEntity entity);
 
     WorkshopJpaEntity toEntity(Workshop domain);
