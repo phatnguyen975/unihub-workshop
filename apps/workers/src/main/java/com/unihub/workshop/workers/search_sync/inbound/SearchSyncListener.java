@@ -6,8 +6,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import com.unihub.workshop.workers.search_sync.core.models.WorkshopDocument;
 import com.unihub.workshop.workers.search_sync.core.ports.in.SyncWorkshopIndex;
+import com.unihub.workshop.workers.search_sync.inbound.dto.WorkshopCanceledEventDto;
+import com.unihub.workshop.workers.search_sync.inbound.dto.WorkshopCompletedEventDto;
+import com.unihub.workshop.workers.search_sync.inbound.dto.WorkshopPublishedEventDto;
+import com.unihub.workshop.workers.search_sync.inbound.dto.WorkshopRescheduledEventDto;
+import com.unihub.workshop.workers.search_sync.inbound.dto.WorkshopUpdatedEventDto;
 import com.unihub.workshop.workers.search_sync.inbound.mapper.SearchSyncEventMapper;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -68,44 +75,82 @@ public class SearchSyncListener {
         }
     }
 
-    void dispatchMessage(String routingKey, String typeId, JsonNode root) {
+    void dispatchMessage(String routingKey, String typeId, JsonNode root)
+        throws JsonProcessingException {
         if (
             "workshop.rescheduled".equals(routingKey) ||
             typeId.endsWith("WorkshopRescheduledEvent")
         ) {
-            SearchSyncEventMapper.ReschedulePayload payload =
-                mapper.toReschedulePayload(root);
+            WorkshopRescheduledEventDto dto = objectMapper.treeToValue(
+                root,
+                WorkshopRescheduledEventDto.class
+            );
+            validateWorkshopId(
+                dto != null ? dto.workshopId() : null,
+                "WorkshopRescheduledEvent"
+            );
+            Instant startsAt = parseInstant(dto.effectiveStartsAt());
+            Instant endsAt = parseInstant(dto.effectiveEndsAt());
             syncWorkshopIndex.handleWorkshopRescheduled(
-                payload.workshopId(),
-                payload.startsAt(),
-                payload.endsAt(),
-                payload.timezone()
+                dto.workshopId(),
+                startsAt,
+                endsAt,
+                dto.timezone()
             );
         } else if (
             "workshop.completed".equals(routingKey) ||
             typeId.endsWith("WorkshopCompletedEvent")
         ) {
-            syncWorkshopIndex.handleWorkshopCompleted(
-                mapper.extractWorkshopId(root, "WorkshopCompletedEvent")
+            WorkshopCompletedEventDto dto = objectMapper.treeToValue(
+                root,
+                WorkshopCompletedEventDto.class
             );
+            validateWorkshopId(
+                dto != null ? dto.workshopId() : null,
+                "WorkshopCompletedEvent"
+            );
+            syncWorkshopIndex.handleWorkshopCompleted(dto.workshopId());
         } else if (
             "workshop.canceled".equals(routingKey) ||
             typeId.endsWith("WorkshopCanceledEvent")
         ) {
-            syncWorkshopIndex.handleWorkshopCanceled(
-                mapper.extractWorkshopId(root, "WorkshopCanceledEvent")
+            WorkshopCanceledEventDto dto = objectMapper.treeToValue(
+                root,
+                WorkshopCanceledEventDto.class
             );
+            validateWorkshopId(
+                dto != null ? dto.workshopId() : null,
+                "WorkshopCanceledEvent"
+            );
+            syncWorkshopIndex.handleWorkshopCanceled(dto.workshopId());
         } else if (
             "search".equals(routingKey) ||
             typeId.endsWith("WorkshopPublishedEvent") ||
             typeId.endsWith("WorkshopUpdatedEvent")
         ) {
-            WorkshopDocument doc = mapper.toWorkshopDocument(root);
             if (
                 typeId.endsWith("WorkshopUpdatedEvent") || root.has("updatedAt")
             ) {
+                WorkshopUpdatedEventDto dto = objectMapper.treeToValue(
+                    root,
+                    WorkshopUpdatedEventDto.class
+                );
+                validateWorkshopId(
+                    dto != null ? dto.workshopId() : null,
+                    "WorkshopUpdatedEvent"
+                );
+                WorkshopDocument doc = mapper.toWorkshopDocument(dto);
                 syncWorkshopIndex.handleWorkshopUpdated(doc);
             } else {
+                WorkshopPublishedEventDto dto = objectMapper.treeToValue(
+                    root,
+                    WorkshopPublishedEventDto.class
+                );
+                validateWorkshopId(
+                    dto != null ? dto.workshopId() : null,
+                    "WorkshopPublishedEvent"
+                );
+                WorkshopDocument doc = mapper.toWorkshopDocument(dto);
                 syncWorkshopIndex.handleWorkshopPublished(doc);
             }
         } else {
@@ -116,5 +161,17 @@ public class SearchSyncListener {
                     typeId
             );
         }
+    }
+
+    private void validateWorkshopId(UUID workshopId, String eventType) {
+        if (workshopId == null) {
+            throw new IllegalArgumentException(
+                eventType + " missing required workshopId"
+            );
+        }
+    }
+
+    private Instant parseInstant(String value) {
+        return value != null && !value.isBlank() ? Instant.parse(value) : null;
     }
 }

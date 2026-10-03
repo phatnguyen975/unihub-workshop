@@ -6,6 +6,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.workers.search_sync.core.models.WorkshopDocument;
+import com.unihub.workshop.workers.search_sync.outbound.elasticsearch.mapper.WorkshopDocumentMapper;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -13,6 +15,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 
@@ -28,7 +31,7 @@ class ElasticsearchWorkshopIndexAdapterTest {
     @BeforeEach
     void setUp() {
         elasticsearchOperations = mock(ElasticsearchOperations.class);
-        mapper = new WorkshopDocumentMapper();
+        mapper = Mappers.getMapper(WorkshopDocumentMapper.class);
         adapter = new ElasticsearchWorkshopIndexAdapter(
             elasticsearchOperations,
             mapper
@@ -94,13 +97,12 @@ class ElasticsearchWorkshopIndexAdapterTest {
     void shouldUpdateScheduleOfExistingDocument() {
         Instant oldStartsAt = Instant.now().plusSeconds(3600);
         Instant oldEndsAt = oldStartsAt.plusSeconds(3600);
-        WorkshopEsDocument existing = WorkshopEsDocument.builder()
-            .id(WORKSHOP_ID.toString())
-            .title("Existing Workshop")
-            .startsAt(oldStartsAt)
-            .endsAt(oldEndsAt)
-            .timezone("UTC")
-            .build();
+        WorkshopEsDocument existing = new WorkshopEsDocument();
+        existing.setId(WORKSHOP_ID.toString());
+        existing.setTitle("Existing Workshop");
+        existing.setStartsAt(oldStartsAt);
+        existing.setEndsAt(oldEndsAt);
+        existing.setTimezone("UTC");
 
         when(
             elasticsearchOperations.get(

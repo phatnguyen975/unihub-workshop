@@ -19,6 +19,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 
@@ -37,7 +38,7 @@ class SearchSyncListenerTest {
     @BeforeEach
     void setUp() {
         syncWorkshopIndex = mock(SyncWorkshopIndex.class);
-        mapper = new SearchSyncEventMapper();
+        mapper = Mappers.getMapper(SearchSyncEventMapper.class);
         objectMapper = new ObjectMapper();
         channel = mock(Channel.class);
         listener = new SearchSyncListener(

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
@@ -13,7 +12,6 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(indexName = "workshops")
@@ -68,7 +66,6 @@ public class WorkshopEsDocument {
     private List<SpeakerEsSubDocument> speakers;
 
     @Data
-    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SpeakerEsSubDocument {

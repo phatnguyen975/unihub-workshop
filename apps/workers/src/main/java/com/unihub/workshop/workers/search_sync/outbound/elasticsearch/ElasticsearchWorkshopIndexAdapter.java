@@ -2,6 +2,7 @@ package com.unihub.workshop.workers.search_sync.outbound.elasticsearch;
 
 import com.unihub.workshop.workers.search_sync.core.models.WorkshopDocument;
 import com.unihub.workshop.workers.search_sync.core.ports.out.WorkshopIndexStore;
+import com.unihub.workshop.workers.search_sync.outbound.elasticsearch.mapper.WorkshopDocumentMapper;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
