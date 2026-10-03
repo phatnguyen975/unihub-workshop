@@ -142,22 +142,22 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
 
 > **Rationale:** T3 adds a single read endpoint to the existing `workshops` module. It is lower risk than T2 (the module already exists with full infrastructure, JPA entities, and repo) and has no novel infrastructure beyond reusing the Redis availability key pattern from T1.
 
-- [ ] **T3 — Callers can retrieve the full detail of a single PUBLISHED workshop by UUID or slug via `GET /api/v1/workshops/{identifier}`**
+- [x] **T3 — Callers can retrieve the full detail of a single PUBLISHED workshop by UUID or slug via `GET /api/v1/workshops/{identifier}`**
   - **Size:** M
   - **Depends on:** T1 (Redis capacity key `workshop:{id}:capacity` written by `search_sync`; its format is consumed here for `availableSeats`)
-  - **Layers touched:** Domain (no new domain model; reuses existing `Workshop` + `WorkshopStatus`), Application (new use case port + query, availability single-key port), Infrastructure (new persistence read adapter via replica routing; Redis single-key adapter), Presentation (`PublicWorkshopDetailController`, response DTOs, mapper)
+  - **Layers touched:** Domain (no new domain model; reuses existing `Workshop` + `WorkshopStatus`), Application (new use case port + query, availability single-key port), Infrastructure (new persistence read adapter via replica routing; Redis single-key adapter), Presentation (`PublicWorkshopController`, response DTOs, mapper)
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/in/GetPublicWorkshopQuery.java` _(new — `identifier: String`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/in/GetPublicWorkshopUseCase.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopAvailabilityPort.java` _(new — single-key Redis GET + DB fallback port)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/usecases/GetPublicWorkshopUseCaseImpl.java` _(new — UUID-vs-slug detection, PUBLISHED-only gate, `availableSeats` resolution)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/cache/RedisWorkshopAvailabilityAdapter.java` _(new — single-key GET `workshop:{id}:capacity` + DB fallback)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/PublicWorkshopDetailController.java` _(new — `GET /api/v1/workshops/{identifier}`)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/controllers/PublicWorkshopController.java` _(new — `GET /api/v1/workshops/{identifier}`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/PublicWorkshopDetailResponse.java` _(new — full detail shape including speakers array)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/dto/PublicSpeakerResponse.java` _(new)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/presentation/mapper/PublicWorkshopDetailPresentationMapper.java` _(new — MapStruct)_
     - `apps/backend/src/test/java/com/unihub/workshop/workshops/application/usecases/GetPublicWorkshopUseCaseImplTest.java` _(new)_
-    - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/PublicWorkshopDetailControllerTest.java` _(new)_
+    - `apps/backend/src/test/java/com/unihub/workshop/workshops/presentation/controllers/PublicWorkshopControllerTest.java` _(new)_
   - **Acceptance Criteria:**
     - `GET /api/v1/workshops/{uuid}` for an existing PUBLISHED workshop returns `200 OK` with the standard success envelope; `data` contains all `PublicWorkshopDetail` fields including `status = "PUBLISHED"`, `speakers` array ordered by `sortOrder ASC`, and a non-negative integer `availableSeats`. _(FR-16, FR-17, FR-20, FR-22 — Scenario 11)_
     - `GET /api/v1/workshops/{slug}` for the same workshop returns the identical response as the UUID lookup (identifier auto-detection). _(FR-17 — Scenario 12)_
@@ -170,13 +170,13 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks T1, T2, T3 are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified with passing targeted unit tests.
-- [ ] `ModulithArchitectureTest` passes clean in `apps/backend/`.
-- [ ] `HexagonalArchitectureTest` passes clean in `apps/workers/`.
-- [ ] Targeted test suites for touched classes in both apps pass (`SearchSyncServiceTest`, `SearchSyncListenerTest`, `SearchWorkshopsUseCaseImplTest`, `WorkshopSearchControllerTest`, `GetPublicWorkshopUseCaseImplTest`, `PublicWorkshopDetailControllerTest`, `PublishWorkshopUseCaseImplTest`).
-- [ ] No compilation errors or warnings in either app.
-- [ ] Ready for `/review workshop-catalog-browsing`.
+- [x] All tasks T1, T2, T3 are checked off.
+- [x] Every acceptance criterion across all tasks has been verified with passing targeted unit tests.
+- [x] `ModulithArchitectureTest` passes clean in `apps/backend/`.
+- [x] `HexagonalArchitectureTest` passes clean in `apps/workers/`.
+- [x] Targeted test suites for touched classes in both apps pass (`SearchSyncServiceTest`, `SearchSyncListenerTest`, `SearchWorkshopsUseCaseImplTest`, `WorkshopSearchControllerTest`, `GetPublicWorkshopUseCaseImplTest`, `PublicWorkshopControllerTest`, `PublishWorkshopUseCaseImplTest`).
+- [x] No compilation errors or warnings in either app.
+- [x] Ready for `/review workshop-catalog-browsing`.
 
 ## Risks and Mitigations
 

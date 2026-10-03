@@ -148,6 +148,15 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<Workshop> findBySlug(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return Optional.empty();
+        }
+        return repository.findBySlug(slug).map(this::mapToDomainWithSpeakers);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<String> findConflictingSpeakerEmails(
         Collection<String> emails,
         Instant startsAt,

@@ -19,6 +19,8 @@ public interface WorkshopRepository {
 
     boolean existsBySlug(String slug);
 
+    Optional<Workshop> findBySlug(String slug);
+
     List<String> findConflictingSpeakerEmails(
         Collection<String> emails,
         Instant startsAt,
