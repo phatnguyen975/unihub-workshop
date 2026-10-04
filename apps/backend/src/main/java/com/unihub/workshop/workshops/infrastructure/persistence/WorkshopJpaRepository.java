@@ -59,4 +59,17 @@ public interface WorkshopJpaRepository
         @Param("startsAt") Instant startsAt,
         @Param("endsAt") Instant endsAt
     );
+
+    @Query(
+        """
+        SELECT w
+        FROM WorkshopJpaEntity w
+        WHERE w.status = 'PUBLISHED'
+            AND w.endsAt IS NOT NULL
+            AND w.endsAt > :now
+        """
+    )
+    List<WorkshopJpaEntity> findActivePublishedWorkshops(
+        @Param("now") Instant now
+    );
 }

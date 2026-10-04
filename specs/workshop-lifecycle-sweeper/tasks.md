@@ -66,7 +66,7 @@ This plan implements the two background maintenance jobs for Feature 2.5 (`works
 
 ### Phase 2: Capacity Reconciliation (Job 2)
 
-- [ ] **T2 — Capacity Reconciliation for Active Workshops**
+- [x] **T2 — Capacity Reconciliation for Active Workshops**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:**
@@ -77,7 +77,7 @@ This plan implements the two background maintenance jobs for Feature 2.5 (`works
     - Configuration (`application.yml`)
   - **Files:**
     - `apps/backend/src/main/resources/application.yml` _(modify — add `app.workshops.capacity-reconciliation.cron` default `0 */5 * * * *`)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/ActiveWorkshopCapacity.java` _(create — record `UUID id, int capacity`)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/domain/model/ActiveWorkshopCapacity.java` _(create — record `UUID id, int capacity`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopRepository.java` _(modify — add `List<ActiveWorkshopCapacity> findActivePublishedWorkshops(Instant now)`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopJpaRepository.java` _(modify — add query for published workshops with `endsAt > now`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopRepositoryAdapter.java` _(modify — implement `findActivePublishedWorkshops`)_
@@ -102,17 +102,16 @@ This plan implements the two background maintenance jobs for Feature 2.5 (`works
 
 #### Checkpoint: Phase 2
 
-- [ ] All Phase 2 unit tests pass (`ReconcileWorkshopCapacityUseCaseImplTest`, `WorkshopCapacityReconciliationSchedulerTest`).
-- [ ] Modulith architecture tests pass (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
-- [ ] No regression across the entire test suite.
+- [x] All Phase 2 unit tests pass (`ReconcileWorkshopCapacityUseCaseImplTest`, `WorkshopCapacityReconciliationSchedulerTest`).
+- [x] Modulith architecture tests pass (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
+- [x] No regression across the entire test suite.
 
 ### Checkpoint: Feature Complete
 
-- [ ] All tasks above (T1, T2) are checked off.
-- [ ] Every acceptance criterion across Scenarios 1–12 from `SPEC.md` has been verified with unit tests.
-- [ ] Architecture regression test passes (`ModulithArchitectureTest`).
-- [ ] Full backend test suite passes (`./gradlew test`).
-- [ ] Ready for `/review workshop-lifecycle-sweeper`.
+- [x] All tasks above (T1, T2) are checked off.
+- [x] Every acceptance criterion across Scenarios 1–12 from `SPEC.md` has been verified with unit tests.
+- [x] Architecture regression test passes (`ModulithArchitectureTest`).
+- [x] Ready for `/review workshop-lifecycle-sweeper`.
 
 ## Risks and Mitigations
 

@@ -8,6 +8,7 @@ import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
+import com.unihub.workshop.workshops.domain.model.ActiveWorkshopCapacity;
 import com.unihub.workshop.workshops.domain.model.CompletedWorkshopDetails;
 import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
@@ -664,5 +665,19 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             return odt.toInstant();
         }
         return Instant.parse(obj.toString());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActiveWorkshopCapacity> findActivePublishedWorkshops(
+        Instant now
+    ) {
+        Instant effectiveNow = now != null ? now : Instant.now();
+        List<WorkshopJpaEntity> entities =
+            repository.findActivePublishedWorkshops(effectiveNow);
+        return entities
+            .stream()
+            .map(e -> new ActiveWorkshopCapacity(e.getId(), e.getCapacity()))
+            .toList();
     }
 }
