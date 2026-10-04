@@ -616,6 +616,7 @@ sequenceDiagram
     DB-->>Sweeper: Acknowledge bulk update
     Sweeper->>DB: Bulk Insert WorkshopCompletedEvent into Outbox
     DB-->>Sweeper: Acknowledge bulk insert
+    Note over Sweeper,Cache: Post-commit (AFTER_COMMIT) cache cleanup
     Sweeper->>Cache: DEL workshop:{id}:capacity (Delete capacity counter)
     Sweeper->>Cache: Release distributed lock
   end
@@ -646,7 +647,7 @@ sequenceDiagram
 - **State Machine Enforcement:** The system enforces strict transitions: `DRAFT` -> `PUBLISHED` -> `COMPLETED`/`CANCELED`. Once a workshop reaches a terminal state (`COMPLETED` or `CANCELED`), the API layer strictly blocks any further mutations and returns `422 Unprocessable Entity` for attempts to modify the record.
 - **Data Ownership & Core Validation:** Modification endpoints validate `jwt.org` against `workshop.organization_id` to enforce logical multi-tenancy (skipped for `Create`). Any ORGANIZER within the same organization can manage its workshops. The `PUT /api/v1/admin/workshops/{id}` handler is restricted strictly to `PUBLISHED` workshops (modifications to `DRAFT` workshops must use `POST /api/v1/admin/workshops/drafts`); once `PUBLISHED`, core fields (`price`, `currency`, `organization_id`, `status`) and timeline fields (`starts_at`, `ends_at`) are strictly prohibited in `PUT`, and any attempt to change them or reduce `capacity` below current registrations is rejected with `422 Unprocessable Entity` to protect active attendees. Timeline modifications must use `PATCH /reschedule`.
 - **Optimistic Locking (Concurrent Admin Mutations):** The service uses optimistic concurrency control via a `@Version` field on the workshop entity. If the version has changed between read and update, the database raises a conflict and the API returns `409 Conflict`, preventing lost updates when multiple ORGANIZERs edit or publish the same workshop concurrently.
-- **Automated Event Completion Sweeper:** A dedicated `Sweeper` cron component runs hourly. It queries the database for expired `PUBLISHED` workshops, marks them `COMPLETED`, and writes `WorkshopCompletedEvent` entries into the transactional outbox for downstream processing.
+- **Automated Event Completion Sweeper:** A dedicated `Sweeper` cron component runs periodically (default every 5 minutes: `0 */5 * * * *`, configurable via `app.workshops.sweeper.cron`). It acquires a distributed lock (`lock:sweeper:lifecycle`, TTL 240s), queries the database for expired `PUBLISHED` workshops (`ends_at <= NOW()`), marks them `COMPLETED` via atomic bulk update, writes `WorkshopCompletedEvent` entries into the transactional outbox (`event_publication`) for downstream processing, and deletes Redis capacity counters (`workshop:{id}:capacity`) post-commit (`AFTER_COMMIT`).
 - **Granular Asynchronous Branching:** The `Registry` component (not the API) extracts committed outbox rows and externalizes them to the message broker. Background workers synchronize to Elasticsearch on publication, updates, rescheduling, and completion events (keeping `DRAFT` items completely isolated); mass notification flows are executed only for disruptive events (Rescheduled, Canceled), and downstream registration cancellation along with payment refunding (for paid workshops) is handled asynchronously by worker event consumers.
 - **Strict Reschedule Guarantees:** The reschedule endpoint is explicitly blocked for `DRAFT`, `COMPLETED`, or `CANCELED` states. Rescheduling requires a `PUBLISHED` workshop, validates that proposed times are future and form a valid range, and runs a PostgreSQL-level resource collision check (location and speaker availability) to prevent double-booking. Any validation failure returns `422 Unprocessable Entity` and the transaction is not committed.
 - **Decoupled Media Upload & Storage Partitioning:** Workshop cover images and speaker portraits are uploaded via `POST /api/v1/admin/workshops/media/upload` directly to MinIO bucket `unihub-media` under `workshops/covers/{uuid}.{ext}` and `speakers/avatars/{uuid}.{ext}`. The upload endpoint is decoupled from Save Draft so large binary transfers do not tie up database transactions. The frontend receives the public URL, shows an immediate preview, and sends the URL in the subsequent draft payload. When drafts are updated or hard-deleted, orphaned media files in MinIO are cleaned up.
@@ -1204,11 +1205,12 @@ Redis `DECR` is the first-line defense but is not infallible. The database-level
 
 Redis counter state can drift from the database due to JVM crashes or network interruptions occurring between a successful `DECR` and its corresponding compensating `INCR` on rollback paths (e.g., failed payment, circuit breaker trip). Left unaddressed, this drift causes Redis to permanently under-report available seats even when real capacity exists in PostgreSQL.
 
-A **periodic Capacity Reconciliation Job** runs every 5 minutes (configurable via `app.workshops.capacity-reconciliation.cron`) to detect and correct drift. It computes ground-truth availability from the database and resets the Redis counter accordingly:
+A **periodic Capacity Reconciliation Job** runs every 5 minutes (configurable via `app.workshops.capacity-reconciliation.cron`) to detect and correct drift. To ensure safe execution in multi-node deployments behind Nginx, the job acquires a non-blocking distributed lock in Redis (`SET lock:sweeper:capacity-reconciliation true NX EX 240`) before execution. It computes ground-truth availability from the database and resets the Redis counter accordingly:
 
 ```mermaid
 flowchart TD
-  Cron["Capacity Reconciliation Job - every 5 min"] --> Query["Database: SELECT w.id, w.capacity, COUNT(r.id) FILTER (WHERE r.status IN ('CONFIRMED', 'PENDING'))\n FROM workshops w LEFT JOIN registrations r ON w.id = r.workshop_id\n WHERE w.status = 'PUBLISHED' AND w.ends_at > NOW()\n GROUP BY w.id, w.capacity"]
+  Cron["Capacity Reconciliation Job - every 5 min"] --> Lock["Redis: Acquire distributed lock\n(SET lock:sweeper:capacity-reconciliation NX EX 240)"]
+  Lock --> Query["Database: SELECT w.id, w.capacity, COUNT(r.id) FILTER (WHERE r.status IN ('CONFIRMED', 'PENDING'))\n FROM workshops w LEFT JOIN registrations r ON w.id = r.workshop_id\n WHERE w.status = 'PUBLISHED' AND w.ends_at > NOW()\n GROUP BY w.id, w.capacity"]
   Query --> Compute["Compute: ground_truth = Math.max(0, capacity - occupied)"]
   Compute --> Compare["Compare with Redis GET workshop:{workshopId}:capacity"]
   Compare --> Drift{"Counter drifted or missing?"}
@@ -1216,9 +1218,12 @@ flowchart TD
   Drift -->|No| Skip[No-op]
   Reset --> Log["Log: WARN [CAPACITY_DRIFT_DETECTED] workshopId, redisVal, groundTruth"]
   Skip --> Log2["Log: DEBUG counter consistent"]
+  Log --> Release["Redis: Release lock"]
+  Log2 --> Release
 ```
 
 - **Scope:** Runs only against active `PUBLISHED` workshops (`ends_at > NOW()`).
+- **Multi-Node Concurrency Protection:** Acquires a non-blocking distributed lock `lock:sweeper:capacity-reconciliation` with TTL 240s before scanning to ensure only a single backend node executes reconciliation per cycle.
 - **Atomicity & Self-Healing:** The Redis `SET` is unconditional — the computed database value is always authoritative. If the Redis key was missing (due to cache eviction or Redis restart), the reconciler automatically re-initializes it.
 - **Observability:** Emits structured SLF4J warning logs (`[CAPACITY_DRIFT_DETECTED]`) whenever drift is detected and corrected. No external metric library overhead required during core feature build.
 

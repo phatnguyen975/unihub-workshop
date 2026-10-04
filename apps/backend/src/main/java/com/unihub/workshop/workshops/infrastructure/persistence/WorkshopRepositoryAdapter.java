@@ -8,6 +8,8 @@ import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
+import com.unihub.workshop.workshops.domain.model.ActiveWorkshopCapacity;
+import com.unihub.workshop.workshops.domain.model.CompletedWorkshopDetails;
 import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
@@ -600,5 +602,77 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             secondaryVal
         );
         return KeysetCursorCodec.encode(cursor);
+    }
+
+    @Override
+    @Transactional
+    public List<CompletedWorkshopDetails> completeExpiredWorkshops(
+        Instant now
+    ) {
+        Instant effectiveNow = now != null ? now : Instant.now();
+        String sql = """
+        UPDATE workshops
+        SET status = 'COMPLETED', updated_at = :now, version = version + 1
+        WHERE status = 'PUBLISHED' AND ends_at <= :now
+        RETURNING id, organization_id, title, slug, starts_at, ends_at, updated_at
+        """;
+
+        List<?> rows = entityManager
+            .createNativeQuery(sql)
+            .setParameter("now", effectiveNow)
+            .getResultList();
+
+        List<CompletedWorkshopDetails> result = new ArrayList<>(rows.size());
+        for (Object rowObj : rows) {
+            if (rowObj instanceof Object[] row) {
+                result.add(
+                    new CompletedWorkshopDetails(
+                        toUuid(row[0]),
+                        toUuid(row[1]),
+                        row[2] != null ? row[2].toString() : null,
+                        row[3] != null ? row[3].toString() : null,
+                        toInstant(row[4]),
+                        toInstant(row[5]),
+                        toInstant(row[6])
+                    )
+                );
+            }
+        }
+        return result;
+    }
+
+    private UUID toUuid(Object obj) {
+        if (obj == null) {
+            return null;
+        }
+        if (obj instanceof UUID uuid) {
+            return uuid;
+        }
+        return UUID.fromString(obj.toString());
+    }
+
+    private Instant toInstant(Object obj) {
+        if (obj == null) {
+            return null;
+        }
+        if (obj instanceof Instant instant) {
+            return instant;
+        }
+        if (obj instanceof java.sql.Timestamp ts) {
+            return ts.toInstant();
+        }
+        if (obj instanceof java.time.OffsetDateTime odt) {
+            return odt.toInstant();
+        }
+        return Instant.parse(obj.toString());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActiveWorkshopCapacity> findActivePublishedWorkshops(
+        Instant now
+    ) {
+        Instant effectiveNow = now != null ? now : Instant.now();
+        return repository.findActivePublishedWorkshops(effectiveNow);
     }
 }

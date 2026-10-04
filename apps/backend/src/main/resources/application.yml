@@ -73,6 +73,11 @@ app:
   realtime:
     heartbeat-interval-seconds: ${APP_REALTIME_HEARTBEAT_INTERVAL_SECONDS:15}
     stream-timeout-ms: ${APP_REALTIME_STREAM_TIMEOUT_MS:1800000}
+  workshops:
+    sweeper:
+      cron: ${APP_WORKSHOPS_SWEEPER_CRON:0 */5 * * * *}
+    capacity-reconciliation:
+      cron: ${APP_WORKSHOPS_CAPACITY_RECONCILIATION_CRON:0 */5 * * * *}
 
 # =============================================================================
 # Datasource Configuration
