@@ -13,4 +13,11 @@ public interface WorkshopAvailabilityPort {
      * @return non-negative remaining seat count
      */
     int resolveAvailableSeats(UUID workshopId, int totalCapacity);
+
+    /**
+     * Deletes the Redis availability counter key `workshop:{id}:capacity`.
+     *
+     * @param workshopId unique identifier of the workshop
+     */
+    void deleteCapacity(UUID workshopId);
 }

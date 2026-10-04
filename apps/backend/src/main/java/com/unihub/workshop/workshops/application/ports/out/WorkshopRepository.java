@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.application.ports.out;
 
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
+import com.unihub.workshop.workshops.domain.model.CompletedWorkshopDetails;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import java.time.Instant;
@@ -40,4 +41,6 @@ public interface WorkshopRepository {
     CursorPage<WorkshopSummary> findAllByOrganizationWithFilters(
         ListAdminWorkshopsQuery query
     );
+
+    List<CompletedWorkshopDetails> completeExpiredWorkshops(Instant now);
 }

@@ -21,7 +21,7 @@ This plan implements the two background maintenance jobs for Feature 2.5 (`works
 
 ### Phase 1: Lifecycle Sweeper (Job 1)
 
-- [ ] **T1 — Automated Lifecycle Sweeper for Expired Workshops**
+- [x] **T1 — Automated Lifecycle Sweeper for Expired Workshops**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:**
@@ -35,7 +35,7 @@ This plan implements the two background maintenance jobs for Feature 2.5 (`works
     - `apps/backend/src/main/resources/application.yml` _(modify — add `app.workshops.sweeper.cron` default `0 */5 * * * *`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopLockPort.java` _(create — `tryLock(String lockKey, Duration ttl)`, `releaseLock(String lockKey)`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/cache/RedisWorkshopLockAdapter.java` _(create — implements `WorkshopLockPort` using `StringRedisTemplate`)_
-    - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/CompletedWorkshopDetails.java` _(create — record DTO for returned workshop data)_
+    - `apps/backend/src/main/java/com/unihub/workshop/workshops/domain/model/CompletedWorkshopDetails.java` _(create — record DTO for returned workshop data)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopRepository.java` _(modify — add `List<CompletedWorkshopDetails> completeExpiredWorkshops(Instant now)`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/infrastructure/persistence/WorkshopRepositoryAdapter.java` _(modify — implement `completeExpiredWorkshops` using native SQL `UPDATE ... RETURNING ...`)_
     - `apps/backend/src/main/java/com/unihub/workshop/workshops/application/ports/out/WorkshopAvailabilityPort.java` _(modify — add `void deleteCapacity(UUID workshopId)`)_
@@ -60,9 +60,9 @@ This plan implements the two background maintenance jobs for Feature 2.5 (`works
 
 #### Checkpoint: Phase 1
 
-- [ ] All Phase 1 unit tests pass (`RedisWorkshopLockAdapterTest`, `WorkshopLifecycleCacheEvictionListenerTest`, `SweepWorkshopLifecycleUseCaseImplTest`, `WorkshopLifecycleSweeperSchedulerTest`).
-- [ ] Modulith architecture tests pass (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
-- [ ] No regression in existing tests across `workshops` and `registrations`.
+- [x] All Phase 1 unit tests pass (`RedisWorkshopLockAdapterTest`, `WorkshopLifecycleCacheEvictionListenerTest`, `SweepWorkshopLifecycleUseCaseImplTest`, `WorkshopLifecycleSweeperSchedulerTest`).
+- [x] Modulith architecture tests pass (`./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`).
+- [x] No regression in existing tests across `workshops` and `registrations`.
 
 ### Phase 2: Capacity Reconciliation (Job 2)
 

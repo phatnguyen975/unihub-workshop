@@ -56,4 +56,23 @@ public class RedisWorkshopAvailabilityAdapter
             return Math.max(0, totalCapacity);
         }
     }
+
+    @Override
+    public void deleteCapacity(UUID workshopId) {
+        if (workshopId == null) {
+            return;
+        }
+
+        String key = "workshop:" + workshopId + ":capacity";
+        try {
+            redisTemplate.delete(key);
+            log.info("Deleted Redis capacity key '{}'", key);
+        } catch (Exception e) {
+            log.warn(
+                "Failed to delete Redis capacity key '{}': {}",
+                key,
+                e.getMessage()
+            );
+        }
+    }
 }
