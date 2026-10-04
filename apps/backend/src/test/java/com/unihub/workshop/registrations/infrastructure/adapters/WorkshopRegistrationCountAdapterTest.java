@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,5 +50,41 @@ class WorkshopRegistrationCountAdapterTest {
         long count = adapter.countActiveRegistrations(null);
 
         assertThat(count).isZero();
+    }
+
+    @Test
+    @DisplayName(
+        "countActiveRegistrationsBatch: returns counts mapped by workshop ID"
+    )
+    void shouldReturnBatchActiveRegistrationCounts() {
+        UUID id1 = UUID.randomUUID();
+        UUID id2 = UUID.randomUUID();
+        Query query = mock(Query.class);
+
+        Object[] row1 = new Object[] { id1, 15L };
+        Object[] row2 = new Object[] { id2.toString(), 25L };
+
+        when(entityManager.createNativeQuery(anyString())).thenReturn(query);
+        when(query.setParameter("workshopIds", List.of(id1, id2))).thenReturn(
+            query
+        );
+        when(query.getResultList()).thenReturn(List.of(row1, row2));
+
+        Map<UUID, Long> result = adapter.countActiveRegistrationsBatch(
+            List.of(id1, id2)
+        );
+
+        assertThat(result).containsEntry(id1, 15L);
+        assertThat(result).containsEntry(id2, 25L);
+        verify(query).setParameter("workshopIds", List.of(id1, id2));
+    }
+
+    @Test
+    @DisplayName(
+        "countActiveRegistrationsBatch: returns empty map when workshopIds is null or empty"
+    )
+    void shouldReturnEmptyMapWhenBatchInputIsNullOrEmpty() {
+        assertThat(adapter.countActiveRegistrationsBatch(null)).isEmpty();
+        assertThat(adapter.countActiveRegistrationsBatch(List.of())).isEmpty();
     }
 }

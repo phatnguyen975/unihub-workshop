@@ -8,6 +8,7 @@ import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
+import com.unihub.workshop.workshops.domain.model.Speaker;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
@@ -23,12 +24,15 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
@@ -71,35 +75,11 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             }
 
             if (workshop.speakers() != null) {
-                speakerRepository.deleteByWorkshopId(saved.getId());
-                if (!workshop.speakers().isEmpty()) {
-                    List<WorkshopSpeakerJpaEntity> speakerEntities = workshop
-                        .speakers()
-                        .stream()
-                        .map(s -> {
-                            WorkshopSpeakerJpaEntity se =
-                                mapper.toSpeakerEntity(s);
-                            se.setWorkshopId(saved.getId());
-                            if (se.getId() == null) {
-                                se.setId(UUID.randomUUID());
-                            }
-                            if (se.getCreatedBy() == null) {
-                                se.setCreatedBy(saved.getCreatedBy());
-                            }
-                            if (se.getUpdatedBy() == null) {
-                                se.setUpdatedBy(saved.getUpdatedBy());
-                            }
-                            if (se.getCreatedAt() == null) {
-                                se.setCreatedAt(Instant.now());
-                            }
-                            if (se.getUpdatedAt() == null) {
-                                se.setUpdatedAt(Instant.now());
-                            }
-                            return se;
-                        })
-                        .toList();
-                    speakerRepository.saveAllAndFlush(speakerEntities);
-                }
+                syncSpeakers(
+                    saved.getId(),
+                    workshop.speakers(),
+                    saved.getUpdatedBy()
+                );
             }
 
             return mapToDomainWithSpeakers(saved);
@@ -144,6 +124,15 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     @Transactional(readOnly = true)
     public boolean existsBySlug(String slug) {
         return repository.existsBySlug(slug);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Workshop> findBySlug(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return Optional.empty();
+        }
+        return repository.findBySlug(slug).map(this::mapToDomainWithSpeakers);
     }
 
     @Override
@@ -315,6 +304,105 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    private void syncSpeakers(
+        UUID workshopId,
+        List<Speaker> desiredSpeakers,
+        UUID actorId
+    ) {
+        if (desiredSpeakers == null) {
+            return;
+        }
+
+        List<WorkshopSpeakerJpaEntity> existingEntities =
+            speakerRepository.findByWorkshopIdOrderBySortOrderAsc(workshopId);
+
+        if (desiredSpeakers.isEmpty() && existingEntities.isEmpty()) {
+            return;
+        }
+
+        Map<UUID, WorkshopSpeakerJpaEntity> existingById = existingEntities
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    WorkshopSpeakerJpaEntity::getId,
+                    Function.identity()
+                )
+            );
+
+        Map<String, WorkshopSpeakerJpaEntity> existingByEmail = existingEntities
+            .stream()
+            .filter(e -> e.getEmail() != null)
+            .collect(
+                Collectors.toMap(
+                    e -> e.getEmail().trim().toLowerCase(Locale.ROOT),
+                    Function.identity(),
+                    (first, second) -> first
+                )
+            );
+
+        Set<UUID> matchedExistingIds = new HashSet<>();
+        List<WorkshopSpeakerJpaEntity> toPersist = new ArrayList<>();
+        Instant now = Instant.now();
+
+        for (Speaker s : desiredSpeakers) {
+            WorkshopSpeakerJpaEntity target = null;
+            if (s.id() != null && existingById.containsKey(s.id())) {
+                target = existingById.get(s.id());
+            } else if (s.email() != null) {
+                String normalizedEmail = s
+                    .email()
+                    .trim()
+                    .toLowerCase(Locale.ROOT);
+                target = existingByEmail.get(normalizedEmail);
+            }
+
+            if (target != null) {
+                matchedExistingIds.add(target.getId());
+                target.setName(s.name());
+                target.setBio(s.bio());
+                target.setAvatarUrl(s.avatarUrl());
+                target.setLinkedinUrl(s.linkedinUrl());
+                target.setEmail(s.email());
+                target.setSortOrder(s.sortOrder() != null ? s.sortOrder() : 0);
+                target.setUpdatedAt(now);
+                if (actorId != null) {
+                    target.setUpdatedBy(actorId);
+                }
+            } else {
+                WorkshopSpeakerJpaEntity newEntity = mapper.toSpeakerEntity(s);
+                newEntity.setWorkshopId(workshopId);
+                if (newEntity.getId() == null) {
+                    newEntity.setId(UUID.randomUUID());
+                }
+                if (newEntity.getCreatedBy() == null) {
+                    newEntity.setCreatedBy(actorId);
+                }
+                if (newEntity.getUpdatedBy() == null) {
+                    newEntity.setUpdatedBy(actorId);
+                }
+                if (newEntity.getCreatedAt() == null) {
+                    newEntity.setCreatedAt(now);
+                }
+                if (newEntity.getUpdatedAt() == null) {
+                    newEntity.setUpdatedAt(now);
+                }
+                toPersist.add(newEntity);
+            }
+        }
+
+        for (WorkshopSpeakerJpaEntity existing : existingEntities) {
+            if (!matchedExistingIds.contains(existing.getId())) {
+                entityManager.remove(existing);
+            }
+        }
+
+        for (WorkshopSpeakerJpaEntity newEntity : toPersist) {
+            entityManager.persist(newEntity);
+        }
+
+        entityManager.flush();
+    }
 
     private List<Predicate> buildPredicates(
         CriteriaBuilder cb,

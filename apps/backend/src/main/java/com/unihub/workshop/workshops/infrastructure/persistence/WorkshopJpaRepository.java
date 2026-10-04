@@ -20,6 +20,8 @@ public interface WorkshopJpaRepository
 
     boolean existsBySlug(String slug);
 
+    Optional<WorkshopJpaEntity> findBySlug(String slug);
+
     @Query(
         """
         SELECT w.id

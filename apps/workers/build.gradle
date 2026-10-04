@@ -56,6 +56,9 @@ dependencies {
     // --- SEARCH ENGINE ---
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
 
+    // --- CACHE ---
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
     // --- OBJECT STORAGE ---
     implementation 'software.amazon.awssdk:s3'
     implementation 'software.amazon.awssdk:url-connection-client'

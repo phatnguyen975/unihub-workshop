@@ -501,15 +501,10 @@ public class AdminWorkshopController {
             );
         }
 
-        MediaUploadResponse response = MediaUploadResponse.builder()
-            .url(storedMedia.publicUrl())
-            .fileKey(storedMedia.fileKey())
-            .type(storedMedia.assetType().name())
-            .size(storedMedia.size())
-            .contentType(storedMedia.contentType())
-            .build();
-
-        return ApiResponse.success(response, "Media uploaded successfully.");
+        return ApiResponse.success(
+            workshopMapper.toMediaUploadResponse(storedMedia),
+            "Media uploaded successfully."
+        );
     }
 
     private Instant parseInstant(String value, String paramName) {

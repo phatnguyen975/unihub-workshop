@@ -26,6 +26,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
 class PublishWorkshopUseCaseImplTest {
@@ -116,7 +117,15 @@ class PublishWorkshopUseCaseImplTest {
         assertThat(published.updatedBy()).isEqualTo(CALLER_ID);
 
         verify(workshopRepository).save(any(Workshop.class));
-        verify(eventPublisher).publishEvent(any(WorkshopPublishedEvent.class));
+        ArgumentCaptor<WorkshopPublishedEvent> eventCaptor =
+            ArgumentCaptor.forClass(WorkshopPublishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        WorkshopPublishedEvent event = eventCaptor.getValue();
+        assertThat(event.speakers()).hasSize(1);
+        assertThat(event.speakers().get(0).name()).isEqualTo("Dr. Alan Turing");
+        assertThat(event.speakers().get(0).email()).isEqualTo(
+            "alan.turing@university.edu"
+        );
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.presentation.mapper;
 
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.pagination.PageResponse;
+import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.domain.model.AssignedStaff;
 import com.unihub.workshop.workshops.domain.model.AvailableStaff;
@@ -11,6 +12,7 @@ import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
+import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerRequest;
 import com.unihub.workshop.workshops.presentation.dto.SpeakerResponse;
@@ -23,6 +25,10 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface WorkshopPresentationMapper {
+    @Mapping(target = "url", source = "publicUrl")
+    @Mapping(target = "type", source = "assetType")
+    MediaUploadResponse toMediaUploadResponse(StoredMedia storedMedia);
+
     WorkshopResponse toResponse(Workshop workshop);
 
     SpeakerResponse toSpeakerResponse(Speaker speaker);

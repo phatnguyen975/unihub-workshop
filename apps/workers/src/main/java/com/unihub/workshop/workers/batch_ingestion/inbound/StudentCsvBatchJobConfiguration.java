@@ -14,9 +14,8 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ExecutionContext;
-import org.springframework.batch.infrastructure.item.ItemProcessor;
-import org.springframework.batch.infrastructure.item.ItemReader;
 import org.springframework.batch.infrastructure.item.ItemStreamReader;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.support.CompositeItemProcessor;
@@ -42,13 +41,13 @@ public class StudentCsvBatchJobConfiguration {
     public Step processCsvStep(
         JobRepository jobRepository,
         PlatformTransactionManager transactionManager,
-        ItemReader<StudentDirectoryRow> studentCsvItemReader,
-        ItemProcessor<
+        StudentCsvItemStreamReader studentCsvItemReader,
+        CompositeItemProcessor<
             StudentDirectoryRow,
             StudentDirectoryRow
         > compositeProcessor,
         ChunkDuplicateResolver deduplicator,
-        ItemWriter<StudentDirectoryRow> studentDirectoryItemWriter
+        StudentDirectoryChunkItemWriter studentDirectoryItemWriter
     ) {
         return new StepBuilder("processCsvStep", jobRepository)
             .<StudentDirectoryRow, StudentDirectoryRow>chunk(100)
@@ -62,7 +61,7 @@ public class StudentCsvBatchJobConfiguration {
 
     @Bean
     @StepScope
-    public ItemProcessor<
+    public CompositeItemProcessor<
         StudentDirectoryRow,
         StudentDirectoryRow
     > compositeProcessor(
@@ -79,53 +78,95 @@ public class StudentCsvBatchJobConfiguration {
 
     @Bean
     @StepScope
-    public ItemStreamReader<StudentDirectoryRow> studentCsvItemReader(
+    public StudentCsvItemStreamReader studentCsvItemReader(
         StreamingStudentCsvReader streamingReader,
         @Value("#{jobParameters['sourceFileKey']}") String sourceFileKey,
         @Value("#{jobParameters['organizationId']}") String orgId
     ) {
-        return new ItemStreamReader<>() {
-            private boolean opened = false;
-
-            @Override
-            public void open(ExecutionContext executionContext) {
-                if (!opened) {
-                    streamingReader.open(sourceFileKey, UUID.fromString(orgId));
-                    opened = true;
-                }
-            }
-
-            @Override
-            public void update(ExecutionContext executionContext) {}
-
-            @Override
-            public void close() {
-                try {
-                    streamingReader.close();
-                } catch (Exception ignored) {}
-            }
-
-            @Override
-            public StudentDirectoryRow read() throws Exception {
-                if (!opened) {
-                    open(new ExecutionContext());
-                }
-                StudentDirectoryRow row = streamingReader.readRow();
-                if (row == null) {
-                    close();
-                }
-                return row;
-            }
-        };
+        return new StudentCsvItemStreamReader(
+            streamingReader,
+            sourceFileKey,
+            UUID.fromString(orgId)
+        );
     }
 
     @Bean
     @StepScope
-    public ItemWriter<StudentDirectoryRow> studentDirectoryItemWriter(
+    public StudentDirectoryChunkItemWriter studentDirectoryItemWriter(
         StudentDirectoryWriter writer,
         @Value("#{jobParameters['sourceFileKey']}") String sourceFileKey
     ) {
-        return chunk ->
+        return new StudentDirectoryChunkItemWriter(writer, sourceFileKey);
+    }
+
+    public static class StudentCsvItemStreamReader
+        implements ItemStreamReader<StudentDirectoryRow>
+    {
+
+        private final StreamingStudentCsvReader streamingReader;
+        private final String sourceFileKey;
+        private final UUID organizationId;
+        private boolean opened = false;
+
+        public StudentCsvItemStreamReader(
+            StreamingStudentCsvReader streamingReader,
+            String sourceFileKey,
+            UUID organizationId
+        ) {
+            this.streamingReader = streamingReader;
+            this.sourceFileKey = sourceFileKey;
+            this.organizationId = organizationId;
+        }
+
+        @Override
+        public void open(ExecutionContext executionContext) {
+            if (!opened) {
+                streamingReader.open(sourceFileKey, organizationId);
+                opened = true;
+            }
+        }
+
+        @Override
+        public void update(ExecutionContext executionContext) {}
+
+        @Override
+        public void close() {
+            try {
+                streamingReader.close();
+            } catch (Exception ignored) {}
+        }
+
+        @Override
+        public StudentDirectoryRow read() throws Exception {
+            if (!opened) {
+                open(new ExecutionContext());
+            }
+            StudentDirectoryRow row = streamingReader.readRow();
+            if (row == null) {
+                close();
+            }
+            return row;
+        }
+    }
+
+    public static class StudentDirectoryChunkItemWriter
+        implements ItemWriter<StudentDirectoryRow>
+    {
+
+        private final StudentDirectoryWriter writer;
+        private final String sourceFileKey;
+
+        public StudentDirectoryChunkItemWriter(
+            StudentDirectoryWriter writer,
+            String sourceFileKey
+        ) {
+            this.writer = writer;
+            this.sourceFileKey = sourceFileKey;
+        }
+
+        @Override
+        public void write(Chunk<? extends StudentDirectoryRow> chunk) {
             writer.bulkUpsert(new ArrayList<>(chunk.getItems()), sourceFileKey);
+        }
     }
 }

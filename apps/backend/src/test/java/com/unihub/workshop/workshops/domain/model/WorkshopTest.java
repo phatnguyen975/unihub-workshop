@@ -299,8 +299,7 @@ class WorkshopTest {
         UUID orgId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         UUID updaterId = UUID.randomUUID();
-        Instant now = Instant.parse("2026-10-01T10:00:00Z");
-        Instant startsAt = now.plusSeconds(86400 * 2); // 2 days in future
+        Instant startsAt = Instant.now().plusSeconds(86400 * 2); // 2 days in future
         Instant endsAt = startsAt.plusSeconds(7200); // + 2 hours
 
         Workshop draft = Workshop.createDraft(
