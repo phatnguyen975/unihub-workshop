@@ -1,5 +1,6 @@
 package com.unihub.workshop.workshops.infrastructure.persistence;
 
+import com.unihub.workshop.workshops.domain.model.ActiveWorkshopCapacity;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -62,14 +63,14 @@ public interface WorkshopJpaRepository
 
     @Query(
         """
-        SELECT w
+        SELECT new com.unihub.workshop.workshops.domain.model.ActiveWorkshopCapacity(w.id, w.capacity)
         FROM WorkshopJpaEntity w
         WHERE w.status = 'PUBLISHED'
             AND w.endsAt IS NOT NULL
             AND w.endsAt > :now
         """
     )
-    List<WorkshopJpaEntity> findActivePublishedWorkshops(
+    List<ActiveWorkshopCapacity> findActivePublishedWorkshops(
         @Param("now") Instant now
     );
 }

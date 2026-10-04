@@ -71,7 +71,7 @@ public class ReconcileWorkshopCapacityUseCaseImpl
                 long activeCount = activeCounts.getOrDefault(id, 0L);
                 int groundTruth = Math.max(
                     0,
-                    workshop.capacity() - (int) activeCount
+                    workshop.capacityValue() - (int) activeCount
                 );
 
                 Integer currentVal = availabilityPort.getCapacity(id);

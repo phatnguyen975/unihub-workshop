@@ -673,11 +673,6 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         Instant now
     ) {
         Instant effectiveNow = now != null ? now : Instant.now();
-        List<WorkshopJpaEntity> entities =
-            repository.findActivePublishedWorkshops(effectiveNow);
-        return entities
-            .stream()
-            .map(e -> new ActiveWorkshopCapacity(e.getId(), e.getCapacity()))
-            .toList();
+        return repository.findActivePublishedWorkshops(effectiveNow);
     }
 }

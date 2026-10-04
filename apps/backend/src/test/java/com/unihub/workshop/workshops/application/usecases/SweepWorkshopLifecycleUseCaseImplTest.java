@@ -3,6 +3,9 @@ package com.unihub.workshop.workshops.application.usecases;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -17,14 +20,18 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionOperations;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SweepWorkshopLifecycleUseCaseImpl Unit Tests")
@@ -42,26 +49,45 @@ class SweepWorkshopLifecycleUseCaseImplTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private TransactionOperations transactionOperations;
+
     private SweepWorkshopLifecycleUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
+        lenient()
+            .doAnswer(invocation -> {
+                Consumer<TransactionStatus> action = invocation.getArgument(0);
+                action.accept(mock(TransactionStatus.class));
+                return null;
+            })
+            .when(transactionOperations)
+            .executeWithoutResult(any());
+
         useCase = new SweepWorkshopLifecycleUseCaseImpl(
             workshopLockPort,
             workshopRepository,
-            eventPublisher
+            eventPublisher,
+            transactionOperations
         );
     }
 
     @Test
-    @DisplayName("Skips execution when lock is already held by another node")
-    void sweepLifecycle_lockHeld_skips() {
+    @DisplayName(
+        "Skips execution without opening transaction when lock is already held"
+    )
+    void sweepLifecycle_lockHeld_skipsWithoutTransaction() {
         when(workshopLockPort.tryLock(LOCK_KEY, LOCK_TTL)).thenReturn(false);
 
         useCase.sweepLifecycle();
 
         verify(workshopLockPort, never()).releaseLock(any());
-        verifyNoInteractions(workshopRepository, eventPublisher);
+        verifyNoInteractions(
+            transactionOperations,
+            workshopRepository,
+            eventPublisher
+        );
     }
 
     @Test
@@ -82,7 +108,7 @@ class SweepWorkshopLifecycleUseCaseImplTest {
 
     @Test
     @DisplayName(
-        "Publishes WorkshopCompletedEvent for each completed workshop and releases lock"
+        "Publishes WorkshopCompletedEvent for each completed workshop, committing in transaction before lock release"
     )
     void sweepLifecycle_eligibleWorkshops_publishesEventsAndReleasesLock() {
         UUID id1 = UUID.randomUUID();
@@ -119,6 +145,11 @@ class SweepWorkshopLifecycleUseCaseImplTest {
 
         useCase.sweepLifecycle();
 
+        InOrder inOrder = inOrder(workshopLockPort, transactionOperations);
+        inOrder.verify(workshopLockPort).tryLock(LOCK_KEY, LOCK_TTL);
+        inOrder.verify(transactionOperations).executeWithoutResult(any());
+        inOrder.verify(workshopLockPort).releaseLock(LOCK_KEY);
+
         ArgumentCaptor<WorkshopCompletedEvent> eventCaptor =
             ArgumentCaptor.forClass(WorkshopCompletedEvent.class);
         verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture());
@@ -130,8 +161,6 @@ class SweepWorkshopLifecycleUseCaseImplTest {
         assertThat(events.get(0).title()).isEqualTo("Workshop 1");
         assertThat(events.get(0).slug()).isEqualTo("workshop-1");
         assertThat(events.get(1).workshopId()).isEqualTo(id2);
-
-        verify(workshopLockPort).releaseLock(LOCK_KEY);
     }
 
     @Test

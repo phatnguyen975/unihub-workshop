@@ -12,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 @Slf4j
 @Service
@@ -27,9 +27,9 @@ public class SweepWorkshopLifecycleUseCaseImpl
     private final WorkshopLockPort workshopLockPort;
     private final WorkshopRepository workshopRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final TransactionOperations transactionOperations;
 
     @Override
-    @Transactional
     public void sweepLifecycle() {
         boolean acquired = workshopLockPort.tryLock(LOCK_KEY, LOCK_TTL);
         if (!acquired) {
@@ -41,38 +41,8 @@ public class SweepWorkshopLifecycleUseCaseImpl
         }
 
         try {
-            Instant now = Instant.now();
-            List<CompletedWorkshopDetails> completedWorkshops =
-                workshopRepository.completeExpiredWorkshops(now);
-
-            if (completedWorkshops.isEmpty()) {
-                log.debug(
-                    "Lifecycle sweeper run completed: 0 workshops transitioned to COMPLETED"
-                );
-                return;
-            }
-
-            for (CompletedWorkshopDetails w : completedWorkshops) {
-                WorkshopCompletedEvent event = new WorkshopCompletedEvent(
-                    w.id(),
-                    w.organizationId(),
-                    w.title(),
-                    w.slug(),
-                    w.startsAt(),
-                    w.endsAt(),
-                    w.completedAt()
-                );
-                eventPublisher.publishEvent(event);
-                log.info(
-                    "Workshop {} transitioned to COMPLETED by lifecycle sweeper",
-                    w.id()
-                );
-            }
-
-            log.info(
-                "Lifecycle sweeper successfully completed {} workshops at {}",
-                completedWorkshops.size(),
-                now
+            transactionOperations.executeWithoutResult(status ->
+                executeSweep()
             );
         } catch (Exception e) {
             log.warn(
@@ -84,5 +54,41 @@ public class SweepWorkshopLifecycleUseCaseImpl
         } finally {
             workshopLockPort.releaseLock(LOCK_KEY);
         }
+    }
+
+    private void executeSweep() {
+        Instant now = Instant.now();
+        List<CompletedWorkshopDetails> completedWorkshops =
+            workshopRepository.completeExpiredWorkshops(now);
+
+        if (completedWorkshops.isEmpty()) {
+            log.debug(
+                "Lifecycle sweeper run completed: 0 workshops transitioned to COMPLETED"
+            );
+            return;
+        }
+
+        for (CompletedWorkshopDetails w : completedWorkshops) {
+            WorkshopCompletedEvent event = new WorkshopCompletedEvent(
+                w.id(),
+                w.organizationId(),
+                w.title(),
+                w.slug(),
+                w.startsAt(),
+                w.endsAt(),
+                w.completedAt()
+            );
+            eventPublisher.publishEvent(event);
+            log.info(
+                "Workshop {} transitioned to COMPLETED by lifecycle sweeper",
+                w.id()
+            );
+        }
+
+        log.info(
+            "Lifecycle sweeper successfully completed {} workshops at {}",
+            completedWorkshops.size(),
+            now
+        );
     }
 }
