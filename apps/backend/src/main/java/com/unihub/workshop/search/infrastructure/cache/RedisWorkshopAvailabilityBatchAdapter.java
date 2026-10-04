@@ -3,6 +3,7 @@ package com.unihub.workshop.search.infrastructure.cache;
 import com.unihub.workshop.search.application.ports.out.WorkshopAvailabilityBatchPort;
 import com.unihub.workshop.search.domain.model.WorkshopCard;
 import com.unihub.workshop.workshops.api.WorkshopRegistrationCountPort;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,8 @@ public class RedisWorkshopAvailabilityBatchAdapter
         }
 
         Map<UUID, Integer> resultMap = new HashMap<>();
+        List<WorkshopCard> missedCards = new ArrayList<>();
+
         for (int i = 0; i < cards.size(); i++) {
             WorkshopCard card = cards.get(i);
             String val =
@@ -63,24 +66,40 @@ public class RedisWorkshopAvailabilityBatchAdapter
                     );
                 }
             }
+            missedCards.add(card);
+        }
 
-            // Cache miss fallback to database active registration count
-            int capacity = card.capacity() != null ? card.capacity() : 0;
+        if (!missedCards.isEmpty()) {
+            List<UUID> missedIds = missedCards
+                .stream()
+                .map(WorkshopCard::id)
+                .toList();
+            Map<UUID, Long> activeCounts;
             try {
-                long activeRegistrations =
-                    registrationCountPort.countActiveRegistrations(card.id());
+                activeCounts =
+                    registrationCountPort.countActiveRegistrationsBatch(
+                        missedIds
+                    );
+            } catch (Exception e) {
+                log.error(
+                    "Failed to query batch active registration counts for {} workshops: {}",
+                    missedIds.size(),
+                    e.getMessage()
+                );
+                activeCounts = Map.of();
+            }
+
+            for (WorkshopCard card : missedCards) {
+                int capacity = card.capacity() != null ? card.capacity() : 0;
+                long activeRegistrations = activeCounts.getOrDefault(
+                    card.id(),
+                    0L
+                );
                 int availableSeats = (int) Math.max(
                     0,
                     capacity - activeRegistrations
                 );
                 resultMap.put(card.id(), availableSeats);
-            } catch (Exception e) {
-                log.error(
-                    "Failed to query active registration count for workshop {}: {}",
-                    card.id(),
-                    e.getMessage()
-                );
-                resultMap.put(card.id(), Math.max(0, capacity));
             }
         }
 

@@ -18,6 +18,7 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 public class WorkshopEsDocument {
 
     @Id
+    @Field(type = FieldType.Keyword)
     private String id;
 
     @Field(type = FieldType.Keyword)

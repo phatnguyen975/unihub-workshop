@@ -18,7 +18,7 @@ public interface WorkshopSpeakerJpaRepository
         UUID workshopId
     );
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         "DELETE FROM WorkshopSpeakerJpaEntity s WHERE s.workshopId = :workshopId"
     )

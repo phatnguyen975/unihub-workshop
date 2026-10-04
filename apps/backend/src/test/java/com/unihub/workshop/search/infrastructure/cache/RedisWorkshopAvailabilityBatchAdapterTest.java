@@ -95,8 +95,10 @@ class RedisWorkshopAvailabilityBatchAdapterTest {
         );
         // Workshop 2 has capacity 10, but 12 registrations (negative clamped to 0)
         when(
-            registrationCountPort.countActiveRegistrations(workshopId2)
-        ).thenReturn(12L);
+            registrationCountPort.countActiveRegistrationsBatch(
+                List.of(workshopId2)
+            )
+        ).thenReturn(Map.of(workshopId2, 12L));
 
         WorkshopCard card1 = createCard(workshopId1, 50);
         WorkshopCard card2 = createCard(workshopId2, 10);
@@ -107,7 +109,9 @@ class RedisWorkshopAvailabilityBatchAdapterTest {
 
         assertThat(result).containsEntry(workshopId1, 25);
         assertThat(result).containsEntry(workshopId2, 0); // clamped to 0
-        verify(registrationCountPort).countActiveRegistrations(workshopId2);
+        verify(registrationCountPort).countActiveRegistrationsBatch(
+            List.of(workshopId2)
+        );
     }
 
     @Test

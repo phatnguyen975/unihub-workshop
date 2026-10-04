@@ -3,11 +3,13 @@ package com.unihub.workshop.workers.search_sync.outbound.elasticsearch;
 import com.unihub.workshop.workers.search_sync.core.models.WorkshopDocument;
 import com.unihub.workshop.workers.search_sync.core.ports.out.WorkshopIndexStore;
 import com.unihub.workshop.workers.search_sync.outbound.elasticsearch.mapper.WorkshopDocumentMapper;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -17,6 +19,26 @@ public class ElasticsearchWorkshopIndexAdapter implements WorkshopIndexStore {
 
     private final ElasticsearchOperations elasticsearchOperations;
     private final WorkshopDocumentMapper mapper;
+
+    @PostConstruct
+    public void initIndex() {
+        try {
+            IndexOperations indexOps = elasticsearchOperations.indexOps(
+                WorkshopEsDocument.class
+            );
+            if (!indexOps.exists()) {
+                indexOps.createWithMapping();
+                log.info(
+                    "Initialized Elasticsearch index with schema mapping for WorkshopEsDocument"
+                );
+            }
+        } catch (Exception e) {
+            log.warn(
+                "Could not check or initialize Elasticsearch index on startup: {}",
+                e.getMessage()
+            );
+        }
+    }
 
     @Override
     public void upsert(WorkshopDocument document) {

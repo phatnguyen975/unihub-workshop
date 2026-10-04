@@ -58,31 +58,39 @@ class RedisSwrCacheAdapterTest {
         "get: parses and returns SwrCacheEntry when valid JSON exists in Redis"
     )
     void shouldReturnParsedEntryWhenKeyPresent() throws Exception {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         CursorPage<WorkshopCard> page = new CursorPage<>(
             List.of(),
-            null,
-            false
+            "cursor123",
+            true
         );
-        SwrCacheEntry entry = new SwrCacheEntry(Instant.now(), page);
-        String json = objectMapper.writeValueAsString(entry);
+        SwrCacheEntry expected = new SwrCacheEntry(Instant.now(), page);
+        String json = objectMapper.writeValueAsString(expected);
 
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get("search:q:test")).thenReturn(json);
 
         Optional<SwrCacheEntry> result = adapter.get("search:q:test");
         assertThat(result).isPresent();
-        assertThat(result.get().result().items()).isEmpty();
+        assertThat(result.get().result().nextCursor()).isEqualTo("cursor123");
+        assertThat(result.get().result().hasMore()).isTrue();
     }
 
     @Test
-    @DisplayName("put: serializes entry and stores in Redis with hard TTL")
-    void shouldStoreEntryWithTtl() {
+    @DisplayName("get: returns empty when JSON deserialization fails")
+    void shouldReturnEmptyWhenJsonCorrupted() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        CursorPage<WorkshopCard> page = new CursorPage<>(
-            List.of(),
-            null,
-            false
-        );
+        when(valueOperations.get("search:q:test")).thenReturn("invalid-json{");
+
+        Optional<SwrCacheEntry> result = adapter.get("search:q:test");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("put: writes JSON with configured hard TTL")
+    void shouldWriteJsonWithHardTtl() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        CursorPage<WorkshopCard> page = CursorPage.empty();
         SwrCacheEntry entry = new SwrCacheEntry(Instant.now(), page);
 
         adapter.put("search:q:test", entry, Duration.ofHours(24));
@@ -95,8 +103,8 @@ class RedisSwrCacheAdapterTest {
     }
 
     @Test
-    @DisplayName("tryLock: delegates to setIfAbsent with lock timeout")
-    void shouldAcquireLockViaSetIfAbsent() {
+    @DisplayName("tryLock: returns true when Redis setIfAbsent succeeds")
+    void shouldReturnTrueWhenLockAcquired() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(
             valueOperations.setIfAbsent(
@@ -104,13 +112,32 @@ class RedisSwrCacheAdapterTest {
                 "1",
                 Duration.ofSeconds(10)
             )
-        ).thenReturn(true);
+        ).thenReturn(Boolean.TRUE);
 
-        boolean acquired = adapter.tryLock(
+        boolean locked = adapter.tryLock(
             "lock:search:q:test",
             Duration.ofSeconds(10)
         );
-        assertThat(acquired).isTrue();
+        assertThat(locked).isTrue();
+    }
+
+    @Test
+    @DisplayName("tryLock: returns false when Redis setIfAbsent fails")
+    void shouldReturnFalseWhenLockNotAcquired() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(
+            valueOperations.setIfAbsent(
+                "lock:search:q:test",
+                "1",
+                Duration.ofSeconds(10)
+            )
+        ).thenReturn(Boolean.FALSE);
+
+        boolean locked = adapter.tryLock(
+            "lock:search:q:test",
+            Duration.ofSeconds(10)
+        );
+        assertThat(locked).isFalse();
     }
 
     @Test

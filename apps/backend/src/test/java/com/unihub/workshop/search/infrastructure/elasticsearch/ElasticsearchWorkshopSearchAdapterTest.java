@@ -157,4 +157,34 @@ class ElasticsearchWorkshopSearchAdapterTest {
         );
         assertThat(decoded.id()).isEqualTo(workshopId1);
     }
+
+    @Test
+    @DisplayName(
+        "search: keyword q constructs native query with root fields multi-match and nested speakers.name"
+    )
+    void shouldConstructQueryWithKeywordSearch() {
+        SearchWorkshopsQuery query = SearchWorkshopsQuery.of(
+            "Jane Doe",
+            "FREE",
+            null,
+            null,
+            "startsAt,asc",
+            null,
+            10
+        );
+
+        when(searchHits.getSearchHits()).thenReturn(List.of());
+        when(
+            elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(WorkshopEsDocument.class),
+                any(IndexCoordinates.class)
+            )
+        ).thenReturn(searchHits);
+
+        CursorPage<WorkshopCard> result = adapter.search(query, null);
+
+        assertThat(result.items()).isEmpty();
+        assertThat(result.hasMore()).isFalse();
+    }
 }

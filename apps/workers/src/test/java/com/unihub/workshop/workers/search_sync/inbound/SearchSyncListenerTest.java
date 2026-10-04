@@ -7,7 +7,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import com.unihub.workshop.workers.search_sync.core.models.WorkshopDocument;
 import com.unihub.workshop.workers.search_sync.core.ports.in.SyncWorkshopIndex;
@@ -27,7 +26,6 @@ class SearchSyncListenerTest {
 
     private SyncWorkshopIndex syncWorkshopIndex;
     private SearchSyncEventMapper mapper;
-    private ObjectMapper objectMapper;
     private Channel channel;
     private SearchSyncListener listener;
 
@@ -39,13 +37,8 @@ class SearchSyncListenerTest {
     void setUp() {
         syncWorkshopIndex = mock(SyncWorkshopIndex.class);
         mapper = Mappers.getMapper(SearchSyncEventMapper.class);
-        objectMapper = new ObjectMapper();
         channel = mock(Channel.class);
-        listener = new SearchSyncListener(
-            syncWorkshopIndex,
-            mapper,
-            objectMapper
-        );
+        listener = new SearchSyncListener(syncWorkshopIndex, mapper);
     }
 
     private Message createAmqpMessage(

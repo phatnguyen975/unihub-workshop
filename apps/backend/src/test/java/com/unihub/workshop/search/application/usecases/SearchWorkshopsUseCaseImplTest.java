@@ -66,6 +66,7 @@ class SearchWorkshopsUseCaseImplTest {
             availabilityBatchPort,
             cachePort,
             circuitBreaker,
+            Runnable::run,
             300L,
             86400L,
             10L
@@ -271,6 +272,7 @@ class SearchWorkshopsUseCaseImplTest {
                 availabilityBatchPort,
                 cachePort,
                 circuitBreaker,
+                Runnable::run,
                 60L,
                 3600L,
                 5L

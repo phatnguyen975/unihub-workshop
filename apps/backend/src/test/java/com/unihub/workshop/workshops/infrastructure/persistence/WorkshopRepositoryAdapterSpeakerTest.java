@@ -2,7 +2,6 @@ package com.unihub.workshop.workshops.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.workshops.domain.model.Speaker;
@@ -51,9 +50,9 @@ class WorkshopRepositoryAdapterSpeakerTest {
 
     @Test
     @DisplayName(
-        "save replaces speakers and returns workshop with persisted speakers"
+        "save synchronizes speakers and retains existing without bulk deleting"
     )
-    void shouldSaveAndReplaceSpeakers() {
+    void shouldSyncSpeakersAndRetainExisting() {
         UUID workshopId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
@@ -62,6 +61,62 @@ class WorkshopRepositoryAdapterSpeakerTest {
             "Alice",
             "alice@example.com",
             "Bio",
+            null,
+            null,
+            0,
+            userId
+        );
+        Workshop workshop = Workshop.builder()
+            .id(workshopId)
+            .organizationId(UUID.randomUUID())
+            .title("Title")
+            .slug("slug")
+            .timezone("Asia/Ho_Chi_Minh")
+            .price(BigDecimal.ZERO)
+            .currency("USD")
+            .status(WorkshopStatus.PUBLISHED)
+            .version(1)
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .createdBy(userId)
+            .updatedBy(userId)
+            .speakers(List.of(s1))
+            .build();
+
+        WorkshopJpaEntity entity = mapper.toEntity(workshop);
+        when(workshopJpaRepository.existsById(workshopId)).thenReturn(true);
+        when(
+            workshopJpaRepository.saveAndFlush(any(WorkshopJpaEntity.class))
+        ).thenReturn(entity);
+
+        WorkshopSpeakerJpaEntity existingEntity = mapper.toSpeakerEntity(s1);
+        when(
+            speakerJpaRepository.findByWorkshopIdOrderBySortOrderAsc(workshopId)
+        ).thenReturn(List.of(existingEntity));
+
+        Workshop result = adapter.save(workshop);
+
+        verify(speakerJpaRepository, never()).deleteByWorkshopId(workshopId);
+        verify(entityManager, never()).remove(any());
+        verify(entityManager, never()).persist(
+            any(WorkshopSpeakerJpaEntity.class)
+        );
+        verify(entityManager).flush();
+        assertThat(result.speakers()).hasSize(1);
+        assertThat(result.speakers().get(0).name()).isEqualTo("Alice");
+    }
+
+    @Test
+    @DisplayName("save persists brand new speakers when added")
+    void shouldPersistNewSpeakersWhenAdded() {
+        UUID workshopId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        Speaker s1 = Speaker.create(
+            workshopId,
+            "Bob",
+            "bob@example.com",
+            "New Bio",
             null,
             null,
             0,
@@ -90,17 +145,148 @@ class WorkshopRepositoryAdapterSpeakerTest {
             workshopJpaRepository.saveAndFlush(any(WorkshopJpaEntity.class))
         ).thenReturn(entity);
 
-        WorkshopSpeakerJpaEntity speakerEntity = mapper.toSpeakerEntity(s1);
+        WorkshopSpeakerJpaEntity persistedEntity = mapper.toSpeakerEntity(s1);
         when(
             speakerJpaRepository.findByWorkshopIdOrderBySortOrderAsc(workshopId)
-        ).thenReturn(List.of(speakerEntity));
+        )
+            .thenReturn(List.of())
+            .thenReturn(List.of(persistedEntity));
 
         Workshop result = adapter.save(workshop);
 
-        verify(speakerJpaRepository).deleteByWorkshopId(workshopId);
-        verify(speakerJpaRepository).saveAllAndFlush(anyList());
+        verify(entityManager).persist(any(WorkshopSpeakerJpaEntity.class));
+        verify(entityManager, never()).remove(any());
+        verify(entityManager).flush();
         assertThat(result.speakers()).hasSize(1);
-        assertThat(result.speakers().get(0).name()).isEqualTo("Alice");
+        assertThat(result.speakers().get(0).email()).isEqualTo(
+            "bob@example.com"
+        );
+    }
+
+    @Test
+    @DisplayName("save removes omitted speakers via entityManager.remove")
+    void shouldRemoveOmittedSpeakers() {
+        UUID workshopId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        Speaker s1 = Speaker.create(
+            workshopId,
+            "Alice",
+            "alice@example.com",
+            "Bio",
+            null,
+            null,
+            0,
+            userId
+        );
+        Workshop workshop = Workshop.builder()
+            .id(workshopId)
+            .organizationId(UUID.randomUUID())
+            .title("Title")
+            .slug("slug")
+            .timezone("Asia/Ho_Chi_Minh")
+            .price(BigDecimal.ZERO)
+            .currency("USD")
+            .status(WorkshopStatus.DRAFT)
+            .version(0)
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .createdBy(userId)
+            .updatedBy(userId)
+            .speakers(List.of())
+            .build();
+
+        WorkshopJpaEntity entity = mapper.toEntity(workshop);
+        when(workshopJpaRepository.existsById(workshopId)).thenReturn(true);
+        when(
+            workshopJpaRepository.saveAndFlush(any(WorkshopJpaEntity.class))
+        ).thenReturn(entity);
+
+        WorkshopSpeakerJpaEntity existingEntity = mapper.toSpeakerEntity(s1);
+        when(
+            speakerJpaRepository.findByWorkshopIdOrderBySortOrderAsc(workshopId)
+        )
+            .thenReturn(List.of(existingEntity))
+            .thenReturn(List.of());
+
+        Workshop result = adapter.save(workshop);
+
+        verify(entityManager).remove(existingEntity);
+        verify(entityManager, never()).persist(
+            any(WorkshopSpeakerJpaEntity.class)
+        );
+        verify(entityManager).flush();
+        assertThat(result.speakers()).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+        "save matches and updates existing speaker by email when id differs"
+    )
+    void shouldMatchAndUpdateExistingSpeakerByEmail() {
+        UUID workshopId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        Speaker incomingSpeaker = Speaker.create(
+            workshopId,
+            "Alice Updated",
+            "alice@example.com",
+            "Updated Bio",
+            null,
+            null,
+            1,
+            userId
+        );
+        Workshop workshop = Workshop.builder()
+            .id(workshopId)
+            .organizationId(UUID.randomUUID())
+            .title("Title")
+            .slug("slug")
+            .timezone("Asia/Ho_Chi_Minh")
+            .price(BigDecimal.ZERO)
+            .currency("USD")
+            .status(WorkshopStatus.DRAFT)
+            .version(0)
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .createdBy(userId)
+            .updatedBy(userId)
+            .speakers(List.of(incomingSpeaker))
+            .build();
+
+        WorkshopJpaEntity entity = mapper.toEntity(workshop);
+        when(workshopJpaRepository.existsById(workshopId)).thenReturn(true);
+        when(
+            workshopJpaRepository.saveAndFlush(any(WorkshopJpaEntity.class))
+        ).thenReturn(entity);
+
+        WorkshopSpeakerJpaEntity existingEntity =
+            WorkshopSpeakerJpaEntity.builder()
+                .id(UUID.randomUUID())
+                .workshopId(workshopId)
+                .name("Alice Old")
+                .email("alice@example.com")
+                .bio("Old Bio")
+                .sortOrder(0)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .createdBy(userId)
+                .updatedBy(userId)
+                .build();
+
+        when(
+            speakerJpaRepository.findByWorkshopIdOrderBySortOrderAsc(workshopId)
+        ).thenReturn(List.of(existingEntity));
+
+        adapter.save(workshop);
+
+        verify(entityManager, never()).remove(any());
+        verify(entityManager, never()).persist(
+            any(WorkshopSpeakerJpaEntity.class)
+        );
+        assertThat(existingEntity.getName()).isEqualTo("Alice Updated");
+        assertThat(existingEntity.getBio()).isEqualTo("Updated Bio");
+        assertThat(existingEntity.getSortOrder()).isEqualTo(1);
     }
 
     @Test

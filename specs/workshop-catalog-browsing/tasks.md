@@ -177,6 +177,8 @@ Tasks are sequenced: the worker (T1) is built first because the ES index it main
 - [x] Targeted test suites for touched classes in both apps pass (`SearchSyncServiceTest`, `SearchSyncListenerTest`, `SearchWorkshopsUseCaseImplTest`, `WorkshopSearchControllerTest`, `GetPublicWorkshopUseCaseImplTest`, `PublicWorkshopControllerTest`, `PublishWorkshopUseCaseImplTest`).
 - [x] No compilation errors or warnings in either app.
 - [x] Ready for `/review workshop-catalog-browsing`.
+- [x] Postman API verification passed for `GET /api/v1/workshops` and `GET /api/v1/workshops/{identifier}` (Domain 3).
+- [x] Feature status updated to `DONE` in `docs/feature-catalog.md`.
 
 ## Risks and Mitigations
 

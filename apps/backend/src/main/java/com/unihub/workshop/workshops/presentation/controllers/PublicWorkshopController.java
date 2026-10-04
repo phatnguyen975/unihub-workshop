@@ -7,7 +7,6 @@ import com.unihub.workshop.workshops.domain.model.PublicWorkshopDetail;
 import com.unihub.workshop.workshops.presentation.dto.PublicWorkshopDetailResponse;
 import com.unihub.workshop.workshops.presentation.mapper.PublicWorkshopDetailPresentationMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,14 +21,12 @@ public class PublicWorkshopController {
     private final PublicWorkshopDetailPresentationMapper mapper;
 
     @GetMapping("/{identifier}")
-    public ResponseEntity<
-        ApiResponse<PublicWorkshopDetailResponse>
-    > getPublicWorkshop(@PathVariable String identifier) {
+    public ApiResponse<PublicWorkshopDetailResponse> getPublicWorkshop(
+        @PathVariable String identifier
+    ) {
         GetPublicWorkshopQuery query = GetPublicWorkshopQuery.of(identifier);
         PublicWorkshopDetail detail = getPublicWorkshopUseCase.execute(query);
         PublicWorkshopDetailResponse response = mapper.toDetailResponse(detail);
-        return ResponseEntity.ok(
-            ApiResponse.success(response, "Workshop retrieved")
-        );
+        return ApiResponse.success(response, "Workshop retrieved");
     }
 }

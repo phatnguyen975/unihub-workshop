@@ -19,7 +19,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +33,7 @@ public class SearchWorkshopsUseCaseImpl implements SearchWorkshopsUseCase {
     private final WorkshopAvailabilityBatchPort availabilityBatchPort;
     private final SearchCachePort cachePort;
     private final CircuitBreaker circuitBreaker;
+    private final Executor taskExecutor;
 
     private final Duration softTtl;
     private final Duration hardTtl;
@@ -40,7 +43,8 @@ public class SearchWorkshopsUseCaseImpl implements SearchWorkshopsUseCase {
         WorkshopSearchRepository searchRepository,
         WorkshopAvailabilityBatchPort availabilityBatchPort,
         SearchCachePort cachePort,
-        CircuitBreaker circuitBreaker,
+        @Qualifier("elasticsearchCircuitBreaker") CircuitBreaker circuitBreaker,
+        @Qualifier("searchTaskExecutor") Executor taskExecutor,
         @Value("${app.search.swr.soft-ttl-seconds:300}") long softTtlSeconds,
         @Value("${app.search.swr.hard-ttl-seconds:86400}") long hardTtlSeconds,
         @Value(
@@ -51,6 +55,7 @@ public class SearchWorkshopsUseCaseImpl implements SearchWorkshopsUseCase {
         this.availabilityBatchPort = availabilityBatchPort;
         this.cachePort = cachePort;
         this.circuitBreaker = circuitBreaker;
+        this.taskExecutor = taskExecutor;
         this.softTtl = Duration.ofSeconds(softTtlSeconds);
         this.hardTtl = Duration.ofSeconds(hardTtlSeconds);
         this.lockTimeout = Duration.ofSeconds(lockTimeoutSeconds);
@@ -94,7 +99,7 @@ public class SearchWorkshopsUseCaseImpl implements SearchWorkshopsUseCase {
                     } finally {
                         cachePort.releaseLock(lockKey);
                     }
-                });
+                }, taskExecutor);
             }
             return entry.result();
         }

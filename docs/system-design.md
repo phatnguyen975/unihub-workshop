@@ -608,13 +608,16 @@ sequenceDiagram
   end
 
   Note over Organizer,Notify: AUTOMATED LIFECYCLE SWEEPER
-  loop Hourly Sweep
-    Sweeper->>DB: Query PUBLISHED workshops where end_time < NOW
+  loop Periodic Sweep (every 5 min)
+    Sweeper->>Cache: Acquire distributed lock (SET lock:sweeper:lifecycle NX EX 240)
+    Sweeper->>DB: Query PUBLISHED workshops where ends_at <= NOW()
     DB-->>Sweeper: Return expired workshop ids
     Sweeper->>DB: Bulk Update Workshop (Status: COMPLETED)
     DB-->>Sweeper: Acknowledge bulk update
     Sweeper->>DB: Bulk Insert WorkshopCompletedEvent into Outbox
     DB-->>Sweeper: Acknowledge bulk insert
+    Sweeper->>Cache: DEL workshop:{id}:capacity (Delete capacity counter)
+    Sweeper->>Cache: Release distributed lock
   end
 
   Note over Organizer,Notify: ASYNCHRONOUS EVENT FAN-OUT
@@ -1201,23 +1204,23 @@ Redis `DECR` is the first-line defense but is not infallible. The database-level
 
 Redis counter state can drift from the database due to JVM crashes or network interruptions occurring between a successful `DECR` and its corresponding compensating `INCR` on rollback paths (e.g., failed payment, circuit breaker trip). Left unaddressed, this drift causes Redis to permanently under-report available seats even when real capacity exists in PostgreSQL.
 
-A **periodic Capacity Reconciliation Job** runs every 5 minutes to detect and correct drift. It computes ground-truth availability from the database and resets the Redis counter accordingly:
+A **periodic Capacity Reconciliation Job** runs every 5 minutes (configurable via `app.workshops.capacity-reconciliation.cron`) to detect and correct drift. It computes ground-truth availability from the database and resets the Redis counter accordingly:
 
 ```mermaid
 flowchart TD
-  Cron[Capacity Reconciliation Job - every 5 min] --> Query["Database: SELECT capacity, COUNT(CONFIRMED + PENDING)\n FROM workshops JOIN registrations"]
-  Query --> Compute["Compute: available = capacity - occupied"]
-  Compute --> Compare["Compare with Redis GET capacity:{workshopId}"]
-  Compare --> Drift{"Counter drifted?"}
-  Drift -->|Yes| Reset["Redis SET capacity:{workshopId} = computed_available"]
+  Cron["Capacity Reconciliation Job - every 5 min"] --> Query["Database: SELECT w.id, w.capacity, COUNT(r.id) FILTER (WHERE r.status IN ('CONFIRMED', 'PENDING'))\n FROM workshops w LEFT JOIN registrations r ON w.id = r.workshop_id\n WHERE w.status = 'PUBLISHED' AND w.ends_at > NOW()\n GROUP BY w.id, w.capacity"]
+  Query --> Compute["Compute: ground_truth = Math.max(0, capacity - occupied)"]
+  Compute --> Compare["Compare with Redis GET workshop:{workshopId}:capacity"]
+  Compare --> Drift{"Counter drifted or missing?"}
+  Drift -->|Yes| Reset["Redis SET workshop:{workshopId}:capacity = ground_truth"]
   Drift -->|No| Skip[No-op]
-  Reset --> Log[Emit drift_detected metric to Micrometer]
-  Skip --> Log2[Log: counters consistent]
+  Reset --> Log["Log: WARN [CAPACITY_DRIFT_DETECTED] workshopId, redisVal, groundTruth"]
+  Skip --> Log2["Log: DEBUG counter consistent"]
 ```
 
-- **Scope:** Runs only against `PUBLISHED` workshops where Redis counter key exists.
-- **Atomicity:** The Redis `SET` is unconditional - the computed database value is always authoritative. This is safe because the reconciler runs infrequently and the drift window is bounded.
-- **Observability:** Emit a `capacity.drift.detected` counter metric via Micrometer each time a correction is applied. Alert on sustained drift frequency as a signal of systemic rollback failures.
+- **Scope:** Runs only against active `PUBLISHED` workshops (`ends_at > NOW()`).
+- **Atomicity & Self-Healing:** The Redis `SET` is unconditional — the computed database value is always authoritative. If the Redis key was missing (due to cache eviction or Redis restart), the reconciler automatically re-initializes it.
+- **Observability:** Emits structured SLF4J warning logs (`[CAPACITY_DRIFT_DETECTED]`) whenever drift is detected and corrected. No external metric library overhead required during core feature build.
 
 ### Real-Time Event Distribution Architecture (Server-Sent Events & Redis Pub/Sub)
 

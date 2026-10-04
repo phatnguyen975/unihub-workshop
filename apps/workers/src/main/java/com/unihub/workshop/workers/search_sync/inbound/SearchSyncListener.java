@@ -1,6 +1,7 @@
 package com.unihub.workshop.workers.search_sync.inbound;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
@@ -28,7 +29,9 @@ public class SearchSyncListener {
 
     private final SyncWorkshopIndex syncWorkshopIndex;
     private final SearchSyncEventMapper mapper;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper()
+        .findAndRegisterModules()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @RabbitListener(
         queues = "${app.search-sync.queue:q.search}",

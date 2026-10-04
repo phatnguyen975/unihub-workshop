@@ -8,6 +8,7 @@ import com.unihub.workshop.search.infrastructure.elasticsearch.mapper.WorkshopEs
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
@@ -40,6 +42,28 @@ public class ElasticsearchWorkshopSearchAdapter
 
     void setIndexName(String indexName) {
         this.indexName = indexName;
+    }
+
+    @PostConstruct
+    public void initIndex() {
+        try {
+            IndexOperations indexOps = elasticsearchOperations.indexOps(
+                WorkshopEsDocument.class
+            );
+            if (!indexOps.exists()) {
+                indexOps.createWithMapping();
+                log.info(
+                    "Initialized Elasticsearch index '{}' with schema mapping",
+                    indexName
+                );
+            }
+        } catch (Exception e) {
+            log.warn(
+                "Could not check or initialize Elasticsearch index '{}': {}",
+                indexName,
+                e.getMessage()
+            );
+        }
     }
 
     @Override
@@ -87,21 +111,38 @@ public class ElasticsearchWorkshopSearchAdapter
             );
         }
 
-        // Keyword query: multi-match across title, slug, location, description, speakers.name
+        // Keyword query: multi-match across root fields OR nested query on speakers.name
         if (query.q() != null && !query.q().isBlank()) {
             String q = query.q().trim();
             boolQuery.must(m ->
-                m.multiMatch(mm ->
-                    mm
-                        .query(q)
-                        .fields(
-                            "title^3",
-                            "slug^2",
-                            "location^1",
-                            "description^1",
-                            "speakers.name^2"
+                m.bool(b ->
+                    b
+                        .should(s ->
+                            s.multiMatch(mm ->
+                                mm
+                                    .query(q)
+                                    .fields(
+                                        "title^3",
+                                        "slug^2",
+                                        "location^1",
+                                        "description^1"
+                                    )
+                                    .fuzziness("AUTO")
+                            )
                         )
-                        .fuzziness("AUTO")
+                        .should(s ->
+                            s.nested(n ->
+                                n.path("speakers").query(nq ->
+                                    nq.match(mq ->
+                                        mq
+                                            .field("speakers.name")
+                                            .query(v -> v.stringValue(q))
+                                            .fuzziness("AUTO")
+                                            .boost(2.0f)
+                                    )
+                                )
+                            )
+                        )
                 )
             );
         }
@@ -189,10 +230,10 @@ public class ElasticsearchWorkshopSearchAdapter
                 ? Sort.Direction.DESC
                 : Sort.Direction.ASC;
 
-        // Primary sort + tie-breaker on _id
+        // Primary sort + tie-breaker on id
         return Sort.by(
             new Sort.Order(direction, field),
-            new Sort.Order(Sort.Direction.ASC, "_id")
+            new Sort.Order(Sort.Direction.ASC, "id")
         );
     }
 

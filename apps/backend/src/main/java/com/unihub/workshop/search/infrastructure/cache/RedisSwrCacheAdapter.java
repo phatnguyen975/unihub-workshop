@@ -1,5 +1,6 @@
 package com.unihub.workshop.search.infrastructure.cache;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.search.application.ports.out.SearchCachePort;
@@ -17,9 +18,9 @@ import org.springframework.stereotype.Component;
 public class RedisSwrCacheAdapter implements SearchCachePort {
 
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(
-        new JavaTimeModule()
-    );
+    private final ObjectMapper objectMapper = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     @Override
     public Optional<SwrCacheEntry> get(String key) {
