@@ -19,7 +19,7 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
 
 ### Phase 1: Direct Single-Channel Pipeline Foundation (OTP Flow)
 
-- [ ] **T1 — End-to-End Direct Email Delivery Pipeline with Circuit Breaker and Audit Logging**
+- [x] **T1 — End-to-End Direct Email Delivery Pipeline with Circuit Breaker and Audit Logging**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Inbound (AMQP listener, DTO, handler), Core (event contract, ports, delivery service), Outbound (AMQP config, Thymeleaf renderer, JavaMailSender adapter, delivery log JPA adapter)
@@ -52,9 +52,9 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
 
 #### Checkpoint: Direct Email Pipeline Operational
 
-- [ ] `OtpRequestedEvent` messages consumed from `q.notifications` deliver emails and persist delivery logs end-to-end.
-- [ ] Circuit breaker, idempotency deduplication, and template rendering unit tests pass.
-- [ ] Hexagonal architecture boundary checks for `notifications` core isolation pass.
+- [x] `OtpRequestedEvent` messages consumed from `q.notifications` deliver emails and persist delivery logs end-to-end.
+- [x] Circuit breaker, idempotency deduplication, and template rendering unit tests pass.
+- [x] Hexagonal architecture boundary checks for `notifications` core isolation pass.
 
 ### Phase 2: Multi-Channel Expansion (In-App Persistence & Real-Time SSE)
 

@@ -25,8 +25,30 @@ spring:
       connect-timeout: 2s
   elasticsearch:
     uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 app:
+  notifications:
+    queue: ${NOTIFICATIONS_QUEUE:q.notifications}
+    exchange: ${NOTIFICATIONS_EXCHANGE:unihub.events}
+    dlx: ${NOTIFICATIONS_DLX:unihub.dlx}
+    dlq-routing-key: ${NOTIFICATIONS_DLQ_ROUTING_KEY:dlq}
+    mail:
+      from: ${NOTIFICATIONS_MAIL_FROM:noreply@unihub.edu.vn}
+      from-name: ${NOTIFICATIONS_MAIL_FROM_NAME:UniHub Workshop}
   search-sync:
     index-name: ${SEARCH_SYNC_INDEX_NAME:workshops}
     queue: ${SEARCH_SYNC_QUEUE:q.search}
@@ -89,3 +111,18 @@ management:
     tags:
       application: ${spring.application.name}
       host: ${HOSTNAME:unknown}
+
+# =============================================================================
+# Resilience4j Circuit Breaker Configuration
+# =============================================================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      emailProvider:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
