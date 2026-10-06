@@ -2,7 +2,7 @@
 
 ## Example 1 — Fresh Start
 
-A human invoked this skill: "Prime context: I'm picking this project back up after a few days off, going to add pagination to the search results endpoint."
+A human invoked this skill: "prime context — I'm picking this project back up after a few days off, going to add pagination to the search results endpoint."
 
 ```markdown
 ## Context Summary — Pagination for search results endpoint
@@ -62,7 +62,7 @@ Yes — ready to implement cursor pagination on `/search` following the `orders.
 
 ## Example 2 — Drift/Reset Trigger
 
-A human invoked this skill: "Prime context: I think we lost the thread after that last context reset, let's make sure we're aligned before continuing the checkout refactor."
+A human invoked this skill: "prime context — I think we lost the thread after that last context reset, let's make sure we're aligned before continuing the checkout refactor."
 
 ```markdown
 ## Context Summary — Checkout refactor (post-reset realignment)

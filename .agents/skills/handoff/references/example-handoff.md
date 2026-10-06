@@ -1,6 +1,6 @@
 # Example — A Filled-In HANDOFF.md
 
-This is a realistic, fully populated example of the Output template from `SKILL.md`, for a session that added rate limiting to an API endpoint and is being handed off partway through. Notice what's _absent_ as much as what's present: no restated architecture, no copied code, no project history — only what's needed to resume.
+This is a realistic, fully populated example of the Output template from `SKILL.md`, for a session that added rate limiting to an API endpoint and is being handed off partway through. Notice what's absent as much as what's present: no restated architecture, no copied code, no project history — only what's needed to resume.
 
 ```markdown
 # Handoff

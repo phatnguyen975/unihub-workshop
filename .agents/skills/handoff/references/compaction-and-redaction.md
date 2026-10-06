@@ -1,45 +1,45 @@
-# Compaction & Redaction — Detailed Guidance
+# Compaction & Redaction
 
-This is the detail behind Workflow steps 2–5 in `SKILL.md`: how to judge what's "already durable" versus what belongs in the live thread, and how to redact sensitive content before writing.
+Detail behind Workflow steps 2–5 in `SKILL.md`: judging what's "already durable" vs. what belongs in the live thread, and redacting before writing.
 
-## Judging "already durable" vs. "live thread"
+## Durable vs. live thread
 
-The single question to ask about every candidate piece of information: **if the next session never read this file at all, but had access to the project's other durable artifacts, would this information still be findable?**
+**Test:** If the next session never read this file, but had access to the project's other artifacts, would this still be findable?
 
-- **Yes → durable.** It belongs in References as a pointer, not restated in the body. Examples: an architectural decision written into an ADR, a requirement already in a spec, a change already captured in a commit message or PR description, a bug already filed as an issue.
-- **No → live thread.** It only exists right now, in this session's working memory. Examples: "I tried approach A, it didn't work because of X, so I'm about to try approach B" — unless that reasoning was written into a commit or doc, it lives only in the conversation and needs to be captured or it's gone.
+- **Yes → durable.** Belongs in References as a pointer, not restated. E.g. an ADR, a spec requirement, a commit/PR, a filed issue.
+- **No → live thread.** Only exists in this session's working memory right now — e.g. "tried A, failed because of X, trying B next." Capture it or it's gone.
 
-A useful secondary test: **would writing this down duplicate wording that already exists in a file the next session can open?** If restating it would just be a paraphrase of something already committed, drop it and point at the original instead.
+**Secondary test:** Would writing this down just paraphrase something already committed? Drop it, point at the original instead.
 
 ### Common judgment calls
 
-- **A decision was made this session but hasn't been written anywhere yet.** → Live thread; goes under "Decisions Made This Session." (If the project keeps its own running decisions or requirements record, note that too, so it eventually lands there — but don't assume it already has.)
-- **A decision was made and immediately committed/documented.** → Durable; reference it, don't restate the decision itself.
-- **A file was fully rewritten this session.** → Don't paste the diff or the new content. Name the file under "Done This Session" and let the next session read the file directly — that's what makes it durable already.
-- **An approach was tried and abandoned.** → This is genuinely live-thread information if it's not written anywhere — knowing what _didn't_ work saves the next session from repeating it. Keep it brief: what was tried, why it didn't work, one line each.
-- **A long discussion converged on a plan, but the plan itself got written into a plan/spec file.** → The plan is durable (reference it); only the fact that this conversation is what produced it, if relevant to "Current State," might be worth one line.
+- **Decision made this session, not written anywhere yet** → live thread, goes under "Decisions Made This Session".
+- **Decision made and immediately committed/documented** → durable, reference it.
+- **A file was fully rewritten** → name it under "Done This Session", don't paste the diff — the file itself is now durable.
+- **An approach tried and abandoned, not written anywhere** → live thread, worth capturing briefly (what, why it failed) — saves the next session from repeating it.
+- **A discussion converged on a plan that got written into a spec file** → the plan is durable; only note the conversation produced it if that's relevant to Current State.
 
-## Scope-filtering against next-session focus
+## Scope-filtering
 
-Once compaction removes duplicated content, apply the declared next-session scope as a second filter:
+Apply the declared next-session focus as a second filter, after compaction:
 
-- Anything squarely inside the stated scope → keep at full detail.
-- Anything adjacent but not blocking → reduce to a one-line mention or drop, at judgment.
-- Anything outside the scope but that would still block or surprise the next session if omitted (a known blocker, a breaking change elsewhere in the codebase) → keep, even if brief, regardless of scope.
+- Squarely in scope → full detail.
+- Adjacent, not blocking → one-line mention or drop, at judgment.
+- Outside scope but would block/surprise if omitted (a known blocker, a breaking change elsewhere) → keep, briefly, regardless of scope.
 
-The goal is a file sized to the actual next task, not the whole project.
+**Goal:** a file sized to the actual next task, not the whole project.
 
 ## Redaction patterns
 
-Scan the compacted content (not the raw conversation — do this as the last step, right before writing) for the following, and replace each with a placeholder describing the _type_ of thing redacted, never the value itself:
+Scan the compacted content — not the raw conversation, do this last, right before writing — and replace with a placeholder naming the _type_, never the value:
 
-| Pattern                                                 | Examples                                                                                                          | Replace with                      |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| API keys / tokens                                       | `sk-...`, `ghp_...`, bearer tokens, JWTs                                                                          | `<REDACTED: API key>`             |
-| Passwords / secrets                                     | Literal passwords, connection strings with embedded credentials                                                   | `<REDACTED: credential>`          |
-| Personally identifiable information                     | Real names tied to personal accounts, emails, phone numbers, physical addresses not already public in the project | `<REDACTED: PII>`                 |
-| Internal-only identifiers that shouldn't leave a system | Internal customer IDs, non-public infrastructure hostnames, if their exposure would be a problem                  | `<REDACTED: internal identifier>` |
+| Pattern                   | Examples                                                                          | Replace with                      |
+| ------------------------- | --------------------------------------------------------------------------------- | --------------------------------- |
+| API keys / tokens         | `sk-...`, `ghp_...`, bearer tokens, JWTs                                          | `<REDACTED: API key>`             |
+| Passwords / secrets       | Literal passwords, connection strings with embedded credentials                   | `<REDACTED: credential>`          |
+| PII                       | Real names tied to personal accounts, emails, phone numbers, non-public addresses | `<REDACTED: PII>`                 |
+| Internal-only identifiers | Internal customer IDs, non-public hostnames                                       | `<REDACTED: internal identifier>` |
 
-If a command or log line contains a credential inline (e.g. a curl command with an Authorization header, or an error message that echoes back a connection string), redact just the sensitive substring and keep the rest of the line intact — don't discard useful debugging context just because part of it needs redaction.
+A credential embedded in a command or log line — redact just that substring, keep the rest intact; don't discard useful debugging context over part of a line.
 
-Always populate the **Redaction Note** section explicitly, even when nothing was found — write something like "No credentials, tokens, or PII found in this session's content." Silence on this point is not an acceptable substitute for stating it; a missing note is indistinguishable from a forgotten check.
+Always fill in **Redaction Note**, even when nothing was found — e.g. "No credentials, tokens, or PII found." A missing note reads the same as a forgotten check.
