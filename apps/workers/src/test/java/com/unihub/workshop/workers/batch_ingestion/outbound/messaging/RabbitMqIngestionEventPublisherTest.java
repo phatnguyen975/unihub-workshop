@@ -36,6 +36,9 @@ class RabbitMqIngestionEventPublisherTest {
         assertThat(message.getMessageProperties().getContentType()).isEqualTo(
             "application/json"
         );
+        assertThat(
+            (String) message.getMessageProperties().getHeader("__TypeId__")
+        ).isEqualTo("FileRejectedEvent");
         String body = new String(message.getBody());
         assertThat(body).contains(orgId.toString());
         assertThat(body).contains(fileKey);
@@ -64,6 +67,9 @@ class RabbitMqIngestionEventPublisherTest {
         assertThat(message.getMessageProperties().getContentType()).isEqualTo(
             "application/json"
         );
+        assertThat(
+            (String) message.getMessageProperties().getHeader("__TypeId__")
+        ).isEqualTo("FileCompletedEvent");
         String body = new String(message.getBody());
         assertThat(body).contains(orgId.toString());
         assertThat(body).contains(fileKey);

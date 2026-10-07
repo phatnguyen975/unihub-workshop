@@ -11,11 +11,15 @@ import static org.mockito.Mockito.when;
 import com.unihub.workshop.workers.notifications.core.models.DeliveryChannel;
 import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
 import com.unihub.workshop.workers.notifications.core.models.MultiChannelDeliveryCommand;
+import com.unihub.workshop.workers.notifications.core.models.OrganizationNotificationCommand;
+import com.unihub.workshop.workers.notifications.core.models.OrganizerRecipient;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailRendererPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailSenderPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.InAppNotificationPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.NotificationDeliveryLogPort;
+import com.unihub.workshop.workers.notifications.core.ports.out.OrganizationRecipientResolverPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.RealtimeEventPublisherPort;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +48,9 @@ class NotificationDeliveryServiceTest {
     @Mock
     private RealtimeEventPublisherPort realtimeEventPublisherPort;
 
+    @Mock
+    private OrganizationRecipientResolverPort organizationRecipientResolverPort;
+
     private NotificationDeliveryService service;
 
     @BeforeEach
@@ -52,7 +60,8 @@ class NotificationDeliveryServiceTest {
             emailRendererPort,
             notificationDeliveryLogPort,
             inAppNotificationPort,
-            realtimeEventPublisherPort
+            realtimeEventPublisherPort,
+            organizationRecipientResolverPort
         );
     }
 
@@ -167,9 +176,7 @@ class NotificationDeliveryServiceTest {
         when(emailRendererPort.render(any(), any())).thenReturn(
             "<html>Body</html>"
         );
-        org.mockito.Mockito.doThrow(
-            new RuntimeException("SMTP connection timeout")
-        )
+        doThrow(new RuntimeException("SMTP connection timeout"))
             .when(emailSenderPort)
             .send(any());
 
@@ -367,6 +374,117 @@ class NotificationDeliveryServiceTest {
         verify(notificationDeliveryLogPort).markSent(
             eq(logId),
             eq(idempotencyKey)
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "Should fan out notifications to all active organizers across all three channels"
+    )
+    void shouldFanOutNotificationsToAllActiveOrganizers() {
+        UUID orgId = UUID.randomUUID();
+        UUID orgUser1 = UUID.randomUUID();
+        UUID orgUser2 = UUID.randomUUID();
+
+        OrganizerRecipient r1 = new OrganizerRecipient(
+            orgUser1,
+            "org1@example.com",
+            "Organizer One"
+        );
+        OrganizerRecipient r2 = new OrganizerRecipient(
+            orgUser2,
+            "org2@example.com",
+            "Organizer Two"
+        );
+
+        when(
+            organizationRecipientResolverPort.findActiveOrganizers(orgId)
+        ).thenReturn(List.of(r1, r2));
+
+        when(emailRendererPort.render(any(), any())).thenReturn(
+            "<p>Html body</p>"
+        );
+        when(
+            notificationDeliveryLogPort.createPendingLog(
+                any(),
+                any(),
+                any(),
+                any()
+            )
+        ).thenReturn(UUID.randomUUID());
+
+        OrganizationNotificationCommand cmd =
+            new OrganizationNotificationCommand(
+                orgId,
+                "FILE_COMPLETED",
+                "students-batch.csv",
+                "FILE_COMPLETED",
+                "/admin/import",
+                "Student Directory Ingestion Completed",
+                "ingestion-completed"
+            );
+
+        service.fanOutOrganizationNotification(cmd);
+
+        verify(inAppNotificationPort, Mockito.times(2)).createNotification(
+            any(),
+            eq("FILE_COMPLETED"),
+            eq("/admin/import"),
+            any(),
+            any()
+        );
+        verify(realtimeEventPublisherPort).publishNotificationSignal(
+            orgUser1,
+            "notification.new"
+        );
+        verify(realtimeEventPublisherPort).publishNotificationSignal(
+            orgUser2,
+            "notification.new"
+        );
+        verify(emailSenderPort, Mockito.times(2)).send(any());
+    }
+
+    @Test
+    @DisplayName(
+        "Should silently skip fan-out and log warning when no active organizers found"
+    )
+    void shouldSilentlySkipFanOutWhenNoActiveOrganizersFound() {
+        UUID orgId = UUID.randomUUID();
+
+        when(
+            organizationRecipientResolverPort.findActiveOrganizers(orgId)
+        ).thenReturn(List.of());
+
+        OrganizationNotificationCommand cmd =
+            new OrganizationNotificationCommand(
+                orgId,
+                "FILE_COMPLETED",
+                "students-batch.csv",
+                "FILE_COMPLETED",
+                "/admin/import",
+                "Student Directory Ingestion Completed",
+                "ingestion-completed"
+            );
+
+        assertDoesNotThrow(() -> service.fanOutOrganizationNotification(cmd));
+
+        verify(inAppNotificationPort, never()).createNotification(
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(realtimeEventPublisherPort, never()).publishNotificationSignal(
+            any(),
+            any()
+        );
+        verify(emailSenderPort, never()).send(any());
+        verify(notificationDeliveryLogPort, never()).createPendingLog(
+            any(),
+            any(),
+            any(),
+            any()
         );
     }
 }

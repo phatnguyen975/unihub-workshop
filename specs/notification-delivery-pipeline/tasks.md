@@ -95,7 +95,7 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
 
 ### Phase 3: Multi-Recipient Fan-Out & Pipeline Hardening
 
-- [ ] **T3 — Organization-Scoped Recipient Fan-Out and Batch Ingestion Event Header Alignment**
+- [x] **T3 — Organization-Scoped Recipient Fan-Out and Batch Ingestion Event Header Alignment**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Publisher (`batch_ingestion` alignment), Inbound (DTO, handler), Core (organization recipient resolution port, fan-out logic), Outbound (user query JPA adapter, Thymeleaf templates)

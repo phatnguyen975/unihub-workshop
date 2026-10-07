@@ -3,13 +3,19 @@ package com.unihub.workshop.workers.notifications.core.usecases;
 import com.unihub.workshop.workers.notifications.core.models.DeliveryChannel;
 import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
 import com.unihub.workshop.workers.notifications.core.models.MultiChannelDeliveryCommand;
+import com.unihub.workshop.workers.notifications.core.models.OrganizationNotificationCommand;
+import com.unihub.workshop.workers.notifications.core.models.OrganizerRecipient;
 import com.unihub.workshop.workers.notifications.core.ports.in.DirectEmailDeliveryUseCase;
 import com.unihub.workshop.workers.notifications.core.ports.in.MultiChannelNotificationDeliveryUseCase;
+import com.unihub.workshop.workers.notifications.core.ports.in.OrganizationNotificationFanOutUseCase;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailRendererPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailSenderPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.InAppNotificationPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.NotificationDeliveryLogPort;
+import com.unihub.workshop.workers.notifications.core.ports.out.OrganizationRecipientResolverPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.RealtimeEventPublisherPort;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +28,8 @@ import org.springframework.stereotype.Service;
 public class NotificationDeliveryService
     implements
         DirectEmailDeliveryUseCase,
-        MultiChannelNotificationDeliveryUseCase
+        MultiChannelNotificationDeliveryUseCase,
+        OrganizationNotificationFanOutUseCase
 {
 
     private final EmailSenderPort emailSenderPort;
@@ -30,6 +37,7 @@ public class NotificationDeliveryService
     private final NotificationDeliveryLogPort notificationDeliveryLogPort;
     private final InAppNotificationPort inAppNotificationPort;
     private final RealtimeEventPublisherPort realtimeEventPublisherPort;
+    private final OrganizationRecipientResolverPort organizationRecipientResolverPort;
 
     @Override
     public void deliverMultiChannel(MultiChannelDeliveryCommand command) {
@@ -159,6 +167,85 @@ public class NotificationDeliveryService
                 e
             );
             notificationDeliveryLogPort.markFailed(logId, e.getMessage());
+        }
+    }
+
+    @Override
+    public void fanOutOrganizationNotification(
+        OrganizationNotificationCommand command
+    ) {
+        if (command == null || command.organizationId() == null) {
+            log.warn(
+                "Skipping invalid OrganizationNotificationCommand: missing organizationId"
+            );
+            return;
+        }
+
+        List<OrganizerRecipient> organizers =
+            organizationRecipientResolverPort.findActiveOrganizers(
+                command.organizationId()
+            );
+
+        if (organizers.isEmpty()) {
+            log.warn(
+                "No active organizers found for organizationId='{}'. Skipping notification fan-out.",
+                command.organizationId()
+            );
+            return;
+        }
+
+        log.info(
+            "Fanning out organization notification for organizationId='{}' to {} active organizers",
+            command.organizationId(),
+            organizers.size()
+        );
+
+        for (OrganizerRecipient organizer : organizers) {
+            String idempotencyKey =
+                command.idempotencyPrefix() +
+                ":" +
+                command.organizationId() +
+                ":" +
+                command.sourceFileKey() +
+                ":" +
+                organizer.id();
+
+            Map<String, Object> inAppPayload = new HashMap<>();
+            inAppPayload.put(
+                "organizationId",
+                command.organizationId().toString()
+            );
+            inAppPayload.put("sourceFileKey", command.sourceFileKey());
+            inAppPayload.put("actionUrl", command.inAppActionUrl());
+
+            Map<String, Object> emailModel = new HashMap<>();
+            emailModel.put(
+                "recipientName",
+                organizer.fullName() != null
+                    ? organizer.fullName()
+                    : "Organizer"
+            );
+            emailModel.put("sourceFileKey", command.sourceFileKey());
+            emailModel.put("actionUrl", command.inAppActionUrl());
+
+            MultiChannelDeliveryCommand deliveryCmd =
+                new MultiChannelDeliveryCommand(
+                    organizer.id(),
+                    organizer.email(),
+                    idempotencyKey,
+                    true,
+                    command.inAppEventKey(),
+                    command.inAppActionUrl(),
+                    inAppPayload,
+                    true,
+                    "notification.new",
+                    true,
+                    command.emailSubject(),
+                    command.emailTemplateName(),
+                    emailModel
+                );
+
+            deliverMultiChannel(deliveryCmd);
         }
     }
 }

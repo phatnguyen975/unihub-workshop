@@ -175,4 +175,56 @@ class ThymeleafTemplateRenderingIntegrationTest {
         assertTrue(html.contains("ACTIVE"));
         assertTrue(html.contains("University of Science"));
     }
+
+    @Test
+    @DisplayName(
+        "Should render ingestion-completed template with fragments and dynamic file key"
+    )
+    void shouldRenderIngestionCompletedTemplate() {
+        String html = renderer.render(
+            "email/ingestion-completed",
+            Map.of(
+                "recipientName",
+                "Organizer One",
+                "sourceFileKey",
+                "students-2026-10-07.csv",
+                "actionUrl",
+                "/admin/import"
+            )
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Student Directory Ingestion Completed"));
+        assertTrue(html.contains("Organizer One"));
+        assertTrue(html.contains("students-2026-10-07.csv"));
+        assertTrue(html.contains("/admin/import"));
+        assertTrue(html.contains("University of Science"));
+    }
+
+    @Test
+    @DisplayName(
+        "Should render ingestion-rejected template with fragments and dynamic file key"
+    )
+    void shouldRenderIngestionRejectedTemplate() {
+        String html = renderer.render(
+            "email/ingestion-rejected",
+            Map.of(
+                "recipientName",
+                "Organizer Two",
+                "sourceFileKey",
+                "students-corrupted.csv",
+                "actionUrl",
+                "/admin/import"
+            )
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Student Directory Ingestion Rejected"));
+        assertTrue(html.contains("Organizer Two"));
+        assertTrue(html.contains("students-corrupted.csv"));
+        assertTrue(html.contains("/admin/import"));
+        assertTrue(html.contains("University of Science"));
+    }
 }

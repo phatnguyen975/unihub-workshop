@@ -1,6 +1,6 @@
 ---
 name: grilling
-description: Interview the user through structured, round-based questioning to resolve ambiguity in a plan, decision, or idea before any artifact, spec, or code gets created. Use proactively when a request is underspecified or has a fork with more than one reasonable implementation, or when the user asks to be "grilled", "interviewed", or to "stress-test" a plan. Not for a single one-off clarifying question — this is structured, multi-round elicitation.
+description: Interview the user through structured, round-based questioning to resolve ambiguity in a plan, decision, or idea before any artifact, spec, or code gets created. Use proactively when a request is underspecified or has a fork with more than one reasonable implementation, or when the user asks to be "grilled" or "interviewed" about an already-chosen plan. Not for a single one-off clarifying question — this is structured, multi-round elicitation.
 ---
 
 # Grilling
@@ -16,9 +16,11 @@ A structured interview primitive for resolving ambiguity before it turns into re
 
 ## When to Use
 
-- **Self-invoked, before creating an artifact.** Spot an unresolved fork, an unquantified requirement, or a point you'd otherwise silently interpret — grill before producing the artifact, not after.
-- **User-invoked, explicit request.** "Grill me on this", "interview me before we start", "stress-test this plan", or a direct invocation.
-- **Confidence in "what the user actually wants" is meaningfully below certain** — not just their literal words, their underlying goal.
+Trigger phrases: "grill me", "interview me before we start", "make sure we're not missing anything", or a direct invocation. Typical situations:
+
+- A request is underspecified, or has a fork with more than one reasonable implementation.
+- About to produce a spec, design, or plan where a non-trivial assumption would otherwise be silently made.
+- Confidence in what's actually wanted is meaningfully below certain — not just the literal words, the underlying goal.
 
 ## When NOT to Use
 
@@ -126,8 +128,6 @@ A default flow, not a rigid script — use judgment at each step. Full mechanics
 - Check available context/tools before asking — only ask what a lookup can't answer.
 
 ## Common Rationalizations to Reject
-
-These are excuses that sound reasonable in the moment but quietly defeat the point of this skill. Watch for yourself reaching for one of these:
 
 | Rationalization                                                               | Why it's wrong                                                                                                                           |
 | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
