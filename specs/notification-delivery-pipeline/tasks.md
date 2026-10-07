@@ -116,7 +116,7 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
     - Fanned-out notifications deliver to each active organizer across In-App (`action_url = /admin/import`), Redis SSE, and Email (FR-35, FR-36).
     - When an organization has zero active organizers, zero notifications are sent, a warning log is recorded, and the message is positively acknowledged without errors (FR-09, BR-07).
 
-- [ ] **T4 — Paginated Workshop Attendee Fan-Out and Dead-Letter Error Handling**
+- [x] **T4 — Paginated Workshop Attendee Fan-Out and Dead-Letter Error Handling**
   - **Size:** M
   - **Depends on:** T3
   - **Layers touched:** Inbound (DTO, handler, DLQ routing), Core (attendee resolution port, pagination orchestration), Outbound (registration & user query JPA adapter, Thymeleaf templates)
@@ -139,11 +139,11 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
 
 #### Checkpoint: Feature Complete
 
-- [ ] All four tasks above (T1–T4) are implemented and unit tested.
-- [ ] Every acceptance criterion across all 11 scenarios in `SPEC.md` has been verified.
-- [ ] Architecture guard test passes: `./gradlew :apps:workers:test --tests "com.unihub.workshop.workers.HexagonalArchitectureTest"`.
-- [ ] Targeted unit tests for notifications worker pass with zero regressions.
-- [ ] Ready for `/review notification-delivery-pipeline`.
+- [x] All four tasks above (T1–T4) are implemented and unit tested.
+- [x] Every acceptance criterion across all 11 scenarios in `SPEC.md` has been verified.
+- [x] Architecture guard test passes: `./gradlew :apps:workers:test --tests "com.unihub.workshop.workers.HexagonalArchitectureTest"`.
+- [x] Targeted unit tests for notifications worker pass with zero regressions.
+- [x] Ready for `/review notification-delivery-pipeline`.
 
 ## Risks and Mitigations
 

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -50,10 +51,18 @@ public class NotificationListener {
             dispatcher.dispatch(typeId, root);
             channel.basicAck(deliveryTag, false);
         } catch (JsonProcessingException | IllegalArgumentException e) {
+            String excerpt =
+                message.getBody() != null
+                    ? new String(message.getBody(), StandardCharsets.UTF_8)
+                    : "";
+            if (excerpt.length() > 200) {
+                excerpt = excerpt.substring(0, 200) + "...";
+            }
             log.error(
-                "Rejecting invalid or unmapped event on routingKey '{}', typeId '{}': {}",
+                "Rejecting invalid or unmapped event on routingKey '{}', typeId '{}', payloadExcerpt '{}': {}",
                 routingKey,
                 typeId,
+                excerpt,
                 e.getMessage()
             );
             // Move to DLQ without requeue

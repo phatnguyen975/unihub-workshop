@@ -93,7 +93,6 @@ Two shapes:
 3. **No silent assumptions.** Blocking/Shaping always get an explicit answer; auto-defaults get declared, never buried.
 4. **Concrete over convention.** "The standard way" isn't a decision, it's a placeholder. Push once for specifics. See `references/quality-filters.md`.
 5. **Look it up before you ask.** A research task doesn't belong in a round — resolve it yourself first.
-6. **Doesn't know where it's used.** No project/tool/plugin names in a question or the summary.
 
 ## Workflow
 

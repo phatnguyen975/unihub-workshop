@@ -5,15 +5,19 @@ import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
 import com.unihub.workshop.workers.notifications.core.models.MultiChannelDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.models.OrganizationNotificationCommand;
 import com.unihub.workshop.workers.notifications.core.models.OrganizerRecipient;
+import com.unihub.workshop.workers.notifications.core.models.WorkshopAttendeeRecipient;
+import com.unihub.workshop.workers.notifications.core.models.WorkshopNotificationCommand;
 import com.unihub.workshop.workers.notifications.core.ports.in.DirectEmailDeliveryUseCase;
 import com.unihub.workshop.workers.notifications.core.ports.in.MultiChannelNotificationDeliveryUseCase;
 import com.unihub.workshop.workers.notifications.core.ports.in.OrganizationNotificationFanOutUseCase;
+import com.unihub.workshop.workers.notifications.core.ports.in.WorkshopNotificationFanOutUseCase;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailRendererPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailSenderPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.InAppNotificationPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.NotificationDeliveryLogPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.OrganizationRecipientResolverPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.RealtimeEventPublisherPort;
+import com.unihub.workshop.workers.notifications.core.ports.out.WorkshopAttendeeResolverPort;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +33,8 @@ public class NotificationDeliveryService
     implements
         DirectEmailDeliveryUseCase,
         MultiChannelNotificationDeliveryUseCase,
-        OrganizationNotificationFanOutUseCase
+        OrganizationNotificationFanOutUseCase,
+        WorkshopNotificationFanOutUseCase
 {
 
     private final EmailSenderPort emailSenderPort;
@@ -38,6 +43,7 @@ public class NotificationDeliveryService
     private final InAppNotificationPort inAppNotificationPort;
     private final RealtimeEventPublisherPort realtimeEventPublisherPort;
     private final OrganizationRecipientResolverPort organizationRecipientResolverPort;
+    private final WorkshopAttendeeResolverPort workshopAttendeeResolverPort;
 
     @Override
     public void deliverMultiChannel(MultiChannelDeliveryCommand command) {
@@ -247,5 +253,86 @@ public class NotificationDeliveryService
 
             deliverMultiChannel(deliveryCmd);
         }
+    }
+
+    @Override
+    public void fanOutWorkshopNotification(
+        WorkshopNotificationCommand command
+    ) {
+        if (command == null || command.workshopId() == null) {
+            log.warn(
+                "Skipping invalid WorkshopNotificationCommand: missing workshopId"
+            );
+            return;
+        }
+
+        int page = 0;
+        int pageSize = 500;
+        long totalDispatched = 0;
+
+        while (true) {
+            List<WorkshopAttendeeRecipient> attendees =
+                workshopAttendeeResolverPort.findConfirmedAttendees(
+                    command.workshopId(),
+                    page,
+                    pageSize
+                );
+
+            if (attendees.isEmpty()) {
+                if (page == 0) {
+                    log.warn(
+                        "No confirmed attendees found for workshopId='{}'. Skipping notification fan-out.",
+                        command.workshopId()
+                    );
+                }
+                break;
+            }
+
+            for (WorkshopAttendeeRecipient attendee : attendees) {
+                String idempotencyKey =
+                    command.idempotencyPrefix() + ":" + attendee.id();
+
+                Map<String, Object> emailModel = new HashMap<>(
+                    command.emailTemplateModel()
+                );
+                emailModel.put(
+                    "recipientName",
+                    attendee.fullName() != null
+                        ? attendee.fullName()
+                        : "Student"
+                );
+
+                MultiChannelDeliveryCommand deliveryCmd =
+                    new MultiChannelDeliveryCommand(
+                        attendee.id(),
+                        attendee.email(),
+                        idempotencyKey,
+                        true,
+                        command.inAppEventKey(),
+                        command.inAppActionUrl(),
+                        command.inAppPayload(),
+                        true,
+                        "notification.new",
+                        true,
+                        command.emailSubject(),
+                        command.emailTemplateName(),
+                        emailModel
+                    );
+
+                deliverMultiChannel(deliveryCmd);
+                totalDispatched++;
+            }
+
+            if (attendees.size() < pageSize) {
+                break;
+            }
+            page++;
+        }
+
+        log.info(
+            "Completed workshop notification fan-out for workshopId='{}', total recipients={}",
+            command.workshopId(),
+            totalDispatched
+        );
     }
 }

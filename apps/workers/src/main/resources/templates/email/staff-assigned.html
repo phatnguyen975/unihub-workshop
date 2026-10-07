@@ -104,6 +104,19 @@
                                     </p>
                                     <p
                                         style="
+                                            margin: 0 0 8px;
+                                            font-size: 14px;
+                                            color: #4b5563;
+                                        "
+                                        th:if="${endsAt != null}"
+                                    >
+                                        <strong>Ends At:</strong>
+                                        <span th:text="${endsAt}"
+                                            >2026-10-10 11:30 AM</span
+                                        >
+                                    </p>
+                                    <p
+                                        style="
                                             margin: 0;
                                             font-size: 14px;
                                             color: #4b5563;

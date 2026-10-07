@@ -51,6 +51,7 @@ class StaffAssignedNotificationHandlerTest {
         UUID orgId = UUID.randomUUID();
         UUID assignedBy = UUID.randomUUID();
         Instant startsAt = Instant.now();
+        Instant endsAt = startsAt.plusSeconds(7200);
 
         StaffAssignedEventDto dto = new StaffAssignedEventDto(
             assignmentId,
@@ -60,7 +61,7 @@ class StaffAssignedNotificationHandlerTest {
             assignedBy,
             "Cloud Computing",
             startsAt,
-            null,
+            endsAt,
             "Room 101",
             "staff@hcmus.edu.vn",
             Instant.now()
@@ -76,10 +77,16 @@ class StaffAssignedNotificationHandlerTest {
                     cmd.sendInApp() &&
                     "STAFF_ASSIGNED_TO_WORKSHOP".equals(cmd.inAppEventKey()) &&
                     ("/workshops/" + workshopId).equals(cmd.inAppActionUrl()) &&
+                    endsAt
+                        .toString()
+                        .equals(cmd.inAppPayload().get("endsAt")) &&
                     cmd.sendRealtime() &&
                     "notification.new".equals(cmd.realtimeEventType()) &&
                     cmd.sendEmail() &&
                     "staff-assigned".equals(cmd.emailTemplateName()) &&
+                    endsAt
+                        .toString()
+                        .equals(cmd.emailTemplateModel().get("endsAt")) &&
                     cmd
                         .idempotencyKey()
                         .equals(

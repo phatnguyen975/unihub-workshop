@@ -52,6 +52,9 @@ public class StaffAssignedNotificationHandler
         if (event.startsAt() != null) {
             inAppPayload.put("startsAt", event.startsAt().toString());
         }
+        if (event.endsAt() != null) {
+            inAppPayload.put("endsAt", event.endsAt().toString());
+        }
         if (event.location() != null) {
             inAppPayload.put("location", event.location());
         }
@@ -69,6 +72,9 @@ public class StaffAssignedNotificationHandler
         }
         if (event.startsAt() != null) {
             emailModel.put("startsAt", event.startsAt().toString());
+        }
+        if (event.endsAt() != null) {
+            emailModel.put("endsAt", event.endsAt().toString());
         }
         if (event.location() != null) {
             emailModel.put("location", event.location());

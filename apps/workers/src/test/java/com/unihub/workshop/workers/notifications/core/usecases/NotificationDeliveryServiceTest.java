@@ -13,6 +13,8 @@ import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
 import com.unihub.workshop.workers.notifications.core.models.MultiChannelDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.models.OrganizationNotificationCommand;
 import com.unihub.workshop.workers.notifications.core.models.OrganizerRecipient;
+import com.unihub.workshop.workers.notifications.core.models.WorkshopAttendeeRecipient;
+import com.unihub.workshop.workers.notifications.core.models.WorkshopNotificationCommand;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailRendererPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailSenderPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.InAppNotificationPort;
@@ -51,6 +53,9 @@ class NotificationDeliveryServiceTest {
     @Mock
     private OrganizationRecipientResolverPort organizationRecipientResolverPort;
 
+    @Mock
+    private com.unihub.workshop.workers.notifications.core.ports.out.WorkshopAttendeeResolverPort workshopAttendeeResolverPort;
+
     private NotificationDeliveryService service;
 
     @BeforeEach
@@ -61,7 +66,8 @@ class NotificationDeliveryServiceTest {
             notificationDeliveryLogPort,
             inAppNotificationPort,
             realtimeEventPublisherPort,
-            organizationRecipientResolverPort
+            organizationRecipientResolverPort,
+            workshopAttendeeResolverPort
         );
     }
 
@@ -486,5 +492,131 @@ class NotificationDeliveryServiceTest {
             any(),
             any()
         );
+    }
+
+    @Test
+    @DisplayName(
+        "Should fan out workshop notifications to confirmed attendees with pagination"
+    )
+    void shouldFanOutWorkshopNotificationsWithPagination() {
+        UUID workshopId = UUID.randomUUID();
+        UUID student1 = UUID.randomUUID();
+        UUID student2 = UUID.randomUUID();
+        UUID student3 = UUID.randomUUID();
+
+        WorkshopAttendeeRecipient r1 = new WorkshopAttendeeRecipient(
+            student1,
+            "s1@university.edu",
+            "Student One"
+        );
+        WorkshopAttendeeRecipient r2 = new WorkshopAttendeeRecipient(
+            student2,
+            "s2@university.edu",
+            "Student Two"
+        );
+        WorkshopAttendeeRecipient r3 = new WorkshopAttendeeRecipient(
+            student3,
+            "s3@university.edu",
+            "Student Three"
+        );
+
+        // Page 0 returns 2 attendees, page 1 returns 1 attendee (simulating smaller page chunks or full chunk)
+        when(
+            workshopAttendeeResolverPort.findConfirmedAttendees(
+                eq(workshopId),
+                eq(0),
+                any(int.class)
+            )
+        ).thenReturn(List.of(r1, r2, r3));
+
+        when(emailRendererPort.render(any(), any())).thenReturn(
+            "<p>Html body</p>"
+        );
+        when(
+            notificationDeliveryLogPort.createPendingLog(
+                any(),
+                any(),
+                any(),
+                any()
+            )
+        ).thenReturn(UUID.randomUUID());
+
+        WorkshopNotificationCommand cmd = new WorkshopNotificationCommand(
+            workshopId,
+            "WORKSHOP_RESCHEDULED",
+            "microservices-101",
+            "WORKSHOP_RESCHEDULED",
+            "/workshops/microservices-101",
+            Map.of("workshopId", workshopId.toString()),
+            "Workshop Rescheduled: Microservices 101",
+            "email/workshop-rescheduled",
+            Map.of("workshopTitle", "Microservices 101")
+        );
+
+        service.fanOutWorkshopNotification(cmd);
+
+        verify(inAppNotificationPort, Mockito.times(3)).createNotification(
+            any(),
+            eq("WORKSHOP_RESCHEDULED"),
+            eq("/workshops/microservices-101"),
+            any(),
+            any()
+        );
+        verify(realtimeEventPublisherPort).publishNotificationSignal(
+            student1,
+            "notification.new"
+        );
+        verify(realtimeEventPublisherPort).publishNotificationSignal(
+            student2,
+            "notification.new"
+        );
+        verify(realtimeEventPublisherPort).publishNotificationSignal(
+            student3,
+            "notification.new"
+        );
+        verify(emailSenderPort, Mockito.times(3)).send(any());
+    }
+
+    @Test
+    @DisplayName(
+        "Should silently skip workshop fan-out and log warning when no confirmed attendees found"
+    )
+    void shouldSkipWorkshopFanOutWhenNoConfirmedAttendeesFound() {
+        UUID workshopId = UUID.randomUUID();
+
+        when(
+            workshopAttendeeResolverPort.findConfirmedAttendees(
+                eq(workshopId),
+                eq(0),
+                any(int.class)
+            )
+        ).thenReturn(List.of());
+
+        WorkshopNotificationCommand cmd = new WorkshopNotificationCommand(
+            workshopId,
+            "WORKSHOP_CANCELED",
+            "cloud-native-dev",
+            "WORKSHOP_CANCELED",
+            "/workshops/cloud-native-dev",
+            Map.of("workshopId", workshopId.toString()),
+            "Workshop Canceled: Cloud Native Dev",
+            "email/workshop-canceled",
+            Map.of("workshopTitle", "Cloud Native Dev")
+        );
+
+        assertDoesNotThrow(() -> service.fanOutWorkshopNotification(cmd));
+
+        verify(inAppNotificationPort, never()).createNotification(
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(realtimeEventPublisherPort, never()).publishNotificationSignal(
+            any(),
+            any()
+        );
+        verify(emailSenderPort, never()).send(any());
     }
 }

@@ -104,6 +104,8 @@ class ThymeleafTemplateRenderingIntegrationTest {
                 "Advanced Cloud Architecture",
                 "startsAt",
                 "2026-10-15 09:00 AM",
+                "endsAt",
+                "2026-10-15 11:30 AM",
                 "location",
                 "Auditorium 1"
             )
@@ -113,7 +115,10 @@ class ThymeleafTemplateRenderingIntegrationTest {
         assertTrue(html.contains("UniHub Workshop"));
         assertTrue(html.contains("Workshop Staff Assignment"));
         assertTrue(html.contains("Advanced Cloud Architecture"));
+        assertTrue(html.contains("Starts At:"));
         assertTrue(html.contains("2026-10-15 09:00 AM"));
+        assertTrue(html.contains("Ends At:"));
+        assertTrue(html.contains("2026-10-15 11:30 AM"));
         assertTrue(html.contains("Auditorium 1"));
         assertTrue(html.contains("University of Science"));
     }
@@ -225,6 +230,78 @@ class ThymeleafTemplateRenderingIntegrationTest {
         assertTrue(html.contains("Organizer Two"));
         assertTrue(html.contains("students-corrupted.csv"));
         assertTrue(html.contains("/admin/import"));
+        assertTrue(html.contains("University of Science"));
+    }
+
+    @Test
+    @DisplayName(
+        "Should render workshop-rescheduled template with fragments and dynamic schedule info"
+    )
+    void shouldRenderWorkshopRescheduledTemplate() {
+        String html = renderer.render(
+            "email/workshop-rescheduled",
+            Map.of(
+                "recipientName",
+                "Nguyen Van C",
+                "workshopTitle",
+                "Advanced Cloud Architectures",
+                "previousStartsAt",
+                "2026-10-15 09:00 AM",
+                "previousEndsAt",
+                "2026-10-15 11:00 AM",
+                "newStartsAt",
+                "2026-10-18 10:00 AM",
+                "newEndsAt",
+                "2026-10-18 12:00 PM",
+                "location",
+                "Building A, Room 204",
+                "actionUrl",
+                "/workshops/advanced-cloud-architectures"
+            )
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Workshop Schedule Update"));
+        assertTrue(html.contains("Nguyen Van C"));
+        assertTrue(html.contains("Advanced Cloud Architectures"));
+        assertTrue(html.contains("Previous Schedule:"));
+        assertTrue(html.contains("2026-10-15 09:00 AM"));
+        assertTrue(html.contains("2026-10-15 11:00 AM"));
+        assertTrue(html.contains("New Schedule:"));
+        assertTrue(html.contains("2026-10-18 10:00 AM"));
+        assertTrue(html.contains("2026-10-18 12:00 PM"));
+        assertTrue(html.contains("Building A, Room 204"));
+        assertTrue(html.contains("/workshops/advanced-cloud-architectures"));
+        assertTrue(html.contains("University of Science"));
+    }
+
+    @Test
+    @DisplayName(
+        "Should render workshop-canceled template with fragments and cancellation reason"
+    )
+    void shouldRenderWorkshopCanceledTemplate() {
+        String html = renderer.render(
+            "email/workshop-canceled",
+            Map.of(
+                "recipientName",
+                "Tran Thi D",
+                "workshopTitle",
+                "Introduction to Quantum Computing",
+                "reason",
+                "Speaker medical emergency",
+                "actionUrl",
+                "/workshops"
+            )
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Workshop Cancellation Notice"));
+        assertTrue(html.contains("Tran Thi D"));
+        assertTrue(html.contains("Introduction to Quantum Computing"));
+        assertTrue(html.contains("Speaker medical emergency"));
+        assertTrue(html.contains("/workshops"));
         assertTrue(html.contains("University of Science"));
     }
 }

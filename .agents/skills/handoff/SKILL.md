@@ -98,7 +98,6 @@ One file, `HANDOFF.md`, project root. Doesn't exist → create it. Exists → **
 2. **Snapshot, not log.** Full overwrite every run — only one current handoff ever exists.
 3. **Scope-filtered, not exhaustive.** Next-session focus decides real detail versus a one-line reference.
 4. **Redact before writing, every time.** — regardless of repo visibility.
-5. **Doesn't know where it's used.** No project/tool/plugin names inside the file; refer to any project-specific record generically, by what it is.
 
 ## Workflow
 

@@ -8,10 +8,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface JpaUserRepository extends JpaRepository<UserEntity, UUID> {
     @Query(
-        "SELECT u FROM UserEntity u " +
-            "WHERE u.organizationId = :organizationId " +
-            "AND u.role = 'ORGANIZER' " +
-            "AND u.isActive = true"
+        """
+        SELECT u FROM UserEntity u
+        WHERE u.organizationId = :organizationId
+            AND u.role = 'ORGANIZER'
+            AND u.isActive = true
+        """
     )
     List<UserEntity> findActiveOrganizersByOrganizationId(
         @Param("organizationId") UUID organizationId
