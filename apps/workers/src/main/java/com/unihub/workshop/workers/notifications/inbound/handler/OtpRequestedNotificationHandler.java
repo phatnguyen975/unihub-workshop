@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class OtpNotificationHandler
+public class OtpRequestedNotificationHandler
     implements NotificationEventHandler<OtpRequestedEventDto>
 {
 

@@ -22,11 +22,11 @@ class OtpNotificationHandlerTest {
     @Mock
     private DirectEmailDeliveryUseCase emailDeliveryUseCase;
 
-    private OtpNotificationHandler handler;
+    private OtpRequestedNotificationHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new OtpNotificationHandler(emailDeliveryUseCase);
+        handler = new OtpRequestedNotificationHandler(emailDeliveryUseCase);
     }
 
     @Test

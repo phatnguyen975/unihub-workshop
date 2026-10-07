@@ -34,7 +34,7 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/NotificationListener.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/NotificationEventDispatcher.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/OtpRequestedEventDto.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/OtpNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/OtpRequestedNotificationHandler.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/config/NotificationAmqpConfig.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/email/ThymeleafEmailRenderer.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/email/JavaMailSenderAdapter.java`
@@ -58,17 +58,21 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
 
 ### Phase 2: Multi-Channel Expansion (In-App Persistence & Real-Time SSE)
 
-- [ ] **T2 — Multi-Channel Direct Delivery with In-App Persistence and Redis Real-Time SSE**
+- [x] **T2 — Multi-Channel Direct Delivery with In-App Persistence and Redis Real-Time SSE**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Inbound (DTOs, handlers), Core (in-app port, SSE publisher port, multi-channel orchestration), Outbound (in-app JPA adapter, Redis Pub/Sub adapter, Thymeleaf templates)
   - **Files:**
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/core/ports/out/InAppNotificationPort.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/core/ports/out/RealtimeEventPublisherPort.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/StaffAssignmentEventDto.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/UserLifecycleEventDto.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/StaffAssignmentNotificationHandler.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/UserLifecycleNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/StaffAssignedEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/StaffRevokedEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/UserProvisionedEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/UserStatusChangedEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/StaffAssignedNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/StaffRevokedNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/UserProvisionedNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/UserStatusChangedNotificationHandler.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/persistence/InAppNotificationEntity.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/persistence/JpaInAppNotificationRepository.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/persistence/InAppNotificationAdapter.java`
@@ -86,8 +90,8 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
 
 #### Checkpoint: Multi-Channel Delivery Operational
 
-- [ ] All four direct multi-channel event types deliver across In-App, Redis SSE, and Email channels according to their channel matrix.
-- [ ] In-app idempotency, action URL formatting, and Redis soft-failure isolation verified by unit tests.
+- [x] All four direct multi-channel event types deliver across In-App, Redis SSE, and Email channels according to their channel matrix.
+- [x] In-app idempotency, action URL formatting, and Redis soft-failure isolation verified by unit tests.
 
 ### Phase 3: Multi-Recipient Fan-Out & Pipeline Hardening
 
@@ -98,8 +102,10 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
   - **Files:**
     - `apps/workers/src/main/java/com/unihub/workshop/workers/batch_ingestion/outbound/messaging/RabbitMqIngestionEventPublisher.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/core/ports/out/OrganizationRecipientResolverPort.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/FileIngestionEventDto.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/FileIngestionNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/FileCompletedEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/FileRejectedEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/FileCompletedNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/FileRejectedNotificationHandler.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/persistence/JpaUserRepository.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/persistence/OrganizationRecipientResolverAdapter.java`
     - `apps/workers/src/main/resources/templates/email/ingestion-completed.html`
@@ -116,8 +122,10 @@ This implementation plan decomposes the `notification-delivery-pipeline` (Featur
   - **Layers touched:** Inbound (DTO, handler, DLQ routing), Core (attendee resolution port, pagination orchestration), Outbound (registration & user query JPA adapter, Thymeleaf templates)
   - **Files:**
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/core/ports/out/WorkshopAttendeeResolverPort.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/WorkshopLifecycleEventDto.java`
-    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/WorkshopLifecycleNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/WorkshopRescheduledEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/dto/WorkshopCanceledEventDto.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/WorkshopRescheduledNotificationHandler.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/WorkshopCanceledNotificationHandler.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/persistence/JpaRegistrationRepository.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/persistence/WorkshopAttendeeResolverAdapter.java`
     - `apps/workers/src/main/resources/templates/email/workshop-rescheduled.html`

@@ -3,15 +3,19 @@ package com.unihub.workshop.workers.notifications.core.usecases;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.workers.notifications.core.models.DeliveryChannel;
 import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
+import com.unihub.workshop.workers.notifications.core.models.MultiChannelDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailRendererPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailSenderPort;
+import com.unihub.workshop.workers.notifications.core.ports.out.InAppNotificationPort;
 import com.unihub.workshop.workers.notifications.core.ports.out.NotificationDeliveryLogPort;
+import com.unihub.workshop.workers.notifications.core.ports.out.RealtimeEventPublisherPort;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +37,12 @@ class NotificationDeliveryServiceTest {
     @Mock
     private NotificationDeliveryLogPort notificationDeliveryLogPort;
 
+    @Mock
+    private InAppNotificationPort inAppNotificationPort;
+
+    @Mock
+    private RealtimeEventPublisherPort realtimeEventPublisherPort;
+
     private NotificationDeliveryService service;
 
     @BeforeEach
@@ -40,7 +50,9 @@ class NotificationDeliveryServiceTest {
         service = new NotificationDeliveryService(
             emailSenderPort,
             emailRendererPort,
-            notificationDeliveryLogPort
+            notificationDeliveryLogPort,
+            inAppNotificationPort,
+            realtimeEventPublisherPort
         );
     }
 
@@ -177,5 +189,184 @@ class NotificationDeliveryServiceTest {
             eq("SMTP connection timeout")
         );
         verify(notificationDeliveryLogPort, never()).markSent(any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "Should deliver across In-App, Real-Time SSE, and Email channels when all enabled"
+    )
+    void shouldDeliverAcrossAllChannelsWhenEnabled() {
+        UUID userId = UUID.randomUUID();
+        UUID logId = UUID.randomUUID();
+        String recipient = "staff@hcmus.edu.vn";
+        String idempotencyKey = "STAFF_ASSIGNED:" + userId + ":W-123";
+
+        when(
+            inAppNotificationPort.isAlreadyCreated(userId, idempotencyKey)
+        ).thenReturn(false);
+        when(
+            notificationDeliveryLogPort.isAlreadySent(
+                recipient,
+                DeliveryChannel.EMAIL,
+                idempotencyKey
+            )
+        ).thenReturn(false);
+        when(
+            notificationDeliveryLogPort.createPendingLog(
+                userId,
+                DeliveryChannel.EMAIL,
+                recipient,
+                idempotencyKey
+            )
+        ).thenReturn(logId);
+        when(emailRendererPort.render(eq("staff-assigned"), any())).thenReturn(
+            "<html>Assigned</html>"
+        );
+
+        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
+            userId,
+            recipient,
+            idempotencyKey,
+            true,
+            "STAFF_ASSIGNED_TO_WORKSHOP",
+            "/workshops/W-123",
+            Map.of("workshopTitle", "Spring Cloud"),
+            true,
+            "notification.new",
+            true,
+            "Staff Assigned",
+            "staff-assigned",
+            Map.of("workshopTitle", "Spring Cloud")
+        );
+
+        service.deliverMultiChannel(command);
+
+        verify(inAppNotificationPort).createNotification(
+            eq(userId),
+            eq("STAFF_ASSIGNED_TO_WORKSHOP"),
+            eq("/workshops/W-123"),
+            eq(Map.of("workshopTitle", "Spring Cloud")),
+            eq(idempotencyKey)
+        );
+        verify(realtimeEventPublisherPort).publishNotificationSignal(
+            eq(userId),
+            eq("notification.new")
+        );
+        verify(emailSenderPort).send(any());
+        verify(notificationDeliveryLogPort).markSent(
+            eq(logId),
+            eq(idempotencyKey)
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "Should skip In-App persistence when already created with same idempotency key"
+    )
+    void shouldSkipInAppWhenAlreadyCreated() {
+        UUID userId = UUID.randomUUID();
+        String idempotencyKey = "USER_PROVISIONED:" + userId;
+
+        when(
+            inAppNotificationPort.isAlreadyCreated(userId, idempotencyKey)
+        ).thenReturn(true);
+
+        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
+            userId,
+            "organizer@hcmus.edu.vn",
+            idempotencyKey,
+            true,
+            "USER_PROVISIONED",
+            null,
+            Map.of("role", "ORGANIZER"),
+            false,
+            null,
+            false,
+            null,
+            null,
+            Map.of()
+        );
+
+        service.deliverMultiChannel(command);
+
+        verify(inAppNotificationPort, never()).createNotification(
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(realtimeEventPublisherPort, never()).publishNotificationSignal(
+            any(),
+            any()
+        );
+        verify(emailSenderPort, never()).send(any());
+    }
+
+    @Test
+    @DisplayName(
+        "Should isolate Real-Time SSE failure as soft failure without aborting In-App and Email"
+    )
+    void shouldIsolateRealtimeFailureWithoutAbortingOtherChannels() {
+        UUID userId = UUID.randomUUID();
+        UUID logId = UUID.randomUUID();
+        String recipient = "staff@hcmus.edu.vn";
+        String idempotencyKey = "STAFF_REVOKED:" + userId + ":W-123";
+
+        when(
+            inAppNotificationPort.isAlreadyCreated(userId, idempotencyKey)
+        ).thenReturn(false);
+        when(
+            notificationDeliveryLogPort.isAlreadySent(
+                recipient,
+                DeliveryChannel.EMAIL,
+                idempotencyKey
+            )
+        ).thenReturn(false);
+        when(
+            notificationDeliveryLogPort.createPendingLog(
+                userId,
+                DeliveryChannel.EMAIL,
+                recipient,
+                idempotencyKey
+            )
+        ).thenReturn(logId);
+        when(emailRendererPort.render(eq("staff-revoked"), any())).thenReturn(
+            "<html>Revoked</html>"
+        );
+        doThrow(new RuntimeException("Redis connection refused"))
+            .when(realtimeEventPublisherPort)
+            .publishNotificationSignal(any(), any());
+
+        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
+            userId,
+            recipient,
+            idempotencyKey,
+            true,
+            "STAFF_REVOKED_FROM_WORKSHOP",
+            "/workshops",
+            Map.of("workshopTitle", "Spring Cloud"),
+            true,
+            "notification.new",
+            true,
+            "Staff Revoked",
+            "staff-revoked",
+            Map.of("workshopTitle", "Spring Cloud")
+        );
+
+        assertDoesNotThrow(() -> service.deliverMultiChannel(command));
+
+        verify(inAppNotificationPort).createNotification(
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(emailSenderPort).send(any());
+        verify(notificationDeliveryLogPort).markSent(
+            eq(logId),
+            eq(idempotencyKey)
+        );
     }
 }

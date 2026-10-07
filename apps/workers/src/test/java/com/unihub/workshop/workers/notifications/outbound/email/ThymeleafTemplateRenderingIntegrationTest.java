@@ -91,4 +91,88 @@ class ThymeleafTemplateRenderingIntegrationTest {
             "Must contain footer fragment university name"
         );
     }
+
+    @Test
+    @DisplayName(
+        "Should render staff-assigned template with fragments and dynamic workshop info"
+    )
+    void shouldRenderStaffAssignedTemplate() {
+        String html = renderer.render(
+            "email/staff-assigned",
+            Map.of(
+                "workshopTitle",
+                "Advanced Cloud Architecture",
+                "startsAt",
+                "2026-10-15 09:00 AM",
+                "location",
+                "Auditorium 1"
+            )
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Workshop Staff Assignment"));
+        assertTrue(html.contains("Advanced Cloud Architecture"));
+        assertTrue(html.contains("2026-10-15 09:00 AM"));
+        assertTrue(html.contains("Auditorium 1"));
+        assertTrue(html.contains("University of Science"));
+    }
+
+    @Test
+    @DisplayName(
+        "Should render staff-revoked template with fragments and dynamic workshop info"
+    )
+    void shouldRenderStaffRevokedTemplate() {
+        String html = renderer.render(
+            "email/staff-revoked",
+            Map.of("workshopTitle", "Advanced Cloud Architecture")
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Staff Assignment Update"));
+        assertTrue(html.contains("Advanced Cloud Architecture"));
+        assertTrue(html.contains("University of Science"));
+    }
+
+    @Test
+    @DisplayName(
+        "Should render user-provisioned template with fragments and dynamic temporary password"
+    )
+    void shouldRenderUserProvisionedTemplate() {
+        String html = renderer.render(
+            "email/user-provisioned",
+            Map.of(
+                "fullName",
+                "Nguyen Van A",
+                "temporaryPassword",
+                "TempSecret99!"
+            )
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Welcome to UniHub Workshop"));
+        assertTrue(html.contains("Nguyen Van A"));
+        assertTrue(html.contains("TempSecret99!"));
+        assertTrue(html.contains("University of Science"));
+    }
+
+    @Test
+    @DisplayName(
+        "Should render user-status-changed template with fragments and dynamic status"
+    )
+    void shouldRenderUserStatusChangedTemplate() {
+        String html = renderer.render(
+            "email/user-status-changed",
+            Map.of("fullName", "Tran Thi B", "status", "ACTIVE")
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Account Status Update"));
+        assertTrue(html.contains("Tran Thi B"));
+        assertTrue(html.contains("ACTIVE"));
+        assertTrue(html.contains("University of Science"));
+    }
 }
