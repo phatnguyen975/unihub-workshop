@@ -1292,7 +1292,7 @@ flowchart TD
    - All backend nodes subscribe to these patterns via `RedisMessageListenerContainer`. The node currently holding the target client's `SseEmitter` serializes the payload and pushes it down the HTTP socket.
 3. **Heartbeat & Connection Resilience:** To prevent intermediate proxies (Nginx, ALBs) and browsers from timing out idle sockets, a scheduled task emits a `: ping\n\n` heartbeat comment every 15 seconds.
 4. **Client Lifecycle & Cleanup:** The `SseEmitterRegistry` registers `onCompletion`, `onTimeout`, and `onError` callbacks on every `SseEmitter` to promptly evict closed connections from memory, preventing memory leaks and dangling socket descriptors.
-5. **Fallback to Polling:** If a client environment blocks streaming connections (e.g., highly restrictive corporate proxies), the client gracefully falls back to existing REST endpoints (`GET .../summary-job`, `GET .../notifications`).
+5. **Fallback to Polling:** If a client environment blocks streaming connections (e.g., highly restrictive corporate proxies), the client gracefully falls back to existing REST endpoints (`GET .../summary-job`, `GET .../notifications`, `GET .../notifications/unread-count`).
 
 ### System Telemetry & Core Metrics to Track
 
