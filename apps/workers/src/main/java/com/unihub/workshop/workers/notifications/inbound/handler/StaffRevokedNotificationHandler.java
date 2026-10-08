@@ -52,7 +52,7 @@ public class StaffRevokedNotificationHandler
 
         String templateName = "staff-revoked";
         String subject =
-            "UniHub Workshop - Staff Assignment Revoked: " +
+            "UniHub Workshop — Staff Assignment Revoked: " +
             event.workshopTitle();
 
         Map<String, Object> emailModel = new HashMap<>();

@@ -70,7 +70,7 @@ public class WorkshopCanceledNotificationHandler
             inAppPayload,
             "Workshop Canceled: " +
                 (event.title() != null ? event.title() : "Workshop"),
-            "email/workshop-canceled",
+            "workshop-canceled",
             emailModel
         );
 

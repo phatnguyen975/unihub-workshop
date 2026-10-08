@@ -4,7 +4,11 @@ import com.unihub.workshop.workers.notifications.core.models.WorkshopNotificatio
 import com.unihub.workshop.workers.notifications.core.ports.in.NotificationEventHandler;
 import com.unihub.workshop.workers.notifications.core.ports.in.WorkshopNotificationFanOutUseCase;
 import com.unihub.workshop.workers.notifications.inbound.dto.WorkshopRescheduledEventDto;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +20,10 @@ import org.springframework.stereotype.Component;
 public class WorkshopRescheduledNotificationHandler
     implements NotificationEventHandler<WorkshopRescheduledEventDto>
 {
+
+    private static final DateTimeFormatter SCHEDULE_FORMATTER =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm (O)", Locale.ENGLISH);
+    private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final WorkshopNotificationFanOutUseCase fanOutUseCase;
 
@@ -79,23 +87,19 @@ public class WorkshopRescheduledNotificationHandler
         emailModel.put("location", event.location());
         emailModel.put(
             "previousStartsAt",
-            event.previousStartsAt() != null
-                ? event.previousStartsAt().toString()
-                : null
+            formatSchedule(event.previousStartsAt(), event.timezone())
         );
         emailModel.put(
             "previousEndsAt",
-            event.previousEndsAt() != null
-                ? event.previousEndsAt().toString()
-                : null
+            formatSchedule(event.previousEndsAt(), event.timezone())
         );
         emailModel.put(
             "newStartsAt",
-            event.newStartsAt() != null ? event.newStartsAt().toString() : null
+            formatSchedule(event.newStartsAt(), event.timezone())
         );
         emailModel.put(
             "newEndsAt",
-            event.newEndsAt() != null ? event.newEndsAt().toString() : null
+            formatSchedule(event.newEndsAt(), event.timezone())
         );
         emailModel.put("actionUrl", actionUrl);
 
@@ -111,10 +115,26 @@ public class WorkshopRescheduledNotificationHandler
             inAppPayload,
             "Workshop Rescheduled: " +
                 (event.title() != null ? event.title() : "Workshop"),
-            "email/workshop-rescheduled",
+            "workshop-rescheduled",
             emailModel
         );
 
         fanOutUseCase.fanOutWorkshopNotification(command);
+    }
+
+    private String formatSchedule(Instant instant, String timezone) {
+        if (instant == null) {
+            return null;
+        }
+        ZoneId zoneId;
+        try {
+            zoneId =
+                timezone != null && !timezone.isBlank()
+                    ? ZoneId.of(timezone.trim())
+                    : DEFAULT_ZONE;
+        } catch (Exception e) {
+            zoneId = DEFAULT_ZONE;
+        }
+        return SCHEDULE_FORMATTER.format(instant.atZone(zoneId));
     }
 }

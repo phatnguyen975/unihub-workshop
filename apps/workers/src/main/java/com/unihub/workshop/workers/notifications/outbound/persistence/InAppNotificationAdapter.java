@@ -25,7 +25,7 @@ public class InAppNotificationAdapter implements InAppNotificationPort {
         if (userId == null || idempotencyKey == null) {
             return false;
         }
-        return repository.existsByUserIdAndPayloadContaining(
+        return repository.existsByUserIdAndIdempotencyKey(
             userId,
             idempotencyKey
         );

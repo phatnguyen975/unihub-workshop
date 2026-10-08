@@ -549,7 +549,7 @@ class NotificationDeliveryServiceTest {
             "/workshops/microservices-101",
             Map.of("workshopId", workshopId.toString()),
             "Workshop Rescheduled: Microservices 101",
-            "email/workshop-rescheduled",
+            "workshop-rescheduled",
             Map.of("workshopTitle", "Microservices 101")
         );
 
@@ -600,7 +600,7 @@ class NotificationDeliveryServiceTest {
             "/workshops/cloud-native-dev",
             Map.of("workshopId", workshopId.toString()),
             "Workshop Canceled: Cloud Native Dev",
-            "email/workshop-canceled",
+            "workshop-canceled",
             Map.of("workshopTitle", "Cloud Native Dev")
         );
 

@@ -44,7 +44,7 @@ public class FileRejectedNotificationHandler
                 "FILE_REJECTED",
                 "/admin/import",
                 "Student Directory Ingestion Rejected",
-                "email/ingestion-rejected"
+                "ingestion-rejected"
             );
 
         fanOutUseCase.fanOutOrganizationNotification(command);

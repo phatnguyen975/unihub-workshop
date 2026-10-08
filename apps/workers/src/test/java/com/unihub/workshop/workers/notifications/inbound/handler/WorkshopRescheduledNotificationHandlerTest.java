@@ -89,14 +89,12 @@ class WorkshopRescheduledNotificationHandlerTest {
         assertThat(cmd.emailSubject()).isEqualTo(
             "Workshop Rescheduled: Cloud Native Microservices"
         );
-        assertThat(cmd.emailTemplateName()).isEqualTo(
-            "email/workshop-rescheduled"
-        );
+        assertThat(cmd.emailTemplateName()).isEqualTo("workshop-rescheduled");
         assertThat(cmd.emailTemplateModel())
-            .containsEntry("previousStartsAt", prevStart.toString())
-            .containsEntry("previousEndsAt", prevEnd.toString())
-            .containsEntry("newStartsAt", newStart.toString())
-            .containsEntry("newEndsAt", newEnd.toString());
+            .containsEntry("previousStartsAt", "2026-10-15 16:00 (GMT+7)")
+            .containsEntry("previousEndsAt", "2026-10-15 18:00 (GMT+7)")
+            .containsEntry("newStartsAt", "2026-10-18 17:00 (GMT+7)")
+            .containsEntry("newEndsAt", "2026-10-18 19:00 (GMT+7)");
     }
 
     @Test

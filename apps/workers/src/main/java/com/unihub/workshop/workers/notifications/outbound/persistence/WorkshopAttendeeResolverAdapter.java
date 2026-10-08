@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -33,13 +33,13 @@ public class WorkshopAttendeeResolverAdapter
         }
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<AttendeeProjection> resultPage =
+        Slice<AttendeeProjection> resultSlice =
             registrationRepository.findConfirmedAttendeesByWorkshopId(
                 workshopId,
                 pageable
             );
 
-        return resultPage
+        return resultSlice
             .getContent()
             .stream()
             .map(p ->

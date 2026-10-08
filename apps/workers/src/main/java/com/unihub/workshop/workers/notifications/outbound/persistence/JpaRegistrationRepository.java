@@ -1,8 +1,8 @@
 package com.unihub.workshop.workers.notifications.outbound.persistence;
 
 import java.util.UUID;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,7 +20,7 @@ public interface JpaRegistrationRepository
         ORDER BY r.id ASC
         """
     )
-    Page<AttendeeProjection> findConfirmedAttendeesByWorkshopId(
+    Slice<AttendeeProjection> findConfirmedAttendeesByWorkshopId(
         @Param("workshopId") UUID workshopId,
         Pageable pageable
     );

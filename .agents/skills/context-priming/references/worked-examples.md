@@ -1,4 +1,4 @@
-# Example — A Filled-In Context Summary
+# Examples — A Filled-In Context Summary
 
 ## Example 1 — Fresh Start
 

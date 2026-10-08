@@ -73,6 +73,7 @@ dependencies {
     // --- NOTIFICATIONS ---
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
     // --- OBSERVABILITY ---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'

@@ -44,7 +44,7 @@ public class FileCompletedNotificationHandler
                 "FILE_COMPLETED",
                 "/admin/import",
                 "Student Directory Ingestion Completed",
-                "email/ingestion-completed"
+                "ingestion-completed"
             );
 
         fanOutUseCase.fanOutOrganizationNotification(command);

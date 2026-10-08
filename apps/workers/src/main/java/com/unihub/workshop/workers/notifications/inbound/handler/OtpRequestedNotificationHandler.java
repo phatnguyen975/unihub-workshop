@@ -45,10 +45,10 @@ public class OtpRequestedNotificationHandler
             )
         ) {
             templateName = "otp-password-reset";
-            subject = "UniHub Workshop - Password Reset Verification Code";
+            subject = "UniHub Workshop — Password Reset Verification Code";
         } else {
             templateName = "otp-activation";
-            subject = "UniHub Workshop - Account Activation Verification Code";
+            subject = "UniHub Workshop — Account Activation Verification Code";
         }
 
         Map<String, Object> model = Map.of(

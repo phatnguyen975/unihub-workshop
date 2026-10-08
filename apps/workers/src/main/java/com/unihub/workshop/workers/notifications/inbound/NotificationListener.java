@@ -1,7 +1,6 @@
 package com.unihub.workshop.workers.notifications.inbound;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
@@ -19,9 +18,7 @@ import org.springframework.stereotype.Component;
 public class NotificationListener {
 
     private final NotificationEventDispatcher dispatcher;
-    private final ObjectMapper objectMapper = new ObjectMapper()
-        .findAndRegisterModules()
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private final ObjectMapper objectMapper;
 
     @RabbitListener(
         queues = "${app.notifications.queue:q.notifications}",

@@ -63,9 +63,7 @@ class FileCompletedNotificationHandlerTest {
         assertThat(cmd.emailSubject()).isEqualTo(
             "Student Directory Ingestion Completed"
         );
-        assertThat(cmd.emailTemplateName()).isEqualTo(
-            "email/ingestion-completed"
-        );
+        assertThat(cmd.emailTemplateName()).isEqualTo("ingestion-completed");
     }
 
     @Test

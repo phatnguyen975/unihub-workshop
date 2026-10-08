@@ -98,7 +98,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderStaffAssignedTemplate() {
         String html = renderer.render(
-            "email/staff-assigned",
+            "staff-assigned",
             Map.of(
                 "workshopTitle",
                 "Advanced Cloud Architecture",
@@ -129,7 +129,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderStaffRevokedTemplate() {
         String html = renderer.render(
-            "email/staff-revoked",
+            "staff-revoked",
             Map.of("workshopTitle", "Advanced Cloud Architecture")
         );
 
@@ -146,7 +146,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderUserProvisionedTemplate() {
         String html = renderer.render(
-            "email/user-provisioned",
+            "user-provisioned",
             Map.of(
                 "fullName",
                 "Nguyen Van A",
@@ -169,7 +169,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderUserStatusChangedTemplate() {
         String html = renderer.render(
-            "email/user-status-changed",
+            "user-status-changed",
             Map.of("fullName", "Tran Thi B", "status", "ACTIVE")
         );
 
@@ -187,7 +187,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderIngestionCompletedTemplate() {
         String html = renderer.render(
-            "email/ingestion-completed",
+            "ingestion-completed",
             Map.of(
                 "recipientName",
                 "Organizer One",
@@ -213,7 +213,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderIngestionRejectedTemplate() {
         String html = renderer.render(
-            "email/ingestion-rejected",
+            "ingestion-rejected",
             Map.of(
                 "recipientName",
                 "Organizer Two",
@@ -239,7 +239,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderWorkshopRescheduledTemplate() {
         String html = renderer.render(
-            "email/workshop-rescheduled",
+            "workshop-rescheduled",
             Map.of(
                 "recipientName",
                 "Nguyen Van C",
@@ -282,7 +282,7 @@ class ThymeleafTemplateRenderingIntegrationTest {
     )
     void shouldRenderWorkshopCanceledTemplate() {
         String html = renderer.render(
-            "email/workshop-canceled",
+            "workshop-canceled",
             Map.of(
                 "recipientName",
                 "Tran Thi D",

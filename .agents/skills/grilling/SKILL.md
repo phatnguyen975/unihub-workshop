@@ -43,12 +43,9 @@ _(Or natural language: "grill me thoroughly" → `comprehensive`; "grill me" →
 
 - `normal` — Blocking + Shaping only; Cosmetic items auto-defaulted, declared under "Auto-Defaulted".
 - `comprehensive` — everything, Cosmetic items usually pushed to later rounds.
-- **Self-invoked → always `normal`.** Escalate to `comprehensive` only on explicit user request.
+- Not specified → `normal`. Use `comprehensive` only when explicitly asked for.
 
-**Subject** (required) — everything else in the invocation, plain language. No separate fields; known constraints or a narrower focus are just part of that text.
-
-- **Human-invoked:** subject = what they typed.
-- **Self-invoked:** subject = the task already being analyzed — same reasoning, no fabricated hand-off; go straight into Workflow.
+**Subject** (required) — the plan, request, or idea to interview about, in plain language: whatever was stated with the invocation, or the task already being analyzed. No separate fields; known constraints or a narrower focus are just part of that text. No fabricated hand-off — go straight into Workflow.
 
 ## Output
 
@@ -114,7 +111,7 @@ A default flow, not a rigid script — use judgment at each step. Full mechanics
 | Asking about a node whose prerequisite is still open                     | Wait until the frontier includes it                       |
 | Quietly picking an answer because it "seemed obvious"                    | If it's obvious, it's a fast question — ask it anyway     |
 | Accepting "the standard/best-practice way" as final                      | Push for what it concretely means here                    |
-| Defaulting to `comprehensive` when self-invoking                         | Self-invoked always defaults to `normal`                  |
+| Defaulting to `comprehensive` unprompted                                 | Default is `normal`; escalate only on explicit request    |
 | Continuing past a stop signal, or stopping without declaring what's open | Respect the stop; always list what's left in "Still Open" |
 | Naming the calling project, tool, or plugin in a question                | Keep everything scoped to the subject only                |
 
@@ -147,9 +144,4 @@ Before presenting the Resolution Summary, confirm:
 - [ ] In `normal` mode, every Cosmetic item is either unasked-but-logged under "Auto-Defaulted," or absent entirely — none silently dropped.
 - [ ] Early stop → every remaining item is listed under "Still Open."
 - [ ] The summary follows the exact template, names no specific project/tool/plugin.
-- [ ] Mode matches how the session was invoked (self-invoked defaults to `normal`).
-
-## Reference Files
-
-- `references/decision-tree-and-frontier.md` — heuristics for extracting ambiguity, tagging priority, building dependencies, computing the frontier, formatting a round. Worked example included.
-- `references/quality-filters.md` — detecting vague, buzzword, or deferred-to-convention answers, and following up without being annoying about it.
+- [ ] Mode is `normal` unless `comprehensive` was explicitly requested.

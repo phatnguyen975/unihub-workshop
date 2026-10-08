@@ -436,7 +436,7 @@
 
 ### 7.1 `notification-delivery-pipeline`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Implements the asynchronous background worker pipeline that **consumes domain events from RabbitMQ queue `q.notifications`** (never called directly from the backend) and fans out notifications to registered channels (Email, In-App, and Real-Time SSE push). The event delivery path is strictly: `event_publication` (written in the same transaction as domain state change) → Spring Modulith Event Registry externalizes to RabbitMQ exchange `unihub.events` → `notifications` worker consumes from `q.notifications` → multi-channel notification fan-out. For each event, the worker: (1) routes the message to an extensible, strategy-based `NotificationEventHandler<T>` matching the event type; (2) resolves the target recipient list (Direct recipient, Organization-wide organizers, or Workshop-registered students); (3) renders the email content via Thymeleaf HTML templates and structured JSON payload for in-app display; (4) persists an `in_app_notifications` record per recipient; (5) publishes a `notification.new` event to Redis Pub/Sub channel `unihub:stream:user:{userId}` (F-10.5), triggering instant SSE bell badge counter increments and toast notifications on active web/mobile sessions; (6) dispatches responsive HTML emails via `JavaMailSender` wrapped in a Resilience4j Circuit Breaker; (7) logs every delivery attempt to `notification_delivery_logs` (channel, status: `PENDING`/`SENT`/`FAILED`, `provider_message_id`, `error_reason`, `sent_at`). Failed deliveries retry with exponential backoff; exhausted retries route to DLQ `q.dlq.unihub` via `unihub.dlx`.
 
@@ -452,7 +452,7 @@
 
 ### 7.2 `in-app-notification-management`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Provides the REST API for authenticated users to manage their in-app notifications: `GET /api/v1/notifications` (paginated list with unread count, optimized by composite index on `(user_id, is_read)`), `PATCH /api/v1/notifications/{id}/read` (mark single notification as read), and `PATCH /api/v1/notifications/read-all` (bulk mark-as-read). Upon successful DB update, the backend triggers the `RealtimeEventPublisher` port (F-10.5) to publish a `notification.read` event (`{ id?: string, all: boolean, unreadCount: number, readAt: string }`) to the user's personal channel (`unihub:stream:user:{userId}`). This ensures that active multi-device or multi-tab sessions immediately synchronize their unread badge counter and read status in real time without waiting for client polling or page refresh.
 

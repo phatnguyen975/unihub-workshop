@@ -78,9 +78,7 @@ class WorkshopCanceledNotificationHandlerTest {
         assertThat(cmd.emailSubject()).isEqualTo(
             "Workshop Canceled: AI in Healthcare"
         );
-        assertThat(cmd.emailTemplateName()).isEqualTo(
-            "email/workshop-canceled"
-        );
+        assertThat(cmd.emailTemplateName()).isEqualTo("workshop-canceled");
     }
 
     @Test

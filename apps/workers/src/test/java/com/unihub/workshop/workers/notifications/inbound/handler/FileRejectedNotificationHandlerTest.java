@@ -61,9 +61,7 @@ class FileRejectedNotificationHandlerTest {
         assertThat(cmd.emailSubject()).isEqualTo(
             "Student Directory Ingestion Rejected"
         );
-        assertThat(cmd.emailTemplateName()).isEqualTo(
-            "email/ingestion-rejected"
-        );
+        assertThat(cmd.emailTemplateName()).isEqualTo("ingestion-rejected");
     }
 
     @Test

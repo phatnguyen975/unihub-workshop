@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +29,7 @@ class NotificationListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new NotificationListener(dispatcher);
+        listener = new NotificationListener(dispatcher, new ObjectMapper());
     }
 
     @Test

@@ -53,7 +53,7 @@ public class UserStatusChangedNotificationHandler
         inAppPayload.put("status", status);
 
         String templateName = "user-status-changed";
-        String subject = "UniHub Workshop - Account Status Update";
+        String subject = "UniHub Workshop — Account Status Update";
 
         Map<String, Object> emailModel = new HashMap<>();
         if (event.fullName() != null) {

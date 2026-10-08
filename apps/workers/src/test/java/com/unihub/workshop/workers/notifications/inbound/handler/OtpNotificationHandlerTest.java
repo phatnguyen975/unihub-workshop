@@ -49,7 +49,7 @@ class OtpNotificationHandlerTest {
         verify(emailDeliveryUseCase).deliverEmail(
             eq(userId),
             eq("student@hcmus.edu.vn"),
-            eq("UniHub Workshop - Account Activation Verification Code"),
+            eq("UniHub Workshop — Account Activation Verification Code"),
             eq("otp-activation"),
             eq(Map.of("otp", "123456", "email", "student@hcmus.edu.vn")),
             eq("OTP:" + userId + ":" + requestedAt)
@@ -76,7 +76,7 @@ class OtpNotificationHandlerTest {
         verify(emailDeliveryUseCase).deliverEmail(
             eq(userId),
             eq("student@hcmus.edu.vn"),
-            eq("UniHub Workshop - Password Reset Verification Code"),
+            eq("UniHub Workshop — Password Reset Verification Code"),
             eq("otp-password-reset"),
             eq(Map.of("otp", "654321", "email", "student@hcmus.edu.vn")),
             eq("OTP:" + userId + ":" + requestedAt)

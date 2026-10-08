@@ -90,7 +90,7 @@ One file, `HANDOFF.md`, project root. Doesn't exist → create it. Exists → **
 
 - Already durable somewhere → reference it, don't restate it in the body.
 - More than one thread in flight → give each its own Exact Next Action + How to Verify, or ask the human which to prioritize.
-- Full example: `references/example-handoff.md`.
+- Full example: `references/worked-examples.md`.
 
 ## Core Principles
 
@@ -167,9 +167,3 @@ Before confirming back to the human, confirm:
 - [ ] `HANDOFF.md` was fully overwritten, not appended to, if it already existed.
 - [ ] If multiple threads were in flight, each has its own Exact Next Action, or the human was asked to prioritize.
 - [ ] No specific project, tool, or plugin name appears inside the handoff content.
-
-## Reference Files
-
-- `references/compaction-and-redaction.md` — judging what's "already durable" vs. what belongs in the live thread, plus redaction patterns for credentials, tokens, keys, PII.
-- `references/example-handoff.md` — a complete, fully filled-in sample `HANDOFF.md`.
-- `scripts/ensure-gitignore.sh` / `scripts/ensure-gitignore.ps1` — idempotent scripts adding the `HANDOFF.md` entry to `.gitignore`. See Gitignore Handling above.

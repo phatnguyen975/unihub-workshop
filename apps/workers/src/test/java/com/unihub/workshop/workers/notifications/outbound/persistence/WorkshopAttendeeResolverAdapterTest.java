@@ -17,10 +17,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 
 @ExtendWith(MockitoExtension.class)
 class WorkshopAttendeeResolverAdapterTest {
@@ -50,10 +50,10 @@ class WorkshopAttendeeResolverAdapterTest {
             "student2@example.com",
             "Student Two"
         );
-        Page<AttendeeProjection> page = new PageImpl<>(
+        Slice<AttendeeProjection> slice = new SliceImpl<>(
             List.of(p1, p2),
             PageRequest.of(0, 500),
-            2
+            false
         );
 
         when(
@@ -61,7 +61,7 @@ class WorkshopAttendeeResolverAdapterTest {
                 eq(workshopId),
                 any(Pageable.class)
             )
-        ).thenReturn(page);
+        ).thenReturn(slice);
 
         List<WorkshopAttendeeRecipient> recipients =
             adapter.findConfirmedAttendees(workshopId, 0, 500);
@@ -107,7 +107,7 @@ class WorkshopAttendeeResolverAdapterTest {
                 eq(workshopId),
                 any(Pageable.class)
             )
-        ).thenReturn(Page.empty());
+        ).thenReturn(new SliceImpl<>(List.of()));
 
         List<WorkshopAttendeeRecipient> recipients =
             adapter.findConfirmedAttendees(workshopId, 0, 100);

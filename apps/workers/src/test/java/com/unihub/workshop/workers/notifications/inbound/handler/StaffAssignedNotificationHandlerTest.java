@@ -50,8 +50,8 @@ class StaffAssignedNotificationHandlerTest {
         UUID assignmentId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
         UUID assignedBy = UUID.randomUUID();
-        Instant startsAt = Instant.now();
-        Instant endsAt = startsAt.plusSeconds(7200);
+        Instant startsAt = Instant.parse("2026-10-10T02:00:00Z");
+        Instant endsAt = Instant.parse("2026-10-10T04:30:00Z");
 
         StaffAssignedEventDto dto = new StaffAssignedEventDto(
             assignmentId,
@@ -84,9 +84,9 @@ class StaffAssignedNotificationHandlerTest {
                     "notification.new".equals(cmd.realtimeEventType()) &&
                     cmd.sendEmail() &&
                     "staff-assigned".equals(cmd.emailTemplateName()) &&
-                    endsAt
-                        .toString()
-                        .equals(cmd.emailTemplateModel().get("endsAt")) &&
+                    "2026-10-10 11:30 (GMT+7)".equals(
+                        cmd.emailTemplateModel().get("endsAt")
+                    ) &&
                     cmd
                         .idempotencyKey()
                         .equals(

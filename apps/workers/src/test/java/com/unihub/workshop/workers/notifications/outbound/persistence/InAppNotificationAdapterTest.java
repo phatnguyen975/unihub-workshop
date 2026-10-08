@@ -44,10 +44,7 @@ class InAppNotificationAdapterTest {
         String idempotencyKey = "STAFF_ASSIGNED:U-1:W-1";
 
         when(
-            repository.existsByUserIdAndPayloadContaining(
-                userId,
-                idempotencyKey
-            )
+            repository.existsByUserIdAndIdempotencyKey(userId, idempotencyKey)
         ).thenReturn(true);
 
         assertTrue(adapter.isAlreadyCreated(userId, idempotencyKey));

@@ -56,7 +56,7 @@ public class UserProvisionedNotificationHandler
         }
 
         String templateName = "user-provisioned";
-        String subject = "UniHub Workshop - Account Provisioned";
+        String subject = "UniHub Workshop — Account Provisioned";
 
         // Temporary password is provided ONLY to the email template model
         Map<String, Object> emailModel = new HashMap<>();
