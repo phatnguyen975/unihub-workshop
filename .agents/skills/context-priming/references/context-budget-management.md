@@ -17,8 +17,7 @@ Waiting until the context window is nearly full to start trimming causes an abru
 
 - The original task and any hard constraints — these anchor everything else and should never be the thing trimmed.
 - The active error or test output currently being debugged.
-- The file(s) currently being edited, or its most recent version.
-- Any hard constraints the agent has been asked to enforce (auth rules, naming conventions, etc.).
+- The file(s) currently being edited.
 - Any decision explicitly marked important by the human.
 
 ## Compress before dropping

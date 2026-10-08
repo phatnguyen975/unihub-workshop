@@ -33,6 +33,7 @@ public class RabbitMqIngestionEventPublisher
 
             MessageProperties props = new MessageProperties();
             props.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+            props.setHeader("__TypeId__", "FileRejectedEvent");
             Message message = new Message(body, props);
 
             rabbitTemplate.send("unihub.events", "notifications", message);
@@ -58,6 +59,7 @@ public class RabbitMqIngestionEventPublisher
 
             MessageProperties props = new MessageProperties();
             props.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+            props.setHeader("__TypeId__", "FileCompletedEvent");
             Message message = new Message(body, props);
 
             rabbitTemplate.send("unihub.events", "notifications", message);

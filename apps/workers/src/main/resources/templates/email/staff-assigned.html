@@ -1,0 +1,156 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Staff Assignment Notification</title>
+    </head>
+    <body
+        style="
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f8;
+            font-family:
+                &quot;Helvetica Neue&quot;, Helvetica, Arial, sans-serif;
+            color: #333333;
+        "
+    >
+        <table
+            role="presentation"
+            border="0"
+            cellpadding="0"
+            cellspacing="0"
+            width="100%"
+            style="background-color: #f4f6f8; padding: 30px 15px"
+        >
+            <tr>
+                <td align="center">
+                    <table
+                        role="presentation"
+                        border="0"
+                        cellpadding="0"
+                        cellspacing="0"
+                        width="100%"
+                        style="
+                            max-width: 600px;
+                            background-color: #ffffff;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+                        "
+                    >
+                        <!-- Reusable Header Fragment -->
+                        <tr
+                            th:replace="~{email/fragments/header :: email-header}"
+                        ></tr>
+
+                        <!-- Body Content -->
+                        <tr>
+                            <td style="padding: 30px 25px">
+                                <h2
+                                    style="
+                                        margin: 0 0 15px;
+                                        color: #1a1a1a;
+                                        font-size: 20px;
+                                        font-weight: 600;
+                                    "
+                                >
+                                    Workshop Staff Assignment
+                                </h2>
+                                <p
+                                    style="
+                                        margin: 0 0 15px;
+                                        font-size: 15px;
+                                        line-height: 1.6;
+                                        color: #4b5563;
+                                    "
+                                >
+                                    You have been assigned as a check-in staff
+                                    member for the following workshop:
+                                </p>
+
+                                <div
+                                    style="
+                                        background-color: #f9fafb;
+                                        border: 1px solid #e5e7eb;
+                                        border-radius: 6px;
+                                        padding: 20px;
+                                        margin: 20px 0;
+                                    "
+                                >
+                                    <p
+                                        style="
+                                            margin: 0 0 10px;
+                                            font-size: 16px;
+                                            font-weight: bold;
+                                            color: #111827;
+                                        "
+                                        th:text="${workshopTitle}"
+                                    >
+                                        Workshop Title
+                                    </p>
+                                    <p
+                                        style="
+                                            margin: 0 0 8px;
+                                            font-size: 14px;
+                                            color: #4b5563;
+                                        "
+                                        th:if="${startsAt != null}"
+                                    >
+                                        <strong>Starts At:</strong>
+                                        <span th:text="${startsAt}"
+                                            >2026-10-10 09:00 AM</span
+                                        >
+                                    </p>
+                                    <p
+                                        style="
+                                            margin: 0 0 8px;
+                                            font-size: 14px;
+                                            color: #4b5563;
+                                        "
+                                        th:if="${endsAt != null}"
+                                    >
+                                        <strong>Ends At:</strong>
+                                        <span th:text="${endsAt}"
+                                            >2026-10-10 11:30 AM</span
+                                        >
+                                    </p>
+                                    <p
+                                        style="
+                                            margin: 0;
+                                            font-size: 14px;
+                                            color: #4b5563;
+                                        "
+                                        th:if="${location != null}"
+                                    >
+                                        <strong>Location:</strong>
+                                        <span th:text="${location}"
+                                            >Hall A</span
+                                        >
+                                    </p>
+                                </div>
+
+                                <p
+                                    style="
+                                        margin: 20px 0 0;
+                                        font-size: 14px;
+                                        line-height: 1.6;
+                                        color: #6b7280;
+                                    "
+                                >
+                                    Please ensure your mobile check-in device is
+                                    prepared before the session begins.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Reusable Footer Fragment -->
+                        <tr
+                            th:replace="~{email/fragments/footer :: email-footer}"
+                        ></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+</html>
