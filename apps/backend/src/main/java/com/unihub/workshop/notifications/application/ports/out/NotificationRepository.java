@@ -2,6 +2,7 @@ package com.unihub.workshop.notifications.application.ports.out;
 
 import com.unihub.workshop.notifications.domain.model.InAppNotification;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface NotificationRepository {
@@ -28,4 +29,20 @@ public interface NotificationRepository {
         String cursor,
         int size
     );
+
+    /**
+     * Finds a notification by its unique identifier.
+     *
+     * @param id the notification UUID
+     * @return Optional containing the notification if found, or empty if not found
+     */
+    Optional<InAppNotification> findById(UUID id);
+
+    /**
+     * Persists or updates an InAppNotification entity.
+     *
+     * @param notification the domain entity to save
+     * @return the persisted domain entity
+     */
+    InAppNotification save(InAppNotification notification);
 }

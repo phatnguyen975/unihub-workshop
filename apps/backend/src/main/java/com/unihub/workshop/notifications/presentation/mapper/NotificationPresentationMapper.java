@@ -2,8 +2,10 @@ package com.unihub.workshop.notifications.presentation.mapper;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.unihub.workshop.notifications.application.ports.in.MarkNotificationReadResult;
 import com.unihub.workshop.notifications.application.ports.in.NotificationsResult;
 import com.unihub.workshop.notifications.domain.model.InAppNotification;
+import com.unihub.workshop.notifications.presentation.dto.MarkNotificationReadResponse;
 import com.unihub.workshop.notifications.presentation.dto.NotificationPageData;
 import com.unihub.workshop.notifications.presentation.dto.NotificationResponse;
 import java.util.HashMap;
@@ -40,6 +42,18 @@ public interface NotificationPresentationMapper {
             result.unreadCount(),
             result.nextCursor(),
             result.hasMore()
+        );
+    }
+
+    default MarkNotificationReadResponse toMarkReadResponse(
+        MarkNotificationReadResult result
+    ) {
+        if (result == null) {
+            return null;
+        }
+        return new MarkNotificationReadResponse(
+            toResponse(result.notification()),
+            result.unreadCount()
         );
     }
 

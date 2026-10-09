@@ -17,6 +17,7 @@ import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -114,5 +115,23 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
         }
 
         return new CursorPage<>(items, nextCursor, slice.hasMore());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<InAppNotification> findById(UUID id) {
+        return springDataNotificationRepository
+            .findById(id)
+            .map(notificationPersistenceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public InAppNotification save(InAppNotification notification) {
+        InAppNotificationJpaEntity entity =
+            notificationPersistenceMapper.toEntity(notification);
+        InAppNotificationJpaEntity saved =
+            springDataNotificationRepository.save(entity);
+        return notificationPersistenceMapper.toDomain(saved);
     }
 }

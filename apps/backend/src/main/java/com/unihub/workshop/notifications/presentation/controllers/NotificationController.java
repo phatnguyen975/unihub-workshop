@@ -3,7 +3,10 @@ package com.unihub.workshop.notifications.presentation.controllers;
 import com.unihub.workshop.notifications.application.ports.in.GetNotificationsQuery;
 import com.unihub.workshop.notifications.application.ports.in.GetNotificationsUseCase;
 import com.unihub.workshop.notifications.application.ports.in.GetUnreadCountUseCase;
+import com.unihub.workshop.notifications.application.ports.in.MarkNotificationReadResult;
+import com.unihub.workshop.notifications.application.ports.in.MarkNotificationReadUseCase;
 import com.unihub.workshop.notifications.application.ports.in.NotificationsResult;
+import com.unihub.workshop.notifications.presentation.dto.MarkNotificationReadResponse;
 import com.unihub.workshop.notifications.presentation.dto.NotificationPageData;
 import com.unihub.workshop.notifications.presentation.dto.UnreadCountResponse;
 import com.unihub.workshop.notifications.presentation.mapper.NotificationPresentationMapper;
@@ -14,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +30,7 @@ public class NotificationController {
 
     private final GetUnreadCountUseCase getUnreadCountUseCase;
     private final GetNotificationsUseCase getNotificationsUseCase;
+    private final MarkNotificationReadUseCase markNotificationReadUseCase;
     private final NotificationPresentationMapper notificationPresentationMapper;
 
     @GetMapping("/unread-count")
@@ -65,6 +71,21 @@ public class NotificationController {
 
         return ResponseEntity.ok(
             ApiResponse.success(data, "Notifications retrieved successfully")
+        );
+    }
+
+    @PatchMapping("/{id}/read")
+    public ResponseEntity<ApiResponse<MarkNotificationReadResponse>> markAsRead(
+        @PathVariable UUID id,
+        Authentication authentication
+    ) {
+        UUID userId = SecurityContextUtils.extractUserId(authentication);
+        MarkNotificationReadResult result =
+            markNotificationReadUseCase.markAsRead(id, userId);
+        MarkNotificationReadResponse data =
+            notificationPresentationMapper.toMarkReadResponse(result);
+        return ResponseEntity.ok(
+            ApiResponse.success(data, "Notification marked as read")
         );
     }
 }

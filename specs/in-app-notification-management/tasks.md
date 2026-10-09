@@ -83,20 +83,24 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
 
 ### Phase 2: Mutation & Synchronization Capabilities (State Transitions & SSE)
 
-- [ ] **T3 — Mark Single Notification as Read with Real-Time SSE Sync (`PATCH /api/v1/notifications/{id}/read`)**
+- [x] **T3 — Mark Single Notification as Read with Real-Time SSE Sync (`PATCH /api/v1/notifications/{id}/read`)**
   - **Size:** M
   - **Depends on:** T1, T2
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/domain/model/InAppNotification.java` (add `markAsRead(Instant)` business method)
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java` (add findById and save/update methods)
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java` (add findById and save methods)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement findById & save)
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/NotificationReadEventPayload.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkNotificationReadResult.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkNotificationReadUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/MarkNotificationReadService.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/mapper/NotificationPresentationMapper.java` (add `toMarkReadResponse`)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/dto/MarkNotificationReadResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `PATCH /{id}/read`)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/domain/InAppNotificationMarkReadTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/application/MarkNotificationReadServiceTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/notifications/infrastructure/NotificationRepositoryAdapterTest.java` (add findById & save tests)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/controllers/NotificationControllerMarkReadTest.java`
   - **Acceptance Criteria:**
     - Calling `PATCH /api/v1/notifications/{id}/read` for an unread notification owned by the caller transitions `is_read` to `true`, sets server `read_at = now()`, persists to primary database, publishes a `notification.read` event via `RealtimeEventPublisher`, and returns `200 OK` with updated notification and new `unreadCount` (FR-07, FR-08, FR-15, BR-02, BR-03, Scenario 5).

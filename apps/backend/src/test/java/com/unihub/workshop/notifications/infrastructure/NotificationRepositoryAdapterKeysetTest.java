@@ -31,18 +31,48 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class NotificationRepositoryAdapterKeysetTest {
 
+    @Mock
     private SpringDataNotificationRepository springDataRepository;
+
+    @Mock
     private EntityManager entityManager;
+
+    @Mock
+    private CriteriaBuilder cb;
+
+    @Mock
+    private CriteriaQuery<InAppNotificationJpaEntity> cq;
+
+    @Mock
+    private Root<InAppNotificationJpaEntity> root;
+
+    @Mock
+    private TypedQuery<InAppNotificationJpaEntity> typedQuery;
+
+    @Mock
+    private Path<Object> userPath;
+
+    @Mock
+    private Path<Object> isReadPath;
+
+    @Mock
+    private Path<Instant> createdAtPath;
+
+    @Mock
+    private Path<UUID> idPath;
+
     private NotificationPersistenceMapper mapper;
     private NotificationRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        springDataRepository = mock(SpringDataNotificationRepository.class);
-        entityManager = mock(EntityManager.class);
         mapper = new NotificationPersistenceMapperImpl();
         adapter = new NotificationRepositoryAdapter(
             springDataRepository,
@@ -74,7 +104,6 @@ class NotificationRepositoryAdapterKeysetTest {
     @DisplayName(
         "should query notifications without cursor and return items and next cursor when hasMore is true"
     )
-    @SuppressWarnings("unchecked")
     void shouldFindNotifications_withoutCursor_returnsItemsAndNextCursorWhenHasMore() {
         UUID userId = UUID.randomUUID();
         UUID id1 = UUID.randomUUID();
@@ -106,18 +135,6 @@ class NotificationRepositoryAdapterKeysetTest {
             false,
             t3
         );
-
-        CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<InAppNotificationJpaEntity> cq = mock(
-            CriteriaQuery.class
-        );
-        Root<InAppNotificationJpaEntity> root = mock(Root.class);
-        TypedQuery<InAppNotificationJpaEntity> typedQuery = mock(
-            TypedQuery.class
-        );
-        Path<Object> userPath = mock(Path.class);
-        Path<Instant> createdAtPath = mock(Path.class);
-        Path<UUID> idPath = mock(Path.class);
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(InAppNotificationJpaEntity.class)).thenReturn(cq);
@@ -158,7 +175,6 @@ class NotificationRepositoryAdapterKeysetTest {
 
     @Test
     @DisplayName("should query notifications with isRead filter applied")
-    @SuppressWarnings("unchecked")
     void shouldFindNotifications_withIsReadFilter() {
         UUID userId = UUID.randomUUID();
         UUID id1 = UUID.randomUUID();
@@ -170,19 +186,6 @@ class NotificationRepositoryAdapterKeysetTest {
             false,
             t1
         );
-
-        CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<InAppNotificationJpaEntity> cq = mock(
-            CriteriaQuery.class
-        );
-        Root<InAppNotificationJpaEntity> root = mock(Root.class);
-        TypedQuery<InAppNotificationJpaEntity> typedQuery = mock(
-            TypedQuery.class
-        );
-        Path<Object> userPath = mock(Path.class);
-        Path<Object> isReadPath = mock(Path.class);
-        Path<Instant> createdAtPath = mock(Path.class);
-        Path<UUID> idPath = mock(Path.class);
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(InAppNotificationJpaEntity.class)).thenReturn(cq);
@@ -218,7 +221,6 @@ class NotificationRepositoryAdapterKeysetTest {
 
     @Test
     @DisplayName("should query notifications with valid cursor")
-    @SuppressWarnings("unchecked")
     void shouldFindNotifications_withValidCursor() {
         UUID userId = UUID.randomUUID();
         UUID cursorId = UUID.randomUUID();
@@ -236,18 +238,6 @@ class NotificationRepositoryAdapterKeysetTest {
             false,
             t3
         );
-
-        CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<InAppNotificationJpaEntity> cq = mock(
-            CriteriaQuery.class
-        );
-        Root<InAppNotificationJpaEntity> root = mock(Root.class);
-        TypedQuery<InAppNotificationJpaEntity> typedQuery = mock(
-            TypedQuery.class
-        );
-        Path<Object> userPath = mock(Path.class);
-        Path<Instant> createdAtPath = mock(Path.class);
-        Path<UUID> idPath = mock(Path.class);
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(InAppNotificationJpaEntity.class)).thenReturn(cq);
