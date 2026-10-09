@@ -22,19 +22,19 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
 
 ### Phase 1: Read Path Capabilities (Query & Observability)
 
-- [ ] **T1 — Dedicated Unread Count Endpoint (`GET /api/v1/notifications/unread-count`)**
+- [x] **T1 — Dedicated Unread Count Endpoint (`GET /api/v1/notifications/unread-count`)**
   - **Size:** S
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/package-info.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/domain/model/InAppNotification.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/domain/repository/NotificationRepository.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/InAppNotificationJpaEntity.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/SpringDataNotificationRepository.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/port/in/GetUnreadCountUseCase.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/service/GetUnreadCountService.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/GetUnreadCountUseCase.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/GetUnreadCountService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/UnreadCountResponse.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/domain/InAppNotificationTest.java`
@@ -52,11 +52,11 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/domain/repository/NotificationRepository.java` (add keyset find method)
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java` (add keyset find method)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement keyset query)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/dto/GetNotificationsQuery.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/port/in/GetNotificationsUseCase.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/service/GetNotificationsService.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/GetNotificationsUseCase.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/GetNotificationsService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/NotificationResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/NotificationPageData.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `GET /`)
@@ -85,10 +85,10 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/domain/model/InAppNotification.java` (add `markAsRead(Instant)` business method)
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/domain/repository/NotificationRepository.java` (add findById and save/update methods)
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java` (add findById and save/update methods)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement findById & save)
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/port/in/MarkNotificationReadUseCase.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/service/MarkNotificationReadService.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkNotificationReadUseCase.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/MarkNotificationReadService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/MarkNotificationReadResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `PATCH /{id}/read`)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/domain/InAppNotificationMarkReadTest.java`
@@ -107,11 +107,11 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
   - **Depends on:** T3
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/domain/repository/NotificationRepository.java` (add `markAllAsReadByUserId(UUID, Instant)`)
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java` (add `markAllAsReadByUserId(UUID, Instant)`)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/SpringDataNotificationRepository.java` (add `@Modifying` bulk update query)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement bulk update)
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/port/in/MarkAllNotificationsReadUseCase.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/service/MarkAllNotificationsReadService.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkAllNotificationsReadUseCase.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/MarkAllNotificationsReadService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/MarkAllReadResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `PATCH /read-all` with route precedence)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/application/MarkAllNotificationsReadServiceTest.java`
