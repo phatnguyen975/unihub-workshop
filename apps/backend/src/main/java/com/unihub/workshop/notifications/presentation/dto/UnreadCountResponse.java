@@ -1,4 +1,4 @@
-package com.unihub.workshop.notifications.presentation.responses;
+package com.unihub.workshop.notifications.presentation.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

@@ -6,6 +6,8 @@ import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.notifications.infrastructure.persistence.NotificationRepositoryAdapter;
 import com.unihub.workshop.notifications.infrastructure.persistence.SpringDataNotificationRepository;
+import com.unihub.workshop.notifications.infrastructure.persistence.mapper.NotificationPersistenceMapper;
+import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,12 @@ class NotificationRepositoryAdapterTest {
 
     @Mock
     private SpringDataNotificationRepository springDataNotificationRepository;
+
+    @Mock
+    private EntityManager entityManager;
+
+    @Mock
+    private NotificationPersistenceMapper notificationPersistenceMapper;
 
     @InjectMocks
     private NotificationRepositoryAdapter adapter;

@@ -1,4 +1,4 @@
-package com.unihub.workshop.notifications.presentation;
+package com.unihub.workshop.notifications.presentation.controllers;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.unihub.workshop.notifications.application.ports.in.GetUnreadCountUseCase;
-import com.unihub.workshop.notifications.presentation.controllers.NotificationController;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -34,9 +33,10 @@ class NotificationControllerTest {
     @BeforeEach
     void setUp() {
         getUnreadCountUseCase = mock(GetUnreadCountUseCase.class);
-        NotificationController controller = new NotificationController(
-            getUnreadCountUseCase
-        );
+        NotificationController controller =
+            NotificationControllerTestBuilder.builder()
+                .withGetUnreadCountUseCase(getUnreadCountUseCase)
+                .build();
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(

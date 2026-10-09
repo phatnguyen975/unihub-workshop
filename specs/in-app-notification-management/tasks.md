@@ -33,36 +33,40 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/InAppNotificationJpaEntity.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/SpringDataNotificationRepository.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/mapper/NotificationPersistenceMapper.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/GetUnreadCountUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/GetUnreadCountService.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/UnreadCountResponse.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/dto/UnreadCountResponse.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/domain/InAppNotificationTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/application/GetUnreadCountServiceTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/infrastructure/NotificationRepositoryAdapterTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/NotificationControllerTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/controllers/NotificationControllerTest.java`
   - **Acceptance Criteria:**
     - Calling `GET /api/v1/notifications/unread-count` with valid JWT returns `200 OK` and `{ "success": true, "data": { "unreadCount": <count> }, "metadata": { "processedBy": "...", "traceId": "..." } }` (FR-06, Scenario 4).
     - Query uses index `idx_in_app_notifications_user_is_read` filtering `user_id = :userId AND is_read = false` on replica datasource (`readOnly = true`) (BR-05, BR-06).
     - Calling without `Authorization` header returns `401 Unauthorized` with RFC 7807 problem detail (BR-11, Scenario 11).
     - Module boundaries satisfy Spring Modulith architectural rules (`ModulithArchitectureTest` passes).
 
-- [ ] **T2 — Paginated Notification Listing and Filtering (`GET /api/v1/notifications`)**
+- [x] **T2 — Paginated Notification Listing and Filtering (`GET /api/v1/notifications`)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java` (add keyset find method)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement keyset query)
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/dto/GetNotificationsQuery.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/GetNotificationsQuery.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/NotificationsResult.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/GetNotificationsUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/GetNotificationsService.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/NotificationResponse.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/NotificationPageData.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/mapper/NotificationPresentationMapper.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/dto/NotificationResponse.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/dto/NotificationPageData.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `GET /`)
+    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/controllers/NotificationControllerTestBuilder.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/application/GetNotificationsServiceTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/infrastructure/NotificationRepositoryAdapterKeysetTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/NotificationControllerListTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/controllers/NotificationControllerListTest.java`
   - **Acceptance Criteria:**
     - Calling `GET /api/v1/notifications` returns `200 OK` with items sorted by `createdAt DESC, id DESC`, `cursor: { nextCursor, hasMore }`, and total user `unreadCount` (FR-01, FR-03, FR-04, FR-05, Scenario 1).
     - Query parameter `isRead=false` returns only unread items; `isRead=true` returns only read items; omitted returns all items (FR-02, Scenario 2, Scenario 3).
@@ -73,9 +77,9 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
 
 #### Checkpoint: Phase 1 (Read Path Complete)
 
-- [ ] All read capabilities (T1, T2) pass their acceptance criteria end-to-end.
-- [ ] `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` passes with zero boundary violations.
-- [ ] Keyset pagination and unread counts execute cleanly against repository adapters.
+- [x] All read capabilities (T1, T2) pass their acceptance criteria end-to-end.
+- [x] `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` passes with zero boundary violations.
+- [x] Keyset pagination and unread counts execute cleanly against repository adapters.
 
 ### Phase 2: Mutation & Synchronization Capabilities (State Transitions & SSE)
 
@@ -89,11 +93,11 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement findById & save)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkNotificationReadUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/MarkNotificationReadService.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/MarkNotificationReadResponse.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/dto/MarkNotificationReadResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `PATCH /{id}/read`)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/domain/InAppNotificationMarkReadTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/application/MarkNotificationReadServiceTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/NotificationControllerMarkReadTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/controllers/NotificationControllerMarkReadTest.java`
   - **Acceptance Criteria:**
     - Calling `PATCH /api/v1/notifications/{id}/read` for an unread notification owned by the caller transitions `is_read` to `true`, sets server `read_at = now()`, persists to primary database, publishes a `notification.read` event via `RealtimeEventPublisher`, and returns `200 OK` with updated notification and new `unreadCount` (FR-07, FR-08, FR-15, BR-02, BR-03, Scenario 5).
     - Calling `PATCH /api/v1/notifications/{id}/read` for an already-read notification returns `200 OK` with current state and unread count, executes zero database updates, and suppresses the SSE event (FR-09, FR-17, Scenario 6).
@@ -112,10 +116,10 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement bulk update)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkAllNotificationsReadUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/MarkAllNotificationsReadService.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/responses/MarkAllReadResponse.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/dto/MarkAllReadResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `PATCH /read-all` with route precedence)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/application/MarkAllNotificationsReadServiceTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/NotificationControllerMarkAllReadTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/controllers/NotificationControllerMarkAllReadTest.java`
   - **Acceptance Criteria:**
     - Calling `PATCH /api/v1/notifications/read-all` when unread notifications exist updates all matching records to `is_read = true`, returns `200 OK` with `{ "updatedCount": N, "unreadCount": 0 }`, and publishes a `notification.read` SSE event with `{ "all": true, "unreadCount": 0, "readAt": "..." }` (FR-12, FR-13, FR-16, Scenario 9).
     - Calling `PATCH /api/v1/notifications/read-all` when unread count is already `0` returns `200 OK` with `{ "updatedCount": 0, "unreadCount": 0 }` and suppresses the SSE event (FR-14, FR-18, Scenario 10).
