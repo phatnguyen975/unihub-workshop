@@ -292,4 +292,25 @@ class NotificationControllerMarkReadTest {
             )
             .andExpect(jsonPath("$.error.status").value(400));
     }
+
+    @Test
+    @DisplayName(
+        "PATCH /api/v1/notifications/{id}/read should return 401 Unauthorized when unauthenticated"
+    )
+    void markAsRead_whenUnauthenticated_returns401() throws Exception {
+        UUID notificationId = UUID.randomUUID();
+
+        mockMvc
+            .perform(
+                patch(
+                    "/api/v1/notifications/{id}/read",
+                    notificationId
+                ).contentType(MediaType.APPLICATION_JSON)
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:unauthorized")
+            );
+    }
 }

@@ -4,6 +4,7 @@ import static org.mockito.Mockito.mock;
 
 import com.unihub.workshop.notifications.application.ports.in.GetNotificationsUseCase;
 import com.unihub.workshop.notifications.application.ports.in.GetUnreadCountUseCase;
+import com.unihub.workshop.notifications.application.ports.in.MarkAllNotificationsReadUseCase;
 import com.unihub.workshop.notifications.application.ports.in.MarkNotificationReadUseCase;
 import com.unihub.workshop.notifications.presentation.mapper.NotificationPresentationMapper;
 import com.unihub.workshop.notifications.presentation.mapper.NotificationPresentationMapperImpl;
@@ -19,6 +20,8 @@ public class NotificationControllerTestBuilder {
     private MarkNotificationReadUseCase markNotificationReadUseCase = mock(
         MarkNotificationReadUseCase.class
     );
+    private MarkAllNotificationsReadUseCase markAllNotificationsReadUseCase =
+        mock(MarkAllNotificationsReadUseCase.class);
     private NotificationPresentationMapper notificationPresentationMapper =
         new NotificationPresentationMapperImpl();
 
@@ -47,6 +50,13 @@ public class NotificationControllerTestBuilder {
         return this;
     }
 
+    public NotificationControllerTestBuilder withMarkAllNotificationsReadUseCase(
+        MarkAllNotificationsReadUseCase markAllNotificationsReadUseCase
+    ) {
+        this.markAllNotificationsReadUseCase = markAllNotificationsReadUseCase;
+        return this;
+    }
+
     public NotificationControllerTestBuilder withNotificationPresentationMapper(
         NotificationPresentationMapper notificationPresentationMapper
     ) {
@@ -59,6 +69,7 @@ public class NotificationControllerTestBuilder {
             getUnreadCountUseCase,
             getNotificationsUseCase,
             markNotificationReadUseCase,
+            markAllNotificationsReadUseCase,
             notificationPresentationMapper
         );
     }

@@ -110,7 +110,7 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
     - Invalid UUID syntax for `{id}` returns `400 Bad Request` (`urn:unihub:error:bad-request`).
     - Transient SSE publisher failure logs a warning without rolling back the successful database commit.
 
-- [ ] **T4 — Bulk Mark All Notifications as Read with Real-Time SSE Sync (`PATCH /api/v1/notifications/read-all`)**
+- [x] **T4 — Bulk Mark All Notifications as Read with Real-Time SSE Sync (`PATCH /api/v1/notifications/read-all`)**
   - **Size:** S
   - **Depends on:** T3
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -118,11 +118,14 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/out/NotificationRepository.java` (add `markAllAsReadByUserId(UUID, Instant)`)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/SpringDataNotificationRepository.java` (add `@Modifying` bulk update query)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/infrastructure/persistence/NotificationRepositoryAdapter.java` (implement bulk update)
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkAllReadResult.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/ports/in/MarkAllNotificationsReadUseCase.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/application/usecases/MarkAllNotificationsReadService.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/mapper/NotificationPresentationMapper.java` (add `toMarkAllReadResponse`)
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/dto/MarkAllReadResponse.java`
     - `apps/backend/src/main/java/com/unihub/workshop/notifications/presentation/controllers/NotificationController.java` (add `PATCH /read-all` with route precedence)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/application/MarkAllNotificationsReadServiceTest.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/notifications/infrastructure/NotificationRepositoryAdapterTest.java` (add `markAllAsReadByUserId` test)
     - `apps/backend/src/test/java/com/unihub/workshop/notifications/presentation/controllers/NotificationControllerMarkAllReadTest.java`
   - **Acceptance Criteria:**
     - Calling `PATCH /api/v1/notifications/read-all` when unread notifications exist updates all matching records to `is_read = true`, returns `200 OK` with `{ "updatedCount": N, "unreadCount": 0 }`, and publishes a `notification.read` SSE event with `{ "all": true, "unreadCount": 0, "readAt": "..." }` (FR-12, FR-13, FR-16, Scenario 9).
@@ -131,11 +134,11 @@ This plan outlines the vertical-slice implementation for Feature 7.2 (`in-app-no
 
 #### Checkpoint: Feature Complete
 
-- [ ] All 4 tasks (T1, T2, T3, T4) are checked off.
-- [ ] Every acceptance criterion across all 14 scenarios has been verified with failing-first unit tests (TDD).
-- [ ] Full unit test suite passes: `./gradlew test --tests "com.unihub.workshop.notifications.*"`.
-- [ ] Architecture regression test passes: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
-- [ ] Ready for `/review in-app-notification-management`.
+- [x] All 4 tasks (T1, T2, T3, T4) are checked off.
+- [x] Every acceptance criterion across all 14 scenarios has been verified with failing-first unit tests (TDD).
+- [x] Full unit test suite passes: `./gradlew test --tests "com.unihub.workshop.notifications.*"`.
+- [x] Architecture regression test passes: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
+- [x] Ready for `/review in-app-notification-management`.
 
 ## Risks and Mitigations
 

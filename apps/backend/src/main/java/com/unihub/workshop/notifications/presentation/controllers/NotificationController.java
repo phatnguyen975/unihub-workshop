@@ -3,9 +3,12 @@ package com.unihub.workshop.notifications.presentation.controllers;
 import com.unihub.workshop.notifications.application.ports.in.GetNotificationsQuery;
 import com.unihub.workshop.notifications.application.ports.in.GetNotificationsUseCase;
 import com.unihub.workshop.notifications.application.ports.in.GetUnreadCountUseCase;
+import com.unihub.workshop.notifications.application.ports.in.MarkAllNotificationsReadUseCase;
+import com.unihub.workshop.notifications.application.ports.in.MarkAllReadResult;
 import com.unihub.workshop.notifications.application.ports.in.MarkNotificationReadResult;
 import com.unihub.workshop.notifications.application.ports.in.MarkNotificationReadUseCase;
 import com.unihub.workshop.notifications.application.ports.in.NotificationsResult;
+import com.unihub.workshop.notifications.presentation.dto.MarkAllReadResponse;
 import com.unihub.workshop.notifications.presentation.dto.MarkNotificationReadResponse;
 import com.unihub.workshop.notifications.presentation.dto.NotificationPageData;
 import com.unihub.workshop.notifications.presentation.dto.UnreadCountResponse;
@@ -31,6 +34,7 @@ public class NotificationController {
     private final GetUnreadCountUseCase getUnreadCountUseCase;
     private final GetNotificationsUseCase getNotificationsUseCase;
     private final MarkNotificationReadUseCase markNotificationReadUseCase;
+    private final MarkAllNotificationsReadUseCase markAllNotificationsReadUseCase;
     private final NotificationPresentationMapper notificationPresentationMapper;
 
     @GetMapping("/unread-count")
@@ -71,6 +75,20 @@ public class NotificationController {
 
         return ResponseEntity.ok(
             ApiResponse.success(data, "Notifications retrieved successfully")
+        );
+    }
+
+    @PatchMapping("/read-all")
+    public ResponseEntity<ApiResponse<MarkAllReadResponse>> markAllAsRead(
+        Authentication authentication
+    ) {
+        UUID userId = SecurityContextUtils.extractUserId(authentication);
+        MarkAllReadResult result =
+            markAllNotificationsReadUseCase.markAllAsRead(userId);
+        MarkAllReadResponse data =
+            notificationPresentationMapper.toMarkAllReadResponse(result);
+        return ResponseEntity.ok(
+            ApiResponse.success(data, "All notifications marked as read")
         );
     }
 

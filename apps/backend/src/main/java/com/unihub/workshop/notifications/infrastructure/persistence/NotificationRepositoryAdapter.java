@@ -134,4 +134,13 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
             springDataNotificationRepository.save(entity);
         return notificationPersistenceMapper.toDomain(saved);
     }
+
+    @Override
+    @Transactional
+    public int markAllAsReadByUserId(UUID userId, Instant readAt) {
+        return springDataNotificationRepository.markAllAsReadByUserId(
+            userId,
+            readAt
+        );
+    }
 }

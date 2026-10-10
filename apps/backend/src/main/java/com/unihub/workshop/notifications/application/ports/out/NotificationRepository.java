@@ -2,6 +2,7 @@ package com.unihub.workshop.notifications.application.ports.out;
 
 import com.unihub.workshop.notifications.domain.model.InAppNotification;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,4 +46,13 @@ public interface NotificationRepository {
      * @return the persisted domain entity
      */
     InAppNotification save(InAppNotification notification);
+
+    /**
+     * Marks all unread notifications for a user as read.
+     *
+     * @param userId the user UUID
+     * @param readAt the server timestamp when marked as read
+     * @return number of records actually updated
+     */
+    int markAllAsReadByUserId(UUID userId, Instant readAt);
 }

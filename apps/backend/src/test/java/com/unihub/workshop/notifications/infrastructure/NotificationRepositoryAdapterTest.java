@@ -10,6 +10,7 @@ import com.unihub.workshop.notifications.infrastructure.persistence.Notification
 import com.unihub.workshop.notifications.infrastructure.persistence.SpringDataNotificationRepository;
 import com.unihub.workshop.notifications.infrastructure.persistence.mapper.NotificationPersistenceMapper;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -122,5 +123,29 @@ class NotificationRepositoryAdapterTest {
         verify(notificationPersistenceMapper).toEntity(domain);
         verify(springDataNotificationRepository).save(entity);
         verify(notificationPersistenceMapper).toDomain(savedEntity);
+    }
+
+    @Test
+    @DisplayName(
+        "markAllAsReadByUserId should delegate bulk update to spring data repository"
+    )
+    void markAllAsReadByUserId_delegatesToSpringDataRepository() {
+        UUID userId = UUID.randomUUID();
+        Instant readAt = Instant.parse("2026-10-08T15:30:00Z");
+
+        when(
+            springDataNotificationRepository.markAllAsReadByUserId(
+                userId,
+                readAt
+            )
+        ).thenReturn(5);
+
+        int updated = adapter.markAllAsReadByUserId(userId, readAt);
+
+        assertThat(updated).isEqualTo(5);
+        verify(springDataNotificationRepository).markAllAsReadByUserId(
+            userId,
+            readAt
+        );
     }
 }

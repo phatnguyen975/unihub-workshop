@@ -2,9 +2,11 @@ package com.unihub.workshop.notifications.presentation.mapper;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.unihub.workshop.notifications.application.ports.in.MarkAllReadResult;
 import com.unihub.workshop.notifications.application.ports.in.MarkNotificationReadResult;
 import com.unihub.workshop.notifications.application.ports.in.NotificationsResult;
 import com.unihub.workshop.notifications.domain.model.InAppNotification;
+import com.unihub.workshop.notifications.presentation.dto.MarkAllReadResponse;
 import com.unihub.workshop.notifications.presentation.dto.MarkNotificationReadResponse;
 import com.unihub.workshop.notifications.presentation.dto.NotificationPageData;
 import com.unihub.workshop.notifications.presentation.dto.NotificationResponse;
@@ -17,8 +19,22 @@ import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
 @Mapper(componentModel = "spring")
-public interface NotificationPresentationMapper {
-    ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+public abstract class NotificationPresentationMapper {
+
+    private final ObjectMapper objectMapper;
+
+    protected NotificationPresentationMapper() {
+        this(new ObjectMapper());
+    }
+
+    protected NotificationPresentationMapper(ObjectMapper objectMapper) {
+        this.objectMapper =
+            objectMapper != null ? objectMapper : new ObjectMapper();
+    }
+
+    protected ObjectMapper getObjectMapper() {
+        return objectMapper;
+    }
 
     @Mapping(
         target = "payload",
@@ -26,13 +42,15 @@ public interface NotificationPresentationMapper {
         qualifiedByName = "mapPayload"
     )
     @Mapping(target = "isRead", source = "read")
-    NotificationResponse toResponse(InAppNotification notification);
+    public abstract NotificationResponse toResponse(
+        InAppNotification notification
+    );
 
-    List<NotificationResponse> toResponseList(
+    public abstract List<NotificationResponse> toResponseList(
         List<InAppNotification> notifications
     );
 
-    default NotificationPageData toPageData(NotificationsResult result) {
+    public NotificationPageData toPageData(NotificationsResult result) {
         if (result == null) {
             return null;
         }
@@ -45,7 +63,7 @@ public interface NotificationPresentationMapper {
         );
     }
 
-    default MarkNotificationReadResponse toMarkReadResponse(
+    public MarkNotificationReadResponse toMarkReadResponse(
         MarkNotificationReadResult result
     ) {
         if (result == null) {
@@ -57,14 +75,24 @@ public interface NotificationPresentationMapper {
         );
     }
 
+    public MarkAllReadResponse toMarkAllReadResponse(MarkAllReadResult result) {
+        if (result == null) {
+            return null;
+        }
+        return MarkAllReadResponse.of(
+            result.updatedCount(),
+            result.unreadCount()
+        );
+    }
+
     @Named("mapPayload")
-    default Map<String, Object> mapPayload(String payload) {
+    public Map<String, Object> mapPayload(String payload) {
         if (payload == null || payload.isBlank()) {
             return Map.of();
         }
         try {
             Map<String, Object> map = new HashMap<>(
-                OBJECT_MAPPER.readValue(
+                getObjectMapper().readValue(
                     payload,
                     new TypeReference<Map<String, Object>>() {}
                 )
