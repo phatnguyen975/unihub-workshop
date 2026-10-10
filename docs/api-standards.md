@@ -68,7 +68,9 @@ Wildcard origins (`*`) are strictly prohibited in production. The backend must e
 
 - Success responses must use `Content-Type: application/json`.
 - Error responses must use `Content-Type: application/problem+json` (RFC 7807).
-- Upload endpoints must use `Content-Type: multipart/form-data` (PDF brochures, CSV rosters).
+- Upload endpoints must use `Content-Type: multipart/form-data`:
+  - Workshop & speaker images (`POST /api/v1/admin/workshops/media/upload`): max 5 MB, MIME `image/jpeg`, `image/png`, `image/webp`.
+  - Workshop PDF brochures (`POST /api/v1/admin/workshops/{id}/brochure`): max 10 MB, form parameter `file`, strictly MIME `application/pdf` with magic byte `%PDF-`.
 - Real-time streaming endpoints must use `Content-Type: text/event-stream; charset=UTF-8` (Server-Sent Events).
 
 ### Date/Time & Time Zone

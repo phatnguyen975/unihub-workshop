@@ -224,11 +224,19 @@
 
 ### ADR 026: AI Summarization Integration
 
-- **Context:** PDF summarization must not block admin workflows and must be resilient to external AI failures.
-- **Decision:** Use an async worker pipeline triggered via transactional outbox events and brokered execution with DLQ handling.
-- **Rationale:** Asynchronous processing isolates AI latency and external failures from the core API, while DLQ handling preserves failed jobs for inspection and retry. Workers perform local PDF extraction and text chunking (for example, via PDFBox) prior to invoking external AI APIs; this bounds payload size to prevent external token-limit exhaustion (manifesting as HTTP 413/429 errors) and reduces external compute and inference costs.
-- **Alternatives Considered:** Calling the AI API synchronously from the admin request was rejected because it would couple user latency to external inference variability and break resilience under spikes. Sending raw PDFs directly was rejected because payload size, token limits, and external compute costs make pre-chunking necessary for predictable operation.
-- **Consequences:** Introduces eventual consistency and requires job status tracking.
+- **Context:** PDF summarization must not block admin workflows, must be resilient to external AI failures, and must operate sustainably under a zero-cost developer tier without vendor lock-in or credit card subscriptions.
+- **Decision:** Use an async worker pipeline triggered via transactional outbox events and brokered execution with DLQ handling. Adopt a strict **Pluggable Hexagonal Architecture (Ports & Adapters)** for AI integration:
+  - **Core Outbound Port:** Pure Java interface `AiSummarizationPort` in `core/ports/out/`, completely decoupled from any vendor SDK, receiving pre-processed text chunks and returning domain summary results.
+  - **Primary Adapter:** `GeminiAiSummarizationAdapter` located in `outbound/ai_providers/`, integrating with **Google Gemini API** using configurable Flash models (e.g., `gemini-2.5-flash` / `gemini-2.0-flash` via Google AI Studio Free Tier, defaulting via `AI_GEMINI_MODEL`).
+  - **Resilience & Testing:** Outbound calls are wrapped with a dedicated Resilience4j Circuit Breaker (`aiProvider`). A `MockAiSummarizationAdapter` is provided for offline development and fast unit/integration testing.
+  - **Zero-Code Model Swapping & Vendor Agility:** Updating or switching models within Gemini is a zero-code environment variable change (`AI_GEMINI_MODEL`). Switching to another provider (e.g., OpenAI, Claude, Groq) strictly involves adding or swapping an outbound adapter without altering any core use cases, PDF extraction, chunking, retry policies, database persistence, or SSE notifications.
+- **Rationale:** Asynchronous processing isolates AI latency and external failures from the core API, while DLQ handling preserves failed jobs for inspection and retry. Workers perform local PDF extraction and text chunking (via Apache PDFBox) prior to invoking external AI APIs; this bounds payload size to prevent external token-limit exhaustion (manifesting as HTTP 413/429 errors) and reduces external compute costs. Google Gemini Flash series provides a permanent, generous free tier (15 Requests/Min, 1,000,000 Tokens/Min, 1,500 Requests/Day) with a massive context window (1M tokens) without requiring pre-paid credit cards or paid quotas, making it ideal for the platform.
+- **Alternatives Considered:**
+  - _Directly Coupling Core Worker Logic to a Specific Vendor SDK (e.g. Google/OpenAI SDK in use cases):_ Rejected because tight coupling violates Clean/Hexagonal Architecture; replacing or swapping AI vendors would require cascading modifications across core business logic and tests.
+  - _OpenAI API (GPT-4o / GPT-3.5):_ Rejected as primary provider because OpenAI requires paid pre-funded credits (no permanent free tier); accounts without active credits immediately fail with HTTP 429 Insufficient Quota.
+  - _Calling AI API synchronously from the HTTP request:_ Rejected because it would couple user latency to external inference variability (5–15 seconds) and break resilience under traffic spikes.
+  - _Sending raw PDFs directly to AI provider:_ Rejected because binary uploads and token-limit risks increase external compute costs; local PDFBox extraction and text cleaning provide predictable chunking and early failure on image-only/empty PDFs.
+- **Consequences:** Introduces eventual consistency, requires job status tracking, and requires configuring `app.ai.gemini.*` properties (falling back to mock adapter when no API key is present in test profiles).
 
 ### ADR 027: Pluggable Notification Architecture
 
