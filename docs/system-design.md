@@ -844,26 +844,33 @@ sequenceDiagram
     Redis->>API: Distribute event to active SSE node
     API-->>Web: SSE Event (ai.summary.completed)
     Web->>Organizer: Display summary dialog in real time
+  else No Extractable Text Layer (Image-only PDF)
+    Worker->>DB: Update job (Status: FAILED, error_message: "No extractable text found in PDF brochure")
+    Worker->>Redis: Publish ai.summary.failed to unihub:stream:user:{organizerId}
+    Redis->>API: Distribute event to active SSE node
+    API-->>Web: SSE Event (ai.summary.failed)
+    Web->>Organizer: Display error notice (no extractable text)
+    Worker-->>Broker: ACK message (unrecoverable data error, no retry, no DLQ pollution)
   else Transient Error (HTTP 429 / Timeout / 5xx)
     AI-->>Worker: Error/Rate Limit/Timeout
-    Worker-->>Broker: Retry with backoff
+    Worker-->>Broker: Retry with backoff (up to 3 attempts)
   else Max Retries Exceeded
     Worker->>DB: Update job (Status: FAILED)
     Worker->>Redis: Publish ai.summary.failed to unihub:stream:user:{organizerId}
     Redis->>API: Distribute event to active SSE node
     API-->>Web: SSE Event (ai.summary.failed)
     Web->>Organizer: Display error notice with retry option
-    Worker-->>Broker: Mark message unprocessable
-    Broker-->>DLQ: Route failed job for review
+    Worker-->>Broker: Mark message unprocessable (reject without requeue)
+    Broker-->>DLQ: Route failed job for review (unihub.dlx::dlq)
   end
 ```
 
-- **Decoupled Processing:** The API validates the file (MIME type, `%PDF-` magic byte, max 10MB), checks multi-tenant permissions (`workshop.organization_id == jwt.org`), stores the PDF in MinIO bucket `unihub-brochures`, creates the active `workshop_brochures` record and `ai_summary_jobs` entry, publishes `BrochureSummarizationRequestedEvent` via transactional outbox, and returns `202 Accepted` immediately so heavy PDF processing runs asynchronously.
-- **Local Preprocessing:** The worker extracts, cleans, and chunks text before calling the AI service to avoid oversized payloads and token limit errors. If the PDF has no extractable text layer, it fails fast without calling the external AI API.
-- **AI Integration (Google Gemini Free Tier):** Workers call the Google Gemini API (configurable Flash series via `AI_GEMINI_MODEL`, e.g. `gemini-2.5-flash` / `gemini-2.0-flash` via Google AI Studio Free Tier) wrapped in a Resilience4j circuit breaker (`aiProvider`).
-- **Real-Time Job Notification via SSE:** The database explicitly tracks `PROCESSING`, `COMPLETED`, and `FAILED` states. Upon completion or terminal failure, the worker publishes an event to Redis Pub/Sub, which the backend SSE Hub pushes directly to the Organizer's active browser stream (`GET /api/v1/stream/events`). The client UI immediately displays the generated summary without short-polling delays. The `GET /api/v1/admin/workshops/{id}/brochure/summary-job` endpoint is retained as a fallback for clients reconnecting after network drops.
-- **Rate Limiting Resilience:** The worker treats AI provider `HTTP 429` responses the same as transient timeouts and `5xx` failures, using broker-backed backoff retries to absorb temporary throttling without losing the job.
-- **Dead Letter Queue (DLQ) and Failure Handling:** When max retries are exhausted, the worker marks the database job as `FAILED` before the broker routes the unprocessable payload to the DLQ. This prevents zombie `PROCESSING` jobs and frontend infinite loading while preserving the event for monitoring or manual replay by Ops.
+- **Decoupled Processing:** The API validates the file (MIME type, `%PDF-` magic byte, max 10MB), checks multi-tenant permissions (`workshop.organization_id == jwt.org`), verifies workshop status (`DRAFT` or `PUBLISHED`, 422 if `COMPLETED`/`CANCELED`), rejects with `409 Conflict` if an active `PROCESSING` job already exists for the workshop, stores the PDF in MinIO bucket `unihub-brochures`, creates the active `workshop_brochures` record (deactivating previous brochure) and `ai_summary_jobs` entry (`PROCESSING`), publishes `BrochureSummarizationRequestedEvent` via transactional outbox, and returns `202 Accepted` immediately so heavy PDF processing runs asynchronously.
+- **Local Preprocessing & Text Chunking:** The worker extracts and cleans text locally using Apache PDFBox. If the PDF has no extractable text layer (e.g., scanned image-only PDF), the worker fails fast: marks DB job as `FAILED`, emits `ai.summary.failed` over Redis Pub/Sub, and acknowledges the RabbitMQ message to avoid wasteful retries and DLQ noise. When text is extractable: if sanitized text is $\le$ 50,000 characters, it is passed directly in a single prompt requesting structured Markdown summary (Objectives, Target Audience, Key Highlights/Agenda, Prerequisites/Speaker info); if text exceeds 50,000 characters, it is chunked before summarization.
+- **AI Integration (Google Gemini Free Tier):** Workers call the Google Gemini API (configurable Flash series via `AI_GEMINI_MODEL`, e.g. `gemini-2.5-flash` / `gemini-2.0-flash` via Google AI Studio Free Tier) wrapped in a Resilience4j circuit breaker (`aiProvider`). A mock adapter (`MockAiSummarizationAdapter`) is provided for testing and offline development.
+- **Real-Time Job Notification via SSE & Redis Pub/Sub:** The database explicitly tracks `PROCESSING`, `COMPLETED`, and `FAILED` states. Upon completion or terminal failure, the worker publishes a `RealtimeEvent` JSON envelope (`eventId`, `eventType`, `timestamp`, `payload`) to Redis Pub/Sub channel `unihub:stream:user:{organizerId}`, which the backend SSE Hub pushes directly to the Organizer's active browser stream (`GET /api/v1/stream/events`). The client UI immediately displays the generated summary without short-polling delays. The `GET /api/v1/admin/workshops/{id}/brochure/summary-job` endpoint is retained as a fallback for reconnecting clients (returning `404 Not Found` if no brochure exists).
+- **Rate Limiting Resilience & Broker Retries:** The worker treats AI provider `HTTP 429` responses the same as transient timeouts and `5xx` failures, using broker-backed exponential backoff retries (up to 3 attempts) to absorb temporary throttling without losing the job.
+- **Dead Letter Queue (DLQ) and Failure Handling:** When max retries (3 attempts) are exhausted, the worker marks the database job as `FAILED`, persists `error_message`, publishes `ai.summary.failed` to Redis Pub/Sub, and rejects the message without requeue so the broker routes the unprocessable payload to the DLQ (`unihub.dlx::dlq`). This prevents zombie `PROCESSING` jobs and frontend infinite loading while preserving the event for monitoring or manual replay by Ops.
 
 ### Nightly Legacy CSV Ingestion Flow
 
