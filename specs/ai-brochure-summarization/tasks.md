@@ -70,7 +70,7 @@ Each task within a phase is a complete vertical slice through every layer its ca
     - The endpoint returns `422` when the uploaded file does not begin with `%PDF-`. _(FR-09, Scenario 9)_
     - The endpoint returns `422` when the uploaded file exceeds 10 MB. _(FR-10, Scenario 10)_
 
-- [ ] **T2 — Brochure summary job polling: ORGANIZER can retrieve current job state via the fallback GET endpoint**
+- [x] **T2 — Brochure summary job polling: ORGANIZER can retrieve current job state via the fallback GET endpoint**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Domain (reuse T1 models), Application (use case + port), Infrastructure (persistence — reuse T1 adapters), Presentation (controller + DTO + mapper)
@@ -89,10 +89,10 @@ Each task within a phase is a complete vertical slice through every layer its ca
 
 #### Checkpoint: Phase 1 — Backend API Complete
 
-- [ ] Both endpoints (`POST` and `GET`) return the correct responses for all acceptance criteria above when exercised against a running local stack (backend + MinIO + PostgreSQL).
-- [ ] All unit tests for T1 and T2 pass (use case logic, persistence adapters, controller mapping).
-- [ ] The `BrochureSummarizationRequestedEvent` is visible in the `event_publication` table when the upload succeeds.
-- [ ] Build is clean; `ModulithArchitectureTest` passes.
+- [x] Both endpoints (`POST` and `GET`) return the correct responses for all acceptance criteria above when exercised against a running local stack (backend + MinIO + PostgreSQL).
+- [x] All unit tests for T1 and T2 pass (use case logic, persistence adapters, controller mapping).
+- [x] The `BrochureSummarizationRequestedEvent` is visible in the `event_publication` table when the upload succeeds.
+- [x] Build is clean; `ModulithArchitectureTest` passes.
 
 ### Phase 2: Worker — Core Processing Pipeline
 

@@ -17,6 +17,8 @@ import com.unihub.workshop.workshops.application.ports.in.BrochureUploadResult;
 import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopCommand;
 import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
+import com.unihub.workshop.workshops.application.ports.in.GetBrochureSummaryJobQuery;
+import com.unihub.workshop.workshops.application.ports.in.GetBrochureSummaryJobUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
@@ -36,6 +38,7 @@ import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopCommand;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.UploadBrochureCommand;
 import com.unihub.workshop.workshops.application.ports.in.UploadBrochureUseCase;
+import com.unihub.workshop.workshops.domain.model.AiSummaryJob;
 import com.unihub.workshop.workshops.domain.model.AssignedStaff;
 import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Workshop;
@@ -45,6 +48,7 @@ import com.unihub.workshop.workshops.presentation.dto.AssignStaffRequest;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
+import com.unihub.workshop.workshops.presentation.dto.BrochureSummaryJobResponse;
 import com.unihub.workshop.workshops.presentation.dto.BrochureUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.CancelWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
@@ -103,6 +107,7 @@ public class AdminWorkshopController {
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
     private final UploadBrochureUseCase uploadBrochureUseCase;
+    private final GetBrochureSummaryJobUseCase getBrochureSummaryJobUseCase;
     private final BrochurePresentationMapper brochureMapper;
 
     @GetMapping
@@ -560,6 +565,24 @@ public class AdminWorkshopController {
                 e
             );
         }
+    }
+
+    @GetMapping("/{id}/brochure/summary-job")
+    public ApiResponse<BrochureSummaryJobResponse> getBrochureSummaryJob(
+        @PathVariable("id") UUID id,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+        GetBrochureSummaryJobQuery query = new GetBrochureSummaryJobQuery(
+            id,
+            organizationId
+        );
+        AiSummaryJob job = getBrochureSummaryJobUseCase.getSummaryJob(query);
+
+        return ApiResponse.success(
+            brochureMapper.toResponse(job),
+            "Summary job retrieved."
+        );
     }
 
     private Instant parseInstant(String value, String paramName) {
