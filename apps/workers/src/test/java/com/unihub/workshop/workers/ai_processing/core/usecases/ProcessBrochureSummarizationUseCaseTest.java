@@ -1,5 +1,7 @@
 package com.unihub.workshop.workers.ai_processing.core.usecases;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationRetryExhaustedException;
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationTransientException;
 import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobModel;
 import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobStatusModel;
 import com.unihub.workshop.workers.ai_processing.core.models.BrochureSummarizationRequest;
@@ -92,6 +96,13 @@ class ProcessBrochureSummarizationUseCaseTest {
     }
 
     private AiSummaryJobModel createJobModel(AiSummaryJobStatusModel status) {
+        return createJobModel(status, 0);
+    }
+
+    private AiSummaryJobModel createJobModel(
+        AiSummaryJobStatusModel status,
+        int attempts
+    ) {
         return new AiSummaryJobModel(
             JOB_ID,
             WORKSHOP_ID,
@@ -99,7 +110,7 @@ class ProcessBrochureSummarizationUseCaseTest {
             status,
             null,
             null,
-            0,
+            attempts,
             null,
             null,
             Instant.now(),
@@ -276,5 +287,182 @@ class ProcessBrochureSummarizationUseCaseTest {
         verify(jobRepositoryPort, never()).updateCompleted(any(), any(), any());
         verify(jobRepositoryPort, never()).updateFailed(any(), any(), any());
         verifyNoInteractions(realtimePublisherPort);
+    }
+
+    @Test
+    @DisplayName(
+        "Should increment attempts and set next_retry_at when transient error occurs on attempt 1"
+    )
+    void shouldIncrementAttemptsAndSetNextRetryAtWhenTransientErrorOnAttempt1()
+        throws Exception {
+        BrochureSummarizationRequest request = new BrochureSummarizationRequest(
+            JOB_ID,
+            WORKSHOP_ID,
+            BROCHURE_ID,
+            STORAGE_KEY,
+            ORGANIZER_ID
+        );
+        byte[] pdfBytes = createPdfWithText("Welcome to the Docker workshop.");
+
+        when(jobRepositoryPort.findById(JOB_ID)).thenReturn(
+            Optional.of(createJobModel(AiSummaryJobStatusModel.PROCESSING, 0))
+        );
+        when(storagePort.fetchBrochurePdf(STORAGE_KEY)).thenReturn(pdfBytes);
+        when(aiSummarizationPort.summarizeText(anyString())).thenThrow(
+            new RuntimeException("HTTP 429 Too Many Requests")
+        );
+
+        AiSummarizationTransientException thrown = assertThrows(
+            AiSummarizationTransientException.class,
+            () -> useCase.process(request)
+        );
+
+        assertThat(thrown.getMessage()).contains("429");
+        verify(jobRepositoryPort).updateRetry(
+            eq(JOB_ID),
+            eq(1),
+            any(Instant.class)
+        );
+        verify(jobRepositoryPort, never()).updateCompleted(any(), any(), any());
+        verify(jobRepositoryPort, never()).updateFailed(any(), any(), any());
+        verify(jobRepositoryPort, never()).updateFailed(
+            any(),
+            any(Integer.class),
+            any(),
+            any()
+        );
+        verifyNoInteractions(realtimePublisherPort);
+    }
+
+    @Test
+    @DisplayName(
+        "Should increment attempts to 2 and set next_retry_at when transient error occurs on attempt 2"
+    )
+    void shouldIncrementAttemptsAndSetNextRetryAtWhenTransientErrorOnAttempt2()
+        throws Exception {
+        BrochureSummarizationRequest request = new BrochureSummarizationRequest(
+            JOB_ID,
+            WORKSHOP_ID,
+            BROCHURE_ID,
+            STORAGE_KEY,
+            ORGANIZER_ID
+        );
+        byte[] pdfBytes = createPdfWithText("Welcome to the Docker workshop.");
+
+        when(jobRepositoryPort.findById(JOB_ID)).thenReturn(
+            Optional.of(createJobModel(AiSummaryJobStatusModel.PROCESSING, 1))
+        );
+        when(storagePort.fetchBrochurePdf(STORAGE_KEY)).thenReturn(pdfBytes);
+        when(aiSummarizationPort.summarizeText(anyString())).thenThrow(
+            new RuntimeException("Connection timeout")
+        );
+
+        assertThrows(AiSummarizationTransientException.class, () ->
+            useCase.process(request)
+        );
+
+        verify(jobRepositoryPort).updateRetry(
+            eq(JOB_ID),
+            eq(2),
+            any(Instant.class)
+        );
+        verify(jobRepositoryPort, never()).updateCompleted(any(), any(), any());
+        verify(jobRepositoryPort, never()).updateFailed(any(), any(), any());
+        verify(jobRepositoryPort, never()).updateFailed(
+            any(),
+            any(Integer.class),
+            any(),
+            any()
+        );
+        verifyNoInteractions(realtimePublisherPort);
+    }
+
+    @Test
+    @DisplayName(
+        "Should transition to FAILED, record error, publish realtime event and throw retry exhausted when attempt 3 fails"
+    )
+    void shouldMarkFailedAndPublishEventWhenMaxAttemptsExhaustedOnAttempt3()
+        throws Exception {
+        BrochureSummarizationRequest request = new BrochureSummarizationRequest(
+            JOB_ID,
+            WORKSHOP_ID,
+            BROCHURE_ID,
+            STORAGE_KEY,
+            ORGANIZER_ID
+        );
+        byte[] pdfBytes = createPdfWithText("Welcome to the Docker workshop.");
+
+        when(jobRepositoryPort.findById(JOB_ID)).thenReturn(
+            Optional.of(createJobModel(AiSummaryJobStatusModel.PROCESSING, 2))
+        );
+        when(storagePort.fetchBrochurePdf(STORAGE_KEY)).thenReturn(pdfBytes);
+        when(aiSummarizationPort.summarizeText(anyString())).thenThrow(
+            new RuntimeException("503 Service Unavailable")
+        );
+
+        AiSummarizationRetryExhaustedException thrown = assertThrows(
+            AiSummarizationRetryExhaustedException.class,
+            () -> useCase.process(request)
+        );
+
+        assertThat(thrown.getMessage()).contains("503");
+        verify(jobRepositoryPort).updateFailed(
+            eq(JOB_ID),
+            eq(3),
+            eq("503 Service Unavailable"),
+            any(Instant.class)
+        );
+        verify(realtimePublisherPort).publishSummaryFailed(
+            eq(ORGANIZER_ID),
+            eq(JOB_ID),
+            eq(WORKSHOP_ID),
+            eq("503 Service Unavailable")
+        );
+        verify(jobRepositoryPort, never()).updateRetry(
+            any(),
+            any(Integer.class),
+            any()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "Should mark FAILED immediately and throw retry exhausted when non-transient error occurs"
+    )
+    void shouldMarkFailedAndPublishEventWhenNonTransientErrorOccurs()
+        throws Exception {
+        BrochureSummarizationRequest request = new BrochureSummarizationRequest(
+            JOB_ID,
+            WORKSHOP_ID,
+            BROCHURE_ID,
+            STORAGE_KEY,
+            ORGANIZER_ID
+        );
+        byte[] pdfBytes = createPdfWithText("Welcome to the Docker workshop.");
+
+        when(jobRepositoryPort.findById(JOB_ID)).thenReturn(
+            Optional.of(createJobModel(AiSummaryJobStatusModel.PROCESSING, 0))
+        );
+        when(storagePort.fetchBrochurePdf(STORAGE_KEY)).thenReturn(pdfBytes);
+        when(aiSummarizationPort.summarizeText(anyString())).thenThrow(
+            new IllegalArgumentException("Invalid argument format")
+        );
+
+        assertThrows(AiSummarizationRetryExhaustedException.class, () ->
+            useCase.process(request)
+        );
+
+        verify(jobRepositoryPort).updateFailed(
+            eq(JOB_ID),
+            eq(1),
+            eq("Invalid argument format"),
+            any(Instant.class)
+        );
+        verify(realtimePublisherPort).publishSummaryFailed(
+            eq(ORGANIZER_ID),
+            eq(JOB_ID),
+            eq(WORKSHOP_ID),
+            eq("Invalid argument format")
+        );
     }
 }

@@ -90,4 +90,34 @@ class JpaAiSummaryJobRepositoryAdapterTest {
             any(Instant.class)
         );
     }
+
+    @Test
+    @DisplayName("Should update job status to FAILED with attempts")
+    void shouldUpdateFailedWithAttempts() {
+        Instant completedAt = Instant.now();
+        adapter.updateFailed(JOB_ID, 3, "Max retries", completedAt);
+
+        verify(jpaRepository).updateFailedWithAttempts(
+            eq(JOB_ID),
+            eq("FAILED"),
+            eq(3),
+            eq("Max retries"),
+            eq(completedAt),
+            any(Instant.class)
+        );
+    }
+
+    @Test
+    @DisplayName("Should update job retry attempts and nextRetryAt")
+    void shouldUpdateRetry() {
+        Instant nextRetryAt = Instant.now().plusSeconds(10);
+        adapter.updateRetry(JOB_ID, 2, nextRetryAt);
+
+        verify(jpaRepository).updateRetry(
+            eq(JOB_ID),
+            eq(2),
+            eq(nextRetryAt),
+            any(Instant.class)
+        );
+    }
 }

@@ -61,4 +61,30 @@ public class JpaAiSummaryJobRepositoryAdapter
             now
         );
     }
+
+    @Override
+    @Transactional
+    public void updateFailed(
+        UUID jobId,
+        int attempts,
+        String errorMessage,
+        Instant completedAt
+    ) {
+        Instant now = Instant.now();
+        jpaRepository.updateFailedWithAttempts(
+            jobId,
+            AiSummaryJobStatusModel.FAILED.name(),
+            attempts,
+            errorMessage,
+            completedAt,
+            now
+        );
+    }
+
+    @Override
+    @Transactional
+    public void updateRetry(UUID jobId, int attempts, Instant nextRetryAt) {
+        Instant now = Instant.now();
+        jpaRepository.updateRetry(jobId, attempts, nextRetryAt, now);
+    }
 }

@@ -33,4 +33,28 @@ public interface JpaAiSummaryJobRepository
         @Param("completedAt") Instant completedAt,
         @Param("now") Instant now
     );
+
+    @Modifying
+    @Query(
+        "UPDATE AiSummaryJobJpaEntity j SET j.attempts = :attempts, j.nextRetryAt = :nextRetryAt, j.updatedAt = :now WHERE j.id = :id"
+    )
+    void updateRetry(
+        @Param("id") UUID id,
+        @Param("attempts") int attempts,
+        @Param("nextRetryAt") Instant nextRetryAt,
+        @Param("now") Instant now
+    );
+
+    @Modifying
+    @Query(
+        "UPDATE AiSummaryJobJpaEntity j SET j.status = :status, j.attempts = :attempts, j.errorMessage = :errorMessage, j.completedAt = :completedAt, j.updatedAt = :now WHERE j.id = :id"
+    )
+    void updateFailedWithAttempts(
+        @Param("id") UUID id,
+        @Param("status") String status,
+        @Param("attempts") int attempts,
+        @Param("errorMessage") String errorMessage,
+        @Param("completedAt") Instant completedAt,
+        @Param("now") Instant now
+    );
 }

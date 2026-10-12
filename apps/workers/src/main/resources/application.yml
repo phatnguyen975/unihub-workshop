@@ -68,6 +68,7 @@ app:
     dlq-routing-key: ${AI_SUMMARIZATION_DLQ_ROUTING_KEY:dlq}
     routing-key: ${AI_SUMMARIZATION_ROUTING_KEY:ai.summarization}
     provider: ${AI_PROVIDER:mock}
+    max-attempts: ${AI_MAX_ATTEMPTS:3}
     bucket: unihub-brochures
     gemini:
       model: ${AI_GEMINI_MODEL:gemini-3.8-flash}
@@ -130,6 +131,14 @@ resilience4j:
   circuitbreaker:
     instances:
       emailProvider:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+      aiProvider:
         sliding-window-type: COUNT_BASED
         sliding-window-size: 10
         minimum-number-of-calls: 5

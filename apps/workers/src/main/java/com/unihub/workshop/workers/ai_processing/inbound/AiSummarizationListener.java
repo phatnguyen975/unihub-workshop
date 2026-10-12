@@ -2,6 +2,8 @@ package com.unihub.workshop.workers.ai_processing.inbound;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationRetryExhaustedException;
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationTransientException;
 import com.unihub.workshop.workers.ai_processing.core.models.BrochureSummarizationRequest;
 import com.unihub.workshop.workers.ai_processing.core.ports.in.ProcessBrochureSummarizationPort;
 import java.io.IOException;
@@ -59,9 +61,23 @@ public class AiSummarizationListener {
 
             summarizationPort.process(request);
             channel.basicAck(deliveryTag, false);
+        } catch (AiSummarizationTransientException e) {
+            log.warn(
+                "Transient error processing brochure summarization on routingKey '{}': {}. Requeuing message for retry.",
+                routingKey,
+                e.getMessage()
+            );
+            channel.basicNack(deliveryTag, false, true);
+        } catch (AiSummarizationRetryExhaustedException e) {
+            log.error(
+                "Max retries exhausted for brochure summarization on routingKey '{}': {}. Rejecting message without requeue (routing to DLQ).",
+                routingKey,
+                e.getMessage()
+            );
+            channel.basicNack(deliveryTag, false, false);
         } catch (Exception e) {
             log.error(
-                "Error processing brochure summarization message on routingKey '{}': {}",
+                "Non-recoverable or fatal error processing brochure summarization on routingKey '{}': {}. Rejecting message without requeue.",
                 routingKey,
                 e.getMessage(),
                 e

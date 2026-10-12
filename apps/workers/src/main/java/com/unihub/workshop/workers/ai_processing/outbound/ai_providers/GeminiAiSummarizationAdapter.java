@@ -3,6 +3,7 @@ package com.unihub.workshop.workers.ai_processing.outbound.ai_providers;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummarizationPort;
 import com.unihub.workshop.workers.ai_processing.outbound.config.AiProcessingProperties;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,7 @@ public class GeminiAiSummarizationAdapter implements AiSummarizationPort {
     }
 
     @Override
+    @CircuitBreaker(name = "aiProvider")
     public String summarizeText(String text) {
         String apiKey = properties.getGemini().getApiKey();
         String model = properties.getGemini().getModel();

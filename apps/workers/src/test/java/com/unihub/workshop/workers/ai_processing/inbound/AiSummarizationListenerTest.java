@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationRetryExhaustedException;
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationTransientException;
 import com.unihub.workshop.workers.ai_processing.core.models.BrochureSummarizationRequest;
 import com.unihub.workshop.workers.ai_processing.core.ports.in.ProcessBrochureSummarizationPort;
 import java.time.Instant;
@@ -111,6 +113,60 @@ class AiSummarizationListenerTest {
         Message message = createMessage(body);
 
         doThrow(new RuntimeException("MinIO connection failed"))
+            .when(summarizationPort)
+            .process(any(BrochureSummarizationRequest.class));
+
+        listener.onMessage(message, channel);
+
+        verify(channel).basicNack(42L, false, false);
+    }
+
+    @Test
+    @DisplayName(
+        "Should NACK with requeue when port throws AiSummarizationTransientException"
+    )
+    void shouldNackWithRequeueWhenPortThrowsTransientException()
+        throws Exception {
+        AiSummarizationEventDto dto = new AiSummarizationEventDto(
+            JOB_ID,
+            WORKSHOP_ID,
+            BROCHURE_ID,
+            STORAGE_KEY,
+            ORGANIZER_ID,
+            Instant.now()
+        );
+        byte[] body = objectMapper.writeValueAsBytes(dto);
+        Message message = createMessage(body);
+
+        doThrow(new AiSummarizationTransientException("HTTP 429 rate limited"))
+            .when(summarizationPort)
+            .process(any(BrochureSummarizationRequest.class));
+
+        listener.onMessage(message, channel);
+
+        verify(channel).basicNack(42L, false, true);
+    }
+
+    @Test
+    @DisplayName(
+        "Should NACK without requeue when port throws AiSummarizationRetryExhaustedException (routing to DLQ)"
+    )
+    void shouldNackWithoutRequeueWhenPortThrowsRetryExhaustedException()
+        throws Exception {
+        AiSummarizationEventDto dto = new AiSummarizationEventDto(
+            JOB_ID,
+            WORKSHOP_ID,
+            BROCHURE_ID,
+            STORAGE_KEY,
+            ORGANIZER_ID,
+            Instant.now()
+        );
+        byte[] body = objectMapper.writeValueAsBytes(dto);
+        Message message = createMessage(body);
+
+        doThrow(
+            new AiSummarizationRetryExhaustedException("Max attempts reached")
+        )
             .when(summarizationPort)
             .process(any(BrochureSummarizationRequest.class));
 

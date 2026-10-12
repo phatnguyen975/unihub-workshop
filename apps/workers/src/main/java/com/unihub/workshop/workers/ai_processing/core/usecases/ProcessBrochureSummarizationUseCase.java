@@ -1,5 +1,7 @@
 package com.unihub.workshop.workers.ai_processing.core.usecases;
 
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationRetryExhaustedException;
+import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarizationTransientException;
 import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobModel;
 import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobStatusModel;
 import com.unihub.workshop.workers.ai_processing.core.models.BrochureSummarizationRequest;
@@ -8,21 +10,23 @@ import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummarizationP
 import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummaryJobRepositoryPort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.BrochureStoragePort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.RealtimePublisherPort;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ProcessBrochureSummarizationUseCase
     implements ProcessBrochureSummarizationPort
 {
@@ -30,11 +34,54 @@ public class ProcessBrochureSummarizationUseCase
     public static final int MAX_CHUNK_CHARS = 50_000;
     public static final String NO_EXTRACTABLE_TEXT_ERROR =
         "No extractable text found in PDF brochure";
+    public static final int DEFAULT_MAX_ATTEMPTS = 3;
+    public static final long DEFAULT_BACKOFF_INITIAL_SECONDS = 5;
+    public static final double DEFAULT_BACKOFF_MULTIPLIER = 2.0;
 
     private final BrochureStoragePort storagePort;
     private final AiSummarizationPort aiSummarizationPort;
     private final AiSummaryJobRepositoryPort jobRepositoryPort;
     private final RealtimePublisherPort realtimePublisherPort;
+    private final int maxAttempts;
+    private final long backoffInitialIntervalSeconds;
+    private final double backoffMultiplier;
+
+    public ProcessBrochureSummarizationUseCase(
+        BrochureStoragePort storagePort,
+        AiSummarizationPort aiSummarizationPort,
+        AiSummaryJobRepositoryPort jobRepositoryPort,
+        RealtimePublisherPort realtimePublisherPort,
+        @Value("${app.ai.max-attempts:3}") int maxAttempts,
+        @Value(
+            "${app.ai.backoff-initial-seconds:5}"
+        ) long backoffInitialIntervalSeconds,
+        @Value("${app.ai.backoff-multiplier:2.0}") double backoffMultiplier
+    ) {
+        this.storagePort = storagePort;
+        this.aiSummarizationPort = aiSummarizationPort;
+        this.jobRepositoryPort = jobRepositoryPort;
+        this.realtimePublisherPort = realtimePublisherPort;
+        this.maxAttempts = maxAttempts;
+        this.backoffInitialIntervalSeconds = backoffInitialIntervalSeconds;
+        this.backoffMultiplier = backoffMultiplier;
+    }
+
+    public ProcessBrochureSummarizationUseCase(
+        BrochureStoragePort storagePort,
+        AiSummarizationPort aiSummarizationPort,
+        AiSummaryJobRepositoryPort jobRepositoryPort,
+        RealtimePublisherPort realtimePublisherPort
+    ) {
+        this(
+            storagePort,
+            aiSummarizationPort,
+            jobRepositoryPort,
+            realtimePublisherPort,
+            DEFAULT_MAX_ATTEMPTS,
+            DEFAULT_BACKOFF_INITIAL_SECONDS,
+            DEFAULT_BACKOFF_MULTIPLIER
+        );
+    }
 
     @Override
     public void process(BrochureSummarizationRequest request) {
@@ -62,53 +109,181 @@ public class ProcessBrochureSummarizationUseCase
                 );
                 return;
             }
-        }
-
-        // Fetch PDF from MinIO
-        byte[] pdfBytes = storagePort.fetchBrochurePdf(request.storageKey());
-
-        // Extract text locally via PDFBox
-        String extractedText = extractText(pdfBytes, request);
-        if (extractedText == null || extractedText.trim().isEmpty()) {
-            handleNoExtractableText(request);
-            return;
-        }
-
-        String cleanedText = cleanText(extractedText);
-        if (cleanedText.isEmpty()) {
-            handleNoExtractableText(request);
-            return;
-        }
-
-        // Summarize text
-        String summaryResult;
-        if (cleanedText.length() <= MAX_CHUNK_CHARS) {
-            summaryResult = aiSummarizationPort.summarizeText(cleanedText);
         } else {
-            summaryResult = summarizeChunkedText(cleanedText);
+            log.warn(
+                "Job {} not found in database, terminating message",
+                request.jobId()
+            );
+            return;
         }
 
-        // Persist completed result
-        Instant completedAt = Instant.now();
-        jobRepositoryPort.updateCompleted(
-            request.jobId(),
-            summaryResult,
-            completedAt
-        );
+        int currentAttempts = jobOpt.get().attempts();
 
-        // Push real-time event to Redis Pub/Sub
-        realtimePublisherPort.publishSummaryCompleted(
-            request.organizerId(),
-            request.jobId(),
-            request.workshopId(),
-            summaryResult
-        );
+        try {
+            // Fetch PDF from MinIO
+            byte[] pdfBytes = storagePort.fetchBrochurePdf(
+                request.storageKey()
+            );
 
-        log.info(
-            "Successfully summarized brochure: jobId={}, workshopId={}",
-            request.jobId(),
-            request.workshopId()
-        );
+            // Extract text locally via PDFBox
+            String extractedText = extractText(pdfBytes, request);
+            if (extractedText == null || extractedText.trim().isEmpty()) {
+                handleNoExtractableText(request);
+                return;
+            }
+
+            String cleanedText = cleanText(extractedText);
+            if (cleanedText.isEmpty()) {
+                handleNoExtractableText(request);
+                return;
+            }
+
+            // Summarize text
+            String summaryResult;
+            if (cleanedText.length() <= MAX_CHUNK_CHARS) {
+                summaryResult = aiSummarizationPort.summarizeText(cleanedText);
+            } else {
+                summaryResult = summarizeChunkedText(cleanedText);
+            }
+
+            // Persist completed result
+            Instant completedAt = Instant.now();
+            jobRepositoryPort.updateCompleted(
+                request.jobId(),
+                summaryResult,
+                completedAt
+            );
+
+            // Push real-time event to Redis Pub/Sub
+            realtimePublisherPort.publishSummaryCompleted(
+                request.organizerId(),
+                request.jobId(),
+                request.workshopId(),
+                summaryResult
+            );
+
+            log.info(
+                "Successfully summarized brochure: jobId={}, workshopId={}",
+                request.jobId(),
+                request.workshopId()
+            );
+        } catch (
+            AiSummarizationTransientException
+            | AiSummarizationRetryExhaustedException e
+        ) {
+            throw e;
+        } catch (Exception e) {
+            handleProcessingError(request, currentAttempts, e);
+        }
+    }
+
+    private void handleProcessingError(
+        BrochureSummarizationRequest request,
+        int currentAttempts,
+        Exception e
+    ) {
+        int newAttempts = currentAttempts + 1;
+        String errorMessage =
+            e.getMessage() != null && !e.getMessage().isBlank()
+                ? e.getMessage()
+                : e.getClass().getSimpleName();
+
+        if (isTransientError(e) && newAttempts < maxAttempts) {
+            Instant nextRetryAt = calculateNextRetryAt(newAttempts);
+            log.warn(
+                "Transient error processing brochure summarization for jobId {} (attempt {} of {}): {}. Next retry at {}",
+                request.jobId(),
+                newAttempts,
+                maxAttempts,
+                errorMessage,
+                nextRetryAt
+            );
+            jobRepositoryPort.updateRetry(
+                request.jobId(),
+                newAttempts,
+                nextRetryAt
+            );
+            throw new AiSummarizationTransientException(
+                "Transient error on attempt " +
+                    newAttempts +
+                    ": " +
+                    errorMessage,
+                e
+            );
+        } else {
+            // Max retries exhausted or non-transient unrecoverable failure
+            log.error(
+                "Terminating brochure summarization for jobId {} with failure (attempts={}/{}): {}",
+                request.jobId(),
+                newAttempts,
+                maxAttempts,
+                errorMessage
+            );
+            Instant now = Instant.now();
+            jobRepositoryPort.updateFailed(
+                request.jobId(),
+                newAttempts,
+                errorMessage,
+                now
+            );
+            realtimePublisherPort.publishSummaryFailed(
+                request.organizerId(),
+                request.jobId(),
+                request.workshopId(),
+                errorMessage
+            );
+            throw new AiSummarizationRetryExhaustedException(
+                "Summarization failed for jobId " +
+                    request.jobId() +
+                    ": " +
+                    errorMessage,
+                e
+            );
+        }
+    }
+
+    private boolean isTransientError(Throwable throwable) {
+        if (throwable == null) {
+            return false;
+        }
+        if (throwable instanceof AiSummarizationTransientException) {
+            return true;
+        }
+        if (throwable instanceof CallNotPermittedException) {
+            return true;
+        }
+        if (throwable instanceof ResourceAccessException) {
+            return true;
+        }
+        if (throwable instanceof RestClientResponseException resEx) {
+            int status = resEx.getStatusCode().value();
+            return status == 429 || (status >= 500 && status < 600);
+        }
+        String msg =
+            throwable.getMessage() != null
+                ? throwable.getMessage().toLowerCase()
+                : "";
+        if (
+            msg.contains("429") ||
+            msg.contains("too many requests") ||
+            msg.contains("timeout") ||
+            msg.contains("500") ||
+            msg.contains("502") ||
+            msg.contains("503") ||
+            msg.contains("504") ||
+            msg.contains("rate limit") ||
+            msg.contains("connection refused") ||
+            msg.contains("temporarily unavailable")
+        ) {
+            return true;
+        }
+        return isTransientError(throwable.getCause());
+    }
+
+    private Instant calculateNextRetryAt(int attempt) {
+        long delaySeconds = (long) (backoffInitialIntervalSeconds *
+            Math.pow(backoffMultiplier, Math.max(0, attempt - 1)));
+        return Instant.now().plusSeconds(delaySeconds);
     }
 
     private String extractText(

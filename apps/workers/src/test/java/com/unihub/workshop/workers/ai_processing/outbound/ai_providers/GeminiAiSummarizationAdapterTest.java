@@ -4,12 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.unihub.workshop.workers.ai_processing.outbound.config.AiProcessingProperties;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.match.MockRestRequestMatchers;
+import org.springframework.test.web.client.response.MockRestResponseCreators;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 class GeminiAiSummarizationAdapterTest {
 
@@ -93,5 +98,60 @@ class GeminiAiSummarizationAdapterTest {
             "## Workshop Summary\n\n### Objectives\nLearn Gemini"
         );
         server.verify();
+    }
+
+    @Test
+    @DisplayName(
+        "Should be annotated with @CircuitBreaker(name = 'aiProvider')"
+    )
+    void shouldHaveCircuitBreakerAnnotation() throws NoSuchMethodException {
+        var method = GeminiAiSummarizationAdapter.class.getMethod(
+            "summarizeText",
+            String.class
+        );
+        var annotation = method.getAnnotation(CircuitBreaker.class);
+
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.name()).isEqualTo("aiProvider");
+    }
+
+    @Test
+    @DisplayName(
+        "Should propagate error when Gemini API returns HTTP 429 rate limit"
+    )
+    void shouldPropagateErrorWhenApiReturns429() {
+        AiProcessingProperties properties = new AiProcessingProperties();
+        properties.getGemini().setApiKey("test-key-123");
+        properties.getGemini().setModel("gemini-3.8-flash");
+        properties.getGemini().setEndpoint("https://test.gemini.api");
+
+        RestClient.Builder builder = RestClient.builder().baseUrl(
+            "https://test.gemini.api"
+        );
+        MockRestServiceServer server = MockRestServiceServer.bindTo(
+            builder
+        ).build();
+        RestClient restClient = builder.build();
+
+        GeminiAiSummarizationAdapter adapter = new GeminiAiSummarizationAdapter(
+            properties,
+            restClient
+        );
+
+        server
+            .expect(
+                MockRestRequestMatchers.requestTo(
+                    "https://test.gemini.api/v1beta/models/gemini-3.8-flash:generateContent?key=test-key-123"
+                )
+            )
+            .andRespond(
+                MockRestResponseCreators.withStatus(
+                    HttpStatus.TOO_MANY_REQUESTS
+                )
+            );
+
+        assertThatThrownBy(() ->
+            adapter.summarizeText("Sample text")
+        ).isInstanceOf(RestClientResponseException.class);
     }
 }

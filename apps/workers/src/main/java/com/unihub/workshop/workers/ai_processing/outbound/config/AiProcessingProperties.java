@@ -18,6 +18,9 @@ public class AiProcessingProperties {
     private String dlqRoutingKey = "dlq";
     private String provider = "mock";
     private String bucket = "unihub-brochures";
+    private int maxAttempts = 3;
+    private long backoffInitialSeconds = 5;
+    private double backoffMultiplier = 2.0;
 
     private Gemini gemini = new Gemini();
 

@@ -11,4 +11,13 @@ public interface AiSummaryJobRepositoryPort {
     void updateCompleted(UUID jobId, String resultText, Instant completedAt);
 
     void updateFailed(UUID jobId, String errorMessage, Instant completedAt);
+
+    void updateFailed(
+        UUID jobId,
+        int attempts,
+        String errorMessage,
+        Instant completedAt
+    );
+
+    void updateRetry(UUID jobId, int attempts, Instant nextRetryAt);
 }

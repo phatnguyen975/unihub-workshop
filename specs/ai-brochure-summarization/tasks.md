@@ -140,7 +140,7 @@ Each task within a phase is a complete vertical slice through every layer its ca
 
 ### Phase 3: Worker — Resilience, Retry & Dead-Letter
 
-- [ ] **T4 — Worker retries transient AI errors and dead-letters after max attempts, with idempotency guard for duplicate delivery**
+- [x] **T4 — Worker retries transient AI errors and dead-letters after max attempts, with idempotency guard for duplicate delivery**
   - **Size:** M
   - **Depends on:** T3
   - **Layers touched (Worker Hexagonal):** Inbound (retry/nack logic in listener), Core (retry decision in use case — increments attempts, checks max), Outbound (persistence — update attempts + next_retry_at, AI adapter — circuit breaker wiring)
@@ -159,20 +159,20 @@ Each task within a phase is a complete vertical slice through every layer its ca
 
 #### Checkpoint: Phase 3 — Resilience Complete
 
-- [ ] Retry and DLQ paths are exercisable in dev (by injecting a failing mock that throws on first N attempts and succeeds on the Nth, or always fails).
-- [ ] DLQ receives the dead-lettered message after 3 failed attempts; job is `FAILED` in DB; `ai.summary.failed` event was published.
-- [ ] Duplicate message delivery (same event re-delivered after job is COMPLETED) results in a no-op ACK with no DB writes.
-- [ ] All unit tests for T4 pass (retry decision logic, max-retry terminal path, idempotency guard, nack logic).
-- [ ] Build is clean; `HexagonalArchitectureTest` passes.
+- [x] Retry and DLQ paths are exercisable in dev (by injecting a failing mock that throws on first N attempts and succeeds on the Nth, or always fails).
+- [x] DLQ receives the dead-lettered message after 3 failed attempts; job is `FAILED` in DB; `ai.summary.failed` event was published.
+- [x] Duplicate message delivery (same event re-delivered after job is COMPLETED) results in a no-op ACK with no DB writes.
+- [x] All unit tests for T4 pass (retry decision logic, max-retry terminal path, idempotency guard, nack logic).
+- [x] Build is clean; `HexagonalArchitectureTest` passes.
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks (T1–T4) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end.
-- [ ] Unit tests pass for all directly changed files (per project testing policy — no full-suite run required; user will run the full suite and feed back failures).
-- [ ] `ModulithArchitectureTest` passes (backend).
-- [ ] `HexagonalArchitectureTest` passes (workers).
-- [ ] Ready for `/review ai-brochure-summarization`.
+- [x] All tasks (T1–T4) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end.
+- [x] Unit tests pass for all directly changed files (per project testing policy — no full-suite run required; user will run the full suite and feed back failures).
+- [x] `ModulithArchitectureTest` passes (backend).
+- [x] `HexagonalArchitectureTest` passes (workers).
+- [x] Ready for `/review ai-brochure-summarization`.
 
 ## Risks and Mitigations
 
