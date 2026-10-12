@@ -27,7 +27,7 @@ Each task within a phase is a complete vertical slice through every layer its ca
 
 ### Phase 1: Backend Upload & Fallback Polling
 
-- [ ] **T1 — Brochure upload accepted: ORGANIZER can upload a valid PDF and receive `202 Accepted` with a job ID**
+- [x] **T1 — Brochure upload accepted: ORGANIZER can upload a valid PDF and receive `202 Accepted` with a job ID**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application (use case + ports), Infrastructure (persistence + storage + outbox event), Presentation (controller + DTOs + mapper)

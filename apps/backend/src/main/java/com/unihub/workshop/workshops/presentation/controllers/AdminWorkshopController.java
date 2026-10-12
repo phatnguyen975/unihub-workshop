@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.presentation.controllers;
 
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.InternalServerException;
+import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.pagination.PageResponse;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
@@ -12,6 +13,7 @@ import com.unihub.workshop.shared.storage.StoredMedia;
 import com.unihub.workshop.shared.web.ApiResponse;
 import com.unihub.workshop.workshops.application.ports.in.AssignStaffCommand;
 import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
+import com.unihub.workshop.workshops.application.ports.in.BrochureUploadResult;
 import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopCommand;
 import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
@@ -32,6 +34,8 @@ import com.unihub.workshop.workshops.application.ports.in.SaveDraftCommand;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopCommand;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopUseCase;
+import com.unihub.workshop.workshops.application.ports.in.UploadBrochureCommand;
+import com.unihub.workshop.workshops.application.ports.in.UploadBrochureUseCase;
 import com.unihub.workshop.workshops.domain.model.AssignedStaff;
 import com.unihub.workshop.workshops.domain.model.AvailableStaff;
 import com.unihub.workshop.workshops.domain.model.Workshop;
@@ -41,6 +45,7 @@ import com.unihub.workshop.workshops.presentation.dto.AssignStaffRequest;
 import com.unihub.workshop.workshops.presentation.dto.AssignedStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.AvailableStaffItemResponse;
 import com.unihub.workshop.workshops.presentation.dto.BatchAssignResponse;
+import com.unihub.workshop.workshops.presentation.dto.BrochureUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.CancelWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.MediaUploadResponse;
 import com.unihub.workshop.workshops.presentation.dto.PublishWorkshopRequest;
@@ -49,6 +54,7 @@ import com.unihub.workshop.workshops.presentation.dto.SaveDraftRequest;
 import com.unihub.workshop.workshops.presentation.dto.UpdateWorkshopRequest;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopResponse;
 import com.unihub.workshop.workshops.presentation.dto.WorkshopSummaryResponse;
+import com.unihub.workshop.workshops.presentation.mapper.BrochurePresentationMapper;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -96,6 +102,8 @@ public class AdminWorkshopController {
     private final CancelWorkshopUseCase cancelWorkshopUseCase;
     private final WorkshopPresentationMapper workshopMapper;
     private final MediaStoragePort mediaStoragePort;
+    private final UploadBrochureUseCase uploadBrochureUseCase;
+    private final BrochurePresentationMapper brochureMapper;
 
     @GetMapping
     public ApiResponse<PageResponse<WorkshopSummaryResponse>> listWorkshops(
@@ -505,6 +513,53 @@ public class AdminWorkshopController {
             workshopMapper.toMediaUploadResponse(storedMedia),
             "Media uploaded successfully."
         );
+    }
+
+    @PostMapping(
+        value = "/{id}/brochure",
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiResponse<BrochureUploadResponse> uploadBrochure(
+        @PathVariable("id") UUID id,
+        @RequestParam("file") MultipartFile file,
+        Authentication authentication
+    ) {
+        UUID organizationId = getVerifiedOrganizationId(authentication);
+        UUID organizerId = SecurityContextUtils.extractUserId(authentication);
+
+        if (file == null || file.isEmpty()) {
+            throw new ValidationException(
+                "file",
+                "Uploaded file must not be empty"
+            );
+        }
+
+        try {
+            BrochureUploadResult result = uploadBrochureUseCase.uploadBrochure(
+                new UploadBrochureCommand(
+                    id,
+                    organizerId,
+                    organizationId,
+                    file.getOriginalFilename() != null
+                        ? file.getOriginalFilename()
+                        : "brochure.pdf",
+                    file.getContentType(),
+                    file.getSize(),
+                    file.getInputStream()
+                )
+            );
+
+            return ApiResponse.success(
+                brochureMapper.toResponse(result),
+                "Brochure upload accepted. AI summarization is processing."
+            );
+        } catch (IOException e) {
+            throw new InternalServerException(
+                "Failed to read uploaded brochure file stream",
+                e
+            );
+        }
     }
 
     private Instant parseInstant(String value, String paramName) {
