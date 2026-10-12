@@ -96,7 +96,7 @@ Each task within a phase is a complete vertical slice through every layer its ca
 
 ### Phase 2: Worker — Core Processing Pipeline
 
-- [ ] **T3 — Worker processes brochure event: extracts text, calls AI, persists result, and pushes SSE notification (including no-text fast-fail path)**
+- [x] **T3 — Worker processes brochure event: extracts text, calls AI, persists result, and pushes SSE notification (including no-text fast-fail path)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched (Worker Hexagonal):** Inbound (RabbitMQ listener + AMQP config), Core (use case + domain models + port interfaces), Outbound (MinIO PDF fetch adapter, AI summarization adapter — both real Gemini and mock, JPA job repository adapter, Redis real-time publisher adapter)
@@ -133,10 +133,10 @@ Each task within a phase is a complete vertical slice through every layer its ca
 
 #### Checkpoint: Phase 2 — Worker Core Pipeline Complete
 
-- [ ] The full happy-path flow is exercisable locally: upload a real PDF via the backend `POST` endpoint → worker consumes the event → job transitions to `COMPLETED` → Redis Pub/Sub receives the `ai.summary.completed` event.
-- [ ] The no-text fast-fail path is exercisable: upload an image-only PDF → worker marks job `FAILED` → Redis Pub/Sub receives `ai.summary.failed` → no DLQ message.
-- [ ] All unit tests for T3 pass (listener, use case, all outbound adapters mocked).
-- [ ] Build is clean; `HexagonalArchitectureTest` passes (all hexagonal boundary rules, including the new `ai_processing` module).
+- [x] The full happy-path flow is exercisable locally: upload a real PDF via the backend `POST` endpoint → worker consumes the event → job transitions to `COMPLETED` → Redis Pub/Sub receives the `ai.summary.completed` event.
+- [x] The no-text fast-fail path is exercisable: upload an image-only PDF → worker marks job `FAILED` → Redis Pub/Sub receives `ai.summary.failed` → no DLQ message.
+- [x] All unit tests for T3 pass (listener, use case, all outbound adapters mocked).
+- [x] Build is clean; `HexagonalArchitectureTest` passes (all hexagonal boundary rules, including the new `ai_processing` module).
 
 ### Phase 3: Worker — Resilience, Retry & Dead-Letter
 

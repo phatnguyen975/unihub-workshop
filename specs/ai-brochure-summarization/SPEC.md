@@ -61,7 +61,7 @@ The AI Brochure Summarization feature enables Organizers to upload a PDF brochur
 
 - **FR-21:** The worker SHALL invoke the AI provider with a single structured prompt requesting a standardized Markdown summary (sections: Objectives, Target Audience, Key Highlights/Agenda, Prerequisites/Speaker info) when the extracted text length is ≤ 50,000 characters.
 - **FR-22:** The worker SHALL split the extracted text into chunks before summarization when the extracted text length exceeds 50,000 characters, then consolidate the chunk results into a single Markdown summary.
-- **FR-23:** The worker SHALL use the Google Gemini API (Flash series model, configured via `AI_GEMINI_MODEL` environment variable, e.g., `gemini-2.5-flash` or `gemini-2.0-flash` via Google AI Studio Free Tier) as the primary AI provider, protected by a Resilience4j circuit breaker (`aiProvider`).
+- **FR-23:** The worker SHALL use the Google Gemini API (Flash series model, configured via `AI_GEMINI_MODEL` environment variable, e.g., `gemini-3.8-flash` via Google AI Studio Free Tier) as the primary AI provider, protected by a Resilience4j circuit breaker (`aiProvider`).
 - **FR-24:** The worker SHALL use a mock AI adapter in local and test environments in place of the real Gemini API.
 
 ### 3.8 — Worker: Retry, Failure & Dead-Letter Handling

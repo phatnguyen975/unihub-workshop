@@ -7,3 +7,10 @@ logging:
   level:
     root: INFO
     com.unihub: DEBUG
+
+app:
+  ai:
+    provider: mock
+    gemini:
+      model: ${AI_GEMINI_MODEL:gemini-3.8-flash}
+      api-key: ${AI_GEMINI_API_KEY:dummy-dev-key}
