@@ -49,7 +49,7 @@ This implementation plan delivers the complete free workshop registration capabi
 
 ### Phase 2: Core Registration Mutation & High-Concurrency Protection
 
-- [ ] **T2 — Implement core free workshop registration mutation with domain validation, RSA ticket signing, and transactional outbox persistence**
+- [x] **T2 — Implement core free workshop registration mutation with domain validation, RSA ticket signing, and transactional outbox persistence**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application (Use Case & Strategy), Infrastructure (Persistence & RSA Security), Presentation (Controller & DTOs)
