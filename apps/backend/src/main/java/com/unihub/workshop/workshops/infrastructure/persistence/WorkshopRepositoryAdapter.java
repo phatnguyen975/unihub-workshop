@@ -100,6 +100,19 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Workshop> findAllById(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return repository
+            .findAllById(ids)
+            .stream()
+            .map(mapper::toDomain)
+            .toList();
+    }
+
+    @Override
     @Transactional
     public Optional<Workshop> findByIdForUpdate(UUID id) {
         return repository

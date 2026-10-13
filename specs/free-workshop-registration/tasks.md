@@ -20,7 +20,7 @@ This implementation plan delivers the complete free workshop registration capabi
 
 ### Phase 1: Module Integration Surface & Shared Contracts
 
-- [ ] **T1 — Expose cross-module query facades in `workshops` and `iam` modules and define the externalized `WorkshopRegisteredEvent`**
+- [x] **T1 — Expose cross-module query facades in `workshops` and `iam` modules and define the externalized `WorkshopRegisteredEvent`**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Module Public API (`api/`), Application (`facade/`), Shared Events (`shared/events/`)
@@ -43,9 +43,9 @@ This implementation plan delivers the complete free workshop registration capabi
 
 #### Checkpoint: Module Integration Surface
 
-- [ ] `WorkshopApi` and `IamApi` implementations are unit-tested and pass.
-- [ ] `WorkshopRegisteredEvent` compiles and satisfies Spring Modulith event publication conventions.
-- [ ] Backend build is clean and `ModulithArchitectureTest` succeeds.
+- [x] `WorkshopApi` and `IamApi` implementations are unit-tested and pass.
+- [x] `WorkshopRegisteredEvent` compiles and satisfies Spring Modulith event publication conventions.
+- [x] Backend build is clean and `ModulithArchitectureTest` succeeds.
 
 ### Phase 2: Core Registration Mutation & High-Concurrency Protection
 
