@@ -1,0 +1,2 @@
+CORRUPTED-MAGIC-BYTES-NOT-A-VALID-PDF-STREAM
+This file is intentionally forged to test magic byte header rejection.

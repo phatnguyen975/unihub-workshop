@@ -18,3 +18,8 @@ datasource:
     hikari:
       maximum-pool-size: 5
       pool-name: replica-pool
+
+app:
+  ai:
+    provider: mock
+    bucket: unihub-brochures

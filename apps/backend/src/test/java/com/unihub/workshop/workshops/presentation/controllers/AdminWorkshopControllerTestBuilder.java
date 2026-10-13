@@ -6,6 +6,7 @@ import com.unihub.workshop.shared.storage.MediaStoragePort;
 import com.unihub.workshop.workshops.application.ports.in.AssignStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.CancelWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.DeleteDraftUseCase;
+import com.unihub.workshop.workshops.application.ports.in.GetBrochureSummaryJobUseCase;
 import com.unihub.workshop.workshops.application.ports.in.GetWorkshopUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsUseCase;
 import com.unihub.workshop.workshops.application.ports.in.ListAssignedStaffUseCase;
@@ -15,6 +16,8 @@ import com.unihub.workshop.workshops.application.ports.in.RescheduleWorkshopUseC
 import com.unihub.workshop.workshops.application.ports.in.RevokeStaffUseCase;
 import com.unihub.workshop.workshops.application.ports.in.SaveDraftUseCase;
 import com.unihub.workshop.workshops.application.ports.in.UpdateWorkshopUseCase;
+import com.unihub.workshop.workshops.application.ports.in.UploadBrochureUseCase;
+import com.unihub.workshop.workshops.presentation.mapper.BrochurePresentationMapper;
 import com.unihub.workshop.workshops.presentation.mapper.WorkshopPresentationMapper;
 import org.mapstruct.factory.Mappers;
 
@@ -58,6 +61,15 @@ public class AdminWorkshopControllerTestBuilder {
         WorkshopPresentationMapper.class
     );
     private MediaStoragePort mediaStoragePort = mock(MediaStoragePort.class);
+    private UploadBrochureUseCase uploadBrochureUseCase = mock(
+        UploadBrochureUseCase.class
+    );
+    private GetBrochureSummaryJobUseCase getBrochureSummaryJobUseCase = mock(
+        GetBrochureSummaryJobUseCase.class
+    );
+    private BrochurePresentationMapper brochureMapper = Mappers.getMapper(
+        BrochurePresentationMapper.class
+    );
 
     public static AdminWorkshopControllerTestBuilder builder() {
         return new AdminWorkshopControllerTestBuilder();
@@ -161,6 +173,27 @@ public class AdminWorkshopControllerTestBuilder {
         return this;
     }
 
+    public AdminWorkshopControllerTestBuilder withUploadBrochureUseCase(
+        UploadBrochureUseCase uploadBrochureUseCase
+    ) {
+        this.uploadBrochureUseCase = uploadBrochureUseCase;
+        return this;
+    }
+
+    public AdminWorkshopControllerTestBuilder withGetBrochureSummaryJobUseCase(
+        GetBrochureSummaryJobUseCase getBrochureSummaryJobUseCase
+    ) {
+        this.getBrochureSummaryJobUseCase = getBrochureSummaryJobUseCase;
+        return this;
+    }
+
+    public AdminWorkshopControllerTestBuilder withBrochureMapper(
+        BrochurePresentationMapper brochureMapper
+    ) {
+        this.brochureMapper = brochureMapper;
+        return this;
+    }
+
     public AdminWorkshopController build() {
         return new AdminWorkshopController(
             saveDraftUseCase,
@@ -176,7 +209,10 @@ public class AdminWorkshopControllerTestBuilder {
             rescheduleWorkshopUseCase,
             cancelWorkshopUseCase,
             workshopMapper,
-            mediaStoragePort
+            mediaStoragePort,
+            uploadBrochureUseCase,
+            getBrochureSummaryJobUseCase,
+            brochureMapper
         );
     }
 }

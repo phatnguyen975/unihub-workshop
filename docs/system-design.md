@@ -125,73 +125,108 @@ sequenceDiagram
   participant Notify as Notification Providers
 
   Student->>Web: Select workshop + submit registration
-  Web->>GW: POST /registrations (idempotency key)
+  Web->>GW: POST /api/v1/registrations (Idempotency-Key: UUID, Body: {workshopId})
   GW->>API: Forward request
-  API->>Redis: Consume token bucket
+  API->>Redis: Consume token bucket (Registration Tier: 5 tokens / 10s)
   alt Rate limited
     Redis-->>API: Reject
-    API-->>GW: 429 Too Many Requests
+    API-->>GW: 429 Too Many Requests (X-RateLimit-Retry-After)
     GW-->>Web: 429 Too Many Requests
   else Allowed
     Redis-->>API: Allow
-    API->>DB: Atomic INSERT idempotency key (Primary DB)
-    alt Success (New Request)
-      API->>DB: Query existing registrations for time overlap
-      alt Schedule Overlap Detected
-        DB-->>API: Overlap found
-        API->>DB: Update idempotency key (Status: FAILED)
-        API-->>GW: 422 Unprocessable Entity (Time conflict)
-        GW-->>Web: 422 Unprocessable Entity
-      else No Overlap
-        DB-->>API: Schedule clear
-      end
-      API->>Redis: Atomic decrement capacity pre-check
-      alt No capacity
-        Redis-->>API: Capacity unavailable
-        API->>DB: Update idempotency key (Status: FAILED)
-        API-->>GW: 409 Conflict
-        GW-->>Web: 409 Conflict
-      else Capacity available
-        Redis-->>API: Capacity reserved
-        alt Free workshop
-          API->>DB: Begin tx
-          API->>DB: Insert Registration (Status: CONFIRMED)
-          API->>DB: Insert WorkshopRegisteredEvent into Outbox
-          API->>DB: Update idempotency key (Status: COMPLETED)
-          API->>DB: Commit
-          API-->>GW: 201 Created + QR code
-          GW-->>Web: 201 Created + QR code
-        else Paid workshop
-          API->>DB: Begin tx
-          API->>DB: Insert Registration (Status: PENDING)
-          API->>DB: Commit
-          API->>Pay: Charge (idempotency key)
-          alt Payment success
-            Pay-->>API: Approved
-            API->>DB: Begin tx
-            API->>DB: Update Registration (Status: CONFIRMED)
-            API->>DB: Insert WorkshopRegisteredEvent into Outbox
-            API->>DB: Update idempotency key (Status: COMPLETED)
-            API->>DB: Commit
-            API-->>GW: 201 Created + QR code
-            GW-->>Web: 201 Created + QR code
-          else Timeout or failure
-            Pay-->>API: Timeout/Error
-            Note over API,Pay: Resilience4j circuit breaker trips
-            API->>DB: Begin tx
-            API->>DB: Update Registration (Status: FAILED)
-            API->>Redis: Increment capacity (compensating action)
+    API->>DB: Check student profile (student_record_id IS NOT NULL)
+    alt Unlinked Student Record
+      DB-->>API: student_record_id IS NULL
+      API-->>GW: 403 Forbidden (Student record not linked)
+      GW-->>Web: 403 Forbidden
+    else Verified Student
+      API->>DB: Atomic INSERT idempotency key (Primary DB, Status: PENDING)
+      alt Success (New Request)
+        API->>DB: Query workshop (Status = PUBLISHED, ends_at > NOW())
+        alt Workshop not found or DRAFT
+          API->>DB: Update idempotency key (Status: FAILED)
+          API-->>GW: 404 Not Found
+          GW-->>Web: 404 Not Found
+        else Workshop CANCELED / COMPLETED / Already started (starts_at <= NOW())
+          API->>DB: Update idempotency key (Status: FAILED)
+          API-->>GW: 422 Unprocessable Content (Workshop not open for registration)
+          GW-->>Web: 422 Unprocessable Content
+        else Workshop requires payment (price > 0) in free flow
+          API->>DB: Update idempotency key (Status: FAILED)
+          API-->>GW: 422 Unprocessable Content (Requires paid checkout flow)
+          GW-->>Web: 422 Unprocessable Content
+        else Workshop Valid
+          API->>DB: Query active registrations for student (same workshop or overlapping time)
+          alt Already registered for same workshop
             API->>DB: Update idempotency key (Status: FAILED)
-            API->>DB: Commit
-            API-->>GW: 503 Service Unavailable
-            GW-->>Web: 503 Service Unavailable
+            API-->>GW: 409 Conflict (Already registered for this workshop)
+            GW-->>Web: 409 Conflict
+          else Schedule Overlap with another active workshop
+            API->>DB: Update idempotency key (Status: FAILED)
+            API-->>GW: 422 Unprocessable Content (Schedule conflict)
+            GW-->>Web: 422 Unprocessable Content
+          else Schedule clear
+            alt Redis capacity key missing (Cache miss / evicted)
+              API->>DB: Compute ground_truth = capacity - COUNT(active registrations)
+              API->>Redis: SET workshop:{id}:capacity groundTruth
+            end
+            API->>Redis: Atomic DECR workshop:{id}:capacity
+            alt No capacity (Result < 0)
+              Redis-->>API: Capacity unavailable
+              API->>Redis: Atomic INCR (compensating action)
+              API->>DB: Update idempotency key (Status: FAILED)
+              API-->>GW: 409 Conflict (Capacity exhausted)
+              GW-->>Web: 409 Conflict
+            else Capacity available
+              Redis-->>API: Capacity reserved
+              alt Free workshop (price = 0)
+                API->>API: Generate RSA-SHA256 signature for qr_payload JSON
+                API->>DB: Begin tx
+                API->>DB: Insert Registration (Status: CONFIRMED, qr_payload, qr_signature, qr_issued_at)
+                API->>DB: Insert WorkshopRegisteredEvent into Outbox (event_publication)
+                API->>DB: Update idempotency key (Status: COMPLETED, Response: 201)
+                API->>DB: Commit tx
+                API->>Redis: Set idempotency key L1 Cache (COMPLETED, TTL: 24h)
+                API->>Redis: Publish registration.updated to unihub:stream:workshop:{id}
+                API-->>GW: 201 Created + Registration with signed QR
+                GW-->>Web: 201 Created + Registration with signed QR
+              else Paid workshop (price > 0)
+                API->>DB: Begin tx
+                API->>DB: Insert Registration (Status: PENDING)
+                API->>DB: Commit tx
+                API->>Pay: Charge (idempotency key)
+                alt Payment success
+                  Pay-->>API: Approved
+                  API->>API: Generate RSA-SHA256 signature for qr_payload JSON
+                  API->>DB: Begin tx
+                  API->>DB: Update Registration (Status: CONFIRMED, qr_payload, qr_signature, qr_issued_at)
+                  API->>DB: Insert WorkshopRegisteredEvent into Outbox (event_publication)
+                  API->>DB: Update idempotency key (Status: COMPLETED, Response: 201)
+                  API->>DB: Commit tx
+                  API->>Redis: Set idempotency key L1 Cache (COMPLETED, TTL: 24h)
+                  API->>Redis: Publish registration.updated to unihub:stream:workshop:{id}
+                  API-->>GW: 201 Created + Registration with signed QR
+                  GW-->>Web: 201 Created + Registration with signed QR
+                else Timeout or failure
+                  Pay-->>API: Timeout/Error
+                  Note over API,Pay: Resilience4j circuit breaker trips
+                  API->>DB: Begin tx
+                  API->>DB: Update Registration (Status: FAILED)
+                  API->>Redis: Increment capacity (compensating action)
+                  API->>DB: Update idempotency key (Status: FAILED)
+                  API->>DB: Commit tx
+                  API-->>GW: 503 Service Unavailable
+                  GW-->>Web: 503 Service Unavailable
+                end
+              end
+            end
           end
         end
+      else Unique Constraint Violation (Concurrent Retry)
+        API->>DB: Load cached response (Primary DB)
+        API-->>GW: Return cached response (or 409 Conflict if PENDING)
+        GW-->>Web: Return cached response (or 409 Conflict if PENDING)
       end
-    else Unique Constraint Violation (Concurrent Retry)
-      API->>DB: Load cached response (Primary DB)
-      API-->>GW: Return cached response (or 409 Conflict if PENDING)
-      GW-->>Web: Return cached response (or 409 Conflict if PENDING)
     end
   end
 
@@ -206,7 +241,7 @@ sequenceDiagram
     Sweeper->>Pay: Query payment transaction status
     alt Payment actually succeeded (Delayed Webhook Recovery)
       Pay-->>Sweeper: Transaction Paid
-      Sweeper->>DB: Update Registration (Status: CONFIRMED)
+      Sweeper->>DB: Update Registration (Status: CONFIRMED, qr_payload, qr_signature, qr_issued_at)
       Sweeper->>DB: Insert WorkshopRegisteredEvent into Outbox (event_publication)
       Sweeper->>DB: Update idempotency key (Status: COMPLETED, Response: 201)
     else Payment failed or never initiated (Standard Cleanup)
@@ -218,13 +253,24 @@ sequenceDiagram
   end
 ```
 
-- **Distributed Rate Limiting Location:** The rate limiting logic (via Bucket4j) is evaluated directly within the application filter layer of the Core Backend Monolith using shared Redis nodes for state counters, preventing Nginx from needing direct data tier couplings.
-- **Lock-Free Concurrency Chokepoint:** To sustain 12,000 concurrent requests without hitting database row contention or thread pool depletion, capacity checks are offloaded entirely to Redis via an atomic decrement operation. The database transaction is only opened after capacity is verified.
-- **Idempotency Lifecycle (Strict State Management):** The system completely guards against double-booking and duplicate charges by tracking the idempotency key state through three phases: `PENDING` (acts as a concurrent lock), `COMPLETED` (serves cached payloads), and `FAILED` (safely releases the lock for client retries).
-- **Transactional Outbox Implementation:** To eliminate distributed transaction vulnerability, event emission is tightly integrated with domain operations. The registration record modifications and event storage occur in the same database transaction, natively mapped to Spring Modulith’s `event_publication` table.
-- **Deferred QR Code Generation:** QR payload and signature are generated and persisted only when a registration transitions to `CONFIRMED` status - never at the `PENDING` insert step. For free workshops, this happens atomically within the single confirmation transaction. For paid workshops, it happens inside the payment-confirmation transaction after the gateway returns `Approved`. This ensures that a cryptographically valid QR code can never be extracted from a `PENDING` record prior to payment completion. The `qr_payload`, `qr_signature`, and `qr_issued_at` columns in the `registrations` table are therefore nullable and are only populated on the `PENDING` -> `CONFIRMED` state transition.
+- **Distributed Rate Limiting Location:** The rate limiting logic (via Bucket4j) is evaluated directly within the application filter layer of the Core Backend Monolith (`POST /api/v1/registrations/**`, Registration Tier: 5 tokens, refill 5 per 10s) using shared Redis nodes for state counters, preventing Nginx from needing direct data tier couplings.
+- **Student Profile Verification Gating:** In accordance with the student directory linkage invariant (`users.student_record_id`), students with `student_record_id IS NULL` can only update their profile and are strictly barred from registering for workshops. The endpoint enforces this prerequisite check immediately upon token validation, rejecting unlinked accounts with `403 Forbidden` (`urn:unihub:error:forbidden`).
+- **Schedule Overlap & Duplicate Registration Distinction:** The system strictly queries the Primary PostgreSQL database for existing active registrations (`status IN ('PENDING', 'CONFIRMED')`) belonging to the student. If the student is already actively registered for the requested workshop, the system returns `409 Conflict` (`urn:unihub:error:conflict`). If the student holds an active registration for another workshop whose time interval overlaps (`existing.starts_at < target.ends_at AND existing.ends_at > target.starts_at`), the system returns `422 Unprocessable Content` (`urn:unihub:error:validation`).
+- **Lock-Free Concurrency Chokepoint & Cache Miss Self-Healing:** To sustain 12,000 concurrent requests without hitting database row contention or thread pool depletion, capacity checks are offloaded entirely to Redis via an atomic decrement operation (`DECR workshop:{workshopId}:capacity`). If the Redis capacity key is missing (due to key eviction or Redis restart), the application executes a lazy fallback to compute ground-truth availability from PostgreSQL (`Math.max(0, workshop.capacity - COUNT(active registrations))`), sets the key in Redis, and then evaluates the decrement. If the post-decrement counter is less than zero, the backend executes an immediate compensating `INCR`, marks the idempotency key as `FAILED`, and returns `409 Conflict` without opening a write transaction in PostgreSQL.
+- **Idempotency Lifecycle (Strict State Management):** The system guards against double-booking and duplicate charges by tracking the idempotency key state through three phases: `PENDING` (acts as a concurrent in-flight lock, returning `409 Conflict` with `Retry-After: 2`), `COMPLETED` (serves cached payloads immediately), and `FAILED` (releases the lock for client retries).
+- **Transactional Outbox Implementation:** To eliminate distributed transaction vulnerability, event emission is tightly integrated with domain operations. The registration record insertion (`CONFIRMED`), outbox event storage (`WorkshopRegisteredEvent` into `event_publication`), and idempotency completion occur within the same atomic database transaction, externalized by the Spring Modulith Event Registry to RabbitMQ queue `q.notifications` via routing key `workshop.registered`.
+- **Deferred Cryptographic QR Code Generation:** QR payload and signature are generated and persisted only when a registration transitions to `CONFIRMED` status — never at the `PENDING` insert step. For free workshops, this occurs atomically within the single confirmation transaction. The QR payload consists of a compact canonical JSON object:
+  ```json
+  {
+    "registrationId": "UUID",
+    "workshopId": "UUID",
+    "studentId": "UUID",
+    "issuedAt": "ISO-8601 UTC"
+  }
+  ```
+  The signature (`qr_signature`) is generated server-side using asymmetric RSA-SHA256 (`SHA256withRSA`) with the platform's private key (`rsa.private-key`), encoded as a Base64 string. Offline mobile check-in staff verify this signature using the cached public key (`rsa.public-key`), guaranteeing zero-trust ticket authenticity without internet connectivity.
 - **Dual-Case Reconciliation Sweeper:** The background cleanup job acts as a defensive synchronization boundary. Instead of blindly cancelling expired `PENDING` states, it first issues an API call to the Payment Gateway. If a webhook was lost but payment succeeded, it heals the state to `CONFIRMED`. If the checkout was abandoned, it marks it as `FAILED`, refunds the Redis capacity, and unlocks the idempotency state.
-- **Live Registration Broadcasting:** When a registration transitions to `CONFIRMED` or `CANCELED`, the backend publishes a `registration.updated` event to the workshop Redis Pub/Sub channel (`unihub:stream:workshop:{workshopId}`). Organizers viewing the Workshop Registration Dashboard (F-4.4) receive live count and occupancy updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual polling or page reloads.
+- **Live Registration Broadcasting:** When a registration transitions to `CONFIRMED` or `CANCELED`, the backend publishes a `registration.updated` event to the workshop Redis Pub/Sub channel (`unihub:stream:workshop:{workshopId}`) via `RealtimeEventPublisher`. Organizers viewing the Workshop Registration Dashboard (F-4.4) receive live count and occupancy updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual polling or page reloads.
 
 ### Payment Webhook Handling Flow
 
@@ -844,26 +890,33 @@ sequenceDiagram
     Redis->>API: Distribute event to active SSE node
     API-->>Web: SSE Event (ai.summary.completed)
     Web->>Organizer: Display summary dialog in real time
+  else No Extractable Text Layer (Image-only PDF)
+    Worker->>DB: Update job (Status: FAILED, error_message: "No extractable text found in PDF brochure")
+    Worker->>Redis: Publish ai.summary.failed to unihub:stream:user:{organizerId}
+    Redis->>API: Distribute event to active SSE node
+    API-->>Web: SSE Event (ai.summary.failed)
+    Web->>Organizer: Display error notice (no extractable text)
+    Worker-->>Broker: ACK message (unrecoverable data error, no retry, no DLQ pollution)
   else Transient Error (HTTP 429 / Timeout / 5xx)
     AI-->>Worker: Error/Rate Limit/Timeout
-    Worker-->>Broker: Retry with backoff
+    Worker-->>Broker: Retry with backoff (up to 3 attempts)
   else Max Retries Exceeded
     Worker->>DB: Update job (Status: FAILED)
     Worker->>Redis: Publish ai.summary.failed to unihub:stream:user:{organizerId}
     Redis->>API: Distribute event to active SSE node
     API-->>Web: SSE Event (ai.summary.failed)
     Web->>Organizer: Display error notice with retry option
-    Worker-->>Broker: Mark message unprocessable
-    Broker-->>DLQ: Route failed job for review
+    Worker-->>Broker: Mark message unprocessable (reject without requeue)
+    Broker-->>DLQ: Route failed job for review (unihub.dlx::dlq)
   end
 ```
 
-- **Decoupled Processing:** The API validates the file (MIME type, `%PDF-` magic byte, max 10MB), checks multi-tenant permissions (`workshop.organization_id == jwt.org`), stores the PDF in MinIO bucket `unihub-brochures`, creates the active `workshop_brochures` record and `ai_summary_jobs` entry, publishes `BrochureSummarizationRequestedEvent` via transactional outbox, and returns `202 Accepted` immediately so heavy PDF processing runs asynchronously.
-- **Local Preprocessing:** The worker extracts, cleans, and chunks text before calling the AI service to avoid oversized payloads and token limit errors. If the PDF has no extractable text layer, it fails fast without calling the external AI API.
-- **AI Integration (Google Gemini Free Tier):** Workers call the Google Gemini API (configurable Flash series via `AI_GEMINI_MODEL`, e.g. `gemini-2.5-flash` / `gemini-2.0-flash` via Google AI Studio Free Tier) wrapped in a Resilience4j circuit breaker (`aiProvider`).
-- **Real-Time Job Notification via SSE:** The database explicitly tracks `PROCESSING`, `COMPLETED`, and `FAILED` states. Upon completion or terminal failure, the worker publishes an event to Redis Pub/Sub, which the backend SSE Hub pushes directly to the Organizer's active browser stream (`GET /api/v1/stream/events`). The client UI immediately displays the generated summary without short-polling delays. The `GET /api/v1/admin/workshops/{id}/brochure/summary-job` endpoint is retained as a fallback for clients reconnecting after network drops.
-- **Rate Limiting Resilience:** The worker treats AI provider `HTTP 429` responses the same as transient timeouts and `5xx` failures, using broker-backed backoff retries to absorb temporary throttling without losing the job.
-- **Dead Letter Queue (DLQ) and Failure Handling:** When max retries are exhausted, the worker marks the database job as `FAILED` before the broker routes the unprocessable payload to the DLQ. This prevents zombie `PROCESSING` jobs and frontend infinite loading while preserving the event for monitoring or manual replay by Ops.
+- **Decoupled Processing:** The API validates the file (MIME type, `%PDF-` magic byte, max 10MB), checks multi-tenant permissions (`workshop.organization_id == jwt.org`), verifies workshop status (`DRAFT` or `PUBLISHED`, 422 if `COMPLETED`/`CANCELED`), rejects with `409 Conflict` if an active `PROCESSING` job already exists for the workshop, stores the PDF in MinIO bucket `unihub-brochures`, creates the active `workshop_brochures` record (deactivating previous brochure) and `ai_summary_jobs` entry (`PROCESSING`), publishes `BrochureSummarizationRequestedEvent` via transactional outbox, and returns `202 Accepted` immediately so heavy PDF processing runs asynchronously.
+- **Local Preprocessing & Text Chunking:** The worker extracts and cleans text locally using Apache PDFBox. If the PDF has no extractable text layer (e.g., scanned image-only PDF), the worker fails fast: marks DB job as `FAILED`, emits `ai.summary.failed` over Redis Pub/Sub, and acknowledges the RabbitMQ message to avoid wasteful retries and DLQ noise. When text is extractable: if sanitized text is $\le$ 50,000 characters, it is passed directly in a single prompt requesting structured Markdown summary (Objectives, Target Audience, Key Highlights/Agenda, Prerequisites/Speaker info); if text exceeds 50,000 characters, it is chunked before summarization.
+- **AI Integration (Google Gemini Free Tier):** Workers call the Google Gemini API (configurable Flash series via `AI_GEMINI_MODEL`, e.g. `gemini-3.8-flash` via Google AI Studio Free Tier) wrapped in a Resilience4j circuit breaker (`aiProvider`). A mock adapter (`MockAiSummarizationAdapter`) is provided for testing and offline development.
+- **Real-Time Job Notification via SSE & Redis Pub/Sub:** The database explicitly tracks `PROCESSING`, `COMPLETED`, and `FAILED` states. Upon completion or terminal failure, the worker publishes a `RealtimeEvent` JSON envelope (`eventId`, `eventType`, `timestamp`, `payload`) to Redis Pub/Sub channel `unihub:stream:user:{organizerId}`, which the backend SSE Hub pushes directly to the Organizer's active browser stream (`GET /api/v1/stream/events`). The client UI immediately displays the generated summary without short-polling delays. The `GET /api/v1/admin/workshops/{id}/brochure/summary-job` endpoint is retained as a fallback for reconnecting clients (returning `404 Not Found` if no brochure exists).
+- **Rate Limiting Resilience & Broker Retries:** The worker treats AI provider `HTTP 429` responses the same as transient timeouts and `5xx` failures, using broker-backed exponential backoff retries (up to 3 attempts) to absorb temporary throttling without losing the job.
+- **Dead Letter Queue (DLQ) and Failure Handling:** When max retries (3 attempts) are exhausted, the worker marks the database job as `FAILED`, persists `error_message`, publishes `ai.summary.failed` to Redis Pub/Sub, and rejects the message without requeue so the broker routes the unprocessable payload to the DLQ (`unihub.dlx::dlq`). This prevents zombie `PROCESSING` jobs and frontend infinite loading while preserving the event for monitoring or manual replay by Ops.
 
 ### Nightly Legacy CSV Ingestion Flow
 
@@ -1192,10 +1245,13 @@ The platform uses a **lock-free atomic pre-check via Redis**. The Core Backend M
 
 ```mermaid
 flowchart TD
-  API[Backend API receives request] --> Decr["Redis Atomic DECR (capacity)"]
+  API[Backend API receives request] --> CheckCache{"Redis Key Exists?"}
+  CheckCache -->|No / Miss| Reinit["Compute DB Ground Truth:\nMath.max(0, capacity - COUNT(active))\nSET workshop:{id}:capacity groundTruth"]
+  CheckCache -->|Yes| Decr["Redis Atomic DECR (capacity)"]
+  Reinit --> Decr
   Decr --> Decision{"Is Capacity >= 0?"}
   Decision -->|Yes| DB[Proceed to PostgreSQL transaction]
-  Decision -->|No| Conflict[Return 409 Conflict]
+  Decision -->|No| Incr["Compensating INCR\n(restore counter)"] --> Conflict[Return 409 Conflict]
 ```
 
 #### Database Constraint as Last-Resort Guard

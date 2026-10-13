@@ -26,7 +26,7 @@ public class S3RejectArtifactStore implements RejectArtifactStore {
 
     public S3RejectArtifactStore(
         S3Client s3Client,
-        @Value("${app.storage.buckets.csv}") String bucketName,
+        @Value("${app.batch-ingestion.bucket}") String bucketName,
         @Value("${app.batch-ingestion.reject-dir:resources}") String rejectDir
     ) {
         this.s3Client = s3Client;

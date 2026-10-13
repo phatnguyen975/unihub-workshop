@@ -45,7 +45,7 @@ public class S3IngestionObjectStore implements IngestionObjectStore {
 
     public S3IngestionObjectStore(
         S3Client s3Client,
-        @Value("${app.storage.buckets.csv}") String bucketName
+        @Value("${app.batch-ingestion.bucket}") String bucketName
     ) {
         this.s3Client = s3Client;
         this.bucketName = bucketName;
