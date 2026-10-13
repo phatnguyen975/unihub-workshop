@@ -518,6 +518,18 @@ erDiagram
 >
 > - All registration creation and idempotency checks must hit the primary database to enforce exactly-once semantics.
 > - `qr_payload`, `qr_signature`, and `qr_issued_at` are intentionally nullable. They must **only** be populated inside the `PENDING` -> `CONFIRMED` state transition transaction - never at the initial `PENDING` insert. For free workshops this occurs in the same transaction as the insert. For paid workshops this occurs only after payment gateway confirmation (synchronous callback or webhook). Application code must enforce this invariant; the database columns are nullable to reflect the deferred lifecycle.
+> - **QR Payload & Signature Specification:**
+>   - `qr_payload`: Canonical UTF-8 JSON object containing minimal data required for offline check-in:
+>     ```json
+>     {
+>       "registrationId": "UUID",
+>       "workshopId": "UUID",
+>       "studentId": "UUID",
+>       "issuedAt": "ISO-8601 UTC"
+>     }
+>     ```
+>   - `qr_signature`: Base64-encoded string representing the cryptographic signature generated via `SHA256withRSA` over the raw bytes of `qr_payload` using the server's private key (`rsa.private-key`). Verified on-device by Staff mobile app using the cached public key (`rsa.public-key`).
+>   - `qr_issued_at`: Exact timestamp (`TIMESTAMPTZ`) of cryptographic signing, stored in parity with `issuedAt` inside `qr_payload`.
 
 ### Table: `payments`
 

@@ -1,11 +1,13 @@
 package com.unihub.workshop.workshops.infrastructure.persistence;
 
 import com.unihub.workshop.workshops.domain.model.ActiveWorkshopCapacity;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,6 +16,10 @@ import org.springframework.stereotype.Repository;
 public interface WorkshopJpaRepository
     extends JpaRepository<WorkshopJpaEntity, UUID>
 {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM WorkshopJpaEntity w WHERE w.id = :id")
+    Optional<WorkshopJpaEntity> findByIdForUpdate(@Param("id") UUID id);
+
     Optional<WorkshopJpaEntity> findByIdAndOrganizationId(
         UUID id,
         UUID organizationId

@@ -16,6 +16,7 @@ import com.unihub.workshop.workers.ai_processing.core.exceptions.AiSummarization
 import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobModel;
 import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobStatusModel;
 import com.unihub.workshop.workers.ai_processing.core.models.BrochureSummarizationRequest;
+import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummarizationMetricsPort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummarizationPort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummaryJobRepositoryPort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.BrochureStoragePort;
@@ -40,6 +41,7 @@ class ProcessBrochureSummarizationUseCaseTest {
     private AiSummarizationPort aiSummarizationPort;
     private AiSummaryJobRepositoryPort jobRepositoryPort;
     private RealtimePublisherPort realtimePublisherPort;
+    private AiSummarizationMetricsPort metricsPort;
 
     private ProcessBrochureSummarizationUseCase useCase;
 
@@ -56,12 +58,17 @@ class ProcessBrochureSummarizationUseCaseTest {
         aiSummarizationPort = mock(AiSummarizationPort.class);
         jobRepositoryPort = mock(AiSummaryJobRepositoryPort.class);
         realtimePublisherPort = mock(RealtimePublisherPort.class);
+        metricsPort = mock(AiSummarizationMetricsPort.class);
 
         useCase = new ProcessBrochureSummarizationUseCase(
             storagePort,
             aiSummarizationPort,
             jobRepositoryPort,
-            realtimePublisherPort
+            realtimePublisherPort,
+            metricsPort,
+            ProcessBrochureSummarizationUseCase.DEFAULT_MAX_ATTEMPTS,
+            ProcessBrochureSummarizationUseCase.DEFAULT_BACKOFF_INITIAL_SECONDS,
+            ProcessBrochureSummarizationUseCase.DEFAULT_BACKOFF_MULTIPLIER
         );
     }
 
@@ -161,6 +168,10 @@ class ProcessBrochureSummarizationUseCaseTest {
             eq(WORKSHOP_ID),
             eq(expectedSummary)
         );
+        verify(metricsPort).recordJobStarted();
+        verify(metricsPort).recordJobCompleted();
+        verify(metricsPort, never()).recordJobFailed();
+        verify(metricsPort, never()).recordJobRetried();
     }
 
     @Test
@@ -197,6 +208,9 @@ class ProcessBrochureSummarizationUseCaseTest {
             eq(WORKSHOP_ID),
             eq("No extractable text found in PDF brochure")
         );
+        verify(metricsPort).recordJobStarted();
+        verify(metricsPort).recordJobFailed();
+        verify(metricsPort, never()).recordJobCompleted();
     }
 
     @Test
@@ -235,6 +249,8 @@ class ProcessBrochureSummarizationUseCaseTest {
             eq(WORKSHOP_ID),
             eq("No extractable text found in PDF brochure")
         );
+        verify(metricsPort).recordJobStarted();
+        verify(metricsPort).recordJobFailed();
     }
 
     @Test
@@ -261,6 +277,7 @@ class ProcessBrochureSummarizationUseCaseTest {
         verify(jobRepositoryPort, never()).updateCompleted(any(), any(), any());
         verify(jobRepositoryPort, never()).updateFailed(any(), any(), any());
         verifyNoInteractions(realtimePublisherPort);
+        verifyNoInteractions(metricsPort);
     }
 
     @Test
@@ -287,6 +304,7 @@ class ProcessBrochureSummarizationUseCaseTest {
         verify(jobRepositoryPort, never()).updateCompleted(any(), any(), any());
         verify(jobRepositoryPort, never()).updateFailed(any(), any(), any());
         verifyNoInteractions(realtimePublisherPort);
+        verifyNoInteractions(metricsPort);
     }
 
     @Test
@@ -332,6 +350,8 @@ class ProcessBrochureSummarizationUseCaseTest {
             any()
         );
         verifyNoInteractions(realtimePublisherPort);
+        verify(metricsPort).recordJobStarted();
+        verify(metricsPort).recordJobRetried();
     }
 
     @Test
@@ -375,6 +395,8 @@ class ProcessBrochureSummarizationUseCaseTest {
             any()
         );
         verifyNoInteractions(realtimePublisherPort);
+        verify(metricsPort).recordJobStarted();
+        verify(metricsPort).recordJobRetried();
     }
 
     @Test
@@ -423,6 +445,8 @@ class ProcessBrochureSummarizationUseCaseTest {
             any(Integer.class),
             any()
         );
+        verify(metricsPort).recordJobStarted();
+        verify(metricsPort).recordJobFailed();
     }
 
     @Test
@@ -464,5 +488,7 @@ class ProcessBrochureSummarizationUseCaseTest {
             eq(WORKSHOP_ID),
             eq("Invalid argument format")
         );
+        verify(metricsPort).recordJobStarted();
+        verify(metricsPort).recordJobFailed();
     }
 }

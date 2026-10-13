@@ -100,6 +100,14 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
     }
 
     @Override
+    @Transactional
+    public Optional<Workshop> findByIdForUpdate(UUID id) {
+        return repository
+            .findByIdForUpdate(id)
+            .map(this::mapToDomainWithSpeakers);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<Workshop> findByIdAndOrganizationId(
         UUID id,

@@ -40,14 +40,6 @@ public class GeminiAiSummarizationAdapter implements AiSummarizationPort {
             .build();
     }
 
-    public GeminiAiSummarizationAdapter(
-        AiProcessingProperties properties,
-        RestClient restClient
-    ) {
-        this.properties = properties;
-        this.restClient = restClient;
-    }
-
     @Override
     @CircuitBreaker(name = "aiProvider")
     public String summarizeText(String text) {
@@ -67,23 +59,33 @@ public class GeminiAiSummarizationAdapter implements AiSummarizationPort {
             Map.of("temperature", 0.2)
         );
 
-        String uri =
-            "/v1beta/models/" + model + ":generateContent?key=" + apiKey;
+        String uri = "/v1beta/models/" + model + ":generateContent";
         log.debug("Calling Google Gemini API model '{}'", model);
 
         GeminiResponse response = restClient
             .post()
             .uri(uri)
+            .header("x-goog-api-key", apiKey)
             .contentType(MediaType.APPLICATION_JSON)
             .body(request)
             .retrieve()
             .body(GeminiResponse.class);
 
+        if (response == null) {
+            throw new RuntimeException("Gemini API returned null response.");
+        }
+
         if (
-            response == null ||
-            response.candidates() == null ||
-            response.candidates().isEmpty()
+            response.promptFeedback() != null &&
+            response.promptFeedback().blockReason() != null
         ) {
+            throw new RuntimeException(
+                "Gemini API blocked prompt due to safety policy: " +
+                    response.promptFeedback().blockReason()
+            );
+        }
+
+        if (response.candidates() == null || response.candidates().isEmpty()) {
             throw new RuntimeException(
                 "Gemini API returned empty candidates list."
             );
@@ -91,12 +93,27 @@ public class GeminiAiSummarizationAdapter implements AiSummarizationPort {
 
         Candidate candidate = response.candidates().getFirst();
         if (
+            candidate.finishReason() != null &&
+            "SAFETY".equalsIgnoreCase(candidate.finishReason())
+        ) {
+            throw new RuntimeException(
+                "Gemini candidate generation was blocked by safety filters."
+            );
+        }
+
+        if (
             candidate.content() == null ||
             candidate.content().parts() == null ||
             candidate.content().parts().isEmpty()
         ) {
+            String reason =
+                candidate.finishReason() != null
+                    ? " (finishReason: " + candidate.finishReason() + ")"
+                    : "";
             throw new RuntimeException(
-                "Gemini API candidate does not contain text parts."
+                "Gemini API candidate does not contain text parts" +
+                    reason +
+                    "."
             );
         }
 
@@ -113,8 +130,14 @@ public class GeminiAiSummarizationAdapter implements AiSummarizationPort {
     public record Part(String text) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record GeminiResponse(List<Candidate> candidates) {}
+    public record PromptFeedback(String blockReason) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Candidate(Content content) {}
+    public record Candidate(Content content, String finishReason) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record GeminiResponse(
+        List<Candidate> candidates,
+        PromptFeedback promptFeedback
+    ) {}
 }

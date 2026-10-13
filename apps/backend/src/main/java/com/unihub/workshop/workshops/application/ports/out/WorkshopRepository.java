@@ -17,6 +17,8 @@ public interface WorkshopRepository {
 
     Optional<Workshop> findById(UUID id);
 
+    Optional<Workshop> findByIdForUpdate(UUID id);
+
     Optional<Workshop> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
     boolean existsBySlug(String slug);

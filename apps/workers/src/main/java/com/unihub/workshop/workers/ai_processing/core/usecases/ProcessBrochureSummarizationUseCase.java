@@ -6,6 +6,7 @@ import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobModel;
 import com.unihub.workshop.workers.ai_processing.core.models.AiSummaryJobStatusModel;
 import com.unihub.workshop.workers.ai_processing.core.models.BrochureSummarizationRequest;
 import com.unihub.workshop.workers.ai_processing.core.ports.in.ProcessBrochureSummarizationPort;
+import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummarizationMetricsPort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummarizationPort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.AiSummaryJobRepositoryPort;
 import com.unihub.workshop.workers.ai_processing.core.ports.out.BrochureStoragePort;
@@ -42,6 +43,7 @@ public class ProcessBrochureSummarizationUseCase
     private final AiSummarizationPort aiSummarizationPort;
     private final AiSummaryJobRepositoryPort jobRepositoryPort;
     private final RealtimePublisherPort realtimePublisherPort;
+    private final AiSummarizationMetricsPort metricsPort;
     private final int maxAttempts;
     private final long backoffInitialIntervalSeconds;
     private final double backoffMultiplier;
@@ -51,6 +53,7 @@ public class ProcessBrochureSummarizationUseCase
         AiSummarizationPort aiSummarizationPort,
         AiSummaryJobRepositoryPort jobRepositoryPort,
         RealtimePublisherPort realtimePublisherPort,
+        AiSummarizationMetricsPort metricsPort,
         @Value("${app.ai.max-attempts:3}") int maxAttempts,
         @Value(
             "${app.ai.backoff-initial-seconds:5}"
@@ -61,26 +64,10 @@ public class ProcessBrochureSummarizationUseCase
         this.aiSummarizationPort = aiSummarizationPort;
         this.jobRepositoryPort = jobRepositoryPort;
         this.realtimePublisherPort = realtimePublisherPort;
+        this.metricsPort = metricsPort;
         this.maxAttempts = maxAttempts;
         this.backoffInitialIntervalSeconds = backoffInitialIntervalSeconds;
         this.backoffMultiplier = backoffMultiplier;
-    }
-
-    public ProcessBrochureSummarizationUseCase(
-        BrochureStoragePort storagePort,
-        AiSummarizationPort aiSummarizationPort,
-        AiSummaryJobRepositoryPort jobRepositoryPort,
-        RealtimePublisherPort realtimePublisherPort
-    ) {
-        this(
-            storagePort,
-            aiSummarizationPort,
-            jobRepositoryPort,
-            realtimePublisherPort,
-            DEFAULT_MAX_ATTEMPTS,
-            DEFAULT_BACKOFF_INITIAL_SECONDS,
-            DEFAULT_BACKOFF_MULTIPLIER
-        );
     }
 
     @Override
@@ -118,6 +105,7 @@ public class ProcessBrochureSummarizationUseCase
         }
 
         int currentAttempts = jobOpt.get().attempts();
+        metricsPort.recordJobStarted();
 
         try {
             // Fetch PDF from MinIO
@@ -162,6 +150,8 @@ public class ProcessBrochureSummarizationUseCase
                 summaryResult
             );
 
+            metricsPort.recordJobCompleted();
+
             log.info(
                 "Successfully summarized brochure: jobId={}, workshopId={}",
                 request.jobId(),
@@ -203,6 +193,7 @@ public class ProcessBrochureSummarizationUseCase
                 newAttempts,
                 nextRetryAt
             );
+            metricsPort.recordJobRetried();
             throw new AiSummarizationTransientException(
                 "Transient error on attempt " +
                     newAttempts +
@@ -232,6 +223,7 @@ public class ProcessBrochureSummarizationUseCase
                 request.workshopId(),
                 errorMessage
             );
+            metricsPort.recordJobFailed();
             throw new AiSummarizationRetryExhaustedException(
                 "Summarization failed for jobId " +
                     request.jobId() +
@@ -323,6 +315,7 @@ public class ProcessBrochureSummarizationUseCase
             request.workshopId(),
             NO_EXTRACTABLE_TEXT_ERROR
         );
+        metricsPort.recordJobFailed();
     }
 
     private String cleanText(String text) {

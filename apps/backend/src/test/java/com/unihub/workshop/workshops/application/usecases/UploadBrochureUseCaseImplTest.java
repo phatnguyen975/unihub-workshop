@@ -105,7 +105,7 @@ class UploadBrochureUseCaseImplTest {
     )
     void shouldUploadBrochureSuccessfully() {
         Workshop workshop = createWorkshop(WorkshopStatus.PUBLISHED, ORG_ID);
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(workshop)
         );
         when(
@@ -151,7 +151,7 @@ class UploadBrochureUseCaseImplTest {
     @Test
     @DisplayName("should throw NotFoundException when workshop does not exist")
     void shouldThrowNotFoundWhenWorkshopDoesNotExist() {
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.empty()
         );
 
@@ -176,7 +176,7 @@ class UploadBrochureUseCaseImplTest {
     void shouldThrowForbiddenWhenOrgMismatch() {
         UUID otherOrgId = UUID.randomUUID();
         Workshop workshop = createWorkshop(WorkshopStatus.DRAFT, otherOrgId);
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(workshop)
         );
 
@@ -203,7 +203,7 @@ class UploadBrochureUseCaseImplTest {
             WorkshopStatus.COMPLETED,
             ORG_ID
         );
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(completedWorkshop)
         );
 
@@ -217,7 +217,7 @@ class UploadBrochureUseCaseImplTest {
             WorkshopStatus.CANCELED,
             ORG_ID
         );
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(canceledWorkshop)
         );
 
@@ -232,7 +232,7 @@ class UploadBrochureUseCaseImplTest {
     )
     void shouldThrowConflictWhenProcessingJobExists() {
         Workshop workshop = createWorkshop(WorkshopStatus.DRAFT, ORG_ID);
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(workshop)
         );
         when(
@@ -255,7 +255,7 @@ class UploadBrochureUseCaseImplTest {
     )
     void shouldThrowValidationWhenInvalidMimeType() {
         Workshop workshop = createWorkshop(WorkshopStatus.DRAFT, ORG_ID);
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(workshop)
         );
         when(
@@ -286,7 +286,7 @@ class UploadBrochureUseCaseImplTest {
     )
     void shouldThrowValidationWhenInvalidMagicBytes() {
         Workshop workshop = createWorkshop(WorkshopStatus.DRAFT, ORG_ID);
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(workshop)
         );
         when(
@@ -312,7 +312,7 @@ class UploadBrochureUseCaseImplTest {
     )
     void shouldThrowValidationWhenFileSizeExceeds10Mb() {
         Workshop workshop = createWorkshop(WorkshopStatus.DRAFT, ORG_ID);
-        when(workshopRepository.findById(WORKSHOP_ID)).thenReturn(
+        when(workshopRepository.findByIdForUpdate(WORKSHOP_ID)).thenReturn(
             Optional.of(workshop)
         );
         when(

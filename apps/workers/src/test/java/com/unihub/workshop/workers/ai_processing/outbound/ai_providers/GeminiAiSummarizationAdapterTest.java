@@ -26,10 +26,10 @@ class GeminiAiSummarizationAdapterTest {
         AiProcessingProperties properties = new AiProcessingProperties();
         properties.getGemini().setApiKey("");
 
-        RestClient restClient = RestClient.builder().build();
+        RestClient.Builder builder = RestClient.builder();
         GeminiAiSummarizationAdapter adapter = new GeminiAiSummarizationAdapter(
             properties,
-            restClient
+            builder
         );
 
         assertThatThrownBy(() -> adapter.summarizeText("Sample content"))
@@ -51,11 +51,9 @@ class GeminiAiSummarizationAdapterTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(
             builder
         ).build();
-        RestClient restClient = builder.build();
-
         GeminiAiSummarizationAdapter adapter = new GeminiAiSummarizationAdapter(
             properties,
-            restClient
+            builder
         );
 
         String jsonResponse = """
@@ -76,17 +74,16 @@ class GeminiAiSummarizationAdapterTest {
 
         server
             .expect(
-                org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo(
-                    "https://test.gemini.api/v1beta/models/gemini-3.8-flash:generateContent?key=test-key-123"
+                MockRestRequestMatchers.requestTo(
+                    "https://test.gemini.api/v1beta/models/gemini-3.8-flash:generateContent"
                 )
             )
             .andExpect(
-                org.springframework.test.web.client.match.MockRestRequestMatchers.method(
-                    HttpMethod.POST
-                )
+                MockRestRequestMatchers.header("x-goog-api-key", "test-key-123")
             )
+            .andExpect(MockRestRequestMatchers.method(HttpMethod.POST))
             .andRespond(
-                org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess(
+                MockRestResponseCreators.withSuccess(
                     jsonResponse,
                     MediaType.APPLICATION_JSON
                 )
@@ -98,6 +95,108 @@ class GeminiAiSummarizationAdapterTest {
             "## Workshop Summary\n\n### Objectives\nLearn Gemini"
         );
         server.verify();
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw clear exception when prompt is blocked by safety filters"
+    )
+    void shouldThrowWhenPromptIsBlockedBySafety() {
+        AiProcessingProperties properties = new AiProcessingProperties();
+        properties.getGemini().setApiKey("test-key-123");
+        properties.getGemini().setModel("gemini-3.8-flash");
+        properties.getGemini().setEndpoint("https://test.gemini.api");
+
+        RestClient.Builder builder = RestClient.builder().baseUrl(
+            "https://test.gemini.api"
+        );
+        MockRestServiceServer server = MockRestServiceServer.bindTo(
+            builder
+        ).build();
+        GeminiAiSummarizationAdapter adapter = new GeminiAiSummarizationAdapter(
+            properties,
+            builder
+        );
+
+        String jsonResponse = """
+        {
+          "promptFeedback": {
+            "blockReason": "SAFETY"
+          }
+        }
+        """;
+
+        server
+            .expect(
+                MockRestRequestMatchers.requestTo(
+                    "https://test.gemini.api/v1beta/models/gemini-3.8-flash:generateContent"
+                )
+            )
+            .andExpect(
+                MockRestRequestMatchers.header("x-goog-api-key", "test-key-123")
+            )
+            .andRespond(
+                MockRestResponseCreators.withSuccess(
+                    jsonResponse,
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        assertThatThrownBy(() -> adapter.summarizeText("Blocked content"))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("safety policy: SAFETY");
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw clear exception when candidate is blocked with finishReason SAFETY"
+    )
+    void shouldThrowWhenCandidateFinishReasonIsSafety() {
+        AiProcessingProperties properties = new AiProcessingProperties();
+        properties.getGemini().setApiKey("test-key-123");
+        properties.getGemini().setModel("gemini-3.8-flash");
+        properties.getGemini().setEndpoint("https://test.gemini.api");
+
+        RestClient.Builder builder = RestClient.builder().baseUrl(
+            "https://test.gemini.api"
+        );
+        MockRestServiceServer server = MockRestServiceServer.bindTo(
+            builder
+        ).build();
+        GeminiAiSummarizationAdapter adapter = new GeminiAiSummarizationAdapter(
+            properties,
+            builder
+        );
+
+        String jsonResponse = """
+        {
+          "candidates": [
+            {
+              "finishReason": "SAFETY"
+            }
+          ]
+        }
+        """;
+
+        server
+            .expect(
+                MockRestRequestMatchers.requestTo(
+                    "https://test.gemini.api/v1beta/models/gemini-3.8-flash:generateContent"
+                )
+            )
+            .andExpect(
+                MockRestRequestMatchers.header("x-goog-api-key", "test-key-123")
+            )
+            .andRespond(
+                MockRestResponseCreators.withSuccess(
+                    jsonResponse,
+                    MediaType.APPLICATION_JSON
+                )
+            );
+
+        assertThatThrownBy(() -> adapter.summarizeText("Blocked candidate"))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("blocked by safety filters");
     }
 
     @Test
@@ -131,18 +230,19 @@ class GeminiAiSummarizationAdapterTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(
             builder
         ).build();
-        RestClient restClient = builder.build();
-
         GeminiAiSummarizationAdapter adapter = new GeminiAiSummarizationAdapter(
             properties,
-            restClient
+            builder
         );
 
         server
             .expect(
                 MockRestRequestMatchers.requestTo(
-                    "https://test.gemini.api/v1beta/models/gemini-3.8-flash:generateContent?key=test-key-123"
+                    "https://test.gemini.api/v1beta/models/gemini-3.8-flash:generateContent"
                 )
+            )
+            .andExpect(
+                MockRestRequestMatchers.header("x-goog-api-key", "test-key-123")
             )
             .andRespond(
                 MockRestResponseCreators.withStatus(

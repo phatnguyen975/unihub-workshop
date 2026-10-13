@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.workers.search_sync.core.models.WorkshopDocument;
 import com.unihub.workshop.workers.search_sync.outbound.elasticsearch.mapper.WorkshopDocumentMapper;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;

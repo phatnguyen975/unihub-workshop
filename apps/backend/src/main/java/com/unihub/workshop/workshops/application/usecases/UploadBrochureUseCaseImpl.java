@@ -56,7 +56,7 @@ public class UploadBrochureUseCaseImpl implements UploadBrochureUseCase {
     @Transactional
     public BrochureUploadResult uploadBrochure(UploadBrochureCommand command) {
         Workshop workshop = workshopRepository
-            .findById(command.workshopId())
+            .findByIdForUpdate(command.workshopId())
             .orElseThrow(() ->
                 new NotFoundException(
                     "Workshop not found with id: " + command.workshopId()
