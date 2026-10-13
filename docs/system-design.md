@@ -237,7 +237,7 @@ sequenceDiagram
   end
 
   loop Background sweep (every X minutes)
-    Sweeper->>DB: Select PENDING registrations > 15 minutes
+    Sweeper->>DB: Select PENDING registrations > 30 minutes
     Sweeper->>Pay: Query payment transaction status
     alt Payment actually succeeded (Delayed Webhook Recovery)
       Pay-->>Sweeper: Transaction Paid
@@ -271,6 +271,13 @@ sequenceDiagram
   The signature (`qr_signature`) is generated server-side using asymmetric RSA-SHA256 (`SHA256withRSA`) with the platform's private key (`rsa.private-key`), encoded as a Base64 string. Offline mobile check-in staff verify this signature using the cached public key (`rsa.public-key`), guaranteeing zero-trust ticket authenticity without internet connectivity.
 - **Dual-Case Reconciliation Sweeper:** The background cleanup job acts as a defensive synchronization boundary. Instead of blindly cancelling expired `PENDING` states, it first issues an API call to the Payment Gateway. If a webhook was lost but payment succeeded, it heals the state to `CONFIRMED`. If the checkout was abandoned, it marks it as `FAILED`, refunds the Redis capacity, and unlocks the idempotency state.
 - **Live Registration Broadcasting:** When a registration transitions to `CONFIRMED` or `CANCELED`, the backend publishes a `registration.updated` event to the workshop Redis Pub/Sub channel (`unihub:stream:workshop:{workshopId}`) via `RealtimeEventPublisher`. Organizers viewing the Workshop Registration Dashboard (F-4.4) receive live count and occupancy updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual polling or page reloads.
+- **Student Registration & Ticket Queries:** In addition to the registration mutation endpoint (`POST /api/v1/registrations`), the system exposes two read endpoints for authenticated students:
+  - `GET /api/v1/registrations/me`: Keyset-paginated list of registrations belonging to the authenticated student (`status`, `workshop`, `priceAtRegistration`, `currency`, `createdAt`), filterable by `status`. Paged via `?cursor={base64}&size={size}` per `docs/api-standards.md`.
+  - `GET /api/v1/registrations/{id}`: Single ticket detail for the student, returning workshop metadata, registration status, `priceAtRegistration`, `currency`, and cryptographic check-in fields (`qrPayload`, `qrSignature`, `qrIssuedAt`). Enforces strict ownership verification (`registration.student_user_id == jwt.sub`), returning `403 Forbidden` if caller does not own the registration (`404 Not Found` if nonexistent).
+- **Visual QR Code Rendering in Email:** When the `notifications` worker consumes `WorkshopRegisteredEvent` from RabbitMQ queue `q.notifications`, it renders a scannable 2D QR barcode image (PNG) using ZXing (`com.google.zxing:core` / `javase`) from the combined canonical payload and signature. The PNG barcode is attached as an inline MIME Content-ID attachment (`cid:ticket-qr`) in the Thymeleaf confirmation email (`<img src="cid:ticket-qr" alt="Workshop Ticket QR Code" />`), ensuring visual display across email clients (e.g., Gmail, Outlook) that block external image loading and JavaScript.
+- **Cross-Module API Facades:** The registration pipeline interacts strictly through public module facades to maintain Spring Modulith architectural boundaries:
+  - `iam::api (IamApi)`: Student verification gating via `isStudentRecordLinked(studentUserId)` (`users.student_record_id IS NOT NULL`, returning `403 Forbidden` if unlinked).
+  - `workshops::api (WorkshopApi)`: Workshop validation via `getWorkshopForRegistration(workshopId)` (`PUBLISHED` status, `starts_at > now()`, `price == 0`, capacity).
 
 ### Payment Webhook Handling Flow
 

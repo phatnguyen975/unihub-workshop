@@ -265,6 +265,7 @@ flowchart LR
 
   Registrations -- sync query --> WS_API
   WS_API -- facade --> Workshops
+  Registrations -- sync query --> IAM_API
   Payments -- sync query --> REG_API
   REG_API -- facade --> Registrations
   Attendances -- sync query --> REG_API
