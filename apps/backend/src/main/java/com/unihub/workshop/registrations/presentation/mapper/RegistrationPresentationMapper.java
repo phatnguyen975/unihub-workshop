@@ -1,7 +1,9 @@
 package com.unihub.workshop.registrations.presentation.mapper;
 
 import com.unihub.workshop.registrations.domain.model.Registration;
+import com.unihub.workshop.registrations.domain.model.RegistrationDetail;
 import com.unihub.workshop.registrations.domain.model.RegistrationSummary;
+import com.unihub.workshop.registrations.presentation.dto.RegistrationDetailResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationListResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationSummaryItemResponse;
@@ -17,6 +19,8 @@ public interface RegistrationPresentationMapper {
     @Mapping(target = "qrSignature", source = "qrTicket.qrSignature")
     @Mapping(target = "qrIssuedAt", source = "qrTicket.qrIssuedAt")
     RegistrationResponse toResponse(Registration registration);
+
+    RegistrationDetailResponse toDetailResponse(RegistrationDetail detail);
 
     RegistrationSummaryItemResponse toSummaryItemResponse(
         RegistrationSummary summary

@@ -136,7 +136,7 @@ This implementation plan delivers the complete free workshop registration capabi
     - When student has zero registrations, returns `200 OK` with `items: []`, `hasMore: false`, `nextCursor: null`.
     - Executed with `@Transactional(readOnly = true)` to route queries to the read replica (satisfies BR-15).
 
-- [ ] **T5 — Implement single registration detail view with ownership check and conditional QR ticket fields (`GET /api/v1/registrations/{id}`)**
+- [x] **T5 — Implement single registration detail view with ownership check and conditional QR ticket fields (`GET /api/v1/registrations/{id}`)**
   - **Size:** S
   - **Depends on:** T2
   - **Layers touched:** Application (Query Use Case), Infrastructure (Repository Query & Replica Routing), Presentation (Controller & DTOs)
@@ -155,9 +155,9 @@ This implementation plan delivers the complete free workshop registration capabi
 
 #### Checkpoint: Read Endpoints Complete
 
-- [ ] Both `GET /me` and `GET /{id}` pass unit and web layer tests with mocked dependencies.
-- [ ] Keyset cursor pagination and ownership boundaries are thoroughly verified.
-- [ ] Read-only transaction annotations are confirmed on query services.
+- [x] Both `GET /me` and `GET /{id}` pass unit and web layer tests with mocked dependencies.
+- [x] Keyset cursor pagination and ownership boundaries are thoroughly verified.
+- [x] Read-only transaction annotations are confirmed on query services.
 
 ### Phase 4: Async Notification Worker & QR Ticket Dispatch
 

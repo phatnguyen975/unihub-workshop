@@ -2,10 +2,13 @@ package com.unihub.workshop.registrations.presentation.controllers;
 
 import com.unihub.workshop.registrations.application.ports.in.GetMyRegistrationsQuery;
 import com.unihub.workshop.registrations.application.ports.in.GetMyRegistrationsUseCase;
+import com.unihub.workshop.registrations.application.ports.in.GetRegistrationDetailUseCase;
 import com.unihub.workshop.registrations.application.ports.in.RegisterWorkshopUseCase;
 import com.unihub.workshop.registrations.domain.model.Registration;
+import com.unihub.workshop.registrations.domain.model.RegistrationDetail;
 import com.unihub.workshop.registrations.domain.model.RegistrationSummary;
 import com.unihub.workshop.registrations.presentation.dto.RegisterWorkshopRequest;
+import com.unihub.workshop.registrations.presentation.dto.RegistrationDetailResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationListResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationResponse;
 import com.unihub.workshop.registrations.presentation.mapper.RegistrationPresentationMapper;
@@ -21,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -35,6 +39,7 @@ public class RegistrationController {
 
     private final RegisterWorkshopUseCase registerWorkshopUseCase;
     private final GetMyRegistrationsUseCase getMyRegistrationsUseCase;
+    private final GetRegistrationDetailUseCase getRegistrationDetailUseCase;
     private final RegistrationPresentationMapper registrationMapper;
 
     /**
@@ -117,6 +122,38 @@ public class RegistrationController {
 
         return ResponseEntity.ok(
             ApiResponse.success(response, "Registrations retrieved")
+        );
+    }
+
+    /**
+     * Retrieves single registration details with ownership check and conditional QR ticket fields.
+     *
+     * @param authentication current security context
+     * @param id registration ID
+     * @return 200 OK with registration details
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<
+        ApiResponse<RegistrationDetailResponse>
+    > getRegistrationDetail(
+        Authentication authentication,
+        @PathVariable("id") UUID id
+    ) {
+        SecurityContextUtils.verifyRole(authentication, "STUDENT");
+        UUID studentUserId = SecurityContextUtils.extractUserId(authentication);
+
+        RegistrationDetail detail =
+            getRegistrationDetailUseCase.getRegistrationDetail(
+                studentUserId,
+                id
+            );
+
+        RegistrationDetailResponse response =
+            registrationMapper.toDetailResponse(detail);
+
+        return ResponseEntity.ok(
+            ApiResponse.success(response, "Registration retrieved")
         );
     }
 
