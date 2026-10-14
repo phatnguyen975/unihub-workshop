@@ -1,10 +1,10 @@
 package com.unihub.workshop.workers.notifications.inbound.handler;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.unihub.workshop.workers.notifications.core.models.DirectEmailDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.ports.in.DirectEmailDeliveryUseCase;
 import com.unihub.workshop.workers.notifications.inbound.dto.OtpRequestedEventDto;
 import java.util.Map;
@@ -47,12 +47,18 @@ class OtpNotificationHandlerTest {
         handler.handle(dto);
 
         verify(emailDeliveryUseCase).deliverEmail(
-            eq(userId),
-            eq("student@hcmus.edu.vn"),
-            eq("UniHub Workshop — Account Activation Verification Code"),
-            eq("otp-activation"),
-            eq(Map.of("otp", "123456", "email", "student@hcmus.edu.vn")),
-            eq("OTP:" + userId + ":" + requestedAt)
+            DirectEmailDeliveryCommand.builder()
+                .userId(userId)
+                .recipientAddress("student@hcmus.edu.vn")
+                .subject(
+                    "UniHub Workshop — Account Activation Verification Code"
+                )
+                .templateName("otp-activation")
+                .templateModel(
+                    Map.of("otp", "123456", "email", "student@hcmus.edu.vn")
+                )
+                .idempotencyKey("OTP:" + userId + ":" + requestedAt)
+                .build()
         );
     }
 
@@ -74,12 +80,16 @@ class OtpNotificationHandlerTest {
         handler.handle(dto);
 
         verify(emailDeliveryUseCase).deliverEmail(
-            eq(userId),
-            eq("student@hcmus.edu.vn"),
-            eq("UniHub Workshop — Password Reset Verification Code"),
-            eq("otp-password-reset"),
-            eq(Map.of("otp", "654321", "email", "student@hcmus.edu.vn")),
-            eq("OTP:" + userId + ":" + requestedAt)
+            DirectEmailDeliveryCommand.builder()
+                .userId(userId)
+                .recipientAddress("student@hcmus.edu.vn")
+                .subject("UniHub Workshop — Password Reset Verification Code")
+                .templateName("otp-password-reset")
+                .templateModel(
+                    Map.of("otp", "654321", "email", "student@hcmus.edu.vn")
+                )
+                .idempotencyKey("OTP:" + userId + ":" + requestedAt)
+                .build()
         );
     }
 
@@ -87,14 +97,7 @@ class OtpNotificationHandlerTest {
     @DisplayName("Should skip delivery when event is null or has missing email")
     void shouldSkipWhenInvalid() {
         handler.handle(null);
-        verify(emailDeliveryUseCase, never()).deliverEmail(
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(emailDeliveryUseCase, never()).deliverEmail(any());
 
         OtpRequestedEventDto invalidDto = new OtpRequestedEventDto(
             UUID.randomUUID(),
@@ -104,13 +107,6 @@ class OtpNotificationHandlerTest {
             "2026-10-07T03:00:00Z"
         );
         handler.handle(invalidDto);
-        verify(emailDeliveryUseCase, never()).deliverEmail(
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
-        );
+        verify(emailDeliveryUseCase, never()).deliverEmail(any());
     }
 }

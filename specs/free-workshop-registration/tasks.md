@@ -161,7 +161,7 @@ This implementation plan delivers the complete free workshop registration capabi
 
 ### Phase 4: Async Notification Worker & QR Ticket Dispatch
 
-- [ ] **T6 — Implement notification worker consumer for `WorkshopRegisteredEvent` with ZXing inline QR generation, email dispatch, in-app notification, and SSE publishing**
+- [x] **T6 — Implement notification worker consumer for `WorkshopRegisteredEvent` with ZXing inline QR generation, email dispatch, in-app notification, and SSE publishing**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Workers Inbound (DTO & Handler), Workers Core (Email Models), Workers Outbound (AMQP Config, JavaMail Inline Attachments, Thymeleaf Template)
@@ -171,7 +171,7 @@ This implementation plan delivers the complete free workshop registration capabi
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/inbound/handler/WorkshopRegisteredNotificationHandler.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/core/models/EmailMessage.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/email/JavaMailSenderAdapter.java`
-    - `apps/workers/src/main/java/com/unihub/workers/notifications/outbound/email/QrCodeGenerator.java`
+    - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/email/QrCodeGenerator.java`
     - `apps/workers/src/main/java/com/unihub/workshop/workers/notifications/outbound/config/NotificationAmqpConfig.java`
     - `apps/workers/src/main/resources/templates/email/workshop-registration-confirmation.html`
     - `apps/workers/src/test/java/com/unihub/workshop/workers/notifications/inbound/handler/WorkshopRegisteredNotificationHandlerTest.java`
@@ -187,11 +187,11 @@ This implementation plan delivers the complete free workshop registration capabi
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks (T1 to T6) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified with unit tests.
-- [ ] Architecture tests pass: `ModulithArchitectureTest` for backend, `HexagonalArchitectureTest` for workers.
-- [ ] No warnings or unhandled compiler/linter issues remain.
-- [ ] Ready for `/review`.
+- [x] All tasks (T1 to T6) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified with unit tests.
+- [x] Architecture tests pass: `ModulithArchitectureTest` for backend, `HexagonalArchitectureTest` for workers.
+- [x] No warnings or unhandled compiler/linter issues remain.
+- [x] Ready for `/review`.
 
 ## Risks and Mitigations
 

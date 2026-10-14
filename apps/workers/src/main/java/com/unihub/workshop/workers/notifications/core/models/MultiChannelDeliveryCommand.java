@@ -2,7 +2,9 @@ package com.unihub.workshop.workers.notifications.core.models;
 
 import java.util.Map;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder(toBuilder = true)
 public record MultiChannelDeliveryCommand(
     UUID userId,
     String recipientEmail,
@@ -16,5 +18,18 @@ public record MultiChannelDeliveryCommand(
     boolean sendEmail,
     String emailSubject,
     String emailTemplateName,
-    Map<String, Object> emailTemplateModel
-) {}
+    Map<String, Object> emailTemplateModel,
+    Map<String, byte[]> inlineAttachments
+) {
+    public MultiChannelDeliveryCommand {
+        if (inAppPayload == null) {
+            inAppPayload = Map.of();
+        }
+        if (emailTemplateModel == null) {
+            emailTemplateModel = Map.of();
+        }
+        if (inlineAttachments == null) {
+            inlineAttachments = Map.of();
+        }
+    }
+}

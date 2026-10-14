@@ -4,8 +4,10 @@ import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
 import com.unihub.workshop.workers.notifications.core.ports.out.EmailSenderPort;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.mail.internet.MimeMessage;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
@@ -46,6 +48,18 @@ public class JavaMailSenderAdapter implements EmailSenderPort {
             helper.setTo(message.recipientAddress());
             helper.setSubject(message.subject());
             helper.setText(message.htmlBody(), true);
+
+            if (message.inlineAttachments() != null) {
+                for (Map.Entry<String, byte[]> entry : message
+                    .inlineAttachments()
+                    .entrySet()) {
+                    helper.addInline(
+                        entry.getKey(),
+                        new ByteArrayResource(entry.getValue()),
+                        "image/png"
+                    );
+                }
+            }
 
             mailSender.send(mimeMessage);
             log.info(

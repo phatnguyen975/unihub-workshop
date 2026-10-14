@@ -42,11 +42,11 @@ class JavaMailSenderAdapterTest {
         MimeMessage mimeMessage = new MimeMessage((Session) null);
         when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
-        EmailMessage message = new EmailMessage(
-            "student@hcmus.edu.vn",
-            "OTP verification code",
-            "<html>123456</html>"
-        );
+        EmailMessage message = EmailMessage.builder()
+            .recipientAddress("student@hcmus.edu.vn")
+            .subject("OTP verification code")
+            .htmlBody("<html>123456</html>")
+            .build();
 
         assertDoesNotThrow(() -> adapter.send(message));
         verify(mailSender).send(mimeMessage);
@@ -63,11 +63,11 @@ class JavaMailSenderAdapterTest {
             .when(mailSender)
             .send(any(MimeMessage.class));
 
-        EmailMessage message = new EmailMessage(
-            "student@hcmus.edu.vn",
-            "OTP verification code",
-            "<html>123456</html>"
-        );
+        EmailMessage message = EmailMessage.builder()
+            .recipientAddress("student@hcmus.edu.vn")
+            .subject("OTP verification code")
+            .htmlBody("<html>123456</html>")
+            .build();
 
         assertThrows(RuntimeException.class, () -> adapter.send(message));
     }

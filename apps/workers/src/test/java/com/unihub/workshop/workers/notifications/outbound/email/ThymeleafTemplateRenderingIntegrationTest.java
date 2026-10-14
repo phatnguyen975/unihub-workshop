@@ -304,4 +304,40 @@ class ThymeleafTemplateRenderingIntegrationTest {
         assertTrue(html.contains("/workshops"));
         assertTrue(html.contains("University of Science"));
     }
+
+    @Test
+    @DisplayName(
+        "Should render workshop-registration-confirmation template with fragments, workshop info, and inline QR cid"
+    )
+    void shouldRenderWorkshopRegistrationConfirmationTemplate() {
+        String html = renderer.render(
+            "workshop-registration-confirmation",
+            Map.of(
+                "studentName",
+                "Nguyen Van An",
+                "workshopTitle",
+                "Spring Boot Microservices",
+                "startsAt",
+                "2026-11-01 09:00 AM",
+                "endsAt",
+                "2026-11-01 11:00 AM",
+                "location",
+                "Auditorium C",
+                "actionUrl",
+                "/workshops/spring-boot-microservices"
+            )
+        );
+
+        assertNotNull(html);
+        assertTrue(html.contains("UniHub Workshop"));
+        assertTrue(html.contains("Registration Confirmed!"));
+        assertTrue(html.contains("Nguyen Van An"));
+        assertTrue(html.contains("Spring Boot Microservices"));
+        assertTrue(html.contains("2026-11-01 09:00 AM"));
+        assertTrue(html.contains("2026-11-01 11:00 AM"));
+        assertTrue(html.contains("Auditorium C"));
+        assertTrue(html.contains("cid:ticket-qr"));
+        assertTrue(html.contains("/workshops/spring-boot-microservices"));
+        assertTrue(html.contains("University of Science"));
+    }
 }

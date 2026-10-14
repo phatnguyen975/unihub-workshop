@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.workers.notifications.core.models.DeliveryChannel;
+import com.unihub.workshop.workers.notifications.core.models.DirectEmailDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
 import com.unihub.workshop.workers.notifications.core.models.MultiChannelDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.models.OrganizationNotificationCommand;
@@ -104,16 +105,22 @@ class NotificationDeliveryServiceTest {
         );
 
         service.deliverEmail(
-            userId,
-            recipient,
-            subject,
-            templateName,
-            model,
-            idempotencyKey
+            DirectEmailDeliveryCommand.builder()
+                .userId(userId)
+                .recipientAddress(recipient)
+                .subject(subject)
+                .templateName(templateName)
+                .templateModel(model)
+                .idempotencyKey(idempotencyKey)
+                .build()
         );
 
         verify(emailSenderPort).send(
-            new EmailMessage(recipient, subject, "<html>123456</html>")
+            EmailMessage.builder()
+                .recipientAddress(recipient)
+                .subject(subject)
+                .htmlBody("<html>123456</html>")
+                .build()
         );
         verify(notificationDeliveryLogPort).markSent(logId, idempotencyKey);
     }
@@ -136,12 +143,14 @@ class NotificationDeliveryServiceTest {
         ).thenReturn(true);
 
         service.deliverEmail(
-            userId,
-            recipient,
-            "Subject",
-            "template",
-            Map.of(),
-            idempotencyKey
+            DirectEmailDeliveryCommand.builder()
+                .userId(userId)
+                .recipientAddress(recipient)
+                .subject("Subject")
+                .templateName("template")
+                .templateModel(Map.of())
+                .idempotencyKey(idempotencyKey)
+                .build()
         );
 
         verify(notificationDeliveryLogPort, never()).createPendingLog(
@@ -188,12 +197,14 @@ class NotificationDeliveryServiceTest {
 
         assertDoesNotThrow(() ->
             service.deliverEmail(
-                userId,
-                recipient,
-                "Subject",
-                "template",
-                Map.of(),
-                idempotencyKey
+                DirectEmailDeliveryCommand.builder()
+                    .userId(userId)
+                    .recipientAddress(recipient)
+                    .subject("Subject")
+                    .templateName("template")
+                    .templateModel(Map.of())
+                    .idempotencyKey(idempotencyKey)
+                    .build()
             )
         );
 
@@ -236,21 +247,22 @@ class NotificationDeliveryServiceTest {
             "<html>Assigned</html>"
         );
 
-        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
-            userId,
-            recipient,
-            idempotencyKey,
-            true,
-            "STAFF_ASSIGNED_TO_WORKSHOP",
-            "/workshops/W-123",
-            Map.of("workshopTitle", "Spring Cloud"),
-            true,
-            "notification.new",
-            true,
-            "Staff Assigned",
-            "staff-assigned",
-            Map.of("workshopTitle", "Spring Cloud")
-        );
+        MultiChannelDeliveryCommand command =
+            MultiChannelDeliveryCommand.builder()
+                .userId(userId)
+                .recipientEmail(recipient)
+                .idempotencyKey(idempotencyKey)
+                .sendInApp(true)
+                .inAppEventKey("STAFF_ASSIGNED_TO_WORKSHOP")
+                .inAppActionUrl("/workshops/W-123")
+                .inAppPayload(Map.of("workshopTitle", "Spring Cloud"))
+                .sendRealtime(true)
+                .realtimeEventType("notification.new")
+                .sendEmail(true)
+                .emailSubject("Staff Assigned")
+                .emailTemplateName("staff-assigned")
+                .emailTemplateModel(Map.of("workshopTitle", "Spring Cloud"))
+                .build();
 
         service.deliverMultiChannel(command);
 
@@ -284,21 +296,22 @@ class NotificationDeliveryServiceTest {
             inAppNotificationPort.isAlreadyCreated(userId, idempotencyKey)
         ).thenReturn(true);
 
-        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
-            userId,
-            "organizer@hcmus.edu.vn",
-            idempotencyKey,
-            true,
-            "USER_PROVISIONED",
-            null,
-            Map.of("role", "ORGANIZER"),
-            false,
-            null,
-            false,
-            null,
-            null,
-            Map.of()
-        );
+        MultiChannelDeliveryCommand command =
+            MultiChannelDeliveryCommand.builder()
+                .userId(userId)
+                .recipientEmail("organizer@hcmus.edu.vn")
+                .idempotencyKey(idempotencyKey)
+                .sendInApp(true)
+                .inAppEventKey("USER_PROVISIONED")
+                .inAppActionUrl(null)
+                .inAppPayload(Map.of("role", "ORGANIZER"))
+                .sendRealtime(false)
+                .realtimeEventType(null)
+                .sendEmail(false)
+                .emailSubject(null)
+                .emailTemplateName(null)
+                .emailTemplateModel(Map.of())
+                .build();
 
         service.deliverMultiChannel(command);
 
@@ -351,21 +364,22 @@ class NotificationDeliveryServiceTest {
             .when(realtimeEventPublisherPort)
             .publishNotificationSignal(any(), any());
 
-        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
-            userId,
-            recipient,
-            idempotencyKey,
-            true,
-            "STAFF_REVOKED_FROM_WORKSHOP",
-            "/workshops",
-            Map.of("workshopTitle", "Spring Cloud"),
-            true,
-            "notification.new",
-            true,
-            "Staff Revoked",
-            "staff-revoked",
-            Map.of("workshopTitle", "Spring Cloud")
-        );
+        MultiChannelDeliveryCommand command =
+            MultiChannelDeliveryCommand.builder()
+                .userId(userId)
+                .recipientEmail(recipient)
+                .idempotencyKey(idempotencyKey)
+                .sendInApp(true)
+                .inAppEventKey("STAFF_REVOKED_FROM_WORKSHOP")
+                .inAppActionUrl("/workshops")
+                .inAppPayload(Map.of("workshopTitle", "Spring Cloud"))
+                .sendRealtime(true)
+                .realtimeEventType("notification.new")
+                .sendEmail(true)
+                .emailSubject("Staff Revoked")
+                .emailTemplateName("staff-revoked")
+                .emailTemplateModel(Map.of("workshopTitle", "Spring Cloud"))
+                .build();
 
         assertDoesNotThrow(() -> service.deliverMultiChannel(command));
 

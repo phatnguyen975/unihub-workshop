@@ -147,4 +147,14 @@ public class NotificationAmqpConfig {
             .to(notificationsEventsExchange)
             .with("workshop.canceled");
     }
+
+    @Bean
+    public Binding notificationsWorkshopRegisteredBinding(
+        Queue notificationsQueue,
+        DirectExchange notificationsEventsExchange
+    ) {
+        return BindingBuilder.bind(notificationsQueue)
+            .to(notificationsEventsExchange)
+            .with("workshop.registered");
+    }
 }

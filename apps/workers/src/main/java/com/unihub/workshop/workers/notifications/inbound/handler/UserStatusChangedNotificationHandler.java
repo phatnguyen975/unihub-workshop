@@ -67,21 +67,22 @@ public class UserStatusChangedNotificationHandler
 
         boolean hasEmail = event.email() != null && !event.email().isBlank();
 
-        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
-            event.userId(),
-            event.email(),
-            event.idempotencyKey(),
-            true, // sendInApp
-            eventKey,
-            null, // action_url = null for account-level events
-            inAppPayload,
-            false, // NO SSE for UserStatusChangedEvent
-            null,
-            hasEmail, // sendEmail
-            subject,
-            templateName,
-            emailModel
-        );
+        MultiChannelDeliveryCommand command =
+            MultiChannelDeliveryCommand.builder()
+                .userId(event.userId())
+                .recipientEmail(event.email())
+                .idempotencyKey(event.idempotencyKey())
+                .sendInApp(true)
+                .inAppEventKey(eventKey)
+                .inAppActionUrl(null)
+                .inAppPayload(inAppPayload)
+                .sendRealtime(false)
+                .realtimeEventType(null)
+                .sendEmail(hasEmail)
+                .emailSubject(subject)
+                .emailTemplateName(templateName)
+                .emailTemplateModel(emailModel)
+                .build();
 
         deliveryUseCase.deliverMultiChannel(command);
     }

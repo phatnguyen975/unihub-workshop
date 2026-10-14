@@ -1,6 +1,7 @@
 package com.unihub.workshop.workers.notifications.core.usecases;
 
 import com.unihub.workshop.workers.notifications.core.models.DeliveryChannel;
+import com.unihub.workshop.workers.notifications.core.models.DirectEmailDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.models.EmailMessage;
 import com.unihub.workshop.workers.notifications.core.models.MultiChannelDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.models.OrganizationNotificationCommand;
@@ -107,68 +108,83 @@ public class NotificationDeliveryService
         // 3. Email Channel (Soft failure isolated via deliverEmail)
         if (command.sendEmail() && command.recipientEmail() != null) {
             deliverEmail(
-                command.userId(),
-                command.recipientEmail(),
-                command.emailSubject(),
-                command.emailTemplateName(),
-                command.emailTemplateModel(),
-                command.idempotencyKey()
+                DirectEmailDeliveryCommand.builder()
+                    .userId(command.userId())
+                    .recipientAddress(command.recipientEmail())
+                    .subject(command.emailSubject())
+                    .templateName(command.emailTemplateName())
+                    .templateModel(command.emailTemplateModel())
+                    .inlineAttachments(command.inlineAttachments())
+                    .idempotencyKey(command.idempotencyKey())
+                    .build()
             );
         }
     }
 
     @Override
-    public void deliverEmail(
-        UUID userId,
-        String recipientAddress,
-        String subject,
-        String templateName,
-        Map<String, Object> templateModel,
-        String idempotencyKey
-    ) {
+    public void deliverEmail(DirectEmailDeliveryCommand command) {
+        if (
+            command == null ||
+            command.recipientAddress() == null ||
+            command.recipientAddress().isBlank()
+        ) {
+            log.warn(
+                "Skipping invalid DirectEmailDeliveryCommand: missing recipientAddress"
+            );
+            return;
+        }
+
         if (
             notificationDeliveryLogPort.isAlreadySent(
-                recipientAddress,
+                command.recipientAddress(),
                 DeliveryChannel.EMAIL,
-                idempotencyKey
+                command.idempotencyKey()
             )
         ) {
             log.info(
                 "Skipping duplicate email delivery for recipient='{}', channel=EMAIL, idempotencyKey='{}'",
-                recipientAddress,
-                idempotencyKey
+                command.recipientAddress(),
+                command.idempotencyKey()
             );
             return;
         }
 
         UUID logId = notificationDeliveryLogPort.createPendingLog(
-            userId,
+            command.userId(),
             DeliveryChannel.EMAIL,
-            recipientAddress,
-            idempotencyKey
+            command.recipientAddress(),
+            command.idempotencyKey()
         );
 
         try {
             String htmlBody = emailRendererPort.render(
-                templateName,
-                templateModel
+                command.templateName(),
+                command.templateModel()
             );
             emailSenderPort.send(
-                new EmailMessage(recipientAddress, subject, htmlBody)
+                EmailMessage.builder()
+                    .recipientAddress(command.recipientAddress())
+                    .subject(command.subject())
+                    .htmlBody(htmlBody)
+                    .inlineAttachments(command.inlineAttachments())
+                    .build()
             );
-            notificationDeliveryLogPort.markSent(logId, idempotencyKey);
+            notificationDeliveryLogPort.markSent(
+                logId,
+                command.idempotencyKey()
+            );
             log.info(
                 "Successfully delivered email to recipient='{}', logId='{}', idempotencyKey='{}'",
-                recipientAddress,
+                command.recipientAddress(),
                 logId,
-                idempotencyKey
+                command.idempotencyKey()
             );
         } catch (Exception e) {
             log.error(
                 "Failed to deliver email to recipient='{}', logId='{}', idempotencyKey='{}': {}",
-                recipientAddress,
+                command.recipientAddress(),
                 logId,
-                idempotencyKey,
+                command.idempotencyKey(),
                 e.getMessage(),
                 e
             );
@@ -235,21 +251,21 @@ public class NotificationDeliveryService
             emailModel.put("actionUrl", command.inAppActionUrl());
 
             MultiChannelDeliveryCommand deliveryCmd =
-                new MultiChannelDeliveryCommand(
-                    organizer.id(),
-                    organizer.email(),
-                    idempotencyKey,
-                    true,
-                    command.inAppEventKey(),
-                    command.inAppActionUrl(),
-                    inAppPayload,
-                    true,
-                    "notification.new",
-                    true,
-                    command.emailSubject(),
-                    command.emailTemplateName(),
-                    emailModel
-                );
+                MultiChannelDeliveryCommand.builder()
+                    .userId(organizer.id())
+                    .recipientEmail(organizer.email())
+                    .idempotencyKey(idempotencyKey)
+                    .sendInApp(true)
+                    .inAppEventKey(command.inAppEventKey())
+                    .inAppActionUrl(command.inAppActionUrl())
+                    .inAppPayload(inAppPayload)
+                    .sendRealtime(true)
+                    .realtimeEventType("notification.new")
+                    .sendEmail(true)
+                    .emailSubject(command.emailSubject())
+                    .emailTemplateName(command.emailTemplateName())
+                    .emailTemplateModel(emailModel)
+                    .build();
 
             deliverMultiChannel(deliveryCmd);
         }
@@ -303,21 +319,21 @@ public class NotificationDeliveryService
                 );
 
                 MultiChannelDeliveryCommand deliveryCmd =
-                    new MultiChannelDeliveryCommand(
-                        attendee.id(),
-                        attendee.email(),
-                        idempotencyKey,
-                        true,
-                        command.inAppEventKey(),
-                        command.inAppActionUrl(),
-                        command.inAppPayload(),
-                        true,
-                        "notification.new",
-                        true,
-                        command.emailSubject(),
-                        command.emailTemplateName(),
-                        emailModel
-                    );
+                    MultiChannelDeliveryCommand.builder()
+                        .userId(attendee.id())
+                        .recipientEmail(attendee.email())
+                        .idempotencyKey(idempotencyKey)
+                        .sendInApp(true)
+                        .inAppEventKey(command.inAppEventKey())
+                        .inAppActionUrl(command.inAppActionUrl())
+                        .inAppPayload(command.inAppPayload())
+                        .sendRealtime(true)
+                        .realtimeEventType("notification.new")
+                        .sendEmail(true)
+                        .emailSubject(command.emailSubject())
+                        .emailTemplateName(command.emailTemplateName())
+                        .emailTemplateModel(emailModel)
+                        .build();
 
                 deliverMultiChannel(deliveryCmd);
                 totalDispatched++;
