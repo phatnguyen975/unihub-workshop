@@ -15,6 +15,7 @@ public record Registration(
     String currency,
     UUID idempotencyKeyId,
     QrTicket qrTicket,
+    String paymentClientSecret,
     Instant expiresAt,
     Instant createdAt,
     Instant updatedAt,

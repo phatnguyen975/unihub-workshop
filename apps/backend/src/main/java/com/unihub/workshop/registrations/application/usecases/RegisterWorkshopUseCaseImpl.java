@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestrator service implementing {@link RegisterWorkshopUseCase}.
@@ -42,7 +41,6 @@ public class RegisterWorkshopUseCaseImpl implements RegisterWorkshopUseCase {
     private final List<RegistrationStrategy> strategies;
 
     @Override
-    @Transactional
     public Registration register(
         UUID studentUserId,
         UUID workshopId,
