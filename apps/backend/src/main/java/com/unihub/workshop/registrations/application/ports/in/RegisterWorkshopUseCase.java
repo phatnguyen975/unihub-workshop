@@ -9,12 +9,12 @@ public interface RegisterWorkshopUseCase {
      *
      * @param studentUserId authenticated student user ID
      * @param workshopId target workshop ID
-     * @param idempotencyKeyId idempotency key ID
+     * @param idempotencyKey client-supplied UUID string idempotency key
      * @return confirmed registration aggregate
      */
     Registration register(
         UUID studentUserId,
         UUID workshopId,
-        UUID idempotencyKeyId
+        String idempotencyKey
     );
 }

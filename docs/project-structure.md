@@ -140,6 +140,7 @@ apps/backend/
 │   │   │       │   ├── database/             # Read-replica dynamic routing datasource configuration
 │   │   │       │   ├── events/               # Transactional Outbox integration events (@Externalized to RabbitMQ)
 │   │   │       │   ├── exception/            # RFC 7807 problem details and domain exception mappers
+│   │   │       │   ├── idempotency/          # Generic 2-tier idempotency engine (Redis L1 cache + PostgreSQL L2 durability)
 │   │   │       │   ├── pagination/           # Canonical cursor-based pagination domain and web contract
 │   │   │       │   ├── ratelimit/            # Token-bucket distributed rate limiting filter via Bucket4j and Redis
 │   │   │       │   ├── realtime/             # Server-Sent Events (SSE) streaming hub, emitter registry, Redis Pub/Sub

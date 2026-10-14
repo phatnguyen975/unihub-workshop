@@ -105,7 +105,7 @@ class RegistrationControllerTest {
             registerWorkshopUseCase.register(
                 eq(studentUserId),
                 eq(workshopId),
-                eq(idempotencyKey)
+                eq(idempotencyKey.toString())
             )
         ).thenReturn(registration);
 
@@ -138,7 +138,7 @@ class RegistrationControllerTest {
         verify(registerWorkshopUseCase).register(
             studentUserId,
             workshopId,
-            idempotencyKey
+            idempotencyKey.toString()
         );
     }
 

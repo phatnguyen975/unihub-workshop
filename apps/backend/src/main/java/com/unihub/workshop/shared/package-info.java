@@ -7,6 +7,7 @@
  *   <li>{@code database}: Dynamic primary/replica read-routing datasource</li>
  *   <li>{@code events}: Transactional outbox integration events for asynchronous worker notification</li>
  *   <li>{@code exception}: RFC 7807 global exception handling hierarchy</li>
+ *   <li>{@code idempotency}: Two-tier distributed idempotency engine (Redis L1 + PostgreSQL L2)</li>
  *   <li>{@code pagination}: Canonical cursor-based pagination domain and web contract</li>
  *   <li>{@code ratelimit}: Token-bucket distributed rate limiting filter via Bucket4j and Redis</li>
  *   <li>{@code realtime}: Server-Sent Events (SSE) streaming hub and Redis pub/sub distribution</li>

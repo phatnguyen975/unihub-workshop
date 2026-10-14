@@ -106,6 +106,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     ? sue.getRetryAfterSeconds()
                     : defaultRetryAfterSeconds;
             builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter));
+        } else if (
+            ex.getProperties() != null &&
+            ex.getProperties().get("retryAfter") != null
+        ) {
+            builder.header(
+                HttpHeaders.RETRY_AFTER,
+                String.valueOf(ex.getProperties().get("retryAfter"))
+            );
         }
 
         return builder.body(problem);

@@ -84,19 +84,21 @@ This implementation plan delivers the complete free workshop registration capabi
     - Request returns `409 Conflict` if the student already holds an active (`PENDING` or `CONFIRMED`) registration for the target workshop (satisfies FR-10, BR-06, Scenario 11).
     - Request returns `422 Unprocessable Entity` if the workshop schedule overlaps with any active registration already held by the student (satisfies FR-10, BR-07, Scenario 12).
 
-- [ ] **T3 — Implement high-concurrency Redis capacity control, compensating rollback, and two-tier idempotency protection for registration mutation**
+- [x] **T3 — Implement high-concurrency Redis capacity control, compensating rollback, and two-tier idempotency protection for registration mutation**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Application (Ports & Use Case), Infrastructure (Redis Cache, DB Idempotency Persistence), Presentation (Header Validation & Error Mapping)
   - **Files:**
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/idempotency/IdempotencyPort.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/idempotency/ClaimResult.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/idempotency/IdempotencyConflictException.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/idempotency/IdempotencyKeyJpaEntity.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/idempotency/IdempotencyKeyJpaRepository.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/idempotency/RedisIdempotencyAdapter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/registrations/application/ports/out/CapacityPort.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/registrations/application/ports/out/IdempotencyPort.java`
     - `apps/backend/src/main/java/com/unihub/workshop/registrations/infrastructure/cache/RedisCapacityAdapter.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/registrations/infrastructure/persistence/IdempotencyKeyJpaEntity.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/registrations/infrastructure/persistence/IdempotencyKeyJpaRepository.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/registrations/infrastructure/cache/RedisIdempotencyAdapter.java`
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/idempotency/RedisIdempotencyAdapterTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/infrastructure/cache/RedisCapacityAdapterTest.java`
-    - `apps/backend/src/test/java/com/unihub/workshop/registrations/infrastructure/cache/RedisIdempotencyAdapterTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/presentation/controllers/RegistrationIdempotencyAndCapacityTest.java`
   - **Acceptance Criteria:**
     - Request without an `Idempotency-Key` header, or with a header not conforming to UUIDv4, returns `422 Unprocessable Entity` (satisfies FR-03, BR-03).
@@ -108,9 +110,9 @@ This implementation plan delivers the complete free workshop registration capabi
 
 #### Checkpoint: Registration Mutation Complete
 
-- [ ] `POST /api/v1/registrations` passes all unit tests for validation, business rules, idempotency replay, and capacity exhaustion.
-- [ ] Concurrency edge cases (simultaneous duplicate keys, last-seat race conditions) are verified with unit tests using mocked Redis and repositories.
-- [ ] All code strictly adheres to `registrations` package structure and Clean Architecture layer dependencies.
+- [x] `POST /api/v1/registrations` passes all unit tests for validation, business rules, idempotency replay, and capacity exhaustion.
+- [x] Concurrency edge cases (simultaneous duplicate keys, last-seat race conditions) are verified with unit tests using mocked Redis and repositories.
+- [x] All code strictly adheres to `registrations` package structure and Clean Architecture layer dependencies.
 
 ### Phase 3: Registration Query & Detail Retrieval (Read Path)
 

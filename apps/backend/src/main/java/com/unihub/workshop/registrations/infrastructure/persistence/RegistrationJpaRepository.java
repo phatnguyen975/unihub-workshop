@@ -40,4 +40,14 @@ public interface RegistrationJpaRepository
         @Param("newStartsAt") Instant newStartsAt,
         @Param("newEndsAt") Instant newEndsAt
     );
+
+    @Query(
+        value = """
+        SELECT COUNT(r.id) FROM registrations r
+        WHERE r.workshop_id = :workshopId
+            AND r.status IN ('PENDING', 'CONFIRMED')
+        """,
+        nativeQuery = true
+    )
+    long countActiveRegistrations(@Param("workshopId") UUID workshopId);
 }

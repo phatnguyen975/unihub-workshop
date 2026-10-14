@@ -62,4 +62,13 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
             endsAt
         );
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countActiveRegistrations(UUID workshopId) {
+        if (workshopId == null) {
+            return 0L;
+        }
+        return repository.countActiveRegistrations(workshopId);
+    }
 }

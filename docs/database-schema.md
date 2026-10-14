@@ -597,7 +597,7 @@ erDiagram
 
 ### Table: `idempotency_keys`
 
-**Table Description & UX Context:** Stores idempotency keys and cached responses to enforce exactly-once processing for payment and registration flows.
+**Table Description & UX Context:** Stores idempotency keys and cached responses to enforce exactly-once processing for payment and registration flows. Managed by the Shared Kernel to provide cross-cutting idempotency guarantees across modules.
 
 **Schema Definition Table:**
 

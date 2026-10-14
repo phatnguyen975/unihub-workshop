@@ -50,12 +50,12 @@ public class RegistrationController {
         SecurityContextUtils.verifyRole(authentication, "STUDENT");
         UUID studentUserId = SecurityContextUtils.extractUserId(authentication);
 
-        UUID idempotencyKeyId = parseIdempotencyKey(idempotencyKeyHeader);
+        String idempotencyKey = validateIdempotencyKey(idempotencyKeyHeader);
 
         Registration registration = registerWorkshopUseCase.register(
             studentUserId,
             request.workshopId(),
-            idempotencyKeyId
+            idempotencyKey
         );
 
         RegistrationResponse response = registrationMapper.toResponse(
@@ -67,15 +67,23 @@ public class RegistrationController {
         );
     }
 
-    private UUID parseIdempotencyKey(String header) {
+    private String validateIdempotencyKey(String header) {
         if (header == null || header.isBlank()) {
             throw new ValidationException(
                 "Idempotency-Key",
                 "Idempotency-Key header is required"
             );
         }
+        String trimmed = header.trim();
+        if (trimmed.length() > 64) {
+            throw new ValidationException(
+                "Idempotency-Key",
+                "Idempotency-Key header must not exceed 64 characters"
+            );
+        }
         try {
-            return UUID.fromString(header.trim());
+            UUID.fromString(trimmed);
+            return trimmed;
         } catch (IllegalArgumentException e) {
             throw new ValidationException(
                 "Idempotency-Key",

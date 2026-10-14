@@ -44,4 +44,12 @@ public interface RegistrationRepository {
         Instant startsAt,
         Instant endsAt
     );
+
+    /**
+     * Counts active (PENDING or CONFIRMED) registrations for the given workshop.
+     *
+     * @param workshopId workshop ID
+     * @return active registration count
+     */
+    long countActiveRegistrations(UUID workshopId);
 }
