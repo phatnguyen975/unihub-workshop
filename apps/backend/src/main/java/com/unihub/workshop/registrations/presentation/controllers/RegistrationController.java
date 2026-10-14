@@ -12,7 +12,7 @@ import com.unihub.workshop.registrations.presentation.dto.RegistrationDetailResp
 import com.unihub.workshop.registrations.presentation.dto.RegistrationListResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationResponse;
 import com.unihub.workshop.registrations.presentation.mapper.RegistrationPresentationMapper;
-import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.idempotency.IdempotencyKeyValidator;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
@@ -63,7 +63,9 @@ public class RegistrationController {
         SecurityContextUtils.verifyRole(authentication, "STUDENT");
         UUID studentUserId = SecurityContextUtils.extractUserId(authentication);
 
-        String idempotencyKey = validateIdempotencyKey(idempotencyKeyHeader);
+        String idempotencyKey = IdempotencyKeyValidator.validateAndNormalize(
+            idempotencyKeyHeader
+        );
 
         Registration registration = registerWorkshopUseCase.register(
             studentUserId,
@@ -155,30 +157,5 @@ public class RegistrationController {
         return ResponseEntity.ok(
             ApiResponse.success(response, "Registration retrieved")
         );
-    }
-
-    private String validateIdempotencyKey(String header) {
-        if (header == null || header.isBlank()) {
-            throw new ValidationException(
-                "Idempotency-Key",
-                "Idempotency-Key header is required"
-            );
-        }
-        String trimmed = header.trim();
-        if (trimmed.length() > 64) {
-            throw new ValidationException(
-                "Idempotency-Key",
-                "Idempotency-Key header must not exceed 64 characters"
-            );
-        }
-        try {
-            UUID.fromString(trimmed);
-            return trimmed;
-        } catch (IllegalArgumentException e) {
-            throw new ValidationException(
-                "Idempotency-Key",
-                "Idempotency-Key header must be a valid UUIDv4"
-            );
-        }
     }
 }

@@ -139,6 +139,67 @@ class RegistrationControllerTest {
 
     @Test
     @DisplayName(
+        "POST /api/v1/registrations: trims whitespace on Idempotency-Key header and returns 201 Created"
+    )
+    void register_WhitespacePaddedIdempotencyKey_TrimsAndReturns201Created()
+        throws Exception {
+        UUID registrationId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        Registration registration = Registration.builder()
+            .id(registrationId)
+            .workshopId(workshopId)
+            .studentUserId(studentUserId)
+            .status(RegistrationStatus.CONFIRMED)
+            .priceAtRegistration(BigDecimal.ZERO)
+            .currency("USD")
+            .idempotencyKeyId(idempotencyKey)
+            .qrTicket(
+                new QrTicket(
+                    "{\"regId\":\"" + registrationId + "\"}",
+                    "sig123",
+                    now
+                )
+            )
+            .createdAt(now)
+            .build();
+
+        when(
+            registerWorkshopUseCase.register(
+                eq(studentUserId),
+                eq(workshopId),
+                eq(idempotencyKey.toString())
+            )
+        ).thenReturn(registration);
+
+        RegisterWorkshopRequest request = new RegisterWorkshopRequest(
+            workshopId
+        );
+
+        mockMvc
+            .perform(
+                post("/api/v1/registrations")
+                    .principal(createAuth(studentUserId, "STUDENT"))
+                    .header(
+                        "Idempotency-Key",
+                        "  " + idempotencyKey.toString() + " \t "
+                    )
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request))
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.id").value(registrationId.toString()));
+
+        verify(registerWorkshopUseCase).register(
+            studentUserId,
+            workshopId,
+            idempotencyKey.toString()
+        );
+    }
+
+    @Test
+    @DisplayName(
         "POST /api/v1/registrations: returns 422 Unprocessable Entity when Idempotency-Key header is missing"
     )
     void register_MissingIdempotencyKey_Returns422() throws Exception {

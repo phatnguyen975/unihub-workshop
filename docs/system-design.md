@@ -191,32 +191,25 @@ sequenceDiagram
                 API-->>GW: 201 Created + Registration with signed QR
                 GW-->>Web: 201 Created + Registration with signed QR
               else Paid workshop (price > 0)
-                API->>DB: Begin tx
-                API->>DB: Insert Registration (Status: PENDING)
-                API->>DB: Commit tx
-                API->>Pay: Charge (idempotency key)
-                alt Payment success
-                  Pay-->>API: Approved
-                  API->>API: Generate RSA-SHA256 signature for qr_payload JSON
+                API->>Pay: Create PaymentIntent via SPI (Resilience4j Circuit Breaker)
+                alt Gateway Timeout or Circuit Breaker Open
+                  Pay-->>API: Timeout / Error
+                  API->>Redis: Increment capacity (compensating action)
+                  API->>DB: Update idempotency key (Status: FAILED)
+                  API-->>GW: 503 Service Unavailable (Retry-After: 30)
+                  GW-->>Web: 503 Service Unavailable
+                else PaymentIntent Created Successfully
+                  Pay-->>API: PaymentIntent (id: pi_xxx, client_secret)
                   API->>DB: Begin tx
-                  API->>DB: Update Registration (Status: CONFIRMED, qr_payload, qr_signature, qr_issued_at)
-                  API->>DB: Insert WorkshopRegisteredEvent into Outbox (event_publication)
+                  API->>DB: Insert Registration (Status: PENDING, no QR fields)
+                  API->>DB: Insert Payment (Status: PENDING, provider_payment_id: pi_xxx)
                   API->>DB: Update idempotency key (Status: COMPLETED, Response: 201)
                   API->>DB: Commit tx
                   API->>Redis: Set idempotency key L1 Cache (COMPLETED, TTL: 24h)
-                  API->>Redis: Publish registration.updated to unihub:stream:workshop:{id}
-                  API-->>GW: 201 Created + Registration with signed QR
-                  GW-->>Web: 201 Created + Registration with signed QR
-                else Timeout or failure
-                  Pay-->>API: Timeout/Error
-                  Note over API,Pay: Resilience4j circuit breaker trips
-                  API->>DB: Begin tx
-                  API->>DB: Update Registration (Status: FAILED)
-                  API->>Redis: Increment capacity (compensating action)
-                  API->>DB: Update idempotency key (Status: FAILED)
-                  API->>DB: Commit tx
-                  API-->>GW: 503 Service Unavailable
-                  GW-->>Web: 503 Service Unavailable
+                  API-->>GW: 201 Created (Status: PENDING, paymentClientSecret)
+                  GW-->>Web: 201 Created (Status: PENDING, paymentClientSecret)
+                  Note over Web,Pay: Student completes payment on frontend via Stripe Elements
+                  Note over Web,API: Confirmation occurs asynchronously via Payment Webhook Handling Flow
                 end
               end
             end
@@ -277,7 +270,9 @@ sequenceDiagram
 - **Visual QR Code Rendering in Email:** When the `notifications` worker consumes `WorkshopRegisteredEvent` from RabbitMQ queue `q.notifications`, it renders a scannable 2D QR barcode image (PNG) using ZXing (`com.google.zxing:core` / `javase`) from the combined canonical payload and signature. The PNG barcode is attached as an inline MIME Content-ID attachment (`cid:ticket-qr`) in the Thymeleaf confirmation email (`<img src="cid:ticket-qr" alt="Workshop Ticket QR Code" />`), ensuring visual display across email clients (e.g., Gmail, Outlook) that block external image loading and JavaScript.
 - **Cross-Module API Facades:** The registration pipeline interacts strictly through public module facades to maintain Spring Modulith architectural boundaries:
   - `iam::api (IamApi)`: Student verification gating via `isStudentRecordLinked(studentUserId)` (`users.student_record_id IS NOT NULL`, returning `403 Forbidden` if unlinked).
-  - `workshops::api (WorkshopApi)`: Workshop validation via `getWorkshopForRegistration(workshopId)` (`PUBLISHED` status, `starts_at > now()`, `price == 0`, capacity).
+  - `workshops::api (WorkshopApi)`: Workshop validation via `getWorkshopForRegistration(workshopId)` (`PUBLISHED` status, `starts_at > now()`, capacity).
+  - `registrations::api (RegistrationPaymentPort)`: Outbound SPI interface declared in `registrations/api` and implemented by `payments` module, allowing `PaidRegistrationStrategy` to create Stripe `PaymentIntent` without `registrations` depending directly on `payments`.
+  - `registrations::api (RegistrationApi)`: Inbound facade in `registrations/api` called by `payments` module inside the webhook transaction to confirm paid registrations, atomically transitioning `registrations` to `CONFIRMED`, generating RSA-SHA256 signed QR fields, writing `WorkshopRegisteredEvent` into the outbox, and completing the idempotency key. This guarantees a strictly unidirectional dependency (`payments` -> `registrations::api`) and prevents cyclic dependencies in Spring Modulith.
 
 ### Payment Webhook Handling Flow
 
