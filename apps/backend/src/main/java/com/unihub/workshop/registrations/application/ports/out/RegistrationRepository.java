@@ -1,6 +1,8 @@
 package com.unihub.workshop.registrations.application.ports.out;
 
 import com.unihub.workshop.registrations.domain.model.Registration;
+import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,4 +54,20 @@ public interface RegistrationRepository {
      * @return active registration count
      */
     long countActiveRegistrations(UUID workshopId);
+
+    /**
+     * Finds keyset cursor-paginated registrations belonging to the student.
+     *
+     * @param studentUserId student user ID
+     * @param status optional status filter
+     * @param cursor optional keyset cursor
+     * @param size page window size
+     * @return CursorPage of Registration items
+     */
+    CursorPage<Registration> findByStudentUserId(
+        UUID studentUserId,
+        RegistrationStatus status,
+        String cursor,
+        int size
+    );
 }

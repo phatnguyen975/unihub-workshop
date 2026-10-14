@@ -116,7 +116,7 @@ This implementation plan delivers the complete free workshop registration capabi
 
 ### Phase 3: Registration Query & Detail Retrieval (Read Path)
 
-- [ ] **T4 — Implement keyset cursor-paginated registration history for authenticated students (`GET /api/v1/registrations/me`)**
+- [x] **T4 — Implement keyset cursor-paginated registration history for authenticated students (`GET /api/v1/registrations/me`)**
   - **Size:** S
   - **Depends on:** T2
   - **Layers touched:** Application (Query Use Case), Infrastructure (JPA Keyset Criteria & Replica Routing), Presentation (Controller & DTOs)

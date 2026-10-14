@@ -15,7 +15,6 @@ import com.unihub.workshop.registrations.domain.model.QrTicket;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.registrations.presentation.dto.RegisterWorkshopRequest;
-import com.unihub.workshop.registrations.presentation.mapper.RegistrationPresentationMapper;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -25,7 +24,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mapstruct.factory.Mappers;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,13 +42,10 @@ class RegistrationControllerTest {
     @BeforeEach
     void setUp() {
         registerWorkshopUseCase = mock(RegisterWorkshopUseCase.class);
-        RegistrationPresentationMapper mapper = Mappers.getMapper(
-            RegistrationPresentationMapper.class
-        );
-        RegistrationController controller = new RegistrationController(
-            registerWorkshopUseCase,
-            mapper
-        );
+        RegistrationController controller =
+            RegistrationControllerTestBuilder.builder()
+                .withRegisterWorkshopUseCase(registerWorkshopUseCase)
+                .build();
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(

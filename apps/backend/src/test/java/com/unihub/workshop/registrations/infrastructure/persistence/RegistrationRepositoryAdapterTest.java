@@ -26,11 +26,18 @@ class RegistrationRepositoryAdapterTest {
     @Mock
     private RegistrationPersistenceMapper mapper;
 
+    @Mock
+    private jakarta.persistence.EntityManager entityManager;
+
     private RegistrationRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new RegistrationRepositoryAdapter(repository, mapper);
+        adapter = new RegistrationRepositoryAdapter(
+            repository,
+            mapper,
+            entityManager
+        );
     }
 
     @Test
