@@ -91,21 +91,22 @@ public class StaffAssignedNotificationHandler
         boolean hasEmail =
             event.staffEmail() != null && !event.staffEmail().isBlank();
 
-        MultiChannelDeliveryCommand command = new MultiChannelDeliveryCommand(
-            event.staffUserId(),
-            event.staffEmail(),
-            event.idempotencyKey(),
-            true, // sendInApp
-            eventKey,
-            actionUrl,
-            inAppPayload,
-            true, // sendRealtime
-            "notification.new",
-            hasEmail, // sendEmail
-            subject,
-            templateName,
-            emailModel
-        );
+        MultiChannelDeliveryCommand command =
+            MultiChannelDeliveryCommand.builder()
+                .userId(event.staffUserId())
+                .recipientEmail(event.staffEmail())
+                .idempotencyKey(event.idempotencyKey())
+                .sendInApp(true)
+                .inAppEventKey(eventKey)
+                .inAppActionUrl(actionUrl)
+                .inAppPayload(inAppPayload)
+                .sendRealtime(true)
+                .realtimeEventType("notification.new")
+                .sendEmail(hasEmail)
+                .emailSubject(subject)
+                .emailTemplateName(templateName)
+                .emailTemplateModel(emailModel)
+                .build();
 
         deliveryUseCase.deliverMultiChannel(command);
     }

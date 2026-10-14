@@ -59,10 +59,11 @@ Wildcard origins (`*`) are strictly prohibited in production. The backend must e
 
 ### Mandatory Headers
 
-- `Authorization: Bearer <token>`
+- `Authorization: Bearer <token>` (not required on unauthenticated webhook endpoints e.g. `POST /api/v1/payments/webhook`)
 - `X-Correlation-ID` (client-generated for cross-boundary tracing)
 - `Accept-Language` (localized RFC 7807 error messages)
 - `Idempotency-Key` (required on business-critical `POST`/`PUT`/`PATCH` endpoints such as payments, registrations, and offline-sync; UUIDv4 string, max 64 chars)
+- `Stripe-Signature` (mandatory on unauthenticated webhook endpoint `POST /api/v1/payments/webhook`; HMAC-SHA256 signature calculated with webhook signing secret)
 
 ### Content Types
 
@@ -127,6 +128,31 @@ The JSON envelope is used only for successful `2xx` responses. The backend must 
   }
 }
 ```
+
+**Success Response with Omitted Nulls (`@JsonInclude(NON_NULL)`) — e.g., Paid Registration (PENDING)**
+
+```json
+{
+  "success": true,
+  "message": "Registration initiated. Please complete payment.",
+  "data": {
+    "id": "e0000001-0000-0000-0000-000000000001",
+    "workshopId": "f0000001-0000-0000-0000-000000000001",
+    "studentId": "b0000001-0000-0000-0000-000000000001",
+    "status": "PENDING",
+    "priceAtRegistration": 50.0,
+    "currency": "USD",
+    "paymentClientSecret": "pi_3MtwxAEhLOAGSuTX2xHNulnv_secret_987654",
+    "createdAt": "2026-05-03T12:00:00Z"
+  },
+  "metadata": {
+    "processedBy": "unihub-app-1",
+    "traceId": "7f6f7c9b2d0b4d8c"
+  }
+}
+```
+
+_(Notice: `qrPayload`, `qrSignature`, and `qrIssuedAt` are null for `PENDING` registrations and are cleanly omitted from the JSON payload per `@JsonInclude(NON_NULL)`)._
 
 **Success Response (List / Pagination)**
 

@@ -1,9 +1,14 @@
 package com.unihub.workshop.workers.notifications.core.models;
 
+import java.util.Map;
+import lombok.Builder;
+
+@Builder(toBuilder = true)
 public record EmailMessage(
     String recipientAddress,
     String subject,
-    String htmlBody
+    String htmlBody,
+    Map<String, byte[]> inlineAttachments
 ) {
     public EmailMessage {
         if (recipientAddress == null || recipientAddress.isBlank()) {
@@ -18,6 +23,9 @@ public record EmailMessage(
         }
         if (htmlBody == null) {
             throw new IllegalArgumentException("htmlBody must not be null");
+        }
+        if (inlineAttachments == null) {
+            inlineAttachments = Map.of();
         }
     }
 }

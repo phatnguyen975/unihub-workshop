@@ -1,6 +1,7 @@
 package com.unihub.workshop.iam.api;
 
 import com.unihub.workshop.iam.api.dto.StaffUserDto;
+import com.unihub.workshop.iam.api.dto.StudentProfileDto;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -34,4 +35,12 @@ public interface IamApi {
      * @return list of active StaffUserDto records
      */
     List<StaffUserDto> listActiveStaffByOrganization(UUID organizationId);
+
+    /**
+     * Resolves a student user profile by user ID.
+     *
+     * @param studentUserId target student user ID
+     * @return optional containing StudentProfileDto if student exists and is active, empty otherwise
+     */
+    Optional<StudentProfileDto> getStudentProfile(UUID studentUserId);
 }

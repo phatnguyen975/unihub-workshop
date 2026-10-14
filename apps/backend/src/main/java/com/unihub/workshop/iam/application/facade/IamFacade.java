@@ -2,8 +2,10 @@ package com.unihub.workshop.iam.application.facade;
 
 import com.unihub.workshop.iam.api.IamApi;
 import com.unihub.workshop.iam.api.dto.StaffUserDto;
+import com.unihub.workshop.iam.api.dto.StudentProfileDto;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
 import com.unihub.workshop.iam.domain.model.User;
+import com.unihub.workshop.iam.domain.model.UserRole;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -67,6 +69,19 @@ public class IamFacade implements IamApi {
             .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<StudentProfileDto> getStudentProfile(UUID studentUserId) {
+        if (studentUserId == null) {
+            return Optional.empty();
+        }
+        return userRepository
+            .findById(studentUserId)
+            .filter(User::isActive)
+            .filter(user -> user.role() == UserRole.STUDENT)
+            .map(this::toStudentProfileDto);
+    }
+
     private StaffUserDto toStaffUserDto(User user) {
         return new StaffUserDto(
             user.id(),
@@ -77,6 +92,15 @@ public class IamFacade implements IamApi {
             user.email(),
             user.avatarUrl(),
             user.phoneNumber()
+        );
+    }
+
+    private StudentProfileDto toStudentProfileDto(User user) {
+        return new StudentProfileDto(
+            user.id(),
+            user.studentRecordId(),
+            user.fullName(),
+            user.email()
         );
     }
 }

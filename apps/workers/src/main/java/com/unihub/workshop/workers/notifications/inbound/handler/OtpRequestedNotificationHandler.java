@@ -1,5 +1,6 @@
 package com.unihub.workshop.workers.notifications.inbound.handler;
 
+import com.unihub.workshop.workers.notifications.core.models.DirectEmailDeliveryCommand;
 import com.unihub.workshop.workers.notifications.core.ports.in.DirectEmailDeliveryUseCase;
 import com.unihub.workshop.workers.notifications.core.ports.in.NotificationEventHandler;
 import com.unihub.workshop.workers.notifications.inbound.dto.OtpRequestedEventDto;
@@ -59,12 +60,14 @@ public class OtpRequestedNotificationHandler
         );
 
         emailDeliveryUseCase.deliverEmail(
-            event.userId(),
-            event.email(),
-            subject,
-            templateName,
-            model,
-            event.idempotencyKey()
+            DirectEmailDeliveryCommand.builder()
+                .userId(event.userId())
+                .recipientAddress(event.email())
+                .subject(subject)
+                .templateName(templateName)
+                .templateModel(model)
+                .idempotencyKey(event.idempotencyKey())
+                .build()
         );
     }
 }
