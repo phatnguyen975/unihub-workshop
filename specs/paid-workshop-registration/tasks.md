@@ -19,7 +19,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
 
 ### Phase 1: Paid Registration Creation Flow
 
-- [ ] **T1 — Paid Workshop Registration Initiation (Happy Path)**
+- [x] **T1 — Paid Workshop Registration Initiation (Happy Path)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation (spanning `registrations` and `payments`)
@@ -27,7 +27,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - `apps/backend/src/main/java/com/unihub/workshop/registrations/api/RegistrationPaymentPort.java`
     - `apps/backend/src/main/java/com/unihub/workshop/registrations/api/dto/CreatePaymentIntentCommand.java`
     - `apps/backend/src/main/java/com/unihub/workshop/registrations/api/dto/PaymentIntentResult.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/registrations/infrastructure/config/RegistrationProperties.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/registrations/api/dto/package-info.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/package-info.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/infrastructure/gateway/CurrencyUnitConverter.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/infrastructure/gateway/StripePaymentPortAdapter.java`
@@ -43,7 +43,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - Stripe Payment Intent is created with amount converted via `CurrencyUnitConverter`, currency in lowercase, and `registrationId` in metadata (FR-03, BR-12).
     - Free registrations (`price == 0`) continue to execute via `FreeRegistrationStrategy` returning `201 Created` with `status: "CONFIRMED"` and QR fields intact (no regression).
 
-- [ ] **T2 — Paid Registration Capacity, Resilience & Idempotency Edge Cases**
+- [x] **T2 — Paid Registration Capacity, Resilience & Idempotency Edge Cases**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Application, Infrastructure, Presentation
@@ -61,9 +61,9 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
 
 #### Checkpoint: Phase 1 Complete
 
-- [ ] Authenticated students can register for paid workshops and receive a valid `PENDING` registration with Stripe client secret.
-- [ ] All capacity, concurrency, time-slot overlap, idempotency, and circuit-breaker failure guards pass tests.
-- [ ] `ModulithArchitectureTest` passes with zero boundary violations.
+- [x] Authenticated students can register for paid workshops and receive a valid `PENDING` registration with Stripe client secret.
+- [x] All capacity, concurrency, time-slot overlap, idempotency, and circuit-breaker failure guards pass tests.
+- [x] `ModulithArchitectureTest` passes with zero boundary violations.
 
 ### Phase 2: Payment Webhook Ingestion & Lifecycle Confirmation
 

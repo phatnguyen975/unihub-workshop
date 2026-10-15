@@ -46,4 +46,33 @@ public record Registration(
             .updatedBy(studentUserId)
             .build();
     }
+
+    public static Registration createPendingPaidRegistration(
+        UUID id,
+        UUID workshopId,
+        UUID studentUserId,
+        BigDecimal price,
+        String currency,
+        UUID idempotencyKeyId,
+        String paymentClientSecret,
+        Instant expiresAt
+    ) {
+        Instant now = Instant.now();
+        return Registration.builder()
+            .id(id != null ? id : UUID.randomUUID())
+            .workshopId(workshopId)
+            .studentUserId(studentUserId)
+            .status(RegistrationStatus.PENDING)
+            .priceAtRegistration(price)
+            .currency(currency != null ? currency : "USD")
+            .idempotencyKeyId(idempotencyKeyId)
+            .paymentClientSecret(paymentClientSecret)
+            .qrTicket(null)
+            .expiresAt(expiresAt)
+            .createdAt(now)
+            .updatedAt(now)
+            .createdBy(studentUserId)
+            .updatedBy(studentUserId)
+            .build();
+    }
 }
