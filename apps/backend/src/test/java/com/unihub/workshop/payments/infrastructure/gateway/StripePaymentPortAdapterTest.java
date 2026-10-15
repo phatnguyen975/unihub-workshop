@@ -1,8 +1,10 @@
 package com.unihub.workshop.payments.infrastructure.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,8 +17,12 @@ import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
 import com.stripe.service.PaymentIntentService;
 import com.stripe.service.V1Services;
+import com.unihub.workshop.payments.application.ports.out.PaymentRepository;
+import com.unihub.workshop.payments.domain.model.Payment;
+import com.unihub.workshop.payments.domain.model.PaymentStatus;
 import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
+import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -26,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class StripePaymentPortAdapterTest {
 
@@ -33,6 +40,7 @@ class StripePaymentPortAdapterTest {
     private PaymentIntentService paymentIntentService;
     private CurrencyUnitConverter currencyUnitConverter;
     private CircuitBreaker circuitBreaker;
+    private PaymentRepository paymentRepository;
     private StripePaymentPortAdapter adapter;
 
     private final UUID registrationId = UUID.randomUUID();
@@ -50,10 +58,12 @@ class StripePaymentPortAdapterTest {
 
         currencyUnitConverter = new CurrencyUnitConverter();
         circuitBreaker = CircuitBreaker.ofDefaults("stripe-payment");
+        paymentRepository = mock(PaymentRepository.class);
         adapter = new StripePaymentPortAdapter(
             stripeClient,
             currencyUnitConverter,
-            circuitBreaker
+            circuitBreaker,
+            paymentRepository
         );
     }
 
@@ -167,5 +177,65 @@ class StripePaymentPortAdapterTest {
             any(PaymentIntentCreateParams.class),
             any(RequestOptions.class)
         );
+    }
+
+    @Test
+    @DisplayName(
+        "recordPendingPayment: persists a PENDING payment record with correct fields"
+    )
+    void recordPendingPayment_Success_SavesPendingPayment() {
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(
+            invocation -> invocation.getArgument(0)
+        );
+
+        RecordPendingPaymentCommand command = new RecordPendingPaymentCommand(
+            registrationId,
+            "pi_test_pending_123",
+            new BigDecimal("50.00"),
+            "USD"
+        );
+
+        adapter.recordPendingPayment(command);
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(
+            Payment.class
+        );
+        verify(paymentRepository).save(paymentCaptor.capture());
+        Payment saved = paymentCaptor.getValue();
+
+        assertThat(saved.registrationId()).isEqualTo(registrationId);
+        assertThat(saved.providerPaymentId()).isEqualTo("pi_test_pending_123");
+        assertThat(saved.status()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(saved.provider()).isEqualTo("STRIPE");
+        assertThat(saved.amount()).isEqualByComparingTo("50.00");
+        assertThat(saved.currency()).isEqualTo("USD");
+        assertThat(saved.id()).isNotNull();
+        assertThat(saved.createdAt()).isNotNull();
+        assertThat(saved.updatedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName(
+        "recordPendingPayment: DataIntegrityViolationException on duplicate insert is swallowed gracefully"
+    )
+    void recordPendingPayment_DuplicateInsert_HandledGracefully() {
+        doThrow(
+            new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint"
+            )
+        )
+            .when(paymentRepository)
+            .save(any(Payment.class));
+
+        RecordPendingPaymentCommand command = new RecordPendingPaymentCommand(
+            registrationId,
+            "pi_test_pending_123",
+            new BigDecimal("50.00"),
+            "USD"
+        );
+
+        assertThatCode(() ->
+            adapter.recordPendingPayment(command)
+        ).doesNotThrowAnyException();
     }
 }

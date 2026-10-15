@@ -137,7 +137,7 @@ Unchanged from Feature 4.1. See `specs/free-workshop-registration/API_CONTRACT.m
 
 #### Spec Traceability
 
-- **Satisfies:** FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-16, FR-17
+- **Satisfies:** FR-01, FR-02, FR-03, FR-05, FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12, FR-13, FR-14, FR-15, FR-16, FR-17, FR-18
 - **Scenarios:** 1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 17
 
 ### POST /api/v1/payments/webhook
@@ -253,7 +253,7 @@ None. `200 OK` returned immediately.
 
 #### Spec Traceability
 
-- **Satisfies:** FR-18, FR-19, FR-20, FR-21, FR-22, FR-23, FR-24, FR-25, FR-26, FR-27
+- **Satisfies:** FR-19, FR-20, FR-21, FR-22, FR-23, FR-24, FR-25, FR-26, FR-27, FR-28
 - **Scenarios:** 9, 10, 11, 12, 13, 14
 
 ## 4. Rate Limiting Behavior

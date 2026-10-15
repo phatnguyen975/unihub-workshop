@@ -1,5 +1,6 @@
 package com.unihub.workshop.payments.application.usecases;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -7,14 +8,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.stripe.model.Event;
+import com.stripe.net.Webhook;
 import com.unihub.workshop.payments.application.ports.out.PaymentRepository;
 import com.unihub.workshop.payments.application.ports.out.WebhookVerificationPort;
 import com.unihub.workshop.registrations.api.RegistrationApi;
+import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
+import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 
 class ProcessPaymentWebhookUseCaseImplTest {
 
@@ -114,23 +121,68 @@ class ProcessPaymentWebhookUseCaseImplTest {
 
     @Test
     @DisplayName(
-        "Always-200 contract: post-verification dispatch exception is caught and suppressed"
+        "Event with null apiVersion triggers Jackson fallback parser (missing 'object' discriminator)"
     )
-    void processWebhook_DispatchThrowsException_DoesNotPropagate() {
-        Event event = new Event() {
-            @Override
-            public String getType() {
-                throw new RuntimeException("Unexpected parsing failure");
+    void processWebhook_NullApiVersion_FallbackToJacksonParser_MissingDiscriminator()
+        throws Exception {
+        String jsonWithoutApiVersionOrDiscriminator = """
+        {
+          "id": "evt_test_null_api_ver",
+          "object": "event",
+          "type": "payment_intent.succeeded",
+          "data": {
+            "object": {
+              "id": "pi_test_null_ver_123",
+              "amount": 5000,
+              "currency": "usd",
+              "status": "succeeded",
+              "metadata": {
+                "registrationId": "e0000001-0000-4000-a000-000000000001",
+                "workshopId": "f0000001-0000-4000-a000-000000000001"
+              }
             }
-        };
-        event.setId("evt_err");
+          }
+        }
+        """;
+        long now = Instant.now().getEpochSecond();
+        String secret = "whsec_test_secret";
+        String sig = Webhook.Util.computeHmacSha256(
+            secret,
+            now + "." + jsonWithoutApiVersionOrDiscriminator
+        );
+        Event event = Webhook.constructEvent(
+            jsonWithoutApiVersionOrDiscriminator,
+            "t=" + now + ",v1=" + sig,
+            secret
+        );
+        assertThat(event.getApiVersion()).isNull();
 
         when(
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(event);
+        when(
+            paymentRepository.existsByProviderPaymentId("pi_test_null_ver_123")
+        ).thenReturn(false);
+        when(
+            registrationApi.confirmPaidRegistration(ArgumentMatchers.any())
+        ).thenReturn(
+            new RegistrationConfirmedDto(
+                UUID.fromString("e0000001-0000-4000-a000-000000000001"),
+                UUID.fromString("f0000001-0000-4000-a000-000000000001"),
+                UUID.randomUUID(),
+                "qr_ticket",
+                java.time.Instant.now()
+            )
+        );
 
-        assertThatCode(() ->
-            useCase.processWebhook(PAYLOAD, SIGNATURE)
-        ).doesNotThrowAnyException();
+        useCase.processWebhook(PAYLOAD, SIGNATURE);
+
+        verify(registrationApi).confirmPaidRegistration(
+            new ConfirmPaidRegistrationCommand(
+                UUID.fromString("e0000001-0000-4000-a000-000000000001"),
+                "pi_test_null_ver_123"
+            )
+        );
+        verify(paymentRepository).save(ArgumentMatchers.any());
     }
 }

@@ -109,9 +109,21 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
         return mockEvent;
     }
 
+    /** Helper to build a PENDING payment stub as would exist after PaidRegistrationStrategy runs. */
+    private Payment pendingPayment() {
+        return Payment.createPending(
+            UUID.randomUUID(),
+            REGISTRATION_ID,
+            "STRIPE",
+            PROVIDER_PAYMENT_ID,
+            new BigDecimal("50.00"),
+            "USD"
+        );
+    }
+
     @Test
     @DisplayName(
-        "FR-21, BR-08: payment_intent.payment_failed saves FAILED payment, calls failPaidRegistration, does not publish outbox or SSE"
+        "FR-21, BR-08: payment_intent.payment_failed with PENDING record updates to FAILED, calls failPaidRegistration, does not publish SSE"
     )
     void processWebhook_PaymentIntentFailed_Success() {
         Map<String, String> metadata = Map.of(
@@ -132,8 +144,8 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(mockEvent);
         when(
-            paymentRepository.existsByProviderPaymentId(PROVIDER_PAYMENT_ID)
-        ).thenReturn(false);
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.of(pendingPayment()));
         when(registrationApi.failPaidRegistration(any())).thenReturn(true);
         when(paymentRepository.save(any(Payment.class))).thenAnswer(
             invocation -> invocation.getArgument(0)
@@ -149,7 +161,7 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
             )
         );
 
-        // 2. Verify Payment record saved as FAILED
+        // 2. Verify Payment record saved as FAILED (updated from PENDING)
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(
             Payment.class
         );
@@ -160,10 +172,6 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
             PROVIDER_PAYMENT_ID
         );
         assertThat(savedPayment.status()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(savedPayment.amount()).isEqualByComparingTo(
-            BigDecimal.valueOf(50.00)
-        );
-        assertThat(savedPayment.currency()).isEqualTo("USD");
         assertThat(savedPayment.failureCode()).isEqualTo("card_declined");
         assertThat(savedPayment.failureReason()).isEqualTo(
             "Your card has insufficient funds."
@@ -221,8 +229,8 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(mockEvent);
         when(
-            paymentRepository.existsByProviderPaymentId(PROVIDER_PAYMENT_ID)
-        ).thenReturn(false);
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.of(pendingPayment()));
         when(registrationApi.failPaidRegistration(any())).thenReturn(false);
 
         useCase.processWebhook(PAYLOAD, SIGNATURE);
@@ -233,9 +241,9 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
 
     @Test
     @DisplayName(
-        "FR-22, BR-07: Duplicate providerPaymentId on payment_intent.payment_failed is ignored"
+        "FR-22, BR-07: Existing FAILED payment (terminal state) on payment_intent.payment_failed is ignored"
     )
-    void processWebhook_PaymentIntentFailed_DuplicateProviderPaymentId_NoOp() {
+    void processWebhook_PaymentIntentFailed_AlreadyFailed_NoOp() {
         Map<String, String> metadata = Map.of(
             "registrationId",
             REGISTRATION_ID.toString(),
@@ -253,9 +261,21 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
         when(
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(mockEvent);
+        // Simulate an already-FAILED record (terminal state)
+        Payment failedPayment = Payment.createFailed(
+            UUID.randomUUID(),
+            REGISTRATION_ID,
+            "STRIPE",
+            PROVIDER_PAYMENT_ID,
+            new BigDecimal("50.00"),
+            "USD",
+            "card_declined",
+            "Insufficient funds",
+            Instant.now()
+        );
         when(
-            paymentRepository.existsByProviderPaymentId(PROVIDER_PAYMENT_ID)
-        ).thenReturn(true);
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.of(failedPayment));
 
         useCase.processWebhook(PAYLOAD, SIGNATURE);
 
@@ -298,8 +318,8 @@ class ProcessPaymentWebhookFailedAndIdempotencyTest {
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(mockEvent);
         when(
-            paymentRepository.existsByProviderPaymentId(PROVIDER_PAYMENT_ID)
-        ).thenReturn(false);
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.of(pendingPayment()));
 
         RegistrationConfirmedDto confirmedDto = new RegistrationConfirmedDto(
             REGISTRATION_ID,

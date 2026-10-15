@@ -96,9 +96,21 @@ class ProcessPaymentWebhookSuccessTest {
         return mockEvent;
     }
 
+    /** Helper to build a PENDING payment stub as would exist after PaidRegistrationStrategy runs. */
+    private Payment pendingPayment() {
+        return Payment.createPending(
+            UUID.randomUUID(),
+            REGISTRATION_ID,
+            "STRIPE",
+            PROVIDER_PAYMENT_ID,
+            new BigDecimal("50.00"),
+            "USD"
+        );
+    }
+
     @Test
     @DisplayName(
-        "FR-20, FR-23, FR-24: payment_intent.succeeded successfully confirms registration, persists payment, and publishes SSE events"
+        "FR-20, FR-23, FR-24: payment_intent.succeeded with existing PENDING record updates to COMPLETED, confirms registration, and publishes SSE events"
     )
     void processWebhook_PaymentIntentSucceeded_Success() {
         Map<String, String> metadata = Map.of(
@@ -116,9 +128,10 @@ class ProcessPaymentWebhookSuccessTest {
         when(
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(mockEvent);
+        // Simulate the PENDING record that PaidRegistrationStrategy created
         when(
-            paymentRepository.existsByProviderPaymentId(PROVIDER_PAYMENT_ID)
-        ).thenReturn(false);
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.of(pendingPayment()));
 
         Instant issuedAt = Instant.now();
         RegistrationConfirmedDto confirmedDto = new RegistrationConfirmedDto(
@@ -151,7 +164,7 @@ class ProcessPaymentWebhookSuccessTest {
             )
         );
 
-        // 2. Verify Payment record saved
+        // 2. Verify Payment record saved as COMPLETED (updated from PENDING)
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(
             Payment.class
         );
@@ -166,6 +179,7 @@ class ProcessPaymentWebhookSuccessTest {
             BigDecimal.valueOf(50.00)
         );
         assertThat(savedPayment.currency()).isEqualTo("USD");
+        assertThat(savedPayment.completedAt()).isNotNull();
 
         // 3. Verify Realtime SSE events
         ArgumentCaptor<RealtimeEvent<?>> userEventCaptor =
@@ -228,9 +242,9 @@ class ProcessPaymentWebhookSuccessTest {
 
     @Test
     @DisplayName(
-        "FR-22, BR-07: Duplicate providerPaymentId skips confirmation and payment record"
+        "FR-22, BR-07: Existing COMPLETED payment skips confirmation and payment save"
     )
-    void processWebhook_PaymentIntentSucceeded_DuplicateProviderPaymentId_NoOp() {
+    void processWebhook_PaymentIntentSucceeded_AlreadyCompleted_NoOp() {
         Map<String, String> metadata = Map.of(
             "registrationId",
             REGISTRATION_ID.toString(),
@@ -246,9 +260,19 @@ class ProcessPaymentWebhookSuccessTest {
         when(
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(mockEvent);
+        // Simulate a COMPLETED record already in the DB (terminal state)
+        Payment completedPayment = Payment.createCompleted(
+            UUID.randomUUID(),
+            REGISTRATION_ID,
+            "STRIPE",
+            PROVIDER_PAYMENT_ID,
+            new BigDecimal("50.00"),
+            "USD",
+            Instant.now()
+        );
         when(
-            paymentRepository.existsByProviderPaymentId(PROVIDER_PAYMENT_ID)
-        ).thenReturn(true);
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.of(completedPayment));
 
         useCase.processWebhook(PAYLOAD, SIGNATURE);
 
@@ -278,8 +302,8 @@ class ProcessPaymentWebhookSuccessTest {
             webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
         ).thenReturn(mockEvent);
         when(
-            paymentRepository.existsByProviderPaymentId(PROVIDER_PAYMENT_ID)
-        ).thenReturn(false);
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.of(pendingPayment()));
         when(registrationApi.confirmPaidRegistration(any())).thenReturn(null);
 
         useCase.processWebhook(PAYLOAD, SIGNATURE);
@@ -292,5 +316,55 @@ class ProcessPaymentWebhookSuccessTest {
         );
         verify(paymentRepository, never()).save(any());
         verify(realtimeEventPublisher, never()).publishToUser(any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "No existing payment record (fallback path): inserts a new COMPLETED record"
+    )
+    void processWebhook_PaymentIntentSucceeded_NoExistingRecord_InsertsCompleted() {
+        Map<String, String> metadata = Map.of(
+            "registrationId",
+            REGISTRATION_ID.toString(),
+            "workshopId",
+            WORKSHOP_ID.toString()
+        );
+        Event mockEvent = createMockSucceededEvent(
+            PROVIDER_PAYMENT_ID,
+            metadata,
+            5000L,
+            "usd"
+        );
+        when(
+            webhookVerificationPort.verifyAndConstructEvent(PAYLOAD, SIGNATURE)
+        ).thenReturn(mockEvent);
+        // No existing record
+        when(
+            paymentRepository.findByProviderPaymentId(PROVIDER_PAYMENT_ID)
+        ).thenReturn(Optional.empty());
+
+        RegistrationConfirmedDto confirmedDto = new RegistrationConfirmedDto(
+            REGISTRATION_ID,
+            WORKSHOP_ID,
+            STUDENT_USER_ID,
+            "qr_payload",
+            Instant.now()
+        );
+        when(registrationApi.confirmPaidRegistration(any())).thenReturn(
+            confirmedDto
+        );
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(
+            invocation -> invocation.getArgument(0)
+        );
+
+        useCase.processWebhook(PAYLOAD, SIGNATURE);
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(
+            Payment.class
+        );
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().status()).isEqualTo(
+            PaymentStatus.COMPLETED
+        );
     }
 }

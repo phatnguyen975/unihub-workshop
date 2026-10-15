@@ -101,6 +101,30 @@ public record Payment(
             .build();
     }
 
+    public static Payment createPending(
+        UUID id,
+        UUID registrationId,
+        String provider,
+        String providerPaymentId,
+        BigDecimal amount,
+        String currency
+    ) {
+        Instant now = Instant.now();
+        return Payment.builder()
+            .id(id != null ? id : UUID.randomUUID())
+            .registrationId(registrationId)
+            .provider(provider != null ? provider : "STRIPE")
+            .providerPaymentId(providerPaymentId)
+            .status(PaymentStatus.PENDING)
+            .amount(amount != null ? amount : BigDecimal.ZERO)
+            .currency(
+                currency != null ? currency.toUpperCase(Locale.ROOT) : "USD"
+            )
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+    }
+
     public static BigDecimal convertFromSmallestUnit(
         long smallestUnitAmount,
         String currency

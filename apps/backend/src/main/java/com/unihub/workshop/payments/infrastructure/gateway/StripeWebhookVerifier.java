@@ -1,5 +1,6 @@
 package com.unihub.workshop.payments.infrastructure.gateway;
 
+import com.stripe.Stripe;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
 import com.stripe.net.Webhook;
@@ -47,11 +48,15 @@ public class StripeWebhookVerifier implements WebhookVerificationPort {
         }
 
         try {
-            return Webhook.constructEvent(
+            Event event = Webhook.constructEvent(
                 payload,
                 signatureHeader,
                 webhookSecret
             );
+            if (event != null && event.getApiVersion() == null) {
+                event.setApiVersion(Stripe.API_VERSION);
+            }
+            return event;
         } catch (SignatureVerificationException e) {
             log.warn(
                 "Stripe webhook signature verification failed: {}",

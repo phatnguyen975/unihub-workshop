@@ -10,6 +10,7 @@ import com.unihub.workshop.iam.api.dto.StudentProfileDto;
 import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
+import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
@@ -153,5 +154,19 @@ class PaidRegistrationStrategyTest {
         assertThat(capturedReg.status()).isEqualTo(RegistrationStatus.PENDING);
         assertThat(capturedReg.idempotencyKeyId()).isEqualTo(idempotencyKeyId);
         assertThat(capturedReg.qrTicket()).isNull();
+
+        // Verify PENDING payment record is persisted after registration save
+        ArgumentCaptor<RecordPendingPaymentCommand> pendingPaymentCaptor =
+            ArgumentCaptor.forClass(RecordPendingPaymentCommand.class);
+        verify(registrationPaymentPort).recordPendingPayment(
+            pendingPaymentCaptor.capture()
+        );
+        RecordPendingPaymentCommand capturedPendingCmd =
+            pendingPaymentCaptor.getValue();
+        assertThat(capturedPendingCmd.providerPaymentId()).isEqualTo(
+            "pi_test_123456"
+        );
+        assertThat(capturedPendingCmd.amount()).isEqualByComparingTo("50.00");
+        assertThat(capturedPendingCmd.currency()).isEqualTo("USD");
     }
 }

@@ -36,9 +36,9 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/application/strategy/PaidRegistrationStrategyTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/presentation/controllers/RegistrationControllerPaidTest.java`
   - **Acceptance Criteria:**
-    - When an authenticated student submits `POST /api/v1/registrations` for a `PUBLISHED` workshop with `price > 0`, the endpoint dispatches to `PaidRegistrationStrategy` and returns `201 Created` with `status: "PENDING"`, `priceAtRegistration`, `currency`, and `paymentClientSecret` (FR-01, FR-05, FR-16, FR-17).
+    - When an authenticated student submits `POST /api/v1/registrations` for a `PUBLISHED` workshop with `price > 0`, the endpoint dispatches to `PaidRegistrationStrategy` and returns `201 Created` with `status: "PENDING"`, `priceAtRegistration`, `currency`, and `paymentClientSecret` (FR-01, FR-06, FR-17, FR-18).
     - `expires_at` is populated on the created `PENDING` registration with `now() + TTL` (default 30 minutes, loaded from `app.registration.pending-ttl-minutes`) (FR-01, BR-09).
-    - `qrPayload`, `qrSignature`, and `qrIssuedAt` are null and omitted from the response JSON (FR-05).
+    - `qrPayload`, `qrSignature`, and `qrIssuedAt` are null and omitted from the response JSON (FR-06).
     - The workshop's Redis capacity is decremented atomically (DECR) and `registered_count` is incremented in DB (FR-02).
     - Stripe Payment Intent is created with amount converted via `CurrencyUnitConverter`, currency in lowercase, and `registrationId` in metadata (FR-03, BR-12).
     - Free registrations (`price == 0`) continue to execute via `FreeRegistrationStrategy` returning `201 Created` with `status: "CONFIRMED"` and QR fields intact (no regression).
@@ -53,11 +53,11 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/application/strategy/PaidRegistrationStrategyResilienceTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/presentation/controllers/RegistrationControllerPaidEdgeCasesTest.java`
   - **Acceptance Criteria:**
-    - When workshop remaining seats in Redis reaches zero, `POST /api/v1/registrations` returns `409 Conflict` ("No seats remaining for this workshop"), compensates Redis counter, and creates no registration record (FR-06, BR-01).
-    - When a student already has an active (`PENDING` or `CONFIRMED`) registration for the workshop, returns `409 Conflict` (FR-07, BR-10).
-    - When a student has a `CONFIRMED` registration overlapping the target workshop's time slot, returns `422 Unprocessable Entity` (FR-08, BR-11).
-    - When Stripe call fails or the Resilience4j circuit breaker is `OPEN`, returns `503 Service Unavailable`, compensates Redis capacity DECR (INCR), and creates no DB records (FR-14, FR-15, BR-13).
-    - The student's `Idempotency-Key` header is forwarded to Stripe Payment Intent creation; subsequent requests with the same key replay the cached `201 Created` without calling Stripe or creating new records (FR-04, FR-12).
+    - When workshop remaining seats in Redis reaches zero, `POST /api/v1/registrations` returns `409 Conflict` ("No seats remaining for this workshop"), compensates Redis counter, and creates no registration record (FR-07, BR-01).
+    - When a student already has an active (`PENDING` or `CONFIRMED`) registration for the workshop, returns `409 Conflict` (FR-08, BR-10).
+    - When a student has a `CONFIRMED` registration overlapping the target workshop's time slot, returns `422 Unprocessable Entity` (FR-09, BR-11).
+    - When Stripe call fails or the Resilience4j circuit breaker is `OPEN`, returns `503 Service Unavailable`, compensates Redis capacity DECR (INCR), and creates no DB records (FR-15, FR-16, BR-13).
+    - The student's `Idempotency-Key` header is forwarded to Stripe Payment Intent creation; subsequent requests with the same key replay the cached `201 Created` without calling Stripe or creating new records (FR-05, FR-13).
 
 #### Checkpoint: Phase 1 Complete
 
@@ -79,9 +79,9 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - `apps/backend/src/test/java/com/unihub/workshop/payments/infrastructure/gateway/StripeWebhookVerifierTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/payments/presentation/controllers/PaymentWebhookControllerTest.java`
   - **Acceptance Criteria:**
-    - `POST /api/v1/payments/webhook` accepts unauthenticated requests and verifies the `Stripe-Signature` HMAC-SHA256 header against the raw request body using `stripe.webhook-secret` (FR-18, FR-25, BR-05).
-    - Requests with missing, malformed, or invalid signatures are rejected with `400 Bad Request` (FR-18).
-    - Requests with a valid signature for unhandled or unknown event types (e.g., `customer.subscription.created`) return `200 OK` with `{ "success": true, "message": "Webhook received." }` without executing business logic (FR-19, FR-26, BR-06).
+    - `POST /api/v1/payments/webhook` accepts unauthenticated requests and verifies the `Stripe-Signature` HMAC-SHA256 header against the raw request body using `stripe.webhook-secret` (FR-19, FR-26, BR-05).
+    - Requests with missing, malformed, or invalid signatures are rejected with `400 Bad Request` (FR-19).
+    - Requests with a valid signature for unhandled or unknown event types (e.g., `customer.subscription.created`) return `200 OK` with `{ "success": true, "message": "Webhook received." }` without executing business logic (FR-20, FR-27, BR-06).
 
 - [x] **T4 — Payment Intent Succeeded Processing, Ticket Issuance & Outbox Notification**
   - **Size:** M
@@ -100,10 +100,10 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/application/facade/RegistrationFacadeTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/payments/application/usecases/ProcessPaymentWebhookSuccessTest.java`
   - **Acceptance Criteria:**
-    - When `payment_intent.succeeded` webhook arrives with a valid signature, a new `payments` record is saved with `status = COMPLETED`, `provider_payment_id`, `amount`, and `currency` (FR-20).
-    - In the same DB transaction, `RegistrationApi.confirmPaidRegistration(...)` transitions the registration from `PENDING` to `CONFIRMED`, atomically sets RSA-signed QR fields (`qr_payload`, `qr_signature`, `qr_issued_at`), and writes `WorkshopRegisteredEvent` to the Spring Modulith outbox (FR-20, FR-23, BR-04).
-    - Post-commit side effects publish SSE `payment.confirmed` to `unihub:stream:user:{studentUserId}` and `registration.updated` to `unihub:stream:workshop:{workshopId}` (FR-24).
-    - The notification worker receives `WorkshopRegisteredEvent` from RabbitMQ and delivers confirmation email with QR PNG attachment to the student (FR-23).
+    - When `payment_intent.succeeded` webhook arrives with a valid signature, a new `payments` record is saved with `status = COMPLETED`, `provider_payment_id`, `amount`, and `currency` (FR-21).
+    - In the same DB transaction, `RegistrationApi.confirmPaidRegistration(...)` transitions the registration from `PENDING` to `CONFIRMED`, atomically sets RSA-signed QR fields (`qr_payload`, `qr_signature`, `qr_issued_at`), and writes `WorkshopRegisteredEvent` to the Spring Modulith outbox (FR-21, FR-24, BR-04).
+    - Post-commit side effects publish SSE `payment.confirmed` to `unihub:stream:user:{studentUserId}` and `registration.updated` to `unihub:stream:workshop:{workshopId}` (FR-25).
+    - The notification worker receives `WorkshopRegisteredEvent` from RabbitMQ and delivers confirmation email with QR PNG attachment to the student (FR-24).
     - Calling `GET /api/v1/registrations/{id}` for the confirmed registration returns the full ticket with QR fields (API Contract §POST /api/v1/registrations/me consistency).
 
 - [x] **T5 — Payment Intent Failed Processing, Seat Restoration & Webhook Idempotency**
@@ -117,10 +117,10 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - `apps/backend/src/test/java/com/unihub/workshop/payments/application/usecases/ProcessPaymentWebhookFailedAndIdempotencyTest.java`
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/application/facade/RegistrationFacadeFailureTest.java`
   - **Acceptance Criteria:**
-    - When `payment_intent.payment_failed` webhook arrives, `payments` row is saved with `status = FAILED`, `RegistrationApi.failPaidRegistration(...)` sets registration status to `FAILED`, Redis capacity is incremented (INCR), and `workshops.registered_count` is decremented in DB (FR-21, BR-08).
-    - No `WorkshopRegisteredEvent` is published on payment failure (FR-21).
-    - When a duplicate webhook for an already-processed `provider_payment_id` arrives, the DB unique constraint violation is caught gracefully, returning `200 OK` without re-executing state transitions, outbox events, or notifications (FR-22, BR-07).
-    - If a webhook references a nonexistent or non-PENDING registration, the handler logs a warning and returns `200 OK` to satisfy Stripe's delivery contract (FR-27).
+    - When `payment_intent.payment_failed` webhook arrives, `payments` row is saved with `status = FAILED`, `RegistrationApi.failPaidRegistration(...)` sets registration status to `FAILED`, Redis capacity is incremented (INCR), and `workshops.registered_count` is decremented in DB (FR-22, BR-08).
+    - No `WorkshopRegisteredEvent` is published on payment failure (FR-22).
+    - When a duplicate webhook for an already-processed `provider_payment_id` arrives, the DB unique constraint violation is caught gracefully, returning `200 OK` without re-executing state transitions, outbox events, or notifications (FR-23, BR-07).
+    - If a webhook references a nonexistent or non-PENDING registration, the handler logs a warning and returns `200 OK` to satisfy Stripe's delivery contract (FR-28).
 
 #### Checkpoint: Feature Complete
 

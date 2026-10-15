@@ -5,15 +5,20 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
+import com.unihub.workshop.payments.application.ports.out.PaymentRepository;
+import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
+import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.util.Locale;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,15 +32,18 @@ public class StripePaymentPortAdapter implements RegistrationPaymentPort {
     private final StripeClient stripeClient;
     private final CurrencyUnitConverter currencyUnitConverter;
     private final CircuitBreaker circuitBreaker;
+    private final PaymentRepository paymentRepository;
 
     public StripePaymentPortAdapter(
         StripeClient stripeClient,
         CurrencyUnitConverter currencyUnitConverter,
-        @Qualifier("stripeCircuitBreaker") CircuitBreaker circuitBreaker
+        @Qualifier("stripeCircuitBreaker") CircuitBreaker circuitBreaker,
+        PaymentRepository paymentRepository
     ) {
         this.stripeClient = stripeClient;
         this.currencyUnitConverter = currencyUnitConverter;
         this.circuitBreaker = circuitBreaker;
+        this.paymentRepository = paymentRepository;
     }
 
     @Override
@@ -122,6 +130,31 @@ public class StripePaymentPortAdapter implements RegistrationPaymentPort {
                 "Payment gateway service unavailable. Please retry later.",
                 30,
                 e
+            );
+        }
+    }
+
+    @Override
+    public void recordPendingPayment(RecordPendingPaymentCommand command) {
+        Payment pending = Payment.createPending(
+            UUID.randomUUID(),
+            command.registrationId(),
+            "STRIPE",
+            command.providerPaymentId(),
+            command.amount(),
+            command.currency()
+        );
+        try {
+            paymentRepository.save(pending);
+            log.info(
+                "Recorded PENDING payment [{}] for registration [{}]",
+                command.providerPaymentId(),
+                command.registrationId()
+            );
+        } catch (DataIntegrityViolationException e) {
+            log.info(
+                "PENDING payment already exists for providerPaymentId [{}], skipping duplicate insert",
+                command.providerPaymentId()
             );
         }
     }

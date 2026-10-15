@@ -4,6 +4,7 @@ import com.unihub.workshop.iam.api.dto.StudentProfileDto;
 import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
+import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
@@ -93,6 +94,16 @@ public class PaidRegistrationStrategy implements RegistrationStrategy {
             );
 
         Registration saved = registrationRepository.save(pendingRegistration);
+
+        // 4. Persist PENDING payment record
+        registrationPaymentPort.recordPendingPayment(
+            new RecordPendingPaymentCommand(
+                registrationId,
+                paymentIntent.paymentIntentId(),
+                workshop.price(),
+                currency
+            )
+        );
 
         log.info(
             "Created PENDING paid registration [{}] for student [{}] and workshop [{}]",

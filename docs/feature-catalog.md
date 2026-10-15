@@ -301,7 +301,7 @@
 
 ### 4.2 `paid-workshop-registration`
 
-> **Status:** READY
+> **Status:** DONE
 
 > [!NOTE]
 > Feature 4.2 is implemented concurrently with Feature 5.1 (`payment-webhook-handling`) within the same development cycle to provide a complete, end-to-end verifiable vertical slice from registration creation to payment confirmation, QR issuance, and notification delivery.
@@ -320,7 +320,7 @@
 
 ### 4.3 `registration-reconciliation-and-cancellation`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Covers two complementary concerns: (1) **Dual-Case Reconciliation Sweeper** — a background cron running every 30 minutes that resolves orphaned `PENDING` registrations by querying the payment gateway. If payment succeeded (delayed webhook recovery), the registration is confirmed and QR generated (`qr_payload`, `qr_signature`, `qr_issued_at` set atomically in the `PENDING` → `CONFIRMED` transition transaction). If payment failed or was never initiated, the registration is marked `FAILED` and Redis capacity is restored via `INCR`. (2) **Student-initiated cancellation** — allows a `STUDENT` to cancel their own `CONFIRMED` registration before the workshop starts, transitioning it to `CANCELED` and restoring the Redis capacity counter. An `ORGANIZER` can also force-cancel a student's registration from the admin panel (scoped to their org's workshops).
 
@@ -336,7 +336,7 @@
 
 ### 4.4 `workshop-registration-monitoring-and-roster`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Provides `ORGANIZER` users with operational visibility into workshop registration progress and attendee details. Exposes two primary capabilities: (1) **Registration Summary Endpoint (`GET /api/v1/workshops/{workshopId}/registrations/summary`)** returning real-time operational metrics: total capacity, confirmed registrations count, pending registrations count, available seats, and occupancy percentage. (2) **Attendee Roster Endpoint (`GET /api/v1/workshops/{workshopId}/registrations`)** returning a cursor-paginated list of registered students (student name, student number, faculty, email, registration status `CONFIRMED`/`PENDING`/`CANCELED`, ticket price, registration timestamp), filterable by `status`. When a registration transitions to `CONFIRMED` or `CANCELED` (via free registration, payment webhook, or sweeper/cancellation), the backend immediately publishes a `registration.updated` event to the Redis Pub/Sub workshop channel (`unihub:stream:workshop:{workshopId}`). The Real-Time Event Streaming Hub (F-10.5) pushes this event over the active multiplexed SSE stream (`GET /api/v1/stream/events`) of authorized organizers viewing that workshop's management dashboard, dynamically updating the registration counter and progress indicators in real time without manual polling or page reloads.
 
@@ -356,7 +356,7 @@
 
 ### 5.1 `payment-webhook-handling`
 
-> **Status:** READY
+> **Status:** DONE
 
 > [!NOTE]
 > Feature 5.1 is implemented concurrently with Feature 4.2 (`paid-workshop-registration`) within the same development cycle to provide a complete, end-to-end verifiable vertical slice from registration creation to payment confirmation, QR issuance, and notification delivery.
@@ -375,7 +375,7 @@
 
 ### 5.2 `payment-history-and-status`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Provides authenticated users with read-only access to their payment history and individual payment status. `STUDENT` users can view their own payment records (amount, status, provider reference, timestamps) linked to their registrations. `ORGANIZER` users can view payment summaries across all registrations for workshops within their organization for operational reporting. All payment state transitions are exclusively handled by `payment-webhook-handling` and `registration-reconciliation-and-cancellation`.
 
