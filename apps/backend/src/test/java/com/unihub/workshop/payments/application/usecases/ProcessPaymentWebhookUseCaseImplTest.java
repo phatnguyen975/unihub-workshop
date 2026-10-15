@@ -7,8 +7,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.stripe.model.Event;
+import com.unihub.workshop.payments.application.ports.out.PaymentRepository;
 import com.unihub.workshop.payments.application.ports.out.WebhookVerificationPort;
+import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,9 @@ import org.junit.jupiter.api.Test;
 class ProcessPaymentWebhookUseCaseImplTest {
 
     private WebhookVerificationPort webhookVerificationPort;
+    private PaymentRepository paymentRepository;
+    private RegistrationApi registrationApi;
+    private RealtimeEventPublisher realtimeEventPublisher;
     private ProcessPaymentWebhookUseCaseImpl useCase;
 
     private static final String PAYLOAD = "{\"id\":\"evt_123\"}";
@@ -24,7 +30,16 @@ class ProcessPaymentWebhookUseCaseImplTest {
     @BeforeEach
     void setUp() {
         webhookVerificationPort = mock(WebhookVerificationPort.class);
-        useCase = new ProcessPaymentWebhookUseCaseImpl(webhookVerificationPort);
+        paymentRepository = mock(PaymentRepository.class);
+        registrationApi = mock(RegistrationApi.class);
+        realtimeEventPublisher = mock(RealtimeEventPublisher.class);
+
+        useCase = new ProcessPaymentWebhookUseCaseImpl(
+            webhookVerificationPort,
+            paymentRepository,
+            registrationApi,
+            realtimeEventPublisher
+        );
     }
 
     @Test

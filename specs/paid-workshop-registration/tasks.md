@@ -83,7 +83,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - Requests with missing, malformed, or invalid signatures are rejected with `400 Bad Request` (FR-18).
     - Requests with a valid signature for unhandled or unknown event types (e.g., `customer.subscription.created`) return `200 OK` with `{ "success": true, "message": "Webhook received." }` without executing business logic (FR-19, FR-26, BR-06).
 
-- [ ] **T4 — Payment Intent Succeeded Processing, Ticket Issuance & Outbox Notification**
+- [x] **T4 — Payment Intent Succeeded Processing, Ticket Issuance & Outbox Notification**
   - **Size:** M
   - **Depends on:** T3
   - **Layers touched:** Domain, Application, Infrastructure (`registrations` and `payments` modules)
@@ -106,7 +106,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - The notification worker receives `WorkshopRegisteredEvent` from RabbitMQ and delivers confirmation email with QR PNG attachment to the student (FR-23).
     - Calling `GET /api/v1/registrations/{id}` for the confirmed registration returns the full ticket with QR fields (API Contract §POST /api/v1/registrations/me consistency).
 
-- [ ] **T5 — Payment Intent Failed Processing, Seat Restoration & Webhook Idempotency**
+- [x] **T5 — Payment Intent Failed Processing, Seat Restoration & Webhook Idempotency**
   - **Size:** S
   - **Depends on:** T4
   - **Layers touched:** Application, Infrastructure, Presentation
@@ -124,11 +124,11 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
 
 #### Checkpoint: Feature Complete
 
-- [ ] All 5 tasks are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified end-to-end.
-- [ ] Core Backend unit test suite passes: `./gradlew test --tests "com.unihub.workshop.*"`.
-- [ ] Modulith architecture test passes: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
-- [ ] Ready for `/review paid-workshop-registration`.
+- [x] All 5 tasks are checked off.
+- [x] Every acceptance criterion across all tasks has been verified end-to-end.
+- [x] Core Backend unit test suite passes: `./gradlew test --tests "com.unihub.workshop.*"`.
+- [x] Modulith architecture test passes: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
+- [x] Ready for `/review paid-workshop-registration`.
 
 ## Risks and Mitigations
 

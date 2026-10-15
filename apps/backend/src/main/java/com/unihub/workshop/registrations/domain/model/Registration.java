@@ -75,4 +75,34 @@ public record Registration(
             .updatedBy(studentUserId)
             .build();
     }
+
+    public Registration confirmWithQrTicket(QrTicket qrTicket, Instant now) {
+        if (this.status != RegistrationStatus.PENDING) {
+            throw new IllegalStateException(
+                "Only PENDING registrations can be confirmed, current status: " +
+                    this.status
+            );
+        }
+        Instant timestamp = now != null ? now : Instant.now();
+        return this.toBuilder()
+            .status(RegistrationStatus.CONFIRMED)
+            .qrTicket(qrTicket)
+            .expiresAt(null)
+            .updatedAt(timestamp)
+            .build();
+    }
+
+    public Registration markFailed(Instant now) {
+        if (this.status != RegistrationStatus.PENDING) {
+            throw new IllegalStateException(
+                "Only PENDING registrations can be marked as failed, current status: " +
+                    this.status
+            );
+        }
+        Instant timestamp = now != null ? now : Instant.now();
+        return this.toBuilder()
+            .status(RegistrationStatus.FAILED)
+            .updatedAt(timestamp)
+            .build();
+    }
 }
