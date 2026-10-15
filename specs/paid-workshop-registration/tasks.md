@@ -67,7 +67,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
 
 ### Phase 2: Payment Webhook Ingestion & Lifecycle Confirmation
 
-- [ ] **T3 — Payment Webhook Gateway & HMAC Verification**
+- [x] **T3 — Payment Webhook Gateway & HMAC Verification**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Presentation, Infrastructure, Application (`payments` module)

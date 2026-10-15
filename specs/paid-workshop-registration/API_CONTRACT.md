@@ -204,7 +204,6 @@ Unchanged from Feature 4.1. See `specs/free-workshop-registration/API_CONTRACT.m
 {
   "success": true,
   "message": "Webhook received.",
-  "data": {},
   "metadata": {
     "processedBy": "unihub-app-1",
     "traceId": "7f6f7c9b2d0b4d8c"

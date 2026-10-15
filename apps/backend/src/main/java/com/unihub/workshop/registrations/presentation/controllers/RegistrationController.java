@@ -20,7 +20,6 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -52,7 +52,8 @@ public class RegistrationController {
      */
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<ApiResponse<RegistrationResponse>> register(
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<RegistrationResponse> register(
         Authentication authentication,
         @RequestHeader(
             value = "Idempotency-Key",
@@ -77,9 +78,7 @@ public class RegistrationController {
             registration
         );
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            ApiResponse.success(response, "Registration successful")
-        );
+        return ApiResponse.success(response, "Registration successful");
     }
 
     /**
@@ -93,9 +92,7 @@ public class RegistrationController {
      */
     @GetMapping("/me")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<
-        ApiResponse<RegistrationListResponse>
-    > getMyRegistrations(
+    public ApiResponse<RegistrationListResponse> getMyRegistrations(
         Authentication authentication,
         @RequestParam(value = "cursor", required = false) String cursor,
         @RequestParam(
@@ -122,9 +119,7 @@ public class RegistrationController {
             page
         );
 
-        return ResponseEntity.ok(
-            ApiResponse.success(response, "Registrations retrieved")
-        );
+        return ApiResponse.success(response, "Registrations retrieved");
     }
 
     /**
@@ -136,9 +131,7 @@ public class RegistrationController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<
-        ApiResponse<RegistrationDetailResponse>
-    > getRegistrationDetail(
+    public ApiResponse<RegistrationDetailResponse> getRegistrationDetail(
         Authentication authentication,
         @PathVariable("id") UUID id
     ) {
@@ -154,8 +147,6 @@ public class RegistrationController {
         RegistrationDetailResponse response =
             registrationMapper.toDetailResponse(detail);
 
-        return ResponseEntity.ok(
-            ApiResponse.success(response, "Registration retrieved")
-        );
+        return ApiResponse.success(response, "Registration retrieved");
     }
 }
