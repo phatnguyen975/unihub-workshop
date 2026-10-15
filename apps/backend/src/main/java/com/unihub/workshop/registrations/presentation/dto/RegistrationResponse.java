@@ -13,6 +13,7 @@ public record RegistrationResponse(
     String status,
     BigDecimal priceAtRegistration,
     String currency,
+    String paymentClientSecret,
     String qrPayload,
     String qrSignature,
     Instant qrIssuedAt,

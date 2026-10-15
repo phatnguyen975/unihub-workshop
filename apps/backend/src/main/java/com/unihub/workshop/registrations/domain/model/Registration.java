@@ -15,6 +15,7 @@ public record Registration(
     String currency,
     UUID idempotencyKeyId,
     QrTicket qrTicket,
+    String paymentClientSecret,
     Instant expiresAt,
     Instant createdAt,
     Instant updatedAt,
@@ -43,6 +44,65 @@ public record Registration(
             .updatedAt(now)
             .createdBy(studentUserId)
             .updatedBy(studentUserId)
+            .build();
+    }
+
+    public static Registration createPendingPaidRegistration(
+        UUID id,
+        UUID workshopId,
+        UUID studentUserId,
+        BigDecimal price,
+        String currency,
+        UUID idempotencyKeyId,
+        String paymentClientSecret,
+        Instant expiresAt
+    ) {
+        Instant now = Instant.now();
+        return Registration.builder()
+            .id(id != null ? id : UUID.randomUUID())
+            .workshopId(workshopId)
+            .studentUserId(studentUserId)
+            .status(RegistrationStatus.PENDING)
+            .priceAtRegistration(price)
+            .currency(currency != null ? currency : "USD")
+            .idempotencyKeyId(idempotencyKeyId)
+            .paymentClientSecret(paymentClientSecret)
+            .qrTicket(null)
+            .expiresAt(expiresAt)
+            .createdAt(now)
+            .updatedAt(now)
+            .createdBy(studentUserId)
+            .updatedBy(studentUserId)
+            .build();
+    }
+
+    public Registration confirmWithQrTicket(QrTicket qrTicket, Instant now) {
+        if (this.status != RegistrationStatus.PENDING) {
+            throw new IllegalStateException(
+                "Only PENDING registrations can be confirmed, current status: " +
+                    this.status
+            );
+        }
+        Instant timestamp = now != null ? now : Instant.now();
+        return this.toBuilder()
+            .status(RegistrationStatus.CONFIRMED)
+            .qrTicket(qrTicket)
+            .expiresAt(null)
+            .updatedAt(timestamp)
+            .build();
+    }
+
+    public Registration markFailed(Instant now) {
+        if (this.status != RegistrationStatus.PENDING) {
+            throw new IllegalStateException(
+                "Only PENDING registrations can be marked as failed, current status: " +
+                    this.status
+            );
+        }
+        Instant timestamp = now != null ? now : Instant.now();
+        return this.toBuilder()
+            .status(RegistrationStatus.FAILED)
+            .updatedAt(timestamp)
             .build();
     }
 }

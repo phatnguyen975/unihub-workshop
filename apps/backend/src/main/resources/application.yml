@@ -78,6 +78,8 @@ app:
       cron: ${APP_WORKSHOPS_SWEEPER_CRON:0 */5 * * * *}
     capacity-reconciliation:
       cron: ${APP_WORKSHOPS_CAPACITY_RECONCILIATION_CRON:0 */5 * * * *}
+  registration:
+    pending-ttl-minutes: ${APP_REGISTRATION_PENDING_TTL_MINUTES:30}
 
 # =============================================================================
 # Datasource Configuration
@@ -145,6 +147,8 @@ seed:
 # Rate Limit Configuration
 # =============================================================================
 rate-limit:
+  excluded-paths:
+    - "/api/v1/payments/webhook"
   default-tier:
     capacity: 100
     refill-tokens: 100
@@ -202,3 +206,10 @@ aws:
   s3:
     endpoint: ${AWS_S3_ENDPOINT:http://localhost:9000}
     media-bucket: ${AWS_S3_MEDIA_BUCKET:unihub-media}
+
+# =============================================================================
+# Stripe Payment Gateway Configuration
+# =============================================================================
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_dummy}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_dummy}

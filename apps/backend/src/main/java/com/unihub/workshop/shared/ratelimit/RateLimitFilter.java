@@ -39,6 +39,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
     private final BucketConfiguration defaultConfig;
     private final List<ConfiguredTier> configuredTiers;
+    private final List<String> excludedPaths;
 
     private record ConfiguredTier(
         String name,
@@ -63,6 +64,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         this.metrics = metrics;
         this.objectMapper = new ObjectMapper();
         this.pathMatcher = new AntPathMatcher();
+        this.excludedPaths = properties.excludedPaths();
 
         this.defaultConfig = buildBucketConfig(properties.defaultTier());
         if (properties.tiers() != null && !properties.tiers().isEmpty()) {
@@ -82,6 +84,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } else {
             this.configuredTiers = java.util.List.of();
         }
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return excludedPaths
+            .stream()
+            .anyMatch(pattern -> pathMatcher.match(pattern, uri));
     }
 
     private static BucketConfiguration buildBucketConfig(

@@ -301,7 +301,10 @@
 
 ### 4.2 `paid-workshop-registration`
 
-> **Status:** READY
+> **Status:** DONE
+
+> [!NOTE]
+> Feature 4.2 is implemented concurrently with Feature 5.1 (`payment-webhook-handling`) within the same development cycle to provide a complete, end-to-end verifiable vertical slice from registration creation to payment confirmation, QR issuance, and notification delivery.
 
 **Description:** Handles the registration flow for paid (`price > 0`) workshops. Follows the same rate limiting, identity verification, and idempotency steps as free registration. After the Redis capacity is atomically reserved (`DECR workshop:{id}:capacity`), the use case calls the Stripe payment gateway via an outbound SPI (`RegistrationPaymentPort` declared in `registrations/api` and implemented by `payments` module, wrapped in a Resilience4j Circuit Breaker with the same `Idempotency-Key` forwarded to Stripe) to create a Stripe `PaymentIntent`. Upon successful creation, the backend atomically inserts the registration with `status = PENDING` (strictly without QR fields: `qr_payload`, `qr_signature`, `qr_issued_at` are `NULL`) and creates a payment record in `payments` (`status = PENDING`, `provider_payment_id = pi_xxx`). The endpoint returns `201 Created` with `status: PENDING` and `paymentClientSecret` (`pi_xxx_secret_xxx`) for the frontend to render the payment form via Stripe Elements (QR fields are `null` and omitted from JSON by `@JsonInclude(NON_NULL)`). On payment gateway timeout or circuit-breaker trip during intent creation, the registration is marked `FAILED`, Redis capacity is restored via `INCR` (compensating action), and `503 Service Unavailable` (`Retry-After: 30`) is returned. The webhook-driven async path (see `payment-webhook-handling`, Feature 5.1) is the **exclusive primary confirmation path** per ADR-022; the registration transitions from `PENDING` to `CONFIRMED` and generates the cryptographic QR ticket only upon receipt of `payment_intent.succeeded` (or via the 30-minute fallback sweeper in Feature 4.3).
 
@@ -317,7 +320,7 @@
 
 ### 4.3 `registration-reconciliation-and-cancellation`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Covers two complementary concerns: (1) **Dual-Case Reconciliation Sweeper** — a background cron running every 30 minutes that resolves orphaned `PENDING` registrations by querying the payment gateway. If payment succeeded (delayed webhook recovery), the registration is confirmed and QR generated (`qr_payload`, `qr_signature`, `qr_issued_at` set atomically in the `PENDING` → `CONFIRMED` transition transaction). If payment failed or was never initiated, the registration is marked `FAILED` and Redis capacity is restored via `INCR`. (2) **Student-initiated cancellation** — allows a `STUDENT` to cancel their own `CONFIRMED` registration before the workshop starts, transitioning it to `CANCELED` and restoring the Redis capacity counter. An `ORGANIZER` can also force-cancel a student's registration from the admin panel (scoped to their org's workshops).
 
@@ -333,7 +336,7 @@
 
 ### 4.4 `workshop-registration-monitoring-and-roster`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Provides `ORGANIZER` users with operational visibility into workshop registration progress and attendee details. Exposes two primary capabilities: (1) **Registration Summary Endpoint (`GET /api/v1/workshops/{workshopId}/registrations/summary`)** returning real-time operational metrics: total capacity, confirmed registrations count, pending registrations count, available seats, and occupancy percentage. (2) **Attendee Roster Endpoint (`GET /api/v1/workshops/{workshopId}/registrations`)** returning a cursor-paginated list of registered students (student name, student number, faculty, email, registration status `CONFIRMED`/`PENDING`/`CANCELED`, ticket price, registration timestamp), filterable by `status`. When a registration transitions to `CONFIRMED` or `CANCELED` (via free registration, payment webhook, or sweeper/cancellation), the backend immediately publishes a `registration.updated` event to the Redis Pub/Sub workshop channel (`unihub:stream:workshop:{workshopId}`). The Real-Time Event Streaming Hub (F-10.5) pushes this event over the active multiplexed SSE stream (`GET /api/v1/stream/events`) of authorized organizers viewing that workshop's management dashboard, dynamically updating the registration counter and progress indicators in real time without manual polling or page reloads.
 
@@ -353,7 +356,10 @@
 
 ### 5.1 `payment-webhook-handling`
 
-> **Status:** READY
+> **Status:** DONE
+
+> [!NOTE]
+> Feature 5.1 is implemented concurrently with Feature 4.2 (`paid-workshop-registration`) within the same development cycle to provide a complete, end-to-end verifiable vertical slice from registration creation to payment confirmation, QR issuance, and notification delivery.
 
 **Description:** Implements a dedicated, publicly accessible (unauthenticated) `POST /api/v1/payments/webhook` endpoint that receives asynchronous payment outcome events from the Stripe gateway (e.g., `payment_intent.succeeded`, `payment_intent.payment_failed`). Authentication is performed exclusively via **HMAC-SHA256 webhook signature verification** using the Stripe signing secret stored in environment variables (`Stripe-Signature` header) — never JWT. For `payment_intent.succeeded`, the handler atomically updates `payments` to `COMPLETED`, transitions `registrations` to `CONFIRMED`, sets `qr_payload`/`qr_signature`/`qr_issued_at` (the `PENDING` → `CONFIRMED` atomic transaction executed via `RegistrationApi`), inserts a `WorkshopRegisteredEvent` into the outbox (`event_publication`), and updates the idempotency key to `COMPLETED` — all in a single DB transaction. Post-commit hooks broadcast `payment.confirmed` to the student's SSE stream (`unihub:stream:user:{studentUserId}`) and `registration.updated` to the workshop SSE stream (`unihub:stream:workshop:{workshopId}`). The `WorkshopRegisteredEvent` is then externalized by the Spring Modulith Event Registry to RabbitMQ, where the `notifications` worker consumes it for delivery. For `payment_intent.payment_failed`, both records are set to `FAILED` and Redis capacity is restored. The endpoint **always returns `200 OK`** to prevent gateway retry floods; internal errors are logged to DLQ. Idempotency is guaranteed by the `UNIQUE` constraint on `payments.provider_payment_id` — retried webhooks with the same `provider_payment_id` find the record already in a terminal state and return `200 OK` immediately without reprocessing (per ADR-022).
 
@@ -369,7 +375,7 @@
 
 ### 5.2 `payment-history-and-status`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Provides authenticated users with read-only access to their payment history and individual payment status. `STUDENT` users can view their own payment records (amount, status, provider reference, timestamps) linked to their registrations. `ORGANIZER` users can view payment summaries across all registrations for workshops within their organization for operational reporting. All payment state transitions are exclusively handled by `payment-webhook-handling` and `registration-reconciliation-and-cancellation`.
 

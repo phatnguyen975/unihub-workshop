@@ -16,18 +16,22 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public record RateLimitProperties(
     @NotNull @Valid Tier defaultTier,
-    Map<String, @Valid TierConfig> tiers
+    Map<String, @Valid TierConfig> tiers,
+    List<String> excludedPaths
 ) {
     @ConstructorBinding
     public RateLimitProperties(
         Tier defaultTier,
-        Map<String, TierConfig> tiers
+        Map<String, TierConfig> tiers,
+        List<String> excludedPaths
     ) {
         this.defaultTier = defaultTier;
         this.tiers =
             tiers != null
                 ? Collections.unmodifiableMap(new LinkedHashMap<>(tiers))
                 : Map.of();
+        this.excludedPaths =
+            excludedPaths != null ? List.copyOf(excludedPaths) : List.of();
     }
 
     public TierConfig getTier(String name) {
@@ -94,6 +98,7 @@ public record RateLimitProperties(
 
         private Tier defaultTier;
         private final Map<String, TierConfig> tiers = new LinkedHashMap<>();
+        private List<String> excludedPaths = List.of();
 
         public Builder defaultTier(Tier defaultTier) {
             this.defaultTier = defaultTier;
@@ -145,8 +150,14 @@ public record RateLimitProperties(
             return this;
         }
 
+        public Builder excludedPaths(List<String> excludedPaths) {
+            this.excludedPaths =
+                excludedPaths != null ? List.copyOf(excludedPaths) : List.of();
+            return this;
+        }
+
         public RateLimitProperties build() {
-            return new RateLimitProperties(defaultTier, tiers);
+            return new RateLimitProperties(defaultTier, tiers, excludedPaths);
         }
     }
 }

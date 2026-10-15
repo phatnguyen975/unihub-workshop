@@ -10,6 +10,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface RegistrationPersistenceMapper {
     @Mapping(target = "qrTicket", expression = "java(toQrTicket(entity))")
+    @Mapping(target = "paymentClientSecret", ignore = true)
     Registration toDomain(RegistrationJpaEntity entity);
 
     List<Registration> toDomainList(List<RegistrationJpaEntity> entities);
