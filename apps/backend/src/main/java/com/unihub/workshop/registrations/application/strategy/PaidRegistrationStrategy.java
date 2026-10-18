@@ -33,7 +33,7 @@ public class PaidRegistrationStrategy implements RegistrationStrategy {
         RegistrationRepository registrationRepository,
         RegistrationPaymentPort registrationPaymentPort,
         @Value(
-            "${app.registration.pending-ttl-minutes:30}"
+            "${app.registrations.pending-ttl-minutes:30}"
         ) long pendingTtlMinutes
     ) {
         this.registrationRepository = registrationRepository;

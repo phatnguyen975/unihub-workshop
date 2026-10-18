@@ -10,7 +10,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
 
 ## Architecture Decisions for This Plan
 
-- **Unidirectional Spring Modulith Dependency (`payments → registrations::api`):** To avoid circular dependencies between `registrations` and `payments`, `registrations` declares an outbound SPI port `RegistrationPaymentPort` in `registrations.api`. The `payments` module implements this port (`StripePaymentPortAdapter`). For webhook confirmation, `payments` calls `RegistrationApi` declared in `registrations.api`. `registrations` never references `payments`.
+- **Unidirectional Spring Modulith Dependency (`payments` → `registrations::api`):** To avoid circular dependencies between `registrations` and `payments`, `registrations` declares an outbound SPI port `RegistrationPaymentPort` in `registrations.api`. The `payments` module implements this port (`StripePaymentPortAdapter`). For webhook confirmation, `payments` calls `RegistrationApi` declared in `registrations.api`. `registrations` never references `payments`.
 - **Transaction-Free Payment Gateway Call:** Creating the Stripe Payment Intent occurs strictly outside any database transaction. The database transaction opens only to persist the `PENDING` registration record after Stripe returns successfully, preventing database connection pool exhaustion under external API latency (ADR-020).
 - **Universal Keyset Currency Conversion:** A dedicated `CurrencyUnitConverter` encapsulates conversion from `BigDecimal` price to smallest currency units (e.g., cents for USD, unit factor 1 for VND) to prevent floating-point rounding errors and ensure multi-currency extensibility.
 - **Webhook Always-200 Pattern with HMAC-SHA256 Raw Verification:** The webhook controller receives the raw payload string and verifies the `Stripe-Signature` header before JSON parsing. Any post-verification failures return `200 OK` to prevent retry floods, while duplicate deliveries are handled idempotently via the `payments.provider_payment_id` database unique constraint (ADR-021, ADR-022).
@@ -37,7 +37,7 @@ This plan decomposes the merged Feature 4.2 (`paid-workshop-registration`) and F
     - `apps/backend/src/test/java/com/unihub/workshop/registrations/presentation/controllers/RegistrationControllerPaidTest.java`
   - **Acceptance Criteria:**
     - When an authenticated student submits `POST /api/v1/registrations` for a `PUBLISHED` workshop with `price > 0`, the endpoint dispatches to `PaidRegistrationStrategy` and returns `201 Created` with `status: "PENDING"`, `priceAtRegistration`, `currency`, and `paymentClientSecret` (FR-01, FR-06, FR-17, FR-18).
-    - `expires_at` is populated on the created `PENDING` registration with `now() + TTL` (default 30 minutes, loaded from `app.registration.pending-ttl-minutes`) (FR-01, BR-09).
+    - `expires_at` is populated on the created `PENDING` registration with `now() + TTL` (default 30 minutes, loaded from `app.registrations.pending-ttl-minutes`) (FR-01, BR-09).
     - `qrPayload`, `qrSignature`, and `qrIssuedAt` are null and omitted from the response JSON (FR-06).
     - The workshop's Redis capacity is decremented atomically (DECR) and `registered_count` is incremented in DB (FR-02).
     - Stripe Payment Intent is created with amount converted via `CurrencyUnitConverter`, currency in lowercase, and `registrationId` in metadata (FR-03, BR-12).

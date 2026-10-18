@@ -78,7 +78,7 @@ app:
       cron: ${APP_WORKSHOPS_SWEEPER_CRON:0 */5 * * * *}
     capacity-reconciliation:
       cron: ${APP_WORKSHOPS_CAPACITY_RECONCILIATION_CRON:0 */5 * * * *}
-  registration:
+  registrations:
     pending-ttl-minutes: ${APP_REGISTRATION_PENDING_TTL_MINUTES:30}
 
 # =============================================================================
