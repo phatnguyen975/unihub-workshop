@@ -106,7 +106,7 @@ This plan decomposes Feature 4.3 (`registration-reconciliation-and-cancellation`
 
 ### Phase 3: Worker Notification Delivery
 
-- [ ] **T4 — Worker Multi-Channel Cancellation Notification Delivery (Email, In-App, SSE)**
+- [x] **T4 — Worker Multi-Channel Cancellation Notification Delivery (Email, In-App, SSE)**
   - **Size:** S
   - **Depends on:** T2
   - **Layers touched:** Inbound, Core, Outbound (`apps/workers/notifications`)
@@ -126,10 +126,10 @@ This plan decomposes Feature 4.3 (`registration-reconciliation-and-cancellation`
 
 #### Checkpoint: Feature Complete
 
-- [ ] All 4 tasks above are completed and verified against unit and integration tests.
-- [ ] Every acceptance criterion across all tasks has been verified.
-- [ ] Architecture tests pass: `ModulithArchitectureTest` and `HexagonalArchitectureTest`.
-- [ ] Ready for `/review registration-reconciliation-and-cancellation`.
+- [x] All 4 tasks above are completed and verified against unit and integration tests.
+- [x] Every acceptance criterion across all tasks has been verified.
+- [x] Architecture tests pass: `ModulithArchitectureTest` and `HexagonalArchitectureTest`.
+- [x] Ready for `/review registration-reconciliation-and-cancellation`.
 
 ## Risks and Mitigations
 
