@@ -77,7 +77,7 @@ This plan decomposes Feature 4.3 (`registration-reconciliation-and-cancellation`
     - Responds with `200 OK` showing `status = "CANCELED"`, timestamps, price 0, and null QR fields omitted (FR-39).
     - Handles concurrent cancellations gracefully so exactly one succeeds and the other receives `422` without duplicate side effects (FR-40, Scenario 23).
 
-- [ ] **T3 — Paid Registration Cancellation & Automated Stripe Refund Integration**
+- [x] **T3 — Paid Registration Cancellation & Automated Stripe Refund Integration**
   - **Size:** M
   - **Depends on:** T2
   - **Layers touched:** Presentation, Application, Infrastructure (`registrations` and `payments` modules)
@@ -100,9 +100,9 @@ This plan decomposes Feature 4.3 (`registration-reconciliation-and-cancellation`
 
 #### Checkpoint: Phase 2 Complete
 
-- [ ] Both free and paid registrations can be canceled by student or organizer before workshop start.
-- [ ] 100% Stripe refund executes outside database transaction with strict idempotency and circuit-breaker protection.
-- [ ] State transitions, outbox events, Redis capacity restoration, and SSE updates execute cleanly.
+- [x] Both free and paid registrations can be canceled by student or organizer before workshop start.
+- [x] 100% Stripe refund executes outside database transaction with strict idempotency and circuit-breaker protection.
+- [x] State transitions, outbox events, Redis capacity restoration, and SSE updates execute cleanly.
 
 ### Phase 3: Worker Notification Delivery
 

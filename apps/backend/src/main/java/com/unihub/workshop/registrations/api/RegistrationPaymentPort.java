@@ -4,6 +4,8 @@ import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
 import com.unihub.workshop.registrations.api.dto.PaymentStatusResult;
 import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
+import com.unihub.workshop.registrations.api.dto.RefundPaymentCommand;
+import com.unihub.workshop.registrations.api.dto.RefundPaymentResult;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
@@ -66,4 +68,34 @@ public interface RegistrationPaymentPort {
      * @param failureReason description of failure
      */
     void markPaymentFailed(UUID registrationId, String failureReason);
+
+    /**
+     * Checks if an associated payment record exists in COMPLETED status for a registration.
+     *
+     * @param registrationId registration ID
+     * @return true if an associated COMPLETED payment record exists, false otherwise
+     */
+    boolean hasCompletedPayment(UUID registrationId);
+
+    /**
+     * Requests a 100% refund from the payment gateway outside database transactions.
+     * Uses a deterministic idempotency key to prevent duplicate refunds across client retries.
+     *
+     * @param command refund command details
+     * @return result containing external refund identifier, status, amount, and currency
+     */
+    RefundPaymentResult refundPayment(RefundPaymentCommand command);
+
+    /**
+     * Atomically transitions the associated payment record to REFUNDED status.
+     *
+     * @param registrationId registration ID
+     * @param amount refunded amount
+     * @param currency refunded currency
+     */
+    void markPaymentRefunded(
+        UUID registrationId,
+        BigDecimal amount,
+        String currency
+    );
 }

@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.iam.api.IamApi;
 import com.unihub.workshop.iam.api.dto.StudentProfileDto;
+import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationCommand;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
@@ -54,6 +55,7 @@ class CancelRegistrationUseCaseFreeTest {
     private RealtimeEventPublisher realtimeEventPublisher;
     private ApplicationEventPublisher eventPublisher;
     private TransactionOperations transactionOperations;
+    private RegistrationPaymentPort registrationPaymentPort;
 
     private CancelRegistrationUseCaseImpl useCase;
 
@@ -76,6 +78,7 @@ class CancelRegistrationUseCaseFreeTest {
         realtimeEventPublisher = mock(RealtimeEventPublisher.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         transactionOperations = mock(TransactionOperations.class);
+        registrationPaymentPort = mock(RegistrationPaymentPort.class);
 
         when(transactionOperations.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
@@ -104,7 +107,8 @@ class CancelRegistrationUseCaseFreeTest {
             capacityPort,
             realtimeEventPublisher,
             eventPublisher,
-            transactionOperations
+            transactionOperations,
+            registrationPaymentPort
         );
     }
 

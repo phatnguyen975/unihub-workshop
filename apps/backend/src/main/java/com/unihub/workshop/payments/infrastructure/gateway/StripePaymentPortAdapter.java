@@ -3,8 +3,10 @@ package com.unihub.workshop.payments.infrastructure.gateway;
 import com.stripe.StripeClient;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
+import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.param.RefundCreateParams;
 import com.unihub.workshop.payments.application.ports.out.PaymentRepository;
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentStatus;
@@ -13,6 +15,9 @@ import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
 import com.unihub.workshop.registrations.api.dto.PaymentStatusResult;
 import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
+import com.unihub.workshop.registrations.api.dto.RefundPaymentCommand;
+import com.unihub.workshop.registrations.api.dto.RefundPaymentResult;
+import com.unihub.workshop.shared.exception.InternalServerException;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -415,6 +420,158 @@ public class StripePaymentPortAdapter implements RegistrationPaymentPort {
                     failureReason
                 );
             }
+        }
+    }
+
+    @Override
+    public boolean hasCompletedPayment(UUID registrationId) {
+        return paymentRepository
+            .findByRegistrationId(registrationId)
+            .map(p -> p.status() == PaymentStatus.COMPLETED)
+            .orElse(false);
+    }
+
+    @Override
+    public RefundPaymentResult refundPayment(RefundPaymentCommand command) {
+        Optional<Payment> optPayment = paymentRepository.findByRegistrationId(
+            command.registrationId()
+        );
+        if (
+            optPayment.isEmpty() ||
+            optPayment.get().status() != PaymentStatus.COMPLETED
+        ) {
+            log.error(
+                "Refusing refund for registration [{}]: payment record missing or not COMPLETED (FR-34)",
+                command.registrationId()
+            );
+            throw new InternalServerException(
+                "Paid registration has no payment record in COMPLETED status: " +
+                    command.registrationId()
+            );
+        }
+
+        Payment payment = optPayment.get();
+        String providerPaymentId = payment.providerPaymentId();
+
+        long amountInSmallestUnit = currencyUnitConverter.toSmallestUnit(
+            command.amount(),
+            command.currency()
+        );
+
+        RefundCreateParams.Builder paramsBuilder = RefundCreateParams.builder()
+            .setPaymentIntent(providerPaymentId)
+            .setAmount(amountInSmallestUnit)
+            .putMetadata("registrationId", command.registrationId().toString());
+
+        RequestOptions.RequestOptionsBuilder optionsBuilder =
+            RequestOptions.builder();
+        if (
+            command.idempotencyKey() != null &&
+            !command.idempotencyKey().isBlank()
+        ) {
+            optionsBuilder.setIdempotencyKey(command.idempotencyKey());
+        }
+
+        try {
+            Refund refund = circuitBreaker.executeCallable(() ->
+                stripeClient
+                    .v1()
+                    .refunds()
+                    .create(paramsBuilder.build(), optionsBuilder.build())
+            );
+
+            log.info(
+                "Created Stripe Refund [{}] with status [{}] for payment intent [{}] and registration [{}]",
+                refund.getId(),
+                refund.getStatus(),
+                providerPaymentId,
+                command.registrationId()
+            );
+
+            BigDecimal refundedAmount = Payment.convertFromSmallestUnit(
+                refund.getAmount() != null
+                    ? refund.getAmount()
+                    : amountInSmallestUnit,
+                refund.getCurrency() != null
+                    ? refund.getCurrency()
+                    : command.currency()
+            );
+
+            String currency =
+                refund.getCurrency() != null
+                    ? refund.getCurrency().toUpperCase(Locale.ROOT)
+                    : command.currency() != null
+                      ? command.currency().toUpperCase(Locale.ROOT)
+                      : "USD";
+
+            return new RefundPaymentResult(
+                refund.getId(),
+                refund.getStatus(),
+                refundedAmount,
+                currency
+            );
+        } catch (CallNotPermittedException e) {
+            log.warn(
+                "Stripe circuit breaker [{}] is OPEN for payment refund [{}]: {}",
+                circuitBreaker.getName(),
+                providerPaymentId,
+                e.getMessage()
+            );
+            throw e;
+        } catch (StripeException e) {
+            log.error(
+                "Stripe API call failed for payment refund [{}]: {}",
+                providerPaymentId,
+                e.getMessage(),
+                e
+            );
+            throw new ServiceUnavailableException(
+                "Payment gateway service unavailable. Please retry later.",
+                30,
+                e
+            );
+        } catch (Exception e) {
+            log.error(
+                "Unexpected failure during payment refund [{}]: {}",
+                providerPaymentId,
+                e.getMessage(),
+                e
+            );
+            throw new ServiceUnavailableException(
+                "Payment gateway service unavailable. Please retry later.",
+                30,
+                e
+            );
+        }
+    }
+
+    @Override
+    public void markPaymentRefunded(
+        UUID registrationId,
+        BigDecimal amount,
+        String currency
+    ) {
+        Optional<Payment> existingPayment =
+            paymentRepository.findByRegistrationId(registrationId);
+        if (existingPayment.isPresent()) {
+            Payment p = existingPayment.get();
+            Payment refunded = p
+                .toBuilder()
+                .status(PaymentStatus.REFUNDED)
+                .amount(amount != null ? amount : p.amount())
+                .currency(
+                    currency != null
+                        ? currency.toUpperCase(Locale.ROOT)
+                        : p.currency()
+                )
+                .updatedAt(Instant.now())
+                .build();
+            paymentRepository.save(refunded);
+            log.info(
+                "Marked payment [{}] as REFUNDED for registration [{}]",
+                p.providerPaymentId(),
+                registrationId
+            );
         }
     }
 }

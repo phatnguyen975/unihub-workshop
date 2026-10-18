@@ -2,6 +2,9 @@ package com.unihub.workshop.registrations.application.usecases;
 
 import com.unihub.workshop.iam.api.IamApi;
 import com.unihub.workshop.iam.api.dto.StudentProfileDto;
+import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
+import com.unihub.workshop.registrations.api.dto.RefundPaymentCommand;
+import com.unihub.workshop.registrations.api.dto.RefundPaymentResult;
 import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationCommand;
 import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationUseCase;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
@@ -11,6 +14,7 @@ import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.shared.events.RegistrationCanceledEvent;
 import com.unihub.workshop.shared.exception.ForbiddenException;
+import com.unihub.workshop.shared.exception.InternalServerException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
@@ -49,6 +53,7 @@ public class CancelRegistrationUseCaseImpl
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionOperations transactionOperations;
+    private final RegistrationPaymentPort registrationPaymentPort;
 
     @Override
     public CancelledRegistrationResult cancel(
@@ -140,8 +145,14 @@ public class CancelRegistrationUseCaseImpl
                     now
                 );
             } else {
-                throw new UnsupportedOperationException(
-                    "Paid registration cancellation with Stripe refund is handled in Task T3"
+                return executePaidCancellation(
+                    command,
+                    registration,
+                    workshop,
+                    normalizedReason,
+                    idempotencyKeyRecordId,
+                    requestHash,
+                    now
                 );
             }
         } catch (RuntimeException ex) {
@@ -293,40 +304,10 @@ public class CancelRegistrationUseCaseImpl
         );
 
         // Post-commit Redis capacity restoration
-        try {
-            capacityPort.releaseCapacity(registration.workshopId());
-        } catch (Exception e) {
-            log.warn(
-                "Failed to restore Redis capacity for workshop [{}] after cancellation: {}",
-                registration.workshopId(),
-                e.getMessage()
-            );
-        }
+        restoreCapacity(registration.workshopId());
 
         // Post-commit Realtime SSE event
-        try {
-            Map<String, Object> workshopPayload = Map.of(
-                "workshopId",
-                registration.workshopId(),
-                "status",
-                "CANCELED"
-            );
-            RealtimeEvent<Map<String, Object>> workshopEvent = RealtimeEvent.of(
-                RealtimeEventType.REGISTRATION_UPDATED,
-                workshopPayload
-            );
-            realtimeEventPublisher.publishToWorkshop(
-                registration.workshopId(),
-                workshopEvent
-            );
-        } catch (Exception e) {
-            log.error(
-                "Failed to publish registration.updated SSE for workshop [{}]: {}",
-                registration.workshopId(),
-                e.getMessage(),
-                e
-            );
-        }
+        publishRealtimeUpdate(registration.workshopId());
 
         // Complete idempotency key durability
         CancelledRegistrationResult result = new CancelledRegistrationResult(
@@ -345,6 +326,162 @@ public class CancelRegistrationUseCaseImpl
         );
 
         return result;
+    }
+
+    private CancelledRegistrationResult executePaidCancellation(
+        CancelRegistrationCommand command,
+        Registration registration,
+        WorkshopRegistrationDetailsDto workshop,
+        String normalizedReason,
+        UUID idempotencyKeyRecordId,
+        String requestHash,
+        Instant now
+    ) {
+        // 1. Verify associated payment record exists in COMPLETED status
+        if (!registrationPaymentPort.hasCompletedPayment(registration.id())) {
+            log.error(
+                "Paid registration [{}] has no payment record in COMPLETED status (FR-34)",
+                registration.id()
+            );
+            throw new InternalServerException(
+                "Paid registration has no payment record in COMPLETED status: " +
+                    registration.id()
+            );
+        }
+
+        // 2. Request 100% refund from Stripe outside DB transaction using deterministic idempotency key
+        String refundIdempotencyKey = "refund-reg-" + registration.id();
+        RefundPaymentCommand refundCommand = new RefundPaymentCommand(
+            registration.id(),
+            registration.priceAtRegistration(),
+            registration.currency(),
+            refundIdempotencyKey,
+            normalizedReason
+        );
+        RefundPaymentResult refundResult =
+            registrationPaymentPort.refundPayment(refundCommand);
+
+        // 3. Atomically in one DB transaction: transition registration to CANCELED, payment to REFUNDED, outbox event
+        Registration updatedRegistration = transactionOperations.execute(
+            txStatus -> {
+                boolean updated = registrationRepository.cancelRegistration(
+                    registration.id(),
+                    command.callerUserId(),
+                    now
+                );
+
+                if (!updated) {
+                    Registration fresh = registrationRepository
+                        .findById(registration.id())
+                        .orElse(registration);
+                    if (fresh.status() == RegistrationStatus.CANCELED) {
+                        throw new ValidationException(
+                            "status",
+                            "Registration is already canceled"
+                        );
+                    }
+                    throw new ValidationException(
+                        "status",
+                        "Only CONFIRMED registrations can be canceled"
+                    );
+                }
+
+                registrationPaymentPort.markPaymentRefunded(
+                    registration.id(),
+                    refundResult.amount(),
+                    refundResult.currency()
+                );
+
+                Registration canceled = registration.cancel(
+                    command.callerUserId(),
+                    now
+                );
+
+                StudentProfileDto student = iamApi
+                    .getStudentProfile(registration.studentUserId())
+                    .orElse(null);
+
+                RegistrationCanceledEvent event = new RegistrationCanceledEvent(
+                    canceled.id(),
+                    canceled.workshopId(),
+                    canceled.studentUserId(),
+                    student != null ? student.email() : null,
+                    student != null ? student.fullName() : null,
+                    workshop.title(),
+                    workshop.slug(),
+                    workshop.startsAt(),
+                    workshop.endsAt(),
+                    workshop.location(),
+                    normalizedReason,
+                    command.callerRole(),
+                    refundResult.amount(),
+                    refundResult.currency(),
+                    now
+                );
+                eventPublisher.publishEvent(event);
+
+                return canceled;
+            }
+        );
+
+        // 4. Post-commit Redis capacity restoration
+        restoreCapacity(registration.workshopId());
+
+        // 5. Post-commit Realtime SSE event
+        publishRealtimeUpdate(registration.workshopId());
+
+        // 6. Complete idempotency key durability
+        CancelledRegistrationResult result = new CancelledRegistrationResult(
+            updatedRegistration,
+            refundResult.amount(),
+            refundResult.currency()
+        );
+
+        idempotencyPort.complete(
+            command.callerUserId(),
+            idempotencyKeyRecordId,
+            command.idempotencyKey(),
+            requestHash,
+            200,
+            result
+        );
+
+        return result;
+    }
+
+    private void restoreCapacity(UUID workshopId) {
+        try {
+            capacityPort.releaseCapacity(workshopId);
+        } catch (Exception e) {
+            log.warn(
+                "Failed to restore Redis capacity for workshop [{}] after cancellation: {}",
+                workshopId,
+                e.getMessage()
+            );
+        }
+    }
+
+    private void publishRealtimeUpdate(UUID workshopId) {
+        try {
+            Map<String, Object> workshopPayload = Map.of(
+                "workshopId",
+                workshopId,
+                "status",
+                "CANCELED"
+            );
+            RealtimeEvent<Map<String, Object>> workshopEvent = RealtimeEvent.of(
+                RealtimeEventType.REGISTRATION_UPDATED,
+                workshopPayload
+            );
+            realtimeEventPublisher.publishToWorkshop(workshopId, workshopEvent);
+        } catch (Exception e) {
+            log.error(
+                "Failed to publish registration.updated SSE for workshop [{}]: {}",
+                workshopId,
+                e.getMessage(),
+                e
+            );
+        }
     }
 
     private static String computeRequestHash(
