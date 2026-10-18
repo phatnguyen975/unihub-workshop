@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -64,4 +65,18 @@ public interface RegistrationJpaRepository
         nativeQuery = true
     )
     long countActiveRegistrations(@Param("workshopId") UUID workshopId);
+
+    @Modifying
+    @Query(
+        """
+        UPDATE RegistrationJpaEntity r
+        SET r.status = 'CANCELED', r.updatedAt = :now, r.updatedBy = :updatedBy
+        WHERE r.id = :id AND r.status = 'CONFIRMED'
+        """
+    )
+    int cancelRegistration(
+        @Param("id") UUID id,
+        @Param("updatedBy") UUID updatedBy,
+        @Param("now") Instant now
+    );
 }

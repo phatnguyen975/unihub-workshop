@@ -2,6 +2,7 @@ package com.unihub.workshop.registrations.presentation.controllers;
 
 import static org.mockito.Mockito.mock;
 
+import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationUseCase;
 import com.unihub.workshop.registrations.application.ports.in.GetMyRegistrationsUseCase;
 import com.unihub.workshop.registrations.application.ports.in.GetRegistrationDetailUseCase;
 import com.unihub.workshop.registrations.application.ports.in.RegisterWorkshopUseCase;
@@ -18,6 +19,9 @@ public class RegistrationControllerTestBuilder {
     );
     private GetRegistrationDetailUseCase getRegistrationDetailUseCase = mock(
         GetRegistrationDetailUseCase.class
+    );
+    private CancelRegistrationUseCase cancelRegistrationUseCase = mock(
+        CancelRegistrationUseCase.class
     );
     private RegistrationPresentationMapper registrationMapper =
         Mappers.getMapper(RegistrationPresentationMapper.class);
@@ -47,6 +51,13 @@ public class RegistrationControllerTestBuilder {
         return this;
     }
 
+    public RegistrationControllerTestBuilder withCancelRegistrationUseCase(
+        CancelRegistrationUseCase cancelRegistrationUseCase
+    ) {
+        this.cancelRegistrationUseCase = cancelRegistrationUseCase;
+        return this;
+    }
+
     public RegistrationControllerTestBuilder withRegistrationMapper(
         RegistrationPresentationMapper registrationMapper
     ) {
@@ -59,6 +70,7 @@ public class RegistrationControllerTestBuilder {
             registerWorkshopUseCase,
             getMyRegistrationsUseCase,
             getRegistrationDetailUseCase,
+            cancelRegistrationUseCase,
             registrationMapper
         );
     }

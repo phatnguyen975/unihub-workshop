@@ -182,4 +182,13 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
             .map(mapper::toDomain)
             .toList();
     }
+
+    @Override
+    @Transactional
+    public boolean cancelRegistration(UUID id, UUID updatedBy, Instant now) {
+        if (id == null) {
+            return false;
+        }
+        return repository.cancelRegistration(id, updatedBy, now) > 0;
+    }
 }

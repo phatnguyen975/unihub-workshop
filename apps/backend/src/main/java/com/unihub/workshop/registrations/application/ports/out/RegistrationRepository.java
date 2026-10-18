@@ -83,4 +83,14 @@ public interface RegistrationRepository {
         String cursor,
         int size
     );
+
+    /**
+     * Atomically transitions a registration from CONFIRMED to CANCELED status.
+     *
+     * @param id registration ID
+     * @param updatedBy actor ID performing the cancellation
+     * @param now timestamp of cancellation
+     * @return true if updated, false if registration was not found or was not in CONFIRMED status
+     */
+    boolean cancelRegistration(UUID id, UUID updatedBy, Instant now);
 }

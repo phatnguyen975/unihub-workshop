@@ -53,7 +53,7 @@ This plan decomposes Feature 4.3 (`registration-reconciliation-and-cancellation`
 
 ### Phase 2: Unified Registration Cancellation & Automated Refund
 
-- [ ] **T2 — Unified Free Registration Cancellation Endpoint & State Machine**
+- [x] **T2 — Unified Free Registration Cancellation Endpoint & State Machine**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Presentation, Application, Domain, Infrastructure (`registrations` module)
