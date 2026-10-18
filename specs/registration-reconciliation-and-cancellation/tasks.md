@@ -20,7 +20,7 @@ This plan decomposes Feature 4.3 (`registration-reconciliation-and-cancellation`
 
 ### Phase 1: Dual-Case Reconciliation Sweeper
 
-- [ ] **T1 — Dual-Case Reconciliation Sweeper (Scheduled Fallback & Delayed Recovery)**
+- [x] **T1 — Dual-Case Reconciliation Sweeper (Scheduled Fallback & Delayed Recovery)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure (`registrations` and `payments` modules)
@@ -47,9 +47,9 @@ This plan decomposes Feature 4.3 (`registration-reconciliation-and-cancellation`
 
 #### Checkpoint: Phase 1 Complete
 
-- [ ] Sweeper resolves orphaned `PENDING` registrations reliably in both Case A and Case B paths under distributed lock.
-- [ ] No database transactions are held during Stripe gateway calls.
-- [ ] Redis capacity counter is accurately restored on abandoned checkouts.
+- [x] Sweeper resolves orphaned `PENDING` registrations reliably in both Case A and Case B paths under distributed lock.
+- [x] No database transactions are held during Stripe gateway calls.
+- [x] Redis capacity counter is accurately restored on abandoned checkouts.
 
 ### Phase 2: Unified Registration Cancellation & Automated Refund
 

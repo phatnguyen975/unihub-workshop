@@ -4,10 +4,23 @@ import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface RegistrationRepository {
+    /**
+     * Finds expired registrations in PENDING status ordered by oldest expiration first.
+     *
+     * @param now current cutoff instant
+     * @param batchSize maximum number of items to retrieve
+     * @return list of expired PENDING registrations
+     */
+    List<Registration> findExpiredPendingRegistrations(
+        Instant now,
+        int batchSize
+    );
+
     /**
      * Persists a registration aggregate.
      *

@@ -1,7 +1,9 @@
 package com.unihub.workshop.registrations.infrastructure.persistence;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,6 +11,18 @@ import org.springframework.data.repository.query.Param;
 public interface RegistrationJpaRepository
     extends JpaRepository<RegistrationJpaEntity, UUID>
 {
+    @Query(
+        """
+        SELECT r FROM RegistrationJpaEntity r
+        WHERE r.status = 'PENDING' AND r.expiresAt < :now
+        ORDER BY r.expiresAt ASC
+        """
+    )
+    List<RegistrationJpaEntity> findExpiredPendingRegistrations(
+        @Param("now") Instant now,
+        Pageable pageable
+    );
+
     @Query(
         value = """
         SELECT COUNT(r.id) > 0 FROM registrations r

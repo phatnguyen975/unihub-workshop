@@ -41,10 +41,9 @@ class RedisIdempotencyAdapterTest {
     record TestPayload(String message, int count) {}
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         redisTemplate = mock(StringRedisTemplate.class);
-        valueOperations = mock(ValueOperations.class);
+        valueOperations = mock();
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         repository = mock(IdempotencyKeyJpaRepository.class);

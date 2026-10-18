@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -183,7 +184,7 @@ class ProcessPaymentWebhookSuccessTest {
 
         // 3. Verify Realtime SSE events
         ArgumentCaptor<RealtimeEvent<?>> userEventCaptor =
-            ArgumentCaptor.forClass(RealtimeEvent.class);
+            ArgumentCaptor.captor();
         verify(realtimeEventPublisher).publishToUser(
             eq(STUDENT_USER_ID),
             userEventCaptor.capture()
@@ -192,22 +193,19 @@ class ProcessPaymentWebhookSuccessTest {
         assertThat(userEvent.eventType()).isEqualTo(
             RealtimeEventType.PAYMENT_CONFIRMED.getValue()
         );
-        assertThat(userEvent.payload()).isInstanceOf(Map.class);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> userPayload = (Map<
-            String,
-            Object
-        >) userEvent.payload();
-        assertThat(userPayload.get("registrationId")).isEqualTo(
-            REGISTRATION_ID
-        );
-        assertThat(userPayload.get("workshopId")).isEqualTo(WORKSHOP_ID);
-        assertThat(userPayload.get("qrPayload")).isEqualTo(
-            "{\"reg\":\"" + REGISTRATION_ID + "\"}"
-        );
+        assertThat(userEvent.payload())
+            .asInstanceOf(
+                InstanceOfAssertFactories.map(String.class, Object.class)
+            )
+            .containsEntry("registrationId", REGISTRATION_ID)
+            .containsEntry("workshopId", WORKSHOP_ID)
+            .containsEntry(
+                "qrPayload",
+                "{\"reg\":\"" + REGISTRATION_ID + "\"}"
+            );
 
         ArgumentCaptor<RealtimeEvent<?>> workshopEventCaptor =
-            ArgumentCaptor.forClass(RealtimeEvent.class);
+            ArgumentCaptor.captor();
         verify(realtimeEventPublisher).publishToWorkshop(
             eq(WORKSHOP_ID),
             workshopEventCaptor.capture()

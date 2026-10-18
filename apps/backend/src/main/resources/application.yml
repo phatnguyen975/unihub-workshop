@@ -80,6 +80,9 @@ app:
       cron: ${APP_WORKSHOPS_CAPACITY_RECONCILIATION_CRON:0 */5 * * * *}
   registrations:
     pending-ttl-minutes: ${APP_REGISTRATION_PENDING_TTL_MINUTES:30}
+    sweeper:
+      cron: ${APP_REGISTRATIONS_SWEEPER_CRON:0 */30 * * * *}
+      batch-size: ${APP_REGISTRATIONS_SWEEPER_BATCH_SIZE:100}
 
 # =============================================================================
 # Datasource Configuration

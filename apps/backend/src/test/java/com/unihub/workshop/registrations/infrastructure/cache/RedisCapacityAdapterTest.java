@@ -26,10 +26,9 @@ class RedisCapacityAdapterTest {
     private final String expectedKey = "workshop:" + workshopId + ":capacity";
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         redisTemplate = mock(StringRedisTemplate.class);
-        valueOperations = mock(ValueOperations.class);
+        valueOperations = mock();
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         adapter = new RedisCapacityAdapter(redisTemplate);

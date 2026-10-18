@@ -28,6 +28,11 @@ app:
   otp:
     hmac-secret: test-secret-key-must-be-long-enough-for-hmac-sha256-testing
     ttl-minutes: 15
+  registrations:
+    pending-ttl-minutes: 30
+    sweeper:
+      cron: "-"
+      batch-size: 100
 
 rsa:
   private-key: classpath:security/valid-private.pem
