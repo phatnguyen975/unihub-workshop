@@ -17,11 +17,14 @@ import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Public facade implementing {@link RegistrationApi}.
@@ -161,7 +164,7 @@ public class RegistrationFacade implements RegistrationApi {
         Registration failed = registration.markFailed(now);
         registrationRepository.save(failed);
 
-        capacityPort.releaseCapacity(registration.workshopId());
+        registerPostCommitCapacityRelease(registration.workshopId());
 
         log.info(
             "Successfully marked registration [{}] as FAILED and released capacity for workshop [{}]. Reason: {}",
@@ -171,5 +174,24 @@ public class RegistrationFacade implements RegistrationApi {
         );
 
         return true;
+    }
+
+    private void registerPostCommitCapacityRelease(UUID workshopId) {
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        capacityPort.releaseCapacity(workshopId);
+                    } catch (Exception e) {
+                        log.warn(
+                            "Failed to restore Redis capacity for workshop [{}]: {}",
+                            workshopId,
+                            e.getMessage()
+                        );
+                    }
+                }
+            }
+        );
     }
 }

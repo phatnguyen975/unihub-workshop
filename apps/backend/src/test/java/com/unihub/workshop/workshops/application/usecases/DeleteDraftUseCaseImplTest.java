@@ -120,10 +120,7 @@ class DeleteDraftUseCaseImplTest {
 
         verify(workshopRepository).deleteById(WORKSHOP_ID);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<String>> captor = ArgumentCaptor.forClass(
-            Collection.class
-        );
+        ArgumentCaptor<Collection<String>> captor = ArgumentCaptor.captor();
         verify(mediaStoragePort).deleteAllByUrls(captor.capture());
 
         Collection<String> deletedUrls = captor.getValue();

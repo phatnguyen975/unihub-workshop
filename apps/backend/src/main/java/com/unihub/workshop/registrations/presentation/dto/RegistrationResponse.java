@@ -17,5 +17,9 @@ public record RegistrationResponse(
     String qrPayload,
     String qrSignature,
     Instant qrIssuedAt,
-    Instant createdAt
-) {}
+    Instant createdAt,
+    Instant updatedAt,
+    RefundDto refund
+) {
+    public record RefundDto(BigDecimal amount, String currency) {}
+}

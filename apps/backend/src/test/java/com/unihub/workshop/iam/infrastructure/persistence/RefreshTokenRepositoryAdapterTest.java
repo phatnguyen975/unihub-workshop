@@ -17,7 +17,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -49,7 +48,6 @@ class RefreshTokenRepositoryAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void shouldFindActiveSessions_withoutCursor_returnsItemsAndNextCursorWhenHasMore() {
         UUID userId = UUID.randomUUID();
         UUID id1 = UUID.randomUUID();
@@ -83,14 +81,14 @@ class RefreshTokenRepositoryAdapterTest {
         );
 
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<RefreshTokenJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<RefreshTokenJpaEntity> root = mock(Root.class);
-        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> userPath = mock(Path.class);
-        Path<Object> revokedPath = mock(Path.class);
-        Path<Instant> expiresPath = mock(Path.class);
-        Path<Instant> createdAtPath = mock(Path.class);
-        Path<UUID> idPath = mock(Path.class);
+        CriteriaQuery<RefreshTokenJpaEntity> cq = mock();
+        Root<RefreshTokenJpaEntity> root = mock();
+        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock();
+        Path<Object> userPath = mock();
+        Path<Object> revokedPath = mock();
+        Path<Instant> expiresPath = mock();
+        Path<Instant> createdAtPath = mock();
+        Path<UUID> idPath = mock();
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(RefreshTokenJpaEntity.class)).thenReturn(cq);
@@ -136,7 +134,6 @@ class RefreshTokenRepositoryAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void shouldFindActiveSessions_withValidCursor_decodesAndQueriesRepository() {
         UUID userId = UUID.randomUUID();
         UUID cursorId = UUID.randomUUID();
@@ -157,14 +154,14 @@ class RefreshTokenRepositoryAdapterTest {
         );
 
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<RefreshTokenJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<RefreshTokenJpaEntity> root = mock(Root.class);
-        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> userPath = mock(Path.class);
-        Path<Object> revokedPath = mock(Path.class);
-        Path<Instant> expiresPath = mock(Path.class);
-        Path<Instant> createdAtPath = mock(Path.class);
-        Path<UUID> idPath = mock(Path.class);
+        CriteriaQuery<RefreshTokenJpaEntity> cq = mock();
+        Root<RefreshTokenJpaEntity> root = mock();
+        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock();
+        Path<Object> userPath = mock();
+        Path<Object> revokedPath = mock();
+        Path<Instant> expiresPath = mock();
+        Path<Instant> createdAtPath = mock();
+        Path<UUID> idPath = mock();
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(RefreshTokenJpaEntity.class)).thenReturn(cq);
@@ -192,10 +189,10 @@ class RefreshTokenRepositoryAdapterTest {
             .when(cb.or(any(Predicate.class), any(Predicate.class)))
             .thenReturn(mock(Predicate.class));
         lenient()
-            .when(cb.lessThan(any(Expression.class), any(Instant.class)))
+            .when(cb.lessThan(any(), any(Instant.class)))
             .thenReturn(mock(Predicate.class));
         lenient()
-            .when(cb.lessThan(any(Expression.class), any(UUID.class)))
+            .when(cb.lessThan(any(), any(UUID.class)))
             .thenReturn(mock(Predicate.class));
 
         when(entityManager.createQuery(cq)).thenReturn(typedQuery);
@@ -244,7 +241,6 @@ class RefreshTokenRepositoryAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void shouldFindActiveSessions_withWhitespacePaddedCursor_trimsAndSucceeds() {
         UUID userId = UUID.randomUUID();
         UUID cursorId = UUID.randomUUID();
@@ -265,14 +261,14 @@ class RefreshTokenRepositoryAdapterTest {
         );
 
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<RefreshTokenJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<RefreshTokenJpaEntity> root = mock(Root.class);
-        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> userPath = mock(Path.class);
-        Path<Object> revokedPath = mock(Path.class);
-        Path<Instant> expiresPath = mock(Path.class);
-        Path<Instant> createdAtPath = mock(Path.class);
-        Path<UUID> idPath = mock(Path.class);
+        CriteriaQuery<RefreshTokenJpaEntity> cq = mock();
+        Root<RefreshTokenJpaEntity> root = mock();
+        TypedQuery<RefreshTokenJpaEntity> typedQuery = mock();
+        Path<Object> userPath = mock();
+        Path<Object> revokedPath = mock();
+        Path<Instant> expiresPath = mock();
+        Path<Instant> createdAtPath = mock();
+        Path<UUID> idPath = mock();
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(RefreshTokenJpaEntity.class)).thenReturn(cq);
@@ -300,10 +296,10 @@ class RefreshTokenRepositoryAdapterTest {
             .when(cb.or(any(Predicate.class), any(Predicate.class)))
             .thenReturn(mock(Predicate.class));
         lenient()
-            .when(cb.lessThan(any(Expression.class), any(Instant.class)))
+            .when(cb.lessThan(any(), any(Instant.class)))
             .thenReturn(mock(Predicate.class));
         lenient()
-            .when(cb.lessThan(any(Expression.class), any(UUID.class)))
+            .when(cb.lessThan(any(), any(UUID.class)))
             .thenReturn(mock(Predicate.class));
 
         when(entityManager.createQuery(cq)).thenReturn(typedQuery);

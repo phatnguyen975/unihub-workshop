@@ -1,17 +1,22 @@
 package com.unihub.workshop.registrations.presentation.controllers;
 
+import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationCommand;
+import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationUseCase;
 import com.unihub.workshop.registrations.application.ports.in.GetMyRegistrationsQuery;
 import com.unihub.workshop.registrations.application.ports.in.GetMyRegistrationsUseCase;
 import com.unihub.workshop.registrations.application.ports.in.GetRegistrationDetailUseCase;
 import com.unihub.workshop.registrations.application.ports.in.RegisterWorkshopUseCase;
+import com.unihub.workshop.registrations.domain.model.CancelledRegistrationResult;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationDetail;
 import com.unihub.workshop.registrations.domain.model.RegistrationSummary;
+import com.unihub.workshop.registrations.presentation.dto.CancelRegistrationRequest;
 import com.unihub.workshop.registrations.presentation.dto.RegisterWorkshopRequest;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationDetailResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationListResponse;
 import com.unihub.workshop.registrations.presentation.dto.RegistrationResponse;
 import com.unihub.workshop.registrations.presentation.mapper.RegistrationPresentationMapper;
+import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.idempotency.IdempotencyKeyValidator;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
@@ -40,6 +45,7 @@ public class RegistrationController {
     private final RegisterWorkshopUseCase registerWorkshopUseCase;
     private final GetMyRegistrationsUseCase getMyRegistrationsUseCase;
     private final GetRegistrationDetailUseCase getRegistrationDetailUseCase;
+    private final CancelRegistrationUseCase cancelRegistrationUseCase;
     private final RegistrationPresentationMapper registrationMapper;
 
     /**
@@ -148,5 +154,67 @@ public class RegistrationController {
             registrationMapper.toDetailResponse(detail);
 
         return ApiResponse.success(response, "Registration retrieved");
+    }
+
+    /**
+     * Cancels an existing workshop registration.
+     * Accessible by the student owner or an organizer of the workshop's organization.
+     *
+     * @param authentication current security context
+     * @param id registration ID
+     * @param idempotencyKeyHeader Idempotency-Key header (UUIDv4)
+     * @param request optional request payload containing cancellation reason
+     * @return 200 OK with canceled registration details
+     */
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ORGANIZER')")
+    public ApiResponse<RegistrationResponse> cancel(
+        Authentication authentication,
+        @PathVariable("id") UUID id,
+        @RequestHeader(
+            value = "Idempotency-Key",
+            required = false
+        ) String idempotencyKeyHeader,
+        @Valid @RequestBody(required = false) CancelRegistrationRequest request
+    ) {
+        String callerRole = SecurityContextUtils.extractRole(authentication);
+        if (
+            !"STUDENT".equalsIgnoreCase(callerRole) &&
+            !"ORGANIZER".equalsIgnoreCase(callerRole)
+        ) {
+            throw new ForbiddenException("Access denied");
+        }
+
+        UUID callerUserId = SecurityContextUtils.extractUserId(authentication);
+        UUID callerOrganizationId = null;
+        if ("ORGANIZER".equalsIgnoreCase(callerRole)) {
+            callerOrganizationId = SecurityContextUtils.extractOrganizationId(
+                authentication
+            );
+        }
+
+        String idempotencyKey = IdempotencyKeyValidator.validateAndNormalize(
+            idempotencyKeyHeader
+        );
+
+        String reason = request != null ? request.reason() : null;
+
+        CancelRegistrationCommand command = new CancelRegistrationCommand(
+            id,
+            callerUserId,
+            callerRole,
+            callerOrganizationId,
+            idempotencyKey,
+            reason
+        );
+
+        CancelledRegistrationResult result = cancelRegistrationUseCase.cancel(
+            command
+        );
+        RegistrationResponse response = registrationMapper.toCancelResponse(
+            result
+        );
+
+        return ApiResponse.success(response, "Registration canceled");
     }
 }

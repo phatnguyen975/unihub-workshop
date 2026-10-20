@@ -105,15 +105,14 @@ class WorkshopRepositoryAdapterListTest {
     @DisplayName(
         "Should return first page when cursor is null, including nextCursor when hasMore is true"
     )
-    @SuppressWarnings("unchecked")
     void shouldReturnFirstPageWithNextCursor() {
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<WorkshopJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<WorkshopJpaEntity> root = mock(Root.class);
-        TypedQuery<WorkshopJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> orgPath = mock(Path.class);
-        Path<Object> sortPath = mock(Path.class);
-        Path<Object> idPath = mock(Path.class);
+        CriteriaQuery<WorkshopJpaEntity> cq = mock();
+        Root<WorkshopJpaEntity> root = mock();
+        TypedQuery<WorkshopJpaEntity> typedQuery = mock();
+        Path<Object> orgPath = mock();
+        Path<Object> sortPath = mock();
+        Path<Object> idPath = mock();
         Predicate orgPredicate = mock(Predicate.class);
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
@@ -202,15 +201,14 @@ class WorkshopRepositoryAdapterListTest {
 
     @Test
     @DisplayName("Should return page without nextCursor when hasMore is false")
-    @SuppressWarnings("unchecked")
     void shouldReturnPageWithoutNextCursorWhenNoMore() {
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<WorkshopJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<WorkshopJpaEntity> root = mock(Root.class);
-        TypedQuery<WorkshopJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> orgPath = mock(Path.class);
-        Path<Object> sortPath = mock(Path.class);
-        Path<Object> idPath = mock(Path.class);
+        CriteriaQuery<WorkshopJpaEntity> cq = mock();
+        Root<WorkshopJpaEntity> root = mock();
+        TypedQuery<WorkshopJpaEntity> typedQuery = mock();
+        Path<Object> orgPath = mock();
+        Path<Object> sortPath = mock();
+        Path<Object> idPath = mock();
         Predicate orgPredicate = mock(Predicate.class);
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
@@ -270,7 +268,6 @@ class WorkshopRepositoryAdapterListTest {
     @DisplayName(
         "Should correctly process a valid non-null cursor: keyset predicate executes, boundary page has hasMore=false"
     )
-    @SuppressWarnings("unchecked")
     void shouldHandleValidNonNullCursorOnBoundaryPage() {
         // Build a valid cursor for sort=createdAt,desc
         Instant cursorCreatedAt = Instant.parse("2026-09-20T10:00:00Z");
@@ -285,12 +282,12 @@ class WorkshopRepositoryAdapterListTest {
         );
 
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<WorkshopJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<WorkshopJpaEntity> root = mock(Root.class);
-        TypedQuery<WorkshopJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> orgPath = mock(Path.class);
-        Path<Object> sortPath = mock(Path.class);
-        Path<Object> idPath = mock(Path.class);
+        CriteriaQuery<WorkshopJpaEntity> cq = mock();
+        Root<WorkshopJpaEntity> root = mock();
+        TypedQuery<WorkshopJpaEntity> typedQuery = mock();
+        Path<Object> orgPath = mock();
+        Path<Object> sortPath = mock();
+        Path<Object> idPath = mock();
         Predicate orgPredicate = mock(Predicate.class);
         Predicate keysetPredicate = mock(Predicate.class);
 
@@ -307,20 +304,10 @@ class WorkshopRepositoryAdapterListTest {
         // with Mockito strict mode: the broad matchers would conflict with the specific
         // cb.equal(orgPath, ORG_ID) stub registered above.
         lenient()
-            .when(
-                cb.lessThan(
-                    any(jakarta.persistence.criteria.Expression.class),
-                    any(Instant.class)
-                )
-            )
+            .when(cb.lessThan(any(), any(Instant.class)))
             .thenReturn(mock(Predicate.class));
         lenient()
-            .when(
-                cb.lessThan(
-                    any(jakarta.persistence.criteria.Expression.class),
-                    any(UUID.class)
-                )
-            )
+            .when(cb.lessThan(any(), any(UUID.class)))
             .thenReturn(mock(Predicate.class));
         lenient()
             .when(cb.and(any(Predicate.class), any(Predicate.class)))

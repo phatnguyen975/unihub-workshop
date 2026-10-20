@@ -105,4 +105,20 @@ public record Registration(
             .updatedAt(timestamp)
             .build();
     }
+
+    public Registration cancel(UUID actorId, Instant now) {
+        if (this.status != RegistrationStatus.CONFIRMED) {
+            throw new IllegalStateException(
+                "Only CONFIRMED registrations can be canceled, current status: " +
+                    this.status
+            );
+        }
+        Instant timestamp = now != null ? now : Instant.now();
+        return this.toBuilder()
+            .status(RegistrationStatus.CANCELED)
+            .qrTicket(null)
+            .updatedBy(actorId)
+            .updatedAt(timestamp)
+            .build();
+    }
 }

@@ -537,28 +537,31 @@ erDiagram
 
 **Schema Definition Table:**
 
-| Column Name         | Data Type     | Constraints                                                             | Description/UX Logic                           |
-| :------------------ | :------------ | :---------------------------------------------------------------------- | :--------------------------------------------- |
-| id                  | UUID          | PK, NOT NULL, DEFAULT gen_random_uuid()                                 | Payment identifier.                            |
-| registration_id     | UUID          | FK registrations(id), NOT NULL, UNIQUE                                  | One payment per registration.                  |
-| provider            | VARCHAR(50)   | NOT NULL                                                                | Payment gateway (e.g., Stripe).                |
-| provider_payment_id | VARCHAR(100)  | NOT NULL, UNIQUE                                                        | Gateway payment identifier.                    |
-| status              | VARCHAR(20)   | NOT NULL, CHECK (status IN ('PENDING','COMPLETED','FAILED','REFUNDED')) | Payment state.                                 |
-| amount              | NUMERIC(10,2) | NOT NULL, CHECK (amount >= 0)                                           | Payment amount.                                |
-| currency            | CHAR(3)       | NOT NULL                                                                | ISO 4217 currency code.                        |
-| completed_at        | TIMESTAMPTZ   | NULL                                                                    | Timestamp when payment successfully finalized. |
-| failed_at           | TIMESTAMPTZ   | NULL                                                                    | Failure timestamp.                             |
-| failure_code        | VARCHAR(100)  | NULL                                                                    | Provider error code.                           |
-| failure_reason      | TEXT          | NULL                                                                    | Failure description for audits.                |
-| created_at          | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                               |
-| updated_at          | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                               |
-| created_by          | UUID          | FK users(id), NULL                                                      | System actor for payment events.               |
-| updated_by          | UUID          | FK users(id), NULL                                                      | System actor for payment events.               |
+| Column Name         | Data Type     | Constraints                                                             | Description/UX Logic                                                                                                                                     |
+| :------------------ | :------------ | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                  | UUID          | PK, NOT NULL, DEFAULT gen_random_uuid()                                 | Payment identifier.                                                                                                                                      |
+| registration_id     | UUID          | FK registrations(id), NOT NULL, UNIQUE                                  | One payment per registration.                                                                                                                            |
+| provider            | VARCHAR(50)   | NOT NULL                                                                | Payment gateway (e.g., Stripe).                                                                                                                          |
+| provider_payment_id | VARCHAR(100)  | NOT NULL, UNIQUE                                                        | Gateway payment identifier (e.g., Stripe `pi_xxx`).                                                                                                      |
+| provider_refund_id  | VARCHAR(100)  | NULL                                                                    | Provider refund identifier (e.g., Stripe `re_xxx`). Populated when `status` transitions to `REFUNDED`. NULL for non-refunded payments.                   |
+| status              | VARCHAR(20)   | NOT NULL, CHECK (status IN ('PENDING','COMPLETED','FAILED','REFUNDED')) | Payment state.                                                                                                                                           |
+| amount              | NUMERIC(10,2) | NOT NULL, CHECK (amount >= 0)                                           | Payment amount (reflects refunded amount after a `REFUNDED` transition).                                                                                 |
+| currency            | CHAR(3)       | NOT NULL                                                                | ISO 4217 currency code.                                                                                                                                  |
+| completed_at        | TIMESTAMPTZ   | NULL                                                                    | Timestamp when payment successfully finalized (`COMPLETED`).                                                                                             |
+| failed_at           | TIMESTAMPTZ   | NULL                                                                    | Failure timestamp (`FAILED`).                                                                                                                            |
+| refunded_at         | TIMESTAMPTZ   | NULL                                                                    | Timestamp when refund was successfully processed (`REFUNDED`). Set atomically alongside `provider_refund_id` in the `COMPLETED` → `REFUNDED` transition. |
+| failure_code        | VARCHAR(100)  | NULL                                                                    | Provider error code.                                                                                                                                     |
+| failure_reason      | TEXT          | NULL                                                                    | Failure description for audits.                                                                                                                          |
+| created_at          | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                                                                                                                                         |
+| updated_at          | TIMESTAMPTZ   | NOT NULL, DEFAULT now()                                                 | Audit timestamp.                                                                                                                                         |
+| created_by          | UUID          | FK users(id), NULL                                                      | System actor for payment events.                                                                                                                         |
+| updated_by          | UUID          | FK users(id), NULL                                                      | System actor for payment events.                                                                                                                         |
 
 **Indexing Strategy:**
 
 - Unique B-Tree on `provider_payment_id`.
 - B-Tree on `status` for reconciliation and sweeper jobs.
+- B-Tree on `refunded_at` for refund reporting queries (sparse; only rows with `status = 'REFUNDED'`).
 
 > [!CAUTION]
 > Payment status transitions must be idempotent and coordinated with registration status updates in the same transaction.

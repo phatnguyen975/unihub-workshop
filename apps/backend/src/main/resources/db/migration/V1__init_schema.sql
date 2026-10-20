@@ -539,11 +539,13 @@ CREATE TABLE payments (
     registration_id      UUID           NOT NULL,
     provider             VARCHAR(50)    NOT NULL,
     provider_payment_id  VARCHAR(100)   NOT NULL,
+    provider_refund_id   VARCHAR(100)   NULL,
     status               VARCHAR(20)    NOT NULL CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED')),
     amount               NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
     currency             CHAR(3)        NOT NULL,
     completed_at         TIMESTAMPTZ    NULL,
     failed_at            TIMESTAMPTZ    NULL,
+    refunded_at          TIMESTAMPTZ    NULL,
     failure_code         VARCHAR(100)   NULL,
     failure_reason       TEXT           NULL,
     created_at           TIMESTAMPTZ    NOT NULL DEFAULT now(),
@@ -561,6 +563,10 @@ CREATE TABLE payments (
 
 -- Index: reconciliation sweeper and status-based admin queries
 CREATE INDEX idx_payments_status ON payments (status);
+
+-- Sparse index for refund reporting queries
+CREATE INDEX idx_payments_refunded_at ON payments (refunded_at)
+    WHERE status = 'REFUNDED';
 
 CREATE TRIGGER trg_payments_updated_at
     BEFORE UPDATE ON payments

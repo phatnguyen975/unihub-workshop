@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -165,5 +167,28 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
         }
 
         return new CursorPage<>(items, nextCursor, slice.hasMore());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Registration> findExpiredPendingRegistrations(
+        Instant now,
+        int batchSize
+    ) {
+        Pageable pageable = PageRequest.of(0, Math.max(1, batchSize));
+        return repository
+            .findExpiredPendingRegistrations(now, pageable)
+            .stream()
+            .map(mapper::toDomain)
+            .toList();
+    }
+
+    @Override
+    @Transactional
+    public boolean cancelRegistration(UUID id, UUID updatedBy, Instant now) {
+        if (id == null) {
+            return false;
+        }
+        return repository.cancelRegistration(id, updatedBy, now) > 0;
     }
 }

@@ -41,10 +41,12 @@ class PaymentRepositoryAdapterTest {
             .registrationId(regId)
             .provider("STRIPE")
             .providerPaymentId("pi_123")
+            .providerRefundId("re_123")
             .status(PaymentStatus.COMPLETED)
             .amount(BigDecimal.valueOf(25.00))
             .currency("USD")
             .completedAt(now)
+            .refundedAt(now)
             .createdAt(now)
             .updatedAt(now)
             .build();
@@ -54,10 +56,12 @@ class PaymentRepositoryAdapterTest {
             .registrationId(regId)
             .provider("STRIPE")
             .providerPaymentId("pi_123")
+            .providerRefundId("re_123")
             .status(PaymentStatus.COMPLETED)
             .amount(BigDecimal.valueOf(25.00))
             .currency("USD")
             .completedAt(now)
+            .refundedAt(now)
             .createdAt(now)
             .updatedAt(now)
             .build();
@@ -72,11 +76,13 @@ class PaymentRepositoryAdapterTest {
         assertThat(result.id()).isEqualTo(paymentId);
         assertThat(result.registrationId()).isEqualTo(regId);
         assertThat(result.providerPaymentId()).isEqualTo("pi_123");
+        assertThat(result.providerRefundId()).isEqualTo("re_123");
         assertThat(result.status()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(result.amount()).isEqualByComparingTo(
             BigDecimal.valueOf(25.00)
         );
         assertThat(result.currency()).isEqualTo("USD");
+        assertThat(result.refundedAt()).isEqualTo(now);
         verify(jpaRepository).save(any(PaymentJpaEntity.class));
     }
 

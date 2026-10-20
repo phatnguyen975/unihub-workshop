@@ -18,7 +18,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -107,7 +106,6 @@ class UserRepositoryAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void shouldFindMembersByOrganizationId_withoutCursor_returnsItemsAndNextCursorWhenHasMore() {
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
@@ -142,12 +140,12 @@ class UserRepositoryAdapterTest {
         );
 
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<UserJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<UserJpaEntity> root = mock(Root.class);
-        TypedQuery<UserJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> orgPath = mock(Path.class);
-        Path<Object> idPath = mock(Path.class);
-        Path<Object> createdAtPath = mock(Path.class);
+        CriteriaQuery<UserJpaEntity> cq = mock();
+        Root<UserJpaEntity> root = mock();
+        TypedQuery<UserJpaEntity> typedQuery = mock();
+        Path<Object> orgPath = mock();
+        Path<Object> idPath = mock();
+        Path<Object> createdAtPath = mock();
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(UserJpaEntity.class)).thenReturn(cq);
@@ -190,7 +188,6 @@ class UserRepositoryAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void shouldFindMembersByOrganizationId_withValidCursor_decodesAndQueriesRepository() {
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
@@ -212,17 +209,17 @@ class UserRepositoryAdapterTest {
         );
 
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<UserJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<UserJpaEntity> root = mock(Root.class);
-        TypedQuery<UserJpaEntity> typedQuery = mock(TypedQuery.class);
-        Path<Object> orgPath = mock(Path.class);
-        Path<Object> idPath = mock(Path.class);
-        Path<Object> createdAtPath = mock(Path.class);
-        Path<Object> rolePath = mock(Path.class);
-        Path<Object> activePath = mock(Path.class);
-        Path<String> fullNamePath = mock(Path.class);
-        Path<String> emailPath = mock(Path.class);
-        Path<String> phonePath = mock(Path.class);
+        CriteriaQuery<UserJpaEntity> cq = mock();
+        Root<UserJpaEntity> root = mock();
+        TypedQuery<UserJpaEntity> typedQuery = mock();
+        Path<Object> orgPath = mock();
+        Path<Object> idPath = mock();
+        Path<Object> createdAtPath = mock();
+        Path<Object> rolePath = mock();
+        Path<Object> activePath = mock();
+        Path<String> fullNamePath = mock();
+        Path<String> emailPath = mock();
+        Path<String> phonePath = mock();
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(UserJpaEntity.class)).thenReturn(cq);
@@ -246,7 +243,7 @@ class UserRepositoryAdapterTest {
         lenient()
             .when(cb.like(any(), anyString(), anyChar()))
             .thenReturn(mock(Predicate.class));
-        lenient().when(cb.lower(any())).thenReturn(mock(Expression.class));
+        lenient().when(cb.lower(any())).thenReturn(mock());
         lenient().when(cb.isNotNull(any())).thenReturn(mock(Predicate.class));
         lenient()
             .when(cb.and(any(Predicate.class), any(Predicate.class)))
@@ -258,10 +255,10 @@ class UserRepositoryAdapterTest {
             .when(cb.or(any(Predicate[].class)))
             .thenReturn(mock(Predicate.class));
         lenient()
-            .when(cb.lessThan(any(Expression.class), any(Instant.class)))
+            .when(cb.lessThan(any(), any(Instant.class)))
             .thenReturn(mock(Predicate.class));
         lenient()
-            .when(cb.lessThan(any(Expression.class), any(UUID.class)))
+            .when(cb.lessThan(any(), any(UUID.class)))
             .thenReturn(mock(Predicate.class));
 
         when(entityManager.createQuery(cq)).thenReturn(typedQuery);
@@ -305,26 +302,25 @@ class UserRepositoryAdapterTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void shouldFindMembersByOrganizationId_escapesWildcardCharactersInSearch() {
         UUID orgId = UUID.randomUUID();
         UUID callerId = UUID.randomUUID();
 
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
-        CriteriaQuery<UserJpaEntity> cq = mock(CriteriaQuery.class);
-        Root<UserJpaEntity> root = mock(Root.class);
-        TypedQuery<UserJpaEntity> typedQuery = mock(TypedQuery.class);
+        CriteriaQuery<UserJpaEntity> cq = mock();
+        Root<UserJpaEntity> root = mock();
+        TypedQuery<UserJpaEntity> typedQuery = mock();
 
         when(entityManager.getCriteriaBuilder()).thenReturn(cb);
         when(cb.createQuery(UserJpaEntity.class)).thenReturn(cq);
         when(cq.from(UserJpaEntity.class)).thenReturn(root);
 
-        Path<Object> orgPath = mock(Path.class);
-        Path<Object> idPath = mock(Path.class);
-        Path<Object> createdAtPath = mock(Path.class);
-        Path<String> fullNamePath = mock(Path.class);
-        Path<String> emailPath = mock(Path.class);
-        Path<String> phonePath = mock(Path.class);
+        Path<Object> orgPath = mock();
+        Path<Object> idPath = mock();
+        Path<Object> createdAtPath = mock();
+        Path<String> fullNamePath = mock();
+        Path<String> emailPath = mock();
+        Path<String> phonePath = mock();
 
         lenient().when(root.get("organizationId")).thenReturn(orgPath);
         lenient().when(root.get("id")).thenReturn(idPath);
@@ -342,7 +338,7 @@ class UserRepositoryAdapterTest {
         lenient()
             .when(cb.like(any(), anyString(), anyChar()))
             .thenReturn(mock(Predicate.class));
-        lenient().when(cb.lower(any())).thenReturn(mock(Expression.class));
+        lenient().when(cb.lower(any())).thenReturn(mock());
         lenient().when(cb.isNotNull(any())).thenReturn(mock(Predicate.class));
         lenient()
             .when(cb.and(any(Predicate.class), any(Predicate.class)))
