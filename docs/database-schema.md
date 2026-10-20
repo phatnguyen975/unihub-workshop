@@ -511,6 +511,8 @@ erDiagram
 
 - B-Tree on `workshop_id` for workshop-scoped registration lookups.
 - B-Tree on `student_user_id` for student registration history.
+- Composite B-Tree on `(student_user_id, created_at DESC, id DESC)` for stable, newest-first student-scoped registration and payment-history keyset pagination.
+- Composite B-Tree on `(workshop_id, created_at DESC, id DESC)` for stable, newest-first workshop-scoped operational reporting and payment-history keyset pagination.
 - Partial unique B-Tree on `(workshop_id, student_user_id)` where `status IN ('PENDING','CONFIRMED')` to prevent duplicate active registrations.
 - Composite partial B-Tree on `(expires_at, workshop_id)` where `status = 'PENDING'` for the Dual-Case Reconciliation Sweeper. This index is small (only `PENDING` rows), supports the exact sweeper query `WHERE status = 'PENDING' AND expires_at < NOW()`, and includes `workshop_id` for efficient per-workshop capacity refund operations within the same sweep.
 
@@ -562,6 +564,8 @@ erDiagram
 - Unique B-Tree on `provider_payment_id`.
 - B-Tree on `status` for reconciliation and sweeper jobs.
 - B-Tree on `refunded_at` for refund reporting queries (sparse; only rows with `status = 'REFUNDED'`).
+- Composite B-Tree on `(created_at DESC, id DESC)` for stable, newest-first payment-history keyset pagination.
+- Composite B-Tree on `(status, created_at DESC, id DESC)` for status-filtered payment-history keyset pagination.
 
 > [!CAUTION]
 > Payment status transitions must be idempotent and coordinated with registration status updates in the same transaction.
@@ -792,9 +796,10 @@ Neon PostgreSQL uses a primary-replica topology. Replication lag is expected and
 **Replica Routing Requirements:**
 
 - Heavy background read operations, such as synchronizing workshop data to Elasticsearch or batch reading for reporting, should be explicitly routed to Read Replicas to protect the Primary DB's transaction throughput during high-concurrency spikes.
+- Non-mutating history and reporting queries may use a Read Replica when their callers explicitly tolerate short-lived stale data. They must never participate in a check-then-act decision, idempotency workflow, authorization decision that changes state, or immediate read-after-write UX.
 
 > [!CAUTION]
-> Replica reads on the tables above can produce stale states and break exactly-once guarantees. Restrict replicas to non-critical browsing queries (catalog listing, public workshop discovery) where eventual consistency is acceptable.
+> Replica reads on the tables above can produce stale states and break exactly-once guarantees. Restrict replicas to non-critical browsing, history, and reporting queries where eventual consistency is acceptable.
 
 ## 5. Mobile SQLite Schema (Offline-First)
 

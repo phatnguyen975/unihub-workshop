@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -154,19 +153,12 @@ public class StripePaymentPortAdapter implements RegistrationPaymentPort {
             command.amount(),
             command.currency()
         );
-        try {
-            paymentRepository.save(pending);
-            log.info(
-                "Recorded PENDING payment [{}] for registration [{}]",
-                command.providerPaymentId(),
-                command.registrationId()
-            );
-        } catch (DataIntegrityViolationException e) {
-            log.info(
-                "PENDING payment already exists for providerPaymentId [{}], skipping duplicate insert",
-                command.providerPaymentId()
-            );
-        }
+        paymentRepository.save(pending);
+        log.info(
+            "Recorded PENDING payment [{}] for registration [{}]",
+            command.providerPaymentId(),
+            command.registrationId()
+        );
     }
 
     @Override

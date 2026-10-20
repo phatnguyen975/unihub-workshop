@@ -28,8 +28,9 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -52,6 +53,7 @@ public class ProcessPaymentWebhookUseCaseImpl
     private final RealtimeEventPublisher realtimeEventPublisher;
 
     @Override
+    @Transactional
     public void processWebhook(String payload, String signatureHeader) {
         // 1. Mandatory HMAC verification - throws BadRequestException (400) if invalid
         Event event = webhookVerificationPort.verifyAndConstructEvent(
@@ -77,6 +79,9 @@ public class ProcessPaymentWebhookUseCaseImpl
                 ex.getMessage(),
                 ex
             );
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            }
             // Catch all post-verification errors to prevent Stripe from flooding retry loops
         }
     }
@@ -220,20 +225,12 @@ public class ProcessPaymentWebhookUseCaseImpl
                 )
             );
 
-        try {
-            paymentRepository.save(completedPayment);
-            log.info(
-                "Successfully recorded COMPLETED payment [{}] for registration [{}]",
-                providerPaymentId,
-                registrationId
-            );
-        } catch (DataIntegrityViolationException ex) {
-            log.info(
-                "Duplicate payment record detected for providerPaymentId [{}], ignoring constraint violation",
-                providerPaymentId
-            );
-            return;
-        }
+        paymentRepository.save(completedPayment);
+        log.info(
+            "Successfully recorded COMPLETED payment [{}] for registration [{}]",
+            providerPaymentId,
+            registrationId
+        );
 
         registerPostCommitRealtimeEvents(confirmedDto);
     }
@@ -361,19 +358,12 @@ public class ProcessPaymentWebhookUseCaseImpl
                 )
             );
 
-        try {
-            paymentRepository.save(failedPayment);
-            log.info(
-                "Successfully recorded FAILED payment [{}] for registration [{}]",
-                providerPaymentId,
-                registrationId
-            );
-        } catch (DataIntegrityViolationException ex) {
-            log.info(
-                "Duplicate payment record detected for providerPaymentId [{}], ignoring constraint violation",
-                providerPaymentId
-            );
-        }
+        paymentRepository.save(failedPayment);
+        log.info(
+            "Successfully recorded FAILED payment [{}] for registration [{}]",
+            providerPaymentId,
+            registrationId
+        );
     }
 
     private PaymentIntent extractPaymentIntent(Event event) {

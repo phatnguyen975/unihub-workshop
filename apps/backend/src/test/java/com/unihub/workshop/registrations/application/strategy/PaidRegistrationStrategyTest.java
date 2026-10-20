@@ -11,7 +11,7 @@ import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
 import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
-import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.usecases.PendingPaidRegistrationPersistenceService;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
@@ -26,8 +26,8 @@ import org.mockito.ArgumentCaptor;
 
 class PaidRegistrationStrategyTest {
 
-    private RegistrationRepository registrationRepository;
     private RegistrationPaymentPort registrationPaymentPort;
+    private PendingPaidRegistrationPersistenceService persistenceService;
     private PaidRegistrationStrategy strategy;
 
     private final UUID studentUserId = UUID.randomUUID();
@@ -36,12 +36,14 @@ class PaidRegistrationStrategyTest {
 
     @BeforeEach
     void setUp() {
-        registrationRepository = mock(RegistrationRepository.class);
         registrationPaymentPort = mock(RegistrationPaymentPort.class);
+        persistenceService = mock(
+            PendingPaidRegistrationPersistenceService.class
+        );
 
         strategy = new PaidRegistrationStrategy(
-            registrationRepository,
             registrationPaymentPort,
+            persistenceService,
             30L
         );
     }
@@ -108,9 +110,9 @@ class PaidRegistrationStrategyTest {
             )
         ).thenReturn(paymentResult);
 
-        when(registrationRepository.save(any(Registration.class))).thenAnswer(
-            invocation -> invocation.getArgument(0)
-        );
+        when(
+            persistenceService.persist(any(Registration.class), any())
+        ).thenAnswer(invocation -> invocation.getArgument(0));
 
         Registration result = strategy.register(
             student,
@@ -146,7 +148,7 @@ class PaidRegistrationStrategyTest {
         ArgumentCaptor<Registration> regCaptor = ArgumentCaptor.forClass(
             Registration.class
         );
-        verify(registrationRepository).save(regCaptor.capture());
+        verify(persistenceService).persist(regCaptor.capture(), any());
 
         Registration capturedReg = regCaptor.getValue();
         assertThat(capturedReg.workshopId()).isEqualTo(workshopId);
@@ -155,10 +157,11 @@ class PaidRegistrationStrategyTest {
         assertThat(capturedReg.idempotencyKeyId()).isEqualTo(idempotencyKeyId);
         assertThat(capturedReg.qrTicket()).isNull();
 
-        // Verify PENDING payment record is persisted after registration save
+        // Verify the payment persistence command shares the atomic persistence boundary.
         ArgumentCaptor<RecordPendingPaymentCommand> pendingPaymentCaptor =
             ArgumentCaptor.forClass(RecordPendingPaymentCommand.class);
-        verify(registrationPaymentPort).recordPendingPayment(
+        verify(persistenceService).persist(
+            any(Registration.class),
             pendingPaymentCaptor.capture()
         );
         RecordPendingPaymentCommand capturedPendingCmd =

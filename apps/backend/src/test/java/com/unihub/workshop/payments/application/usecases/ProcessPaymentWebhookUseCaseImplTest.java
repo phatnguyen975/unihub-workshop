@@ -16,12 +16,14 @@ import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
+import org.springframework.transaction.annotation.Transactional;
 
 class ProcessPaymentWebhookUseCaseImplTest {
 
@@ -66,6 +68,20 @@ class ProcessPaymentWebhookUseCaseImplTest {
             PAYLOAD,
             SIGNATURE
         );
+    }
+
+    @Test
+    @DisplayName(
+        "Processes valid webhook state transitions inside one transaction"
+    )
+    void processWebhook_IsTransactional() throws NoSuchMethodException {
+        Method method = ProcessPaymentWebhookUseCaseImpl.class.getMethod(
+            "processWebhook",
+            String.class,
+            String.class
+        );
+
+        assertThat(method.isAnnotationPresent(Transactional.class)).isTrue();
     }
 
     @Test

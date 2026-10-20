@@ -477,7 +477,9 @@ CREATE TRIGGER trg_idempotency_keys_updated_at
 -- CRITICAL: qr_payload, qr_signature, and qr_issued_at are intentionally NULL at
 -- insert time. They must ONLY be populated atomically inside the PENDING → CONFIRMED
 -- transition transaction. Application code enforces this invariant.
--- CRITICAL: All reads/writes must route to the PRIMARY replica.
+-- CRITICAL: All writes and consistency-sensitive reads must route to PRIMARY.
+-- Eventually consistent, non-mutating history/reporting reads may route to a
+-- replica when their callers explicitly tolerate short-lived stale data.
 CREATE TABLE registrations (
     id                    UUID           NOT NULL DEFAULT gen_random_uuid(),
     workshop_id           UUID           NOT NULL,
@@ -507,6 +509,11 @@ CREATE TABLE registrations (
 CREATE INDEX idx_registrations_workshop_id ON registrations (workshop_id);
 -- Index: student registration history
 CREATE INDEX idx_registrations_student_user_id ON registrations (student_user_id);
+-- Composite indexes: stable keyset pagination for student history and workshop reporting.
+CREATE INDEX idx_registrations_student_created_at_id
+    ON registrations (student_user_id, created_at DESC, id DESC);
+CREATE INDEX idx_registrations_workshop_created_at_id
+    ON registrations (workshop_id, created_at DESC, id DESC);
 -- Partial unique index: prevents a student from holding two active registrations
 -- for the same workshop simultaneously (last-resort DB guard for overbooking)
 CREATE UNIQUE INDEX idx_registrations_active_per_student
@@ -563,6 +570,12 @@ CREATE TABLE payments (
 
 -- Index: reconciliation sweeper and status-based admin queries
 CREATE INDEX idx_payments_status ON payments (status);
+
+-- Composite indexes: stable keyset pagination for payment history, with and without status filter.
+CREATE INDEX idx_payments_created_at_id
+    ON payments (created_at DESC, id DESC);
+CREATE INDEX idx_payments_status_created_at_id
+    ON payments (status, created_at DESC, id DESC);
 
 -- Sparse index for refund reporting queries
 CREATE INDEX idx_payments_refunded_at ON payments (refunded_at)

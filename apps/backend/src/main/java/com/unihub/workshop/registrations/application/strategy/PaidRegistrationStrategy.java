@@ -5,7 +5,7 @@ import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentIntentResult;
 import com.unihub.workshop.registrations.api.dto.RecordPendingPaymentCommand;
-import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.usecases.PendingPaidRegistrationPersistenceService;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.math.BigDecimal;
@@ -25,19 +25,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class PaidRegistrationStrategy implements RegistrationStrategy {
 
-    private final RegistrationRepository registrationRepository;
     private final RegistrationPaymentPort registrationPaymentPort;
+    private final PendingPaidRegistrationPersistenceService persistenceService;
     private final long pendingTtlMinutes;
 
     public PaidRegistrationStrategy(
-        RegistrationRepository registrationRepository,
         RegistrationPaymentPort registrationPaymentPort,
+        PendingPaidRegistrationPersistenceService persistenceService,
         @Value(
             "${app.registrations.pending-ttl-minutes:30}"
         ) long pendingTtlMinutes
     ) {
-        this.registrationRepository = registrationRepository;
         this.registrationPaymentPort = registrationPaymentPort;
+        this.persistenceService = persistenceService;
         this.pendingTtlMinutes = pendingTtlMinutes;
     }
 
@@ -93,10 +93,8 @@ public class PaidRegistrationStrategy implements RegistrationStrategy {
                 expiresAt
             );
 
-        Registration saved = registrationRepository.save(pendingRegistration);
-
-        // 4. Persist PENDING payment record
-        registrationPaymentPort.recordPendingPayment(
+        Registration saved = persistenceService.persist(
+            pendingRegistration,
             new RecordPendingPaymentCommand(
                 registrationId,
                 paymentIntent.paymentIntentId(),
