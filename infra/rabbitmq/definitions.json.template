@@ -143,6 +143,22 @@
       "arguments": {}
     },
     {
+      "source": "unihub.events",
+      "vhost": "/",
+      "destination": "q.notifications",
+      "destination_type": "queue",
+      "routing_key": "workshop.registered",
+      "arguments": {}
+    },
+    {
+      "source": "unihub.events",
+      "vhost": "/",
+      "destination": "q.notifications",
+      "destination_type": "queue",
+      "routing_key": "registration.canceled",
+      "arguments": {}
+    },
+    {
       "source": "unihub.dlx",
       "vhost": "/",
       "destination": "q.dlq.unihub",

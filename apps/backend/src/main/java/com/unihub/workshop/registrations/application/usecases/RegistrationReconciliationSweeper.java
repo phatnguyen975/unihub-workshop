@@ -19,9 +19,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
@@ -38,6 +40,16 @@ public class RegistrationReconciliationSweeper {
     private static final String LOCK_KEY =
         "lock:sweeper:registration-reconciliation";
     private static final Duration LOCK_TTL = Duration.ofSeconds(240);
+    private static final DefaultRedisScript<Long> RELEASE_LOCK_SCRIPT =
+        new DefaultRedisScript<>(
+            """
+            if redis.call('GET', KEYS[1]) == ARGV[1] then
+                return redis.call('DEL', KEYS[1])
+            end
+            return 0
+            """,
+            Long.class
+        );
 
     private final RegistrationRepository registrationRepository;
     private final RegistrationPaymentPort registrationPaymentPort;
@@ -70,11 +82,12 @@ public class RegistrationReconciliationSweeper {
 
     @Scheduled(cron = "${app.registrations.sweeper.cron:0 */30 * * * *}")
     public void sweep() {
+        String lockToken = UUID.randomUUID().toString();
         Boolean acquired;
         try {
             acquired = redisTemplate
                 .opsForValue()
-                .setIfAbsent(LOCK_KEY, "1", LOCK_TTL);
+                .setIfAbsent(LOCK_KEY, lockToken, LOCK_TTL);
         } catch (Exception e) {
             log.warn(
                 "Failed to check or acquire distributed lock '{}': {}",
@@ -95,16 +108,15 @@ public class RegistrationReconciliationSweeper {
         try {
             executeSweep();
         } finally {
-            try {
-                redisTemplate.delete(LOCK_KEY);
-            } catch (Exception e) {
-                log.warn(
-                    "Failed to release distributed lock '{}': {}",
-                    LOCK_KEY,
-                    e.getMessage()
-                );
-            }
+            releaseLock(lockToken);
         }
+    }
+
+    /** Outcome of processing a single expired registration in one sweep cycle. */
+    private enum SweeperResult {
+        CONFIRMED,
+        FAILED,
+        SKIPPED,
     }
 
     private void executeSweep() {
@@ -122,15 +134,25 @@ public class RegistrationReconciliationSweeper {
             return;
         }
 
+        int selected = expiredRegistrations.size();
         log.info(
             "Found [{}] expired PENDING registrations for reconciliation (batch limit: {})",
-            expiredRegistrations.size(),
+            selected,
             batchSize
         );
 
+        int confirmed = 0;
+        int failed = 0;
+        int skipped = 0;
+
         for (Registration registration : expiredRegistrations) {
             try {
-                processRegistration(registration);
+                SweeperResult result = processRegistration(registration);
+                switch (result) {
+                    case CONFIRMED -> confirmed++;
+                    case FAILED -> failed++;
+                    case SKIPPED -> skipped++;
+                }
             } catch (Exception e) {
                 log.error(
                     "Unexpected error during reconciliation of registration [{}]: {}",
@@ -138,11 +160,20 @@ public class RegistrationReconciliationSweeper {
                     e.getMessage(),
                     e
                 );
+                skipped++;
             }
         }
+
+        log.info(
+            "Reconciliation sweeper cycle completed: selected={}, confirmed={}, failed={}, skipped={}",
+            selected,
+            confirmed,
+            failed,
+            skipped
+        );
     }
 
-    private void processRegistration(Registration registration) {
+    private SweeperResult processRegistration(Registration registration) {
         Optional<PaymentStatusResult> statusOpt;
         try {
             // Query payment gateway outside DB transactions
@@ -154,14 +185,14 @@ public class RegistrationReconciliationSweeper {
                 "Stripe circuit breaker is OPEN for registration [{}], leaving PENDING",
                 registration.id()
             );
-            return;
+            return SweeperResult.SKIPPED;
         } catch (Exception e) {
             log.error(
                 "Payment status query failed for registration [{}], leaving PENDING: {}",
                 registration.id(),
                 e.getMessage()
             );
-            return;
+            return SweeperResult.SKIPPED;
         }
 
         // Expired PENDING registration without payment record
@@ -170,12 +201,11 @@ public class RegistrationReconciliationSweeper {
                 "Expired PENDING registration [{}] has no payment record, resolving directly as Case B",
                 registration.id()
             );
-            executeCaseB(
+            return executeCaseB(
                 registration,
                 null,
                 "No payment attempt was created before expiration"
             );
-            return;
         }
 
         PaymentStatusResult paymentStatus = statusOpt.get();
@@ -186,17 +216,18 @@ public class RegistrationReconciliationSweeper {
                 "Payment for registration [{}] is still processing, leaving PENDING",
                 registration.id()
             );
-            return;
+            return SweeperResult.SKIPPED;
         }
 
         // Case A: Delayed Webhook Recovery
         if (paymentStatus.isSucceeded()) {
-            log.info(
-                "Payment for registration [{}] succeeded, executing Case A Delayed Webhook Recovery",
+            log.warn(
+                "Payment for registration [{}] succeeded but webhook was not received; executing Case A Delayed Webhook Recovery (lost webhook detected)",
                 registration.id()
             );
-            executeCaseA(registration, paymentStatus);
-            return;
+            return executeCaseA(registration, paymentStatus)
+                ? SweeperResult.CONFIRMED
+                : SweeperResult.SKIPPED;
         }
 
         // Case B: Payment failed, uninitiated, abandoned, or canceled
@@ -211,29 +242,31 @@ public class RegistrationReconciliationSweeper {
                 "Stripe circuit breaker is OPEN for payment cancel on registration [{}], leaving PENDING",
                 registration.id()
             );
-            return;
+            return SweeperResult.SKIPPED;
         } catch (Exception e) {
             log.error(
                 "Payment cancel failed for registration [{}], leaving PENDING: {}",
                 registration.id(),
                 e.getMessage()
             );
-            return;
+            return SweeperResult.SKIPPED;
         }
 
         // If cancel reveals payment has meanwhile succeeded, dynamically process as Case A
         if (cancelResult != null && cancelResult.isSucceeded()) {
-            log.info(
-                "Payment cancel revealed payment has succeeded for registration [{}]",
+            log.warn(
+                "Payment cancel revealed payment has succeeded for registration [{}]; executing Case A Delayed Webhook Recovery (lost webhook detected)",
                 registration.id()
             );
-            executeCaseA(registration, cancelResult);
+            return executeCaseA(registration, cancelResult)
+                ? SweeperResult.CONFIRMED
+                : SweeperResult.SKIPPED;
         } else {
             log.info(
                 "Payment cancel confirmed for registration [{}], executing Case B Standard Cleanup",
                 registration.id()
             );
-            executeCaseB(
+            return executeCaseB(
                 registration,
                 paymentStatus,
                 "Payment attempt canceled or abandoned"
@@ -241,7 +274,7 @@ public class RegistrationReconciliationSweeper {
         }
     }
 
-    private void executeCaseA(
+    private boolean executeCaseA(
         Registration registration,
         PaymentStatusResult paymentStatus
     ) {
@@ -280,13 +313,18 @@ public class RegistrationReconciliationSweeper {
                     paymentStatus.currency()
                 );
 
-                // Mark registration's idempotency key COMPLETED
+                // Mark registration's idempotency key COMPLETED and evict Redis L1 cache
+                // (symmetric with Case B eviction — ensures client retries get a fresh COMPLETED response)
                 if (registration.idempotencyKeyId() != null) {
                     idempotencyKeyJpaRepository
                         .findById(registration.idempotencyKeyId())
                         .ifPresent(key -> {
                             key.setStatus("COMPLETED");
                             idempotencyKeyJpaRepository.save(key);
+                            evictIdempotencyKeyFromRedis(
+                                key.getUserId(),
+                                key.getIdempotencyKey()
+                            );
                         });
                 }
 
@@ -295,17 +333,19 @@ public class RegistrationReconciliationSweeper {
         );
 
         // Post-commit real-time events
-        if (confirmedDto != null) {
-            publishRealtimeEventsCaseA(confirmedDto);
+        if (confirmedDto == null) {
+            return false;
         }
+        publishRealtimeEventsCaseA(confirmedDto);
+        return true;
     }
 
-    private void executeCaseB(
+    private SweeperResult executeCaseB(
         Registration registration,
         PaymentStatusResult paymentStatus,
         String failureReason
     ) {
-        transactionOperations.execute(status -> {
+        Boolean failed = transactionOperations.execute(status -> {
             // Defense against webhook race condition
             Optional<Registration> currentOpt = registrationRepository.findById(
                 registration.id()
@@ -318,7 +358,7 @@ public class RegistrationReconciliationSweeper {
                     "Registration [{}] is no longer PENDING, skipping Case B transition",
                     registration.id()
                 );
-                return null;
+                return false;
             }
 
             FailPaidRegistrationCommand failCmd =
@@ -326,12 +366,14 @@ public class RegistrationReconciliationSweeper {
                     registration.id(),
                     failureReason
                 );
-            boolean failed = registrationApi.failPaidRegistration(failCmd);
-            if (!failed) {
-                return null;
+            boolean transitionApplied = registrationApi.failPaidRegistration(
+                failCmd
+            );
+            if (!transitionApplied) {
+                return false;
             }
 
-            // Transition payment to FAILED if payment record existed
+            // Transition payment to FAILED if payment record existed.
             if (paymentStatus != null) {
                 registrationPaymentPort.markPaymentFailed(
                     registration.id(),
@@ -339,31 +381,62 @@ public class RegistrationReconciliationSweeper {
                 );
             }
 
-            // Mark registration's idempotency key FAILED and invalidate Redis L1
+            // Mark registration's idempotency key FAILED and evict Redis L1 cache
             if (registration.idempotencyKeyId() != null) {
                 idempotencyKeyJpaRepository
                     .findById(registration.idempotencyKeyId())
                     .ifPresent(key -> {
                         key.setStatus("FAILED");
                         idempotencyKeyJpaRepository.save(key);
-                        try {
-                            String redisKey =
-                                "idempotency:" +
-                                key.getUserId() +
-                                ":" +
-                                key.getIdempotencyKey();
-                            redisTemplate.delete(redisKey);
-                        } catch (Exception e) {
-                            log.warn(
-                                "Failed to invalidate Redis idempotency key for user [{}]: {}",
-                                key.getUserId(),
-                                e.getMessage()
-                            );
-                        }
+                        evictIdempotencyKeyFromRedis(
+                            key.getUserId(),
+                            key.getIdempotencyKey()
+                        );
                     });
             }
-            return null;
+            return true;
         });
+        if (!Boolean.TRUE.equals(failed)) {
+            return SweeperResult.SKIPPED;
+        }
+        return SweeperResult.FAILED;
+    }
+
+    private void releaseLock(String lockToken) {
+        try {
+            redisTemplate.execute(
+                RELEASE_LOCK_SCRIPT,
+                List.of(LOCK_KEY),
+                lockToken
+            );
+        } catch (Exception e) {
+            log.warn(
+                "Failed to release distributed lock '{}': {}",
+                LOCK_KEY,
+                e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Evicts the Redis L1 idempotency cache entry for a given user and key.
+     * Called by both Case A (COMPLETED) and Case B (FAILED) to ensure consistency
+     * between the DB idempotency record and the in-memory Redis cache.
+     */
+    private void evictIdempotencyKeyFromRedis(
+        UUID userId,
+        String idempotencyKey
+    ) {
+        try {
+            String redisKey = "idempotency:" + userId + ":" + idempotencyKey;
+            redisTemplate.delete(redisKey);
+        } catch (Exception e) {
+            log.warn(
+                "Failed to evict Redis idempotency key for user [{}]: {}",
+                userId,
+                e.getMessage()
+            );
+        }
     }
 
     private void publishRealtimeEventsCaseA(

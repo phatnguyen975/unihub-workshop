@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,6 +22,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class RedisIdempotencyAdapterTest {
 
@@ -317,6 +320,55 @@ class RedisIdempotencyAdapterTest {
             anyString(),
             eq(Duration.ofHours(24))
         );
+    }
+
+    @Test
+    @DisplayName(
+        "complete: defers the Redis COMPLETED cache entry until the surrounding transaction commits"
+    )
+    void complete_TransactionActive_PopulatesRedisOnlyAfterCommit() {
+        UUID keyId = UUID.randomUUID();
+        IdempotencyKeyJpaEntity entity = IdempotencyKeyJpaEntity.builder()
+            .id(keyId)
+            .userId(userId)
+            .idempotencyKey(idempotencyKey)
+            .status("PENDING")
+            .build();
+        when(repository.findById(keyId)).thenReturn(Optional.of(entity));
+
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            adapter.complete(
+                userId,
+                keyId,
+                idempotencyKey,
+                requestHash,
+                201,
+                new TestPayload("Completed", 100)
+            );
+
+            assertThat(entity.getStatus()).isEqualTo("COMPLETED");
+            verify(repository).save(entity);
+            verify(valueOperations, never()).set(
+                eq(redisKey),
+                anyString(),
+                eq(Duration.ofHours(24))
+            );
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(
+                TransactionSynchronization::afterCommit
+            );
+
+            verify(valueOperations).set(
+                eq(redisKey),
+                anyString(),
+                eq(Duration.ofHours(24))
+            );
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

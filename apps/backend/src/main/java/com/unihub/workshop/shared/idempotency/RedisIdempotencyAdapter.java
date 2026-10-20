@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Two-tier idempotency adapter combining Redis L1 cache for sub-millisecond deduplication
@@ -197,7 +199,37 @@ public class RedisIdempotencyAdapter implements IdempotencyPort {
                 });
         }
 
-        // Populate Redis L1 Cache (24h TTL)
+        String completedResponseBody = responseBodyJson;
+        Runnable populateL1Cache = () ->
+            populateCompletedCache(
+                redisKey,
+                requestHash,
+                responseCode,
+                completedResponseBody
+            );
+        if (
+            TransactionSynchronizationManager.isActualTransactionActive() &&
+            TransactionSynchronizationManager.isSynchronizationActive()
+        ) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        populateL1Cache.run();
+                    }
+                }
+            );
+            return;
+        }
+        populateL1Cache.run();
+    }
+
+    private void populateCompletedCache(
+        String redisKey,
+        String requestHash,
+        int responseCode,
+        String responseBodyJson
+    ) {
         try {
             CachedIdempotencyEntry entry = new CachedIdempotencyEntry(
                 "COMPLETED",

@@ -24,6 +24,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class RegistrationFacadeFailureTest {
 
@@ -69,9 +71,9 @@ class RegistrationFacadeFailureTest {
 
     @Test
     @DisplayName(
-        "FR-21, BR-08: Successfully marks PENDING registration as FAILED and releases Redis capacity"
+        "FR-21, BR-08: Releases Redis capacity only after the failure transaction commits"
     )
-    void failPaidRegistration_PendingRegistration_Success() {
+    void failPaidRegistration_PendingRegistration_ReleasesCapacityAfterCommit() {
         Instant now = Instant.now();
         Registration pending = Registration.createPendingPaidRegistration(
             REGISTRATION_ID,
@@ -95,19 +97,28 @@ class RegistrationFacadeFailureTest {
             REGISTRATION_ID,
             "card_declined"
         );
-        boolean result = registrationFacade.failPaidRegistration(command);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            boolean result = registrationFacade.failPaidRegistration(command);
 
-        assertThat(result).isTrue();
+            assertThat(result).isTrue();
 
-        ArgumentCaptor<Registration> regCaptor = ArgumentCaptor.forClass(
-            Registration.class
-        );
-        verify(registrationRepository).save(regCaptor.capture());
-        Registration savedReg = regCaptor.getValue();
-        assertThat(savedReg.status()).isEqualTo(RegistrationStatus.FAILED);
+            ArgumentCaptor<Registration> regCaptor = ArgumentCaptor.forClass(
+                Registration.class
+            );
+            verify(registrationRepository).save(regCaptor.capture());
+            Registration savedReg = regCaptor.getValue();
+            assertThat(savedReg.status()).isEqualTo(RegistrationStatus.FAILED);
 
-        verify(capacityPort).releaseCapacity(WORKSHOP_ID);
-        verify(eventPublisher, never()).publishEvent(any());
+            verify(capacityPort, never()).releaseCapacity(WORKSHOP_ID);
+            TransactionSynchronizationManager.getSynchronizations().forEach(
+                TransactionSynchronization::afterCommit
+            );
+            verify(capacityPort).releaseCapacity(WORKSHOP_ID);
+            verify(eventPublisher, never()).publishEvent(any());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

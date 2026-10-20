@@ -228,6 +228,7 @@ class CancelRegistrationUseCasePaidTest {
 
         verify(registrationPaymentPort).markPaymentRefunded(
             registrationId,
+            "re_stripe_123",
             price,
             currency
         );
@@ -321,6 +322,7 @@ class CancelRegistrationUseCasePaidTest {
 
         verify(registrationPaymentPort).markPaymentRefunded(
             registrationId,
+            "re_stripe_456",
             price,
             currency
         );
@@ -383,6 +385,7 @@ class CancelRegistrationUseCasePaidTest {
         verify(registrationPaymentPort, never()).markPaymentRefunded(
             any(),
             any(),
+            any(),
             any()
         );
         verify(eventPublisher, never()).publishEvent(any());
@@ -443,6 +446,7 @@ class CancelRegistrationUseCasePaidTest {
         verify(registrationPaymentPort, never()).markPaymentRefunded(
             any(),
             any(),
+            any(),
             any()
         );
         verify(eventPublisher, never()).publishEvent(any());
@@ -498,6 +502,7 @@ class CancelRegistrationUseCasePaidTest {
             any()
         );
         verify(registrationPaymentPort, never()).markPaymentRefunded(
+            any(),
             any(),
             any(),
             any()
@@ -569,6 +574,7 @@ class CancelRegistrationUseCasePaidTest {
         assertEquals("Registration is already canceled", ex.getMessage());
 
         verify(registrationPaymentPort, never()).markPaymentRefunded(
+            any(),
             any(),
             any(),
             any()

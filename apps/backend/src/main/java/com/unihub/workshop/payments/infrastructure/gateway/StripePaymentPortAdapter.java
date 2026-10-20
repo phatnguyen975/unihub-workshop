@@ -548,6 +548,7 @@ public class StripePaymentPortAdapter implements RegistrationPaymentPort {
     @Override
     public void markPaymentRefunded(
         UUID registrationId,
+        String providerRefundId,
         BigDecimal amount,
         String currency
     ) {
@@ -555,22 +556,29 @@ public class StripePaymentPortAdapter implements RegistrationPaymentPort {
             paymentRepository.findByRegistrationId(registrationId);
         if (existingPayment.isPresent()) {
             Payment p = existingPayment.get();
+            Instant refundedAt = Instant.now();
             Payment refunded = p
                 .toBuilder()
                 .status(PaymentStatus.REFUNDED)
+                .providerRefundId(providerRefundId)
                 .amount(amount != null ? amount : p.amount())
                 .currency(
                     currency != null
                         ? currency.toUpperCase(Locale.ROOT)
                         : p.currency()
                 )
-                .updatedAt(Instant.now())
+                .refundedAt(refundedAt)
+                .updatedAt(refundedAt)
                 .build();
             paymentRepository.save(refunded);
+
             log.info(
-                "Marked payment [{}] as REFUNDED for registration [{}]",
+                "Marked payment [{}] as REFUNDED with provider refund [{}] for registration [{}] (amount: {} {})",
                 p.providerPaymentId(),
-                registrationId
+                refunded.providerRefundId(),
+                registrationId,
+                refunded.amount(),
+                refunded.currency()
             );
         }
     }

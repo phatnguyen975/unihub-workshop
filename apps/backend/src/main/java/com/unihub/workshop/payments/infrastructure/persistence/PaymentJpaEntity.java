@@ -44,6 +44,9 @@ public class PaymentJpaEntity {
     )
     private String providerPaymentId;
 
+    @Column(name = "provider_refund_id", length = 100)
+    private String providerRefundId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private PaymentStatus status;
@@ -59,6 +62,9 @@ public class PaymentJpaEntity {
 
     @Column(name = "failed_at")
     private Instant failedAt;
+
+    @Column(name = "refunded_at")
+    private Instant refundedAt;
 
     @Column(name = "failure_code", length = 100)
     private String failureCode;

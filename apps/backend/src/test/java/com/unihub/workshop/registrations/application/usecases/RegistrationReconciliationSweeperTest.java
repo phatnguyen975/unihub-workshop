@@ -5,12 +5,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
@@ -34,6 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.TransactionStatus;
@@ -79,7 +85,7 @@ class RegistrationReconciliationSweeperTest {
         when(
             valueOperations.setIfAbsent(
                 eq("lock:sweeper:registration-reconciliation"),
-                eq("1"),
+                anyString(),
                 eq(Duration.ofSeconds(240))
             )
         ).thenReturn(true);
@@ -121,7 +127,7 @@ class RegistrationReconciliationSweeperTest {
         when(
             valueOperations.setIfAbsent(
                 eq("lock:sweeper:registration-reconciliation"),
-                eq("1"),
+                anyString(),
                 eq(Duration.ofSeconds(240))
             )
         ).thenReturn(false);
@@ -149,10 +155,46 @@ class RegistrationReconciliationSweeperTest {
 
         sweeper.sweep();
 
-        verify(redisTemplate).delete(
+        verify(redisTemplate, never()).delete(
             "lock:sweeper:registration-reconciliation"
         );
         verifyNoInteractions(registrationPaymentPort);
+    }
+
+    @Test
+    @DisplayName("sweep releases only the lock token it acquired")
+    void sweep_ReleasesLockUsingAcquisitionToken() {
+        when(
+            registrationRepository.findExpiredPendingRegistrations(
+                any(),
+                eq(100)
+            )
+        ).thenReturn(List.of());
+
+        sweeper.sweep();
+
+        ArgumentCaptor<String> acquiredToken = ArgumentCaptor.forClass(
+            String.class
+        );
+        verify(valueOperations).setIfAbsent(
+            eq("lock:sweeper:registration-reconciliation"),
+            acquiredToken.capture(),
+            eq(Duration.ofSeconds(240))
+        );
+        ArgumentCaptor<String> releasedToken = ArgumentCaptor.forClass(
+            String.class
+        );
+        verify(redisTemplate).execute(
+            any(),
+            eq(List.of("lock:sweeper:registration-reconciliation")),
+            releasedToken.capture()
+        );
+        assertThat(releasedToken.getValue()).isEqualTo(
+            acquiredToken.getValue()
+        );
+        verify(redisTemplate, never()).delete(
+            "lock:sweeper:registration-reconciliation"
+        );
     }
 
     @Test
@@ -223,7 +265,7 @@ class RegistrationReconciliationSweeperTest {
 
         verify(realtimeEventPublisher).publishToUser(eq(studentUserId), any());
         verify(realtimeEventPublisher).publishToWorkshop(eq(workshopId), any());
-        verify(redisTemplate).delete(
+        verify(redisTemplate, never()).delete(
             "lock:sweeper:registration-reconciliation"
         );
     }
@@ -305,7 +347,7 @@ class RegistrationReconciliationSweeperTest {
             "idempotency:" + studentUserId + ":idem-key-1"
         );
         verifyNoInteractions(realtimeEventPublisher);
-        verify(redisTemplate).delete(
+        verify(redisTemplate, never()).delete(
             "lock:sweeper:registration-reconciliation"
         );
     }
@@ -599,5 +641,256 @@ class RegistrationReconciliationSweeperTest {
             new BigDecimal("50.00"),
             "USD"
         );
+    }
+
+    @Test
+    @DisplayName("Case A Delayed Webhook Recovery is logged at WARN")
+    void sweep_CaseA_LoggedAtWarn() {
+        // Capture log events from the sweeper logger
+        Logger sweeperLogger = (Logger) LoggerFactory.getLogger(
+            RegistrationReconciliationSweeper.class
+        );
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        sweeperLogger.addAppender(listAppender);
+
+        try {
+            Registration reg = buildPendingRegistration(registrationId);
+            when(
+                registrationRepository.findExpiredPendingRegistrations(
+                    any(),
+                    eq(100)
+                )
+            ).thenReturn(List.of(reg));
+            when(registrationRepository.findById(registrationId)).thenReturn(
+                Optional.of(reg)
+            );
+
+            PaymentStatusResult statusResult = new PaymentStatusResult(
+                registrationId,
+                "pi_warn_1",
+                "succeeded",
+                new BigDecimal("50.00"),
+                "USD",
+                null,
+                null
+            );
+            when(
+                registrationPaymentPort.getPaymentStatus(registrationId)
+            ).thenReturn(Optional.of(statusResult));
+
+            RegistrationConfirmedDto confirmedDto =
+                new RegistrationConfirmedDto(
+                    registrationId,
+                    workshopId,
+                    studentUserId,
+                    "{\"qr\":\"sample\"}",
+                    Instant.now()
+                );
+            when(
+                registrationApi.confirmPaidRegistration(
+                    any(ConfirmPaidRegistrationCommand.class)
+                )
+            ).thenReturn(confirmedDto);
+
+            sweeper.sweep();
+
+            List<ILoggingEvent> warnLogs = listAppender.list
+                .stream()
+                .filter(e -> e.getLevel() == Level.WARN)
+                .filter(e ->
+                    e.getFormattedMessage().contains("lost webhook detected")
+                )
+                .toList();
+
+            assertThat(warnLogs)
+                .as(
+                    "Case A recovery should be logged at WARN with 'lost webhook detected'"
+                )
+                .isNotEmpty();
+        } finally {
+            sweeperLogger.detachAppender(listAppender);
+        }
+    }
+
+    @Test
+    @DisplayName(
+        "sweep logs aggregate counts (selected/confirmed/failed/skipped) at cycle completion"
+    )
+    void sweep_LogsAggregateCounts_AtCycleCompletion() {
+        Logger sweeperLogger = (Logger) LoggerFactory.getLogger(
+            RegistrationReconciliationSweeper.class
+        );
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        sweeperLogger.addAppender(listAppender);
+
+        try {
+            // One registration that will be confirmed (Case A)
+            Registration reg = buildPendingRegistration(registrationId);
+            when(
+                registrationRepository.findExpiredPendingRegistrations(
+                    any(),
+                    eq(100)
+                )
+            ).thenReturn(List.of(reg));
+            when(registrationRepository.findById(registrationId)).thenReturn(
+                Optional.of(reg)
+            );
+
+            PaymentStatusResult statusResult = new PaymentStatusResult(
+                registrationId,
+                "pi_count_1",
+                "succeeded",
+                new BigDecimal("50.00"),
+                "USD",
+                null,
+                null
+            );
+            when(
+                registrationPaymentPort.getPaymentStatus(registrationId)
+            ).thenReturn(Optional.of(statusResult));
+
+            RegistrationConfirmedDto confirmedDto =
+                new RegistrationConfirmedDto(
+                    registrationId,
+                    workshopId,
+                    studentUserId,
+                    "{\"qr\":\"sample\"}",
+                    Instant.now()
+                );
+            when(
+                registrationApi.confirmPaidRegistration(
+                    any(ConfirmPaidRegistrationCommand.class)
+                )
+            ).thenReturn(confirmedDto);
+
+            sweeper.sweep();
+
+            boolean foundCycleSummary = listAppender.list
+                .stream()
+                .anyMatch(
+                    e ->
+                        e
+                            .getFormattedMessage()
+                            .contains(
+                                "Reconciliation sweeper cycle completed"
+                            ) &&
+                        e.getFormattedMessage().contains("selected=1") &&
+                        e.getFormattedMessage().contains("confirmed=1") &&
+                        e.getFormattedMessage().contains("failed=0") &&
+                        e.getFormattedMessage().contains("skipped=0")
+                );
+
+            assertThat(foundCycleSummary)
+                .as("Sweeper must log cycle summary with aggregate counts")
+                .isTrue();
+        } finally {
+            sweeperLogger.detachAppender(listAppender);
+        }
+    }
+
+    @Test
+    @DisplayName(
+        "Case A evicts Redis idempotency key symmetrically with Case B"
+    )
+    void sweep_CaseA_EvictsRedisIdempotencyKey() {
+        Registration reg = buildPendingRegistration(registrationId);
+        when(
+            registrationRepository.findExpiredPendingRegistrations(
+                any(),
+                eq(100)
+            )
+        ).thenReturn(List.of(reg));
+        when(registrationRepository.findById(registrationId)).thenReturn(
+            Optional.of(reg)
+        );
+
+        PaymentStatusResult statusResult = new PaymentStatusResult(
+            registrationId,
+            "pi_evict_1",
+            "succeeded",
+            new BigDecimal("50.00"),
+            "USD",
+            null,
+            null
+        );
+        when(
+            registrationPaymentPort.getPaymentStatus(registrationId)
+        ).thenReturn(Optional.of(statusResult));
+
+        RegistrationConfirmedDto confirmedDto = new RegistrationConfirmedDto(
+            registrationId,
+            workshopId,
+            studentUserId,
+            "{\"qr\":\"sample\"}",
+            Instant.now()
+        );
+        when(
+            registrationApi.confirmPaidRegistration(
+                any(ConfirmPaidRegistrationCommand.class)
+            )
+        ).thenReturn(confirmedDto);
+
+        // Set up idempotency key entity
+        IdempotencyKeyJpaEntity keyEntity = new IdempotencyKeyJpaEntity();
+        keyEntity.setId(idempotencyKeyId);
+        keyEntity.setUserId(studentUserId);
+        keyEntity.setIdempotencyKey("idem-key-caseA");
+        keyEntity.setStatus("PENDING");
+        when(idempotencyKeyJpaRepository.findById(idempotencyKeyId)).thenReturn(
+            Optional.of(keyEntity)
+        );
+
+        sweeper.sweep();
+
+        // Case A must evict Redis key just like Case B
+        verify(redisTemplate).delete(
+            "idempotency:" + studentUserId + ":idem-key-caseA"
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "Case B restores capacity only after all database writes succeed"
+    )
+    void sweep_CaseB_DoesNotRestoreCapacityWhenPaymentUpdateFails() {
+        Registration registration = buildPendingRegistration(registrationId);
+        when(
+            registrationRepository.findExpiredPendingRegistrations(
+                any(),
+                eq(100)
+            )
+        ).thenReturn(List.of(registration));
+        when(registrationRepository.findById(registrationId)).thenReturn(
+            Optional.of(registration)
+        );
+
+        PaymentStatusResult status = new PaymentStatusResult(
+            registrationId,
+            "pi_failure_boundary",
+            "requires_payment_method",
+            new BigDecimal("50.00"),
+            "USD",
+            null,
+            null
+        );
+        when(
+            registrationPaymentPort.getPaymentStatus(registrationId)
+        ).thenReturn(Optional.of(status));
+        when(
+            registrationPaymentPort.cancelPaymentAttempt("pi_failure_boundary")
+        ).thenReturn(status);
+        when(registrationApi.failPaidRegistration(any())).thenReturn(true);
+        doThrow(new IllegalStateException("payment update failed"))
+            .when(registrationPaymentPort)
+            .markPaymentFailed(
+                registrationId,
+                "Payment attempt canceled or abandoned"
+            );
+
+        sweeper.sweep();
+
+        verify(registrationApi).failPaidRegistration(any());
     }
 }

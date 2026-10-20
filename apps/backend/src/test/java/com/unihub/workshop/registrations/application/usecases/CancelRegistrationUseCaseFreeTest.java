@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -36,6 +37,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,7 @@ class CancelRegistrationUseCaseFreeTest {
     private ApplicationEventPublisher eventPublisher;
     private TransactionOperations transactionOperations;
     private RegistrationPaymentPort registrationPaymentPort;
+    private AtomicBoolean transactionActive;
 
     private CancelRegistrationUseCaseImpl useCase;
 
@@ -79,10 +82,16 @@ class CancelRegistrationUseCaseFreeTest {
         eventPublisher = mock(ApplicationEventPublisher.class);
         transactionOperations = mock(TransactionOperations.class);
         registrationPaymentPort = mock(RegistrationPaymentPort.class);
+        transactionActive = new AtomicBoolean(false);
 
         when(transactionOperations.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
-            return callback.doInTransaction(mock(TransactionStatus.class));
+            transactionActive.set(true);
+            try {
+                return callback.doInTransaction(mock(TransactionStatus.class));
+            } finally {
+                transactionActive.set(false);
+            }
         });
 
         // Default acquired idempotency key claim
@@ -828,6 +837,140 @@ class CancelRegistrationUseCaseFreeTest {
             anyString(),
             eq(200),
             eq(result)
+        );
+    }
+
+    @Test
+    @DisplayName("lowercase 'student' role accepted by validateAuthorization")
+    void cancel_LowercaseStudentRole_Accepted() {
+        Registration reg = buildConfirmedFreeRegistration();
+        WorkshopRegistrationDetailsDto workshop =
+            buildPublishedFutureWorkshop();
+        StudentProfileDto student = buildStudentProfile();
+
+        when(registrationRepository.findById(registrationId)).thenReturn(
+            Optional.of(reg)
+        );
+        when(workshopApi.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop)
+        );
+        when(iamApi.getStudentProfile(studentUserId)).thenReturn(
+            Optional.of(student)
+        );
+        when(
+            registrationRepository.cancelRegistration(
+                eq(registrationId),
+                eq(studentUserId),
+                any(Instant.class)
+            )
+        ).thenReturn(true);
+
+        CancelRegistrationCommand command = new CancelRegistrationCommand(
+            registrationId,
+            studentUserId,
+            "student",
+            null,
+            idempotencyKey,
+            null
+        );
+
+        CancelledRegistrationResult result = useCase.cancel(command);
+
+        assertThat(result).isNotNull();
+        assertThat(result.registration().status()).isEqualTo(
+            RegistrationStatus.CANCELED
+        );
+    }
+
+    @Test
+    @DisplayName("lowercase 'organizer' role accepted by validateAuthorization")
+    void cancel_LowercaseOrganizerRole_Accepted() {
+        Registration reg = buildConfirmedFreeRegistration();
+        WorkshopRegistrationDetailsDto workshop =
+            buildPublishedFutureWorkshop();
+        StudentProfileDto student = buildStudentProfile();
+
+        when(registrationRepository.findById(registrationId)).thenReturn(
+            Optional.of(reg)
+        );
+        when(workshopApi.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop)
+        );
+        when(iamApi.getStudentProfile(studentUserId)).thenReturn(
+            Optional.of(student)
+        );
+        when(
+            registrationRepository.cancelRegistration(
+                eq(registrationId),
+                eq(organizerUserId),
+                any(Instant.class)
+            )
+        ).thenReturn(true);
+
+        // Role value in lowercase
+        CancelRegistrationCommand command = new CancelRegistrationCommand(
+            registrationId,
+            organizerUserId,
+            "organizer",
+            organizationId,
+            idempotencyKey,
+            null
+        );
+
+        CancelledRegistrationResult result = useCase.cancel(command);
+
+        assertThat(result).isNotNull();
+        assertThat(result.registration().status()).isEqualTo(
+            RegistrationStatus.CANCELED
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "idempotency completion participates in the cancellation transaction"
+    )
+    void cancel_CompletesIdempotencyWithinBusinessTransaction() {
+        Registration registration = buildConfirmedFreeRegistration();
+        when(registrationRepository.findById(registrationId)).thenReturn(
+            Optional.of(registration)
+        );
+        when(workshopApi.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(buildPublishedFutureWorkshop())
+        );
+        when(iamApi.getStudentProfile(studentUserId)).thenReturn(
+            Optional.of(buildStudentProfile())
+        );
+        when(
+            registrationRepository.cancelRegistration(
+                eq(registrationId),
+                eq(studentUserId),
+                any(Instant.class)
+            )
+        ).thenReturn(true);
+
+        doAnswer(invocation -> {
+            assertThat(transactionActive.get()).isTrue();
+            return null;
+        })
+            .when(idempotencyPort)
+            .complete(
+                eq(studentUserId),
+                eq(idempotencyKeyRecordId),
+                eq(idempotencyKey),
+                anyString(),
+                eq(200),
+                any(CancelledRegistrationResult.class)
+            );
+
+        useCase.cancel(
+            new CancelRegistrationCommand(
+                registrationId,
+                studentUserId,
+                "STUDENT",
+                null,
+                idempotencyKey,
+                null
+            )
         );
     }
 }

@@ -169,13 +169,13 @@ public class CancelRegistrationUseCaseImpl
         Registration registration,
         WorkshopRegistrationDetailsDto workshop
     ) {
-        if ("STUDENT".equals(command.callerRole())) {
+        if ("STUDENT".equalsIgnoreCase(command.callerRole())) {
             if (!registration.studentUserId().equals(command.callerUserId())) {
                 throw new ForbiddenException(
                     "You do not have permission to cancel this registration"
                 );
             }
-        } else if ("ORGANIZER".equals(command.callerRole())) {
+        } else if ("ORGANIZER".equalsIgnoreCase(command.callerRole())) {
             if (
                 command.callerOrganizationId() == null ||
                 !workshop
@@ -247,7 +247,7 @@ public class CancelRegistrationUseCaseImpl
         String requestHash,
         Instant now
     ) {
-        Registration updatedRegistration = transactionOperations.execute(
+        CancelledRegistrationResult result = transactionOperations.execute(
             txStatus -> {
                 boolean updated = registrationRepository.cancelRegistration(
                     registration.id(),
@@ -299,7 +299,17 @@ public class CancelRegistrationUseCaseImpl
                 );
                 eventPublisher.publishEvent(event);
 
-                return canceled;
+                CancelledRegistrationResult completedResult =
+                    new CancelledRegistrationResult(canceled, null, null);
+                idempotencyPort.complete(
+                    command.callerUserId(),
+                    idempotencyKeyRecordId,
+                    command.idempotencyKey(),
+                    requestHash,
+                    200,
+                    completedResult
+                );
+                return completedResult;
             }
         );
 
@@ -309,20 +319,12 @@ public class CancelRegistrationUseCaseImpl
         // Post-commit Realtime SSE event
         publishRealtimeUpdate(registration.workshopId());
 
-        // Complete idempotency key durability
-        CancelledRegistrationResult result = new CancelledRegistrationResult(
-            updatedRegistration,
-            null,
-            null
-        );
-
-        idempotencyPort.complete(
+        log.info(
+            "Registration [{}] canceled for workshop [{}] by caller [{}] with role [{}] (free, no refund)",
+            registration.id(),
+            registration.workshopId(),
             command.callerUserId(),
-            idempotencyKeyRecordId,
-            command.idempotencyKey(),
-            requestHash,
-            200,
-            result
+            command.callerRole()
         );
 
         return result;
@@ -362,7 +364,7 @@ public class CancelRegistrationUseCaseImpl
             registrationPaymentPort.refundPayment(refundCommand);
 
         // 3. Atomically in one DB transaction: transition registration to CANCELED, payment to REFUNDED, outbox event
-        Registration updatedRegistration = transactionOperations.execute(
+        CancelledRegistrationResult result = transactionOperations.execute(
             txStatus -> {
                 boolean updated = registrationRepository.cancelRegistration(
                     registration.id(),
@@ -388,6 +390,7 @@ public class CancelRegistrationUseCaseImpl
 
                 registrationPaymentPort.markPaymentRefunded(
                     registration.id(),
+                    refundResult.providerRefundId(),
                     refundResult.amount(),
                     refundResult.currency()
                 );
@@ -420,7 +423,21 @@ public class CancelRegistrationUseCaseImpl
                 );
                 eventPublisher.publishEvent(event);
 
-                return canceled;
+                CancelledRegistrationResult completedResult =
+                    new CancelledRegistrationResult(
+                        canceled,
+                        refundResult.amount(),
+                        refundResult.currency()
+                    );
+                idempotencyPort.complete(
+                    command.callerUserId(),
+                    idempotencyKeyRecordId,
+                    command.idempotencyKey(),
+                    requestHash,
+                    200,
+                    completedResult
+                );
+                return completedResult;
             }
         );
 
@@ -430,20 +447,14 @@ public class CancelRegistrationUseCaseImpl
         // 5. Post-commit Realtime SSE event
         publishRealtimeUpdate(registration.workshopId());
 
-        // 6. Complete idempotency key durability
-        CancelledRegistrationResult result = new CancelledRegistrationResult(
-            updatedRegistration,
+        log.info(
+            "Registration [{}] canceled for workshop [{}] by caller [{}] with role [{}] (refund: {} {})",
+            registration.id(),
+            registration.workshopId(),
+            command.callerUserId(),
+            command.callerRole(),
             refundResult.amount(),
             refundResult.currency()
-        );
-
-        idempotencyPort.complete(
-            command.callerUserId(),
-            idempotencyKeyRecordId,
-            command.idempotencyKey(),
-            requestHash,
-            200,
-            result
         );
 
         return result;

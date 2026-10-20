@@ -90,11 +90,13 @@ public interface RegistrationPaymentPort {
      * Atomically transitions the associated payment record to REFUNDED status.
      *
      * @param registrationId registration ID
+     * @param providerRefundId refund identifier returned by the payment provider
      * @param amount refunded amount
      * @param currency refunded currency
      */
     void markPaymentRefunded(
         UUID registrationId,
+        String providerRefundId,
         BigDecimal amount,
         String currency
     );

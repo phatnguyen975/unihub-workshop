@@ -344,6 +344,7 @@ class StripePaymentPortAdapterRefundTest {
 
         adapter.markPaymentRefunded(
             registrationId,
+            "re_test_987654321",
             new BigDecimal("50.00"),
             "USD"
         );
@@ -355,6 +356,8 @@ class StripePaymentPortAdapterRefundTest {
         assertEquals(PaymentStatus.REFUNDED, saved.status());
         assertEquals(new BigDecimal("50.00"), saved.amount());
         assertEquals("USD", saved.currency());
+        assertEquals("re_test_987654321", saved.providerRefundId());
+        assertNotNull(saved.refundedAt());
         assertNotNull(saved.updatedAt());
     }
 }

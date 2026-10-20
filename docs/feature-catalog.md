@@ -320,7 +320,7 @@
 
 ### 4.3 `registration-reconciliation-and-cancellation`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Covers two complementary operational capabilities within the workshop registration lifecycle:
 
