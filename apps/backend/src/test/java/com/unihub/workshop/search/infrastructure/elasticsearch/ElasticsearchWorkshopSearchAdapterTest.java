@@ -153,9 +153,13 @@ class ElasticsearchWorkshopSearchAdapterTest {
 
         KeysetCursor decoded = KeysetCursorCodec.decode(
             result.nextCursor(),
-            "startsAt"
+            "startsAt",
+            query.filterFingerprint()
         );
         assertThat(decoded.id()).isEqualTo(workshopId1);
+        assertThat(decoded.filterFingerprint()).isEqualTo(
+            "q=*&priceType=*&from=*&to=*"
+        );
     }
 
     @Test

@@ -15,7 +15,7 @@ This contract defines the network interface for the merged Feature 3.1 (`worksho
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** `/api/v{n}/...` path versioning (this contract uses `/api/v1`). Governed by `docs/api-standards.md §Versioning`.
-- **Pagination convention:** Keyset cursor pagination via `?cursor=` (opaque Base64-encoded JSON) and `?size=` (default 20, max 100). Cursor JSON payload: `{ id, sortField, primaryValue, secondaryValue }`. Response includes `{ nextCursor, hasMore }`. Governed by `docs/api-standards.md §Pagination`.
+- **Pagination convention:** Keyset cursor pagination via `?cursor=` (opaque Base64-encoded JSON) and `?size=` (default 20, max 100). Cursor JSON payload: `{ id, sortField, primaryValue, secondaryValue, filterFingerprint }`; the fingerprint binds the cursor to the filter set (`q`, `priceType`, `from`, `to`) that produced it. Response includes `{ nextCursor, hasMore }`. Governed by `docs/api-standards.md §Pagination`.
 - **Search parameter:** `?q=` for free-text keyword search. No alias names (`search`, `keyword`, `query`) permitted. Governed by `docs/api-standards.md §Search`.
 - **Sorting parameter:** `?sort={field},{direction}`. Governed by `docs/api-standards.md §Sorting`.
 - **Success response shape:** Standard JSON envelope `{ success: boolean, message: string, data: object | object[], metadata: { processedBy, traceId } }`. Governed by `docs/api-standards.md §Standard JSON Payloads`.
@@ -66,6 +66,7 @@ This contract defines the network interface for the merged Feature 3.1 (`worksho
 - `sort` — optional; if present, must exactly match one of the six enumerated values. Any other value: `422 Unprocessable Content`.
 - `cursor` — optional; if present, must be a valid Base64-decodable string yielding a valid keyset cursor JSON payload. Malformed cursor: `400 Bad Request`.
 - `cursor` + `sort` mismatch — if `cursor.sortField` does not match the current `sort` parameter, the request is rejected: `400 Bad Request`.
+- `cursor` + filter mismatch — if the cursor's `filterFingerprint` does not match the current filter set (`q`, `priceType`, `from`, `to`), the request is rejected: `400 Bad Request`. This includes adding or removing a filter between pages relative to the set that produced the cursor.
 - `size` — optional; if present, must be an integer between 1 and 100 inclusive. Values > 100: `422 Unprocessable Content`.
 
 #### Response
@@ -155,6 +156,7 @@ This contract defines the network interface for the merged Feature 3.1 (`worksho
 | :-------------------------- | :------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `400 Bad Request`           | `urn:unihub:error:bad-request`  | Malformed or undecodable `cursor` value (Base64 decode failure or invalid JSON structure).                                                                                         |
 | `400 Bad Request`           | `urn:unihub:error:bad-request`  | `cursor.sortField` does not match the current `sort` parameter (cursor sort field mismatch). Error `detail` MUST name both the cursor's sort field and the current sort parameter. |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | The cursor's `filterFingerprint` does not match the current filter set (`q`, `priceType`, `from`, `to`) — including when a filter is added or removed between pages.               |
 | `422 Unprocessable Content` | `urn:unihub:error:validation`   | `priceType` is not one of `FREE` or `PAID`.                                                                                                                                        |
 | `422 Unprocessable Content` | `urn:unihub:error:validation`   | `sort` is not one of the six enumerated sort values.                                                                                                                               |
 | `422 Unprocessable Content` | `urn:unihub:error:validation`   | `from` or `to` is not a valid ISO-8601 UTC timestamp.                                                                                                                              |

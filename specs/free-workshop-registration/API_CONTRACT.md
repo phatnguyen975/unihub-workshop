@@ -11,7 +11,7 @@ This contract defines the three REST endpoints exposed by the `registrations` mo
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** `/api/v1/registrations/**` — URI path versioning per `docs/api-standards.md §Versioning Strategy`.
-- **Pagination convention:** Keyset cursor pagination with `?cursor=` (opaque Base64-encoded JSON) and `?size=` query parameters. Default size: 20, maximum: 50. Response shape: `{ items: [...], cursor: { nextCursor: string|null, hasMore: boolean } }` nested under `data`.
+- **Pagination convention:** Keyset cursor pagination with `?cursor=` (opaque Base64-encoded JSON) and `?size=` query parameters. Default size: 20, maximum: 100. Response shape: `{ items: [...], cursor: { nextCursor: string|null, hasMore: boolean } }` nested under `data`.
 - **Success response shape:** Standard JSON envelope: `{ success: true, message: string, data: object, metadata: { processedBy: string, traceId: string } }`. Null fields omitted via `@JsonInclude(NON_NULL)`.
 - **Error response format:** RFC 7807 Problem Details wrapped in the standard envelope: `{ success: false, error: { type: "urn:unihub:error:*", title, status, detail, instance, [validationErrors] }, metadata: { processedBy, traceId } }`. Content-Type: `application/problem+json`.
 - **Idempotency-key convention:** Required on the `POST /api/v1/registrations` mutation. UUIDv4 string, max 64 characters, sent in the `Idempotency-Key` request header. Not required on GET endpoints.
@@ -154,7 +154,7 @@ On idempotent replay (`201 Created`, key already `COMPLETED`): no side effects a
 | Parameter | Type            | Required | Description                                                                                                                                                                                       |
 | :-------- | :-------------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `cursor`  | string (opaque) | No       | Keyset cursor from a previous response's `data.cursor.nextCursor`. Omit for the first page.                                                                                                       |
-| `size`    | integer         | No       | Number of items per page. Default: `20`. Maximum: `50`. Values outside this range are clamped to the maximum or reset to the default.                                                             |
+| `size`    | integer         | No       | Number of items per page. Default: `20`. Maximum: `100`. Values outside this range are clamped to the maximum or reset to the default.                                                            |
 | `status`  | string (enum)   | No       | Filter by registration status. Allowed values: `PENDING`, `CONFIRMED`, `CANCELED`, `FAILED`. Multiple values are **not** supported; pass a single value. When omitted, all statuses are returned. |
 
 **Request Body:** None.
@@ -202,17 +202,17 @@ On idempotent replay (`201 Created`, key already `COMPLETED`): no side effects a
 >
 > **Note:** QR fields (`qrPayload`, `qrSignature`, `qrIssuedAt`) are **not** returned in the list endpoint — they are available only via `GET /api/v1/registrations/{id}`.
 >
-> **Cursor format:** The `cursor.nextCursor` is an opaque Base64-encoded keyset cursor encoding `{ id, sortField: "createdAt", primaryValue: <created_at ISO>, secondaryValue: null }`. It is `null` and `hasMore` is `false` when no more pages exist. An empty result set returns `items: []`, `hasMore: false`, `nextCursor: null`.
+> **Cursor format:** The `cursor.nextCursor` is an opaque Base64-encoded keyset cursor encoding `{ id, sortField: "createdAt", primaryValue: <created_at ISO>, secondaryValue: null, filterFingerprint: "status=*" }` (or `status=<STATUS>` when a `status` filter is applied). The `filterFingerprint` binds the cursor to the filter set that produced it. It is `null` and `hasMore` is `false` when no more pages exist. An empty result set returns `items: []`, `hasMore: false`, `nextCursor: null`.
 
 **Error Responses:**
 
-| Status                      | Error Type                      | Condition                                                                                                                              |
-| :-------------------------- | :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------- |
-| `400 Bad Request`           | `urn:unihub:error:bad-request`  | `cursor` value is not a valid Base64-encoded keyset cursor, or the cursor's `sortField` does not match the current sort (`createdAt`). |
-| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | JWT is absent, expired, invalid signature, or revoked.                                                                                 |
-| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Authenticated user's role is not `STUDENT`.                                                                                            |
-| `422 Unprocessable Entity`  | `urn:unihub:error:validation`   | `status` query parameter value is not one of the allowed enum values.                                                                  |
-| `500 Internal Server Error` | `urn:unihub:error:internal`     | Unexpected server-side failure.                                                                                                        |
+| Status                      | Error Type                      | Condition                                                                                                                                                                                         |
+| :-------------------------- | :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | `cursor` value is not a valid Base64-encoded keyset cursor, the cursor's `sortField` does not match the current sort (`createdAt`), or the cursor was issued for a different `status` filter set. |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | JWT is absent, expired, invalid signature, or revoked.                                                                                                                                            |
+| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Authenticated user's role is not `STUDENT`.                                                                                                                                                       |
+| `422 Unprocessable Entity`  | `urn:unihub:error:validation`   | `status` query parameter value is not one of the allowed enum values.                                                                                                                             |
+| `500 Internal Server Error` | `urn:unihub:error:internal`     | Unexpected server-side failure.                                                                                                                                                                   |
 
 #### Side Effects
 
@@ -399,6 +399,7 @@ L1: Redis lookup for "K" scoped to studentId
 - **`workshopTitle`, `workshopStartsAt`, `workshopEndsAt`:** Denormalized from the `workshops` table into both read responses (list and detail) for client display convenience. These are the same fields in both endpoints. `workshopLocation` is additionally present in the detail endpoint only.
 - **Error shape:** All error responses use the same RFC 7807-wrapped envelope throughout this contract. No endpoint has a one-off error shape.
 - **Cursor `sortField` value:** Fixed as `"createdAt"` for `GET /me`. If a client submits a cursor issued for a different `sortField`, the endpoint returns `400 Bad Request` per the universal keyset cursor contract in `docs/api-standards.md`.
+- **Cursor filter binding:** The cursor carries a `filterFingerprint` over the `status` filter (encoded as `status=*` when `status` is absent). If a client submits a cursor issued for a different `status` filter set — including adding or removing `status` between pages — the endpoint returns `400 Bad Request` per the universal keyset cursor contract in `docs/api-standards.md`.
 - **Extensibility & Forward Compatibility for Paid Registration (Feature 4.2):** `POST /api/v1/registrations` is designed so that when Feature 4.2 introduces paid workshop registration:
   - Free registrations (`price == 0`) retain this exact contract and behavior (`201 Created`, `status: "CONFIRMED"`, full QR data).
   - Paid registrations (`price > 0`) will use the same endpoint but dispatch to a `PaidRegistrationStrategy`, returning `status: "PENDING"` with Stripe checkout details (`clientSecret`), keeping the API surface unified and eliminating breaking changes for clients.

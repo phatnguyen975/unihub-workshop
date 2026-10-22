@@ -226,7 +226,13 @@ class NotificationRepositoryAdapterKeysetTest {
         UUID cursorId = UUID.randomUUID();
         Instant cursorTime = Instant.parse("2026-10-08T09:00:00Z");
         String cursor = KeysetCursorCodec.encode(
-            KeysetCursor.of(cursorId, "createdAt", cursorTime.toString())
+            new KeysetCursor(
+                cursorId,
+                "createdAt",
+                cursorTime.toString(),
+                null,
+                null
+            )
         );
 
         UUID id3 = UUID.randomUUID();
@@ -305,7 +311,7 @@ class NotificationRepositoryAdapterKeysetTest {
     void shouldThrowBadRequestException_whenCursorSortFieldMismatches() {
         UUID userId = UUID.randomUUID();
         String mismatchedCursor = KeysetCursorCodec.encode(
-            KeysetCursor.of(UUID.randomUUID(), "id", "some-value")
+            new KeysetCursor(UUID.randomUUID(), "id", "some-value", null, null)
         );
 
         assertThatThrownBy(() ->
@@ -318,5 +324,53 @@ class NotificationRepositoryAdapterKeysetTest {
         )
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining("Cursor was issued for sort='id'");
+    }
+
+    @Test
+    @DisplayName("should reject a cursor issued for a different isRead filter")
+    void shouldRejectCursorBoundToAnotherIsReadFilter() {
+        UUID userId = UUID.randomUUID();
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-08T09:00:00Z",
+                null,
+                "isRead=true"
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findNotificationsByUserId(userId, false, cursor, 20)
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
+    }
+
+    @Test
+    @DisplayName(
+        "should reject adding a filter while keeping an unfiltered cursor"
+    )
+    void shouldRejectFilterAddedToUnfilteredCursor() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-08T09:00:00Z",
+                null,
+                "isRead=*"
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findNotificationsByUserId(
+                UUID.randomUUID(),
+                true,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
     }
 }

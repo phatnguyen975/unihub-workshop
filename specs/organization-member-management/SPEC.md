@@ -85,7 +85,7 @@ All operations are strictly scoped to the calling organizer's organization (`jwt
 - **BR-08 (Natural Idempotency):** Mutating operations rely on natural idempotency:
   - Account provisioning is guarded by the unique `email` constraint. Concurrent or repeated calls with the same email return `409 Conflict`.
   - Status updates are idempotent state assignments. Submitting the current `is_active` value returns `200 OK` as a no-op.
-- **BR-09 (Deterministic Cursor Pagination):** Cursors encode `(created_at, id)` as Base64 JSON. The tie-breaker `id DESC` guarantees stable pagination order even when multiple members share identical timestamps.
+- **BR-09 (Deterministic Cursor Pagination):** Cursors encode `(created_at, id)` plus a `filterFingerprint` over `role`, `isActive`, and `q` as Base64 JSON. The tie-breaker `id DESC` guarantees stable pagination order even when multiple members share identical timestamps. Replaying a cursor against a different filter set (including adding or removing a filter) is rejected with `400 Bad Request`.
 
 ## 5. State Transitions
 

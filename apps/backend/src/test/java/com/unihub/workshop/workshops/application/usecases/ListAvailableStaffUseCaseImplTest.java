@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.iam.api.IamApi;
 import com.unihub.workshop.iam.api.dto.StaffUserDto;
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
@@ -403,7 +404,7 @@ class ListAvailableStaffUseCaseImplTest {
         ).thenReturn(Map.of(idNullName, 0));
 
         String cursor = KeysetCursorCodec.encode(
-            KeysetCursor.of(id1, "fullName", "Alice Nguyen")
+            new KeysetCursor(id1, "fullName", "Alice Nguyen", null, null)
         );
 
         ListAvailableStaffQuery query = new ListAvailableStaffQuery(
@@ -418,5 +419,60 @@ class ListAvailableStaffUseCaseImplTest {
 
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).userId()).isEqualTo(idNullName);
+    }
+
+    @Test
+    @DisplayName("Should reject a cursor issued for a different staff query")
+    void shouldRejectCursorBoundToAnotherQuery() {
+        when(workshopRepository.findById(workshopId)).thenReturn(
+            Optional.of(publishedWorkshop())
+        );
+
+        StaffUserDto staff = new StaffUserDto(
+            UUID.randomUUID(),
+            organizationId,
+            "STAFF",
+            true,
+            "Alice Nguyen",
+            "alice@example.com",
+            null,
+            null
+        );
+        when(iamApi.listActiveStaffByOrganization(organizationId)).thenReturn(
+            List.of(staff)
+        );
+        when(
+            assignmentRepository.findAssignedStaffUserIds(workshopId)
+        ).thenReturn(Set.of());
+        when(
+            assignmentRepository.findScheduleConflictingStaffUserIds(
+                organizationId,
+                workshopId,
+                futureStartsAt,
+                futureEndsAt
+            )
+        ).thenReturn(Set.of());
+
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                staff.userId(),
+                "fullName",
+                "Alice Nguyen",
+                null,
+                "q=alice"
+            )
+        );
+
+        ListAvailableStaffQuery query = new ListAvailableStaffQuery(
+            workshopId,
+            organizationId,
+            "bob",
+            cursor,
+            20
+        );
+
+        assertThatThrownBy(() -> useCase.execute(query))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
     }
 }

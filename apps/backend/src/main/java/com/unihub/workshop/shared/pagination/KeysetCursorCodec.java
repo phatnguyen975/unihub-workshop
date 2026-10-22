@@ -49,16 +49,23 @@ public final class KeysetCursorCodec {
     }
 
     /**
-     * Decodes a Base64 cursor string and validates integrity and sort compatibility.
+     * Decodes a Base64 cursor string and validates integrity, sort compatibility, and
+     * filter binding.
+     *
+     * <p>The filter check only runs when both the cursor and the caller carry a
+     * fingerprint. Collections without filters therefore pass {@code null} as the
+     * expectation and remain decodable.
      *
      * @param cursorStr the encoded cursor string
      * @param expectedSortField the expected primary sort field of the current request, or null to skip check
+     * @param expectedFilterFingerprint the canonical fingerprint of the current request's filters, or null to skip check
      * @return the decoded {@link KeysetCursor}, or null if input is null or blank
-     * @throws BadRequestException if the cursor is malformed, missing an ID, or issued for a different sort field
+     * @throws BadRequestException if the cursor is malformed, missing an ID, issued for a different sort field, or issued for a different filter set
      */
     public static KeysetCursor decode(
         String cursorStr,
-        String expectedSortField
+        String expectedSortField,
+        String expectedFilterFingerprint
     ) {
         if (cursorStr == null || cursorStr.isBlank()) {
             return null;
@@ -93,6 +100,16 @@ public final class KeysetCursorCodec {
                         "' but current request uses sort='" +
                         expectedSortField +
                         "'. Discard the cursor and start from page 1."
+                );
+            }
+
+            if (
+                expectedFilterFingerprint != null &&
+                cursor.filterFingerprint() != null &&
+                !cursor.filterFingerprint().equals(expectedFilterFingerprint)
+            ) {
+                throw new BadRequestException(
+                    "Cursor was issued for a different filter set. Discard the cursor and start from page 1."
                 );
             }
 

@@ -1,6 +1,7 @@
 package com.unihub.workshop.search.application.ports.in;
 
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.pagination.FilterFingerprint;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Set;
@@ -40,6 +41,19 @@ public record SearchWorkshopsQuery(
         if (size <= 0) {
             size = DEFAULT_SIZE;
         }
+    }
+
+    /**
+     * Canonical fingerprint of every filter that narrows the result set, so a
+     * cursor is only valid for the filter set that produced it.
+     */
+    public String filterFingerprint() {
+        return FilterFingerprint.builder()
+            .with("q", q)
+            .with("priceType", priceType)
+            .with("from", from)
+            .with("to", to)
+            .build();
     }
 
     public static SearchWorkshopsQuery of(

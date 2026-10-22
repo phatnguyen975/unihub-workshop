@@ -1,6 +1,8 @@
 package com.unihub.workshop.payments.application.ports.out;
 
 import com.unihub.workshop.payments.domain.model.Payment;
+import com.unihub.workshop.payments.domain.model.PaymentStatus;
+import com.unihub.workshop.shared.pagination.CursorPage;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +14,23 @@ public interface PaymentRepository {
     Optional<Payment> findByRegistrationId(UUID registrationId);
 
     boolean existsByProviderPaymentId(String providerPaymentId);
+
+    /**
+     * Finds keyset cursor-paginated payments linked to the student's registrations.
+     *
+     * <p>Ownership is evaluated in the same statement as the ordering window so the page
+     * size, continuation cursor, and {@code hasMore} flag stay consistent.
+     *
+     * @param studentUserId owner student user ID
+     * @param status optional payment status filter
+     * @param cursor optional opaque keyset cursor issued for the same filter set
+     * @param size page window size
+     * @return page of payments ordered by creation time descending, then id descending
+     */
+    CursorPage<Payment> findByStudentUserId(
+        UUID studentUserId,
+        PaymentStatus status,
+        String cursor,
+        int size
+    );
 }

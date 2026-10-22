@@ -21,7 +21,7 @@ This plan delivers the four approved read endpoints as small, independently test
 
 ### Phase 1: Student-facing payment history foundation
 
-- [ ] **T1 — A student can retrieve a stable, status-filterable page of only their own payment history.**
+- [x] **T1 — A student can retrieve a stable, status-filterable page of only their own payment history.**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Registrations public API, Payments application ports/use case, Payments persistence adapter, Payments presentation, shared pagination integration, unit tests.
@@ -38,8 +38,8 @@ This plan delivers the four approved read endpoints as small, independently test
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/{dto,mapper}/...` (new payment-history response DTO and MapStruct mapper)
     - `apps/backend/src/test/java/com/unihub/workshop/{registrations,payments}/...` (new facade, use-case, persistence-adapter, and controller unit tests)
     - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/KeysetCursor.java` (add nullable `filterFingerprint`)
-    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/KeysetCursorCodec.java` (add filter-aware `decode` overload; keep the existing two-argument behavior unchanged)
-    - `apps/backend/src/test/java/com/unihub/workshop/shared/pagination/KeysetCursorCodecTest.java` (filter-binding and backward-compatibility tests)
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/KeysetCursorCodec.java` (single filter-aware `decode(cursor, expectedSortField, expectedFilterFingerprint)` signature; callers that bind no filters pass `null` for the expectation)
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/pagination/KeysetCursorCodecTest.java` (filter-binding tests)
     - `apps/backend/src/test/java/com/unihub/workshop/payments/infrastructure/persistence/PaymentRepositoryAdapterTest.java` (update constructor; the adapter now injects `EntityManager`)
   - **Notes:** `JpaKeysetPagination` is Criteria-based and can only address a single entity root, so it cannot express the ownership join. The adapter composes the row-value keyset predicate in the native projection query while still using `KeysetCursorCodec` for the shared opaque cursor format. The projection selects only `payments` columns; `registration` context comes from `RegistrationApi`. Exact T1 shape:
 
@@ -50,11 +50,14 @@ This plan delivers the four approved read endpoints as small, independently test
     FROM payments p
     JOIN registrations r ON r.id = p.registration_id
     WHERE r.student_user_id = :studentUserId
-        AND (:status IS NULL OR p.status = :status)
-        AND (:cursorCreatedAt IS NULL OR (p.created_at, p.id) < (:cursorCreatedAt, :cursorId))
+        -- appended only when a status filter is present
+        AND p.status = :status
+        -- appended only when a cursor is present
+        AND (p.created_at, p.id) < (:cursorCreatedAt, :cursorId)
     ORDER BY p.created_at DESC, p.id DESC
-    LIMIT :limit
     ```
+
+    The adapter bounds the window with `Query.setMaxResults(size + 1)` rather than a bound `LIMIT`; the extra row signals `hasMore` without a second query.
 
   - **Acceptance Criteria:**
     - An authenticated STUDENT calling `GET /api/v1/payments/me` receives only payment records linked to their registrations, newest first, with the standard page envelope. _(FR-01, FR-10, FR-14; Scenario 1)_
@@ -64,7 +67,7 @@ This plan delivers the four approved read endpoints as small, independently test
 
 #### Checkpoint: Student history foundation
 
-- [ ] T1 acceptance criteria pass, affected unit tests and `ModulithArchitectureTest` pass, and no payments class accesses a registrations internal package.
+- [x] T1 acceptance criteria pass, affected unit tests and `ModulithArchitectureTest` pass, and no payments class accesses a registrations internal package.
 
 ### Phase 2: Organization-scoped operational history
 

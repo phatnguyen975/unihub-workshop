@@ -6,6 +6,7 @@ import com.unihub.workshop.iam.domain.model.UserRole;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.UserPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.FilterFingerprint;
 import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
@@ -18,6 +19,7 @@ import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -123,7 +125,20 @@ public class UserRepositoryAdapter implements UserRepository {
         String cursor,
         int size
     ) {
-        KeysetCursor cursorData = KeysetCursorCodec.decode(cursor, "createdAt");
+        String normalizedQuery =
+            q != null && !q.isBlank()
+                ? sanitizeQuery(q.trim().toLowerCase(Locale.ROOT))
+                : null;
+        String filterFingerprint = FilterFingerprint.builder()
+            .with("role", role)
+            .with("isActive", isActive)
+            .with("q", normalizedQuery)
+            .build();
+        KeysetCursor cursorData = KeysetCursorCodec.decode(
+            cursor,
+            "createdAt",
+            filterFingerprint
+        );
         if (cursorData != null && cursorData.asInstant() == null) {
             throw new BadRequestException("Invalid cursor format");
         }
@@ -143,9 +158,8 @@ public class UserRepositoryAdapter implements UserRepository {
         if (isActive != null) {
             predicates.add(cb.equal(root.get("isActive"), isActive));
         }
-        if (q != null && !q.isBlank()) {
-            String sanitized = sanitizeQuery(q.trim().toLowerCase());
-            String pattern = "%" + sanitized + "%";
+        if (normalizedQuery != null) {
+            String pattern = "%" + normalizedQuery + "%";
             Predicate nameMatch = cb.like(
                 cb.lower(root.get("fullName")),
                 pattern,
@@ -202,10 +216,12 @@ public class UserRepositoryAdapter implements UserRepository {
                 .items()
                 .get(slice.items().size() - 1);
             nextCursor = KeysetCursorCodec.encode(
-                KeysetCursor.of(
+                new KeysetCursor(
                     lastItem.getId(),
                     "createdAt",
-                    lastItem.getCreatedAt().toString()
+                    lastItem.getCreatedAt().toString(),
+                    null,
+                    filterFingerprint
                 )
             );
         }

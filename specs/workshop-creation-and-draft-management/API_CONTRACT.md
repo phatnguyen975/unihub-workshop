@@ -19,7 +19,7 @@ All endpoints are strictly ORGANIZER-only. This contract traces directly to `SPE
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** All endpoints are prefixed with `/api/v1/`. Resources are named with plural nouns following RESTful conventions. _(Source: `docs/api-standards.md`)_
-- **Pagination convention:** `GET /api/v1/admin/workshops` uses keyset cursor pagination (`cursor`, `size` with default 20, max 100) per `docs/api-standards.md`. Responses return `{ "items": [...], "cursor": { "nextCursor": "...", "hasMore": boolean } }`. Single-resource endpoints do not paginate.
+- **Pagination convention:** `GET /api/v1/admin/workshops` uses keyset cursor pagination (`cursor`, `size` with default 20, max 100) per `docs/api-standards.md`. Responses return `{ "items": [...], "cursor": { "nextCursor": "...", "hasMore": boolean } }`. Cursors are bound to the filter set (`status`, `priceType`, `q`, `from`, `to`) that produced them; a mismatch is rejected with `400 Bad Request`. Single-resource endpoints do not paginate.
 - **Success response shape:** Unified `ApiResponse<T>` envelope — `{ "success": true, "message": "...", "data": { ... }, "metadata": { "processedBy": "...", "traceId": "..." } }`. `204 No Content` responses carry no body. Null fields dropped via non-null serialization (`@JsonInclude(Include.NON_NULL)`). _(Source: `docs/api-standards.md`)_
 - **Error response format:** RFC 7807 Problem Details wrapped inside the standard response envelope with `success = false`, `error` object (`type`, `title`, `status`, `detail`, `instance`, and optional `validationErrors`), and `metadata` (`processedBy`, `traceId`) with `Content-Type: application/problem+json`. _(Source: `docs/api-standards.md`)_
 - **Idempotency-key convention:** Not applicable for this feature (see per-endpoint decisions below).
@@ -489,16 +489,16 @@ On success: all `workshop_speakers` rows associated with the deleted workshop ar
 
 **Query Parameters:**
 
-| Parameter   | Type    | Required | Default          | Description                                                                                                                                                          |
-| :---------- | :------ | :------- | :--------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `status`    | String  | No       | _(all)_          | Workshop status filter: `DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED`. If omitted, all statuses returned.                                                            |
-| `priceType` | String  | No       | _(all)_          | Pricing filter: `FREE` (price = 0) or `PAID` (price > 0). If omitted, both free and paid workshops returned.                                                         |
-| `q`         | String  | No       | —                | Case-insensitive partial matching across workshop `title`, `slug`, `location`, and `description` (max 100 characters).                                               |
-| `from`      | String  | No       | —                | ISO 8601 UTC timestamp (`YYYY-MM-DDTHH:mm:ssZ`). Filters workshops where `starts_at >= from`.                                                                        |
-| `to`        | String  | No       | —                | ISO 8601 UTC timestamp (`YYYY-MM-DDTHH:mm:ssZ`). Filters workshops where `starts_at <= to`.                                                                          |
-| `sort`      | String  | No       | `createdAt,desc` | Sort field and direction. Supported: `capacity,asc`, `capacity,desc`, `price,asc`, `price,desc`, `createdAt,desc`, `createdAt,asc`, `startsAt,asc`, `startsAt,desc`. |
-| `cursor`    | String  | No       | —                | Keyset pagination cursor (opaque Base64-encoded string representing the last item from the previous page).                                                           |
-| `size`      | Integer | No       | `20`             | Number of workshops per page. Min: 1, Max: 100.                                                                                                                      |
+| Parameter   | Type    | Required | Default          | Description                                                                                                                                                                                     |
+| :---------- | :------ | :------- | :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`    | String  | No       | _(all)_          | Workshop status filter: `DRAFT`, `PUBLISHED`, `COMPLETED`, `CANCELED`. If omitted, all statuses returned.                                                                                       |
+| `priceType` | String  | No       | _(all)_          | Pricing filter: `FREE` (price = 0) or `PAID` (price > 0). If omitted, both free and paid workshops returned.                                                                                    |
+| `q`         | String  | No       | —                | Case-insensitive partial matching across workshop `title`, `slug`, `location`, and `description` (max 100 characters).                                                                          |
+| `from`      | String  | No       | —                | ISO 8601 UTC timestamp (`YYYY-MM-DDTHH:mm:ssZ`). Filters workshops where `starts_at >= from`.                                                                                                   |
+| `to`        | String  | No       | —                | ISO 8601 UTC timestamp (`YYYY-MM-DDTHH:mm:ssZ`). Filters workshops where `starts_at <= to`.                                                                                                     |
+| `sort`      | String  | No       | `createdAt,desc` | Sort field and direction. Supported: `capacity,asc`, `capacity,desc`, `price,asc`, `price,desc`, `createdAt,desc`, `createdAt,asc`, `startsAt,asc`, `startsAt,desc`.                            |
+| `cursor`    | String  | No       | —                | Keyset pagination cursor (opaque Base64-encoded string representing the last item from the previous page). Bound to the filter set (`status`, `priceType`, `q`, `from`, `to`) that produced it. |
+| `size`      | Integer | No       | `20`             | Number of workshops per page. Min: 1, Max: 100.                                                                                                                                                 |
 
 #### Response
 
@@ -544,12 +544,12 @@ On success: all `workshop_speakers` rows associated with the deleted workshop ar
 
 **Error Responses:**
 
-| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                                     |
-| :-------------------------- | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------ |
-| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Invalid `status` or `priceType` enum, unsupported `sort` parameter, invalid ISO 8601 date, or invalid `size`. |
-| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                                         |
-| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Forbidden             | Caller `role` is not `ORGANIZER`, or caller has no associated `org` claim.                                    |
-| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                                                                  |
+| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                                                                                  |
+| :-------------------------- | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Invalid `status` or `priceType` enum, unsupported `sort` parameter, invalid ISO 8601 date, invalid `size`, malformed `cursor`, or a `cursor` issued for a different filter set (`status`, `priceType`, `q`, `from`, `to`). |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                                                                                                                                                      |
+| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Forbidden             | Caller `role` is not `ORGANIZER`, or caller has no associated `org` claim.                                                                                                                                                 |
+| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                                                                                                                                                                               |
 
 #### Side Effects
 

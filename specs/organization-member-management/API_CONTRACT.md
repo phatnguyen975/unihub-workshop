@@ -45,13 +45,13 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 **Query Parameters:**
 
-| Parameter  | Type    | Required | Default | Constraints                                                             | Description                                                                  |
-| :--------- | :------ | :------: | :-----: | :---------------------------------------------------------------------- | :--------------------------------------------------------------------------- |
-| `cursor`   | string  |    No    |  none   | Base64 JSON `{"id":"...","sortField":"createdAt","primaryValue":"..."}` | Opaque keyset cursor returned from previous page. Absent on initial request. |
-| `size`     | integer |    No    |   20    | Min: 1, Max: 100                                                        | Number of items per page. Defaults to 20 if omitted.                         |
-| `role`     | string  |    No    |  none   | Enum: `ORGANIZER`, `STAFF`, `STUDENT`                                   | Filters members by platform role. Case-insensitive.                          |
-| `isActive` | boolean |    No    |  none   | `true` or `false`                                                       | Filters members by active/banned status.                                     |
-| `q`        | string  |    No    |  none   | Max 200 characters                                                      | Partial keyword match against `fullName`, `email`, or `phoneNumber` (ILIKE). |
+| Parameter  | Type    | Required | Default | Constraints                                                                                                     | Description                                                                                                            |
+| :--------- | :------ | :------: | :-----: | :-------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| `cursor`   | string  |    No    |  none   | Base64 JSON keyset cursor carrying `id`, `sortField`, `primaryValue`, `secondaryValue`, and `filterFingerprint` | Opaque keyset cursor returned from previous page, bound to the filter set that produced it. Absent on initial request. |
+| `size`     | integer |    No    |   20    | Min: 1, Max: 100                                                                                                | Number of items per page. Defaults to 20 if omitted.                                                                   |
+| `role`     | string  |    No    |  none   | Enum: `ORGANIZER`, `STAFF`, `STUDENT`                                                                           | Filters members by platform role. Case-insensitive.                                                                    |
+| `isActive` | boolean |    No    |  none   | `true` or `false`                                                                                               | Filters members by active/banned status.                                                                               |
+| `q`        | string  |    No    |  none   | Max 200 characters                                                                                              | Partial keyword match against `fullName`, `email`, or `phoneNumber` (ILIKE).                                           |
 
 #### Response
 
@@ -102,12 +102,12 @@ This contract defines the four REST endpoints for Feature 1.5 (`organization-mem
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                             |
-| :----: | :------------------------------ | :-------------------- | :-------------------------------------------------------------------- |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | `size < 1`, `size > 100`, malformed `cursor`, or invalid `role` enum. |
-| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, malformed, or blacklisted Bearer token.             |
-| `403`  | `urn:unihub:error:forbidden`    | Forbidden             | Caller role is not `ORGANIZER`, or caller is inactive.                |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                          |
+| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                     |
+| :----: | :------------------------------ | :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | `size < 1`, `size > 100`, malformed `cursor`, a `cursor` issued for a different filter set (`role`, `isActive`, `q`), or invalid `role` enum. |
+| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, malformed, or blacklisted Bearer token.                                                                                     |
+| `403`  | `urn:unihub:error:forbidden`    | Forbidden             | Caller role is not `ORGANIZER`, or caller is inactive.                                                                                        |
+| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database failure.                                                                                                                  |
 
 **Error Response Example (400 Bad Request):**
 

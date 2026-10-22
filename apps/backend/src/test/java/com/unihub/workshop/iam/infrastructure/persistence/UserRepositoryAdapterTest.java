@@ -195,7 +195,13 @@ class UserRepositoryAdapterTest {
         Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
 
         String cursor = KeysetCursorCodec.encode(
-            KeysetCursor.of(cursorId, "createdAt", cursorTime.toString())
+            new KeysetCursor(
+                cursorId,
+                "createdAt",
+                cursorTime.toString(),
+                null,
+                null
+            )
         );
 
         UUID id3 = UUID.randomUUID();
@@ -367,6 +373,33 @@ class UserRepositoryAdapterTest {
             eq("%100\\%\\_test\\\\user%"),
             eq('\\')
         );
+    }
+
+    @Test
+    void shouldRejectCursorBoundToAnotherFilterSet() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "role=STUDENT&isActive=*&q=*"
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findMembersByOrganizationId(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UserRole.ORGANIZER,
+                null,
+                null,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
     }
 
     private UserJpaEntity createMemberEntity(

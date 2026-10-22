@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.in.ListAdminWorkshopsQuery;
 import com.unihub.workshop.workshops.domain.model.WorkshopSummary;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.WorkshopPersistenceMapper;
@@ -395,5 +397,30 @@ class WorkshopRepositoryAdapterListTest {
             .hasMessageContaining("Cursor was issued for sort='capacity'")
             .hasMessageContaining("current request uses sort='price'")
             .hasMessageContaining("Discard the cursor");
+    }
+
+    @Test
+    @DisplayName("Should reject a cursor issued for a different filter set")
+    void shouldRejectCursorIssuedForDifferentFilters() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "status=*&priceType=*&q=alice&from=*&to=*"
+            )
+        );
+        ListAdminWorkshopsQuery query = ListAdminWorkshopsQuery.builder()
+            .organizationId(ORG_ID)
+            .q("bob")
+            .cursor(cursor)
+            .build();
+
+        assertThatThrownBy(() ->
+            adapter.findAllByOrganizationWithFilters(query)
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
     }
 }

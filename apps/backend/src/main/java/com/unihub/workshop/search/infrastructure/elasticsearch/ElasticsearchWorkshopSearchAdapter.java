@@ -205,11 +205,12 @@ public class ElasticsearchWorkshopSearchAdapter
                         ? query.sort()
                         : SearchWorkshopsQuery.DEFAULT_SORT;
                 String primarySortField = effectiveSort.split(",")[0].trim();
-                KeysetCursor nextKeysetCursor = KeysetCursor.of(
+                KeysetCursor nextKeysetCursor = new KeysetCursor(
                     lastId,
                     primarySortField,
                     primaryVal,
-                    secondaryVal
+                    secondaryVal,
+                    query.filterFingerprint()
                 );
                 nextCursor = KeysetCursorCodec.encode(nextKeysetCursor);
             }

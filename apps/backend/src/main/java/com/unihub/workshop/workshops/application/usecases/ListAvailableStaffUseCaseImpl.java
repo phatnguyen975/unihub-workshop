@@ -7,6 +7,7 @@ import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.FilterFingerprint;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.in.ListAvailableStaffQuery;
@@ -19,6 +20,7 @@ import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -96,7 +98,11 @@ public class ListAvailableStaffUseCaseImpl
             );
 
         // 3. Filter eligible staff in application layer
-        String qLower = query.q() != null ? query.q().toLowerCase() : null;
+        String qLower =
+            query.q() != null ? query.q().toLowerCase(Locale.ROOT) : null;
+        String filterFingerprint = FilterFingerprint.builder()
+            .with("q", qLower)
+            .build();
 
         List<StaffUserDto> eligibleStaff = orgStaff
             .stream()
@@ -109,7 +115,8 @@ public class ListAvailableStaffUseCaseImpl
         // 4. Keyset seek past cursor if cursor provided
         KeysetCursor cursor = KeysetCursorCodec.decode(
             query.cursor(),
-            "fullName"
+            "fullName",
+            filterFingerprint
         );
         List<StaffUserDto> afterCursor = eligibleStaff
             .stream()
@@ -131,7 +138,8 @@ public class ListAvailableStaffUseCaseImpl
                     last.userId(),
                     "fullName",
                     last.fullName(),
-                    last.fullName()
+                    last.fullName(),
+                    filterFingerprint
                 )
             );
         }

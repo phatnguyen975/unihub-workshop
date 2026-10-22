@@ -18,6 +18,7 @@ import java.util.UUID;
  * @param sortField the name of the sorted field (e.g. "createdAt", "startsAt", "price", "capacity", "completedAt", "rating")
  * @param primaryValue string representation of the primary sort value, or null if value is null
  * @param secondaryValue string representation of the secondary sort value (e.g. createdAt ISO-8601), or null
+ * @param filterFingerprint server-derived canonical string over the filters that produced the cursor, or null when the collection is unfiltered or the caller does not bind filters
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -25,25 +26,9 @@ public record KeysetCursor(
     UUID id,
     String sortField,
     String primaryValue,
-    String secondaryValue
+    String secondaryValue,
+    String filterFingerprint
 ) implements Serializable {
-    public static KeysetCursor of(
-        UUID id,
-        String sortField,
-        String primaryValue,
-        String secondaryValue
-    ) {
-        return new KeysetCursor(id, sortField, primaryValue, secondaryValue);
-    }
-
-    public static KeysetCursor of(
-        UUID id,
-        String sortField,
-        String primaryValue
-    ) {
-        return new KeysetCursor(id, sortField, primaryValue, null);
-    }
-
     /**
      * Resolves the primary sort value as an {@link Instant}.
      */
