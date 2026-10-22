@@ -20,9 +20,6 @@ public record GetStudentPaymentHistoryQuery(
     String cursor,
     String size
 ) {
-    public static final int DEFAULT_SIZE = 20;
-    public static final int MAX_SIZE = 100;
-
     public GetStudentPaymentHistoryQuery {
         if (studentUserId == null) {
             throw new IllegalArgumentException(

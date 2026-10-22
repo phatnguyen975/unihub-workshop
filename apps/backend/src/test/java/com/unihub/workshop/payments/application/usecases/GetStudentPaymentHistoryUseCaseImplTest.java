@@ -106,12 +106,14 @@ class GetStudentPaymentHistoryUseCaseImplTest {
                 new RegistrationPaymentContextDto(
                     FIRST_REGISTRATION_ID,
                     FIRST_WORKSHOP_ID,
+                    STUDENT_USER_ID,
                     "CONFIRMED"
                 ),
                 SECOND_REGISTRATION_ID,
                 new RegistrationPaymentContextDto(
                     SECOND_REGISTRATION_ID,
                     SECOND_WORKSHOP_ID,
+                    STUDENT_USER_ID,
                     "CANCELED"
                 )
             )
@@ -152,7 +154,7 @@ class GetStudentPaymentHistoryUseCaseImplTest {
                 STUDENT_USER_ID,
                 null,
                 null,
-                GetStudentPaymentHistoryQuery.DEFAULT_SIZE
+                PaymentHistoryQueryParser.DEFAULT_SIZE
             )
         ).thenReturn(CursorPage.empty());
 

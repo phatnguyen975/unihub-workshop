@@ -10,10 +10,12 @@ import java.util.UUID;
  *
  * @param registrationId registration identifier
  * @param workshopId workshop the registration targets
+ * @param studentUserId student user who owns the registration
  * @param status current registration status name (e.g. {@code CONFIRMED})
  */
 public record RegistrationPaymentContextDto(
     UUID registrationId,
     UUID workshopId,
+    UUID studentUserId,
     String status
 ) {}

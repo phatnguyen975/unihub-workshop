@@ -104,7 +104,8 @@ class RegistrationFacadeTest {
             STUDENT_USER_ID,
             UUID.randomUUID(),
             "John Doe",
-            "student@unihub.edu.vn"
+            "student@unihub.edu.vn",
+            "23123456"
         );
 
         WorkshopRegistrationDetailsDto workshop =
@@ -262,12 +263,14 @@ class RegistrationFacadeTest {
                 new RegistrationPaymentContextDto(
                     REGISTRATION_ID,
                     WORKSHOP_ID,
+                    STUDENT_USER_ID,
                     "PENDING"
                 ),
                 secondRegistrationId,
                 new RegistrationPaymentContextDto(
                     secondRegistrationId,
                     WORKSHOP_ID,
+                    STUDENT_USER_ID,
                     "CONFIRMED"
                 )
             )

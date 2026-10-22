@@ -53,7 +53,8 @@ class PaidRegistrationStrategyTest {
             studentUserId,
             UUID.randomUUID(),
             "John Doe",
-            "john@uni.edu"
+            "john@uni.edu",
+            "23123456"
         );
     }
 

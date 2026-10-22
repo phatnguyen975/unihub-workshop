@@ -393,4 +393,222 @@ class PaymentRepositoryAdapterTest {
         assertThat(page.nextCursor()).isNull();
         verify(nativeQuery).setMaxResults(21);
     }
+
+    @Test
+    @DisplayName(
+        "Organizer history projects payments only, joins workshops for tenant visibility, and binds both filters into the cursor"
+    )
+    void shouldQueryOrganizerHistoryWithTenantJoinAndFilterBoundCursor() {
+        UUID organizationId = UUID.randomUUID();
+        UUID workshopId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        Instant newest = Instant.parse("2026-10-21T05:14:00Z");
+        Instant middle = Instant.parse("2026-10-21T05:12:00Z");
+        Instant oldest = Instant.parse("2026-10-21T05:10:00Z");
+        UUID newestId = UUID.randomUUID();
+        UUID middleId = UUID.randomUUID();
+        UUID oldestId = UUID.randomUUID();
+
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(newestId, registrationId, newest),
+                paymentEntity(middleId, registrationId, middle),
+                paymentEntity(oldestId, registrationId, oldest)
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByOrganizationId(
+            organizationId,
+            workshopId,
+            PaymentStatus.COMPLETED,
+            null,
+            2
+        );
+
+        assertThat(page.items())
+            .extracting(Payment::id)
+            .containsExactly(newestId, middleId);
+        assertThat(page.hasMore()).isTrue();
+
+        String expectedFingerprint =
+            "status=COMPLETED&workshopId=" + workshopId;
+        KeysetCursor nextCursor = KeysetCursorCodec.decode(
+            page.nextCursor(),
+            "createdAt",
+            expectedFingerprint
+        );
+        assertThat(nextCursor.id()).isEqualTo(middleId);
+        assertThat(nextCursor.asInstant()).isEqualTo(middle);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(entityManager).createNativeQuery(
+            sql.capture(),
+            eq(PaymentJpaEntity.class)
+        );
+
+        String statement = sql.getValue();
+        String selectList = statement.substring(
+            0,
+            statement.indexOf("FROM payments")
+        );
+        assertThat(selectList).contains("SELECT p.id");
+        assertThat(selectList).doesNotContain("r.");
+        assertThat(selectList).doesNotContain("w.");
+        assertThat(statement)
+            .contains("JOIN registrations r ON r.id = p.registration_id")
+            .contains("JOIN workshops w ON w.id = r.workshop_id")
+            .contains("w.organization_id = :organizationId")
+            .contains("r.workshop_id = :workshopId")
+            .contains("p.status = :status")
+            .contains("ORDER BY p.created_at DESC, p.id DESC");
+
+        verify(nativeQuery).setParameter("organizationId", organizationId);
+        verify(nativeQuery).setParameter("workshopId", workshopId);
+        verify(nativeQuery).setParameter("status", "COMPLETED");
+        verify(nativeQuery).setMaxResults(3);
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history omits optional filters while keeping the cursor bound to their absence"
+    )
+    void shouldQueryOrganizerHistoryWithoutOptionalFilters() {
+        UUID organizationId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        Instant newest = Instant.parse("2026-10-21T05:14:00Z");
+        UUID newestId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(newestId, registrationId, newest),
+                paymentEntity(secondId, registrationId, newest.minusSeconds(60))
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByOrganizationId(
+            organizationId,
+            null,
+            null,
+            null,
+            1
+        );
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.hasMore()).isTrue();
+
+        KeysetCursor nextCursor = KeysetCursorCodec.decode(
+            page.nextCursor(),
+            "createdAt",
+            "status=*&workshopId=*"
+        );
+        assertThat(nextCursor.id()).isEqualTo(newestId);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(entityManager).createNativeQuery(
+            sql.capture(),
+            eq(PaymentJpaEntity.class)
+        );
+        assertThat(sql.getValue())
+            .contains("w.organization_id = :organizationId")
+            .doesNotContain("r.workshop_id = :workshopId")
+            .doesNotContain("p.status = :status");
+
+        verify(nativeQuery).setParameter("organizationId", organizationId);
+        verify(nativeQuery, never()).setParameter(eq("workshopId"), any());
+        verify(nativeQuery, never()).setParameter(eq("status"), any());
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history rejects a cursor issued for a different workshop filter"
+    )
+    void shouldRejectOrganizerCursorBoundToAnotherWorkshopFilter() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "status=*&workshopId=" + UUID.randomUUID()
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByOrganizationId(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
+
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history rejects a cursor issued for a different status filter"
+    )
+    void shouldRejectOrganizerCursorBoundToAnotherStatusFilter() {
+        UUID workshopId = UUID.randomUUID();
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "status=COMPLETED&workshopId=" + workshopId
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByOrganizationId(
+                UUID.randomUUID(),
+                workshopId,
+                PaymentStatus.FAILED,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
+
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history omits the continuation cursor when the window is not exceeded"
+    )
+    void shouldOmitOrganizerCursorWhenNoFurtherPageExists() {
+        UUID organizationId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(
+                    UUID.randomUUID(),
+                    registrationId,
+                    Instant.parse("2026-10-21T05:12:00Z")
+                )
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByOrganizationId(
+            organizationId,
+            null,
+            null,
+            null,
+            20
+        );
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.hasMore()).isFalse();
+        assertThat(page.nextCursor()).isNull();
+        verify(nativeQuery).setMaxResults(21);
+        verify(nativeQuery).setParameter("organizationId", organizationId);
+    }
 }

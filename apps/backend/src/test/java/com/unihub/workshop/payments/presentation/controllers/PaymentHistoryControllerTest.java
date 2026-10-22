@@ -212,6 +212,7 @@ class PaymentHistoryControllerTest {
             )
             .andExpect(jsonPath("$.data.items[0].failureCode").doesNotExist())
             .andExpect(jsonPath("$.data.items[0].failureReason").doesNotExist())
+            .andExpect(jsonPath("$.data.items[0].student").doesNotExist())
             .andExpect(content().string(not(containsString(GATEWAY_REFERENCE))))
             .andExpect(
                 content().string(not(containsString(PROHIBITED_FAILURE_CODE)))

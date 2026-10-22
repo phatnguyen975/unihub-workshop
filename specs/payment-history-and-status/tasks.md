@@ -71,7 +71,7 @@ This plan delivers the four approved read endpoints as small, independently test
 
 ### Phase 2: Organization-scoped operational history
 
-- [ ] **T2 — An organizer can retrieve a stable, tenant-scoped page of payment operations with minimal student identity.**
+- [x] **T2 — An organizer can retrieve a stable, tenant-scoped page of payment operations with minimal student identity.**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Registrations public API, Payments application ports/use case, Payments persistence adapter, Payments presentation, shared pagination integration, unit tests.
@@ -83,13 +83,15 @@ This plan delivers the four approved read endpoints as small, independently test
     - `apps/backend/src/main/java/com/unihub/workshop/payments/application/ports/out/PaymentRepository.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/application/usecases/GetOrganizerPaymentHistoryUseCaseImpl.java` (new)
     - `apps/backend/src/main/java/com/unihub/workshop/payments/infrastructure/persistence/{PaymentRepositoryAdapter,PaymentJpaRepository}.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/PaymentHistoryController.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/PaymentHistoryController.java` (common student and student-or-organizer controller mapped at `"/api/v1/payments"`)
+    - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/AdminPaymentHistoryController.java` (new; organizer-only controller mapped at `"/api/v1/admin/payments"`)
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/{dto,mapper}/...` (organizer item response and MapStruct mapping)
-    - `apps/backend/src/test/java/com/unihub/workshop/{registrations,payments}/...` (new/updated facade, use-case, persistence-adapter, and controller unit tests)
+    - `apps/backend/src/test/java/com/unihub/workshop/{registrations,payments}/...` (new/updated facade, use-case, persistence-adapter unit tests)
+    - `apps/backend/src/test/java/com/unihub/workshop/payments/presentation/controllers/{PaymentHistoryControllerTest,AdminPaymentHistoryControllerTest}.java` (split controller unit tests: common vs organizer-only)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/api/dto/StudentProfileDto.java` (add `studentNumber`)
     - `apps/backend/src/main/java/com/unihub/workshop/iam/application/facade/IamFacade.java` (populate `studentNumber` from `student_directory` through `users.student_record_id`)
     - `apps/backend/src/test/java/com/unihub/workshop/iam/application/facade/IamFacadeTest.java` (student-number mapping)
-  - **Notes:** `studentNumber` is resolved through `IamApi`, never from the join. `StudentProfileDto` is an additive record component; the six `registrations` test fixtures that construct it must be updated with the new component. The T1 projection gains `JOIN workshops w ON w.id = r.workshop_id`, with `w.organization_id = :organizationId` plus the optional `r.workshop_id = :workshopId` filter; both remain predicate-only and no `workshops` column is selected.
+  - **Notes:** `studentNumber` is resolved through `IamApi`, never from the join. `StudentProfileDto` is an additive record component; the six `registrations` test fixtures that construct it must be updated with the new component. The T1 projection gains `JOIN workshops w ON w.id = r.workshop_id`, with `w.organization_id = :organizationId` plus the optional `r.workshop_id = :workshopId` filter; both remain predicate-only and no `workshops` column is selected. Organizer-only endpoints live in `AdminPaymentHistoryController` mapped at `"/api/v1/admin/payments"`; student-only and student-or-organizer endpoints live in `PaymentHistoryController` mapped at `"/api/v1/payments"`. Both use full literal paths, consistent with every other backend controller; no shared version-prefix constant is introduced.
   - **Acceptance Criteria:**
     - An authenticated ORGANIZER calling `GET /api/v1/admin/payments` receives only payment records for workshops in the JWT organization scope, in the contracted cursor order. _(FR-05, FR-10, FR-14; Scenario 4)_
     - A valid accessible `workshopId` and/or payment `status` narrows results without changing cursor semantics; an inaccessible or nonexistent workshop is reported as the contracted non-enumerating 404. _(FR-06; Scenario 5)_
@@ -98,7 +100,7 @@ This plan delivers the four approved read endpoints as small, independently test
 
 #### Checkpoint: Organization history
 
-- [ ] T2 acceptance criteria pass, organization isolation is demonstrated in use-case and controller tests, affected unit tests and `ModulithArchitectureTest` pass.
+- [x] T2 acceptance criteria pass, organization isolation is demonstrated in use-case and controller tests, affected unit tests and `ModulithArchitectureTest` pass.
 
 ### Phase 3: Reusable payment lookup and organization summary
 
@@ -129,7 +131,7 @@ This plan delivers the four approved read endpoints as small, independently test
     - `apps/backend/src/main/java/com/unihub/workshop/payments/application/ports/out/PaymentRepository.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/application/usecases/GetOrganizerPaymentSummaryUseCaseImpl.java` (new)
     - `apps/backend/src/main/java/com/unihub/workshop/payments/infrastructure/persistence/{PaymentRepositoryAdapter,PaymentJpaRepository}.java`
-    - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/PaymentHistoryController.java`
+    - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/AdminPaymentHistoryController.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/{dto,mapper}/...` (summary response and MapStruct mapping)
     - `apps/backend/src/test/java/com/unihub/workshop/payments/{application,infrastructure,presentation}/...` (new unit tests)
   - **Acceptance Criteria:**

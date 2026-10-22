@@ -83,7 +83,8 @@ class PaidRegistrationStrategyResilienceTest {
             studentUserId,
             UUID.randomUUID(),
             "Nguyen Van A",
-            "student@uni.edu"
+            "student@uni.edu",
+            "23123456"
         );
         when(iamApi.getStudentProfile(studentUserId)).thenReturn(
             Optional.of(student)

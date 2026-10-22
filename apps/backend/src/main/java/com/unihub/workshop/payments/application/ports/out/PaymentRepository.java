@@ -33,4 +33,26 @@ public interface PaymentRepository {
         String cursor,
         int size
     );
+
+    /**
+     * Finds keyset cursor-paginated payments for workshops owned by an organization.
+     *
+     * <p>Tenant isolation and the optional workshop filter are evaluated in the same
+     * statement as the ordering window so the page size, continuation cursor, and
+     * {@code hasMore} flag stay consistent.
+     *
+     * @param organizationId caller's organization scope
+     * @param workshopId optional workshop filter already verified as accessible
+     * @param status optional payment status filter
+     * @param cursor optional opaque keyset cursor issued for the same filter set
+     * @param size page window size
+     * @return page of payments ordered by creation time descending, then id descending
+     */
+    CursorPage<Payment> findByOrganizationId(
+        UUID organizationId,
+        UUID workshopId,
+        PaymentStatus status,
+        String cursor,
+        int size
+    );
 }

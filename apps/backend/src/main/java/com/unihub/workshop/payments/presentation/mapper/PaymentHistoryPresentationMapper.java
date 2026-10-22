@@ -1,10 +1,12 @@
 package com.unihub.workshop.payments.presentation.mapper;
 
+import com.unihub.workshop.payments.domain.model.OrganizerPaymentHistoryItem;
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentHistoryItem;
 import com.unihub.workshop.payments.presentation.dto.PaymentHistoryItemResponse;
 import com.unihub.workshop.payments.presentation.dto.PaymentHistoryListResponse;
 import com.unihub.workshop.payments.presentation.dto.PaymentRegistrationContextResponse;
+import com.unihub.workshop.payments.presentation.dto.PaymentStudentResponse;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.List;
@@ -34,10 +36,38 @@ public interface PaymentHistoryPresentationMapper {
     )
     @Mapping(target = "createdAt", source = "payment.createdAt")
     @Mapping(target = "updatedAt", source = "payment.updatedAt")
+    @Mapping(target = "student", ignore = true)
     PaymentHistoryItemResponse toItemResponse(PaymentHistoryItem item);
+
+    @Mapping(target = "paymentId", source = "payment.id")
+    @Mapping(
+        target = "registration",
+        expression = "java(toRegistrationContext(item))"
+    )
+    @Mapping(target = "amount", source = "payment.amount")
+    @Mapping(target = "currency", source = "payment.currency")
+    @Mapping(target = "status", source = "payment.status")
+    @Mapping(
+        target = "providerReferenceMasked",
+        expression = "java(maskProviderReference(item.payment()))"
+    )
+    @Mapping(
+        target = "statusOccurredAt",
+        expression = "java(statusOccurredAt(item.payment()))"
+    )
+    @Mapping(target = "createdAt", source = "payment.createdAt")
+    @Mapping(target = "updatedAt", source = "payment.updatedAt")
+    @Mapping(target = "student", expression = "java(toStudent(item))")
+    PaymentHistoryItemResponse toOrganizerItemResponse(
+        OrganizerPaymentHistoryItem item
+    );
 
     List<PaymentHistoryItemResponse> toItemResponseList(
         List<PaymentHistoryItem> items
+    );
+
+    List<PaymentHistoryItemResponse> toOrganizerItemResponseList(
+        List<OrganizerPaymentHistoryItem> items
     );
 
     default PaymentHistoryListResponse toListResponse(
@@ -53,6 +83,19 @@ public interface PaymentHistoryPresentationMapper {
         );
     }
 
+    default PaymentHistoryListResponse toOrganizerListResponse(
+        CursorPage<OrganizerPaymentHistoryItem> page
+    ) {
+        if (page == null) {
+            return null;
+        }
+        return PaymentHistoryListResponse.of(
+            toOrganizerItemResponseList(page.items()),
+            page.nextCursor(),
+            page.hasMore()
+        );
+    }
+
     default PaymentRegistrationContextResponse toRegistrationContext(
         PaymentHistoryItem item
     ) {
@@ -63,6 +106,36 @@ public interface PaymentHistoryPresentationMapper {
             item.payment().registrationId(),
             item.workshopId(),
             item.registrationStatus()
+        );
+    }
+
+    default PaymentRegistrationContextResponse toRegistrationContext(
+        OrganizerPaymentHistoryItem item
+    ) {
+        if (item == null || item.payment() == null) {
+            return null;
+        }
+        return new PaymentRegistrationContextResponse(
+            item.payment().registrationId(),
+            item.workshopId(),
+            item.registrationStatus()
+        );
+    }
+
+    /**
+     * Builds the minimal student identity block, or omits it entirely when no identity
+     * could be resolved.
+     */
+    default PaymentStudentResponse toStudent(OrganizerPaymentHistoryItem item) {
+        if (
+            item == null ||
+            (item.studentFullName() == null && item.studentNumber() == null)
+        ) {
+            return null;
+        }
+        return new PaymentStudentResponse(
+            item.studentFullName(),
+            item.studentNumber()
         );
     }
 

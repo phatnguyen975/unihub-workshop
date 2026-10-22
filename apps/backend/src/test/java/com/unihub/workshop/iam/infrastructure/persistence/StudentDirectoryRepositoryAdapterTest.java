@@ -7,7 +7,9 @@ import com.unihub.workshop.iam.domain.model.StudentDirectory;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.StudentDirectoryPersistenceMapper;
 import com.unihub.workshop.iam.infrastructure.persistence.mapper.StudentDirectoryPersistenceMapperImpl;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -70,5 +72,66 @@ class StudentDirectoryRepositoryAdapterTest {
             "unknown@test.com"
         );
         assertThat(result.isEmpty()).isTrue();
+    }
+
+    @Test
+    void shouldMapAllEntitiesForBatchLookup() {
+        StudentDirectoryJpaRepository jpaRepo = mock(
+            StudentDirectoryJpaRepository.class
+        );
+        StudentDirectoryRepositoryAdapter adapter =
+            new StudentDirectoryRepositoryAdapter(jpaRepo, mapper);
+
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+        Set<UUID> ids = Set.of(firstId, secondId);
+
+        when(jpaRepo.findAllById(ids)).thenReturn(
+            List.of(
+                directoryEntity(firstId, "23123456"),
+                directoryEntity(secondId, "23999999")
+            )
+        );
+
+        List<StudentDirectory> result = adapter.findAllByIds(ids);
+
+        assertThat(result)
+            .extracting(StudentDirectory::id)
+            .containsExactly(firstId, secondId);
+        assertThat(result)
+            .extracting(StudentDirectory::studentNumber)
+            .containsExactly("23123456", "23999999");
+    }
+
+    @Test
+    void shouldReturnEmptyListWithoutQueryingWhenBatchIdsAreEmpty() {
+        StudentDirectoryJpaRepository jpaRepo = mock(
+            StudentDirectoryJpaRepository.class
+        );
+        StudentDirectoryRepositoryAdapter adapter =
+            new StudentDirectoryRepositoryAdapter(jpaRepo, mapper);
+
+        assertThat(adapter.findAllByIds(Set.of())).isEmpty();
+        assertThat(adapter.findAllByIds(null)).isEmpty();
+
+        verifyNoInteractions(jpaRepo);
+    }
+
+    private StudentDirectoryJpaEntity directoryEntity(
+        UUID id,
+        String studentNumber
+    ) {
+        Instant now = Instant.now();
+        return StudentDirectoryJpaEntity.builder()
+            .id(id)
+            .organizationId(UUID.randomUUID())
+            .studentNumber(studentNumber)
+            .email(studentNumber + "@student.university.edu")
+            .fullName("Student " + studentNumber)
+            .status("ACTIVE")
+            .importedAt(now)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
     }
 }

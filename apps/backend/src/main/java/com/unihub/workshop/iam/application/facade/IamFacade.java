@@ -3,14 +3,18 @@ package com.unihub.workshop.iam.application.facade;
 import com.unihub.workshop.iam.api.IamApi;
 import com.unihub.workshop.iam.api.dto.StaffUserDto;
 import com.unihub.workshop.iam.api.dto.StudentProfileDto;
+import com.unihub.workshop.iam.application.ports.out.StudentDirectoryRepository;
 import com.unihub.workshop.iam.application.ports.out.UserRepository;
+import com.unihub.workshop.iam.domain.model.StudentDirectory;
 import com.unihub.workshop.iam.domain.model.User;
 import com.unihub.workshop.iam.domain.model.UserRole;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class IamFacade implements IamApi {
 
     private final UserRepository userRepository;
+    private final StudentDirectoryRepository studentDirectoryRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -79,7 +84,36 @@ public class IamFacade implements IamApi {
             .findById(studentUserId)
             .filter(User::isActive)
             .filter(user -> user.role() == UserRole.STUDENT)
-            .map(this::toStudentProfileDto);
+            .map(user ->
+                toStudentProfileDto(user, resolveStudentNumbers(List.of(user)))
+            );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, StudentProfileDto> getStudentProfilesByIds(
+        Collection<UUID> studentUserIds
+    ) {
+        if (studentUserIds == null || studentUserIds.isEmpty()) {
+            return Map.of();
+        }
+        List<User> students = userRepository
+            .findAllById(studentUserIds)
+            .stream()
+            .filter(User::isActive)
+            .filter(user -> user.role() == UserRole.STUDENT)
+            .toList();
+        if (students.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> studentNumbers = resolveStudentNumbers(students);
+        return students
+            .stream()
+            .collect(
+                Collectors.toMap(User::id, user ->
+                    toStudentProfileDto(user, studentNumbers)
+                )
+            );
     }
 
     private StaffUserDto toStaffUserDto(User user) {
@@ -95,12 +129,38 @@ public class IamFacade implements IamApi {
         );
     }
 
-    private StudentProfileDto toStudentProfileDto(User user) {
+    private StudentProfileDto toStudentProfileDto(
+        User user,
+        Map<UUID, String> studentNumbers
+    ) {
+        UUID studentRecordId = user.studentRecordId();
         return new StudentProfileDto(
             user.id(),
-            user.studentRecordId(),
+            studentRecordId,
             user.fullName(),
-            user.email()
+            user.email(),
+            studentRecordId != null ? studentNumbers.get(studentRecordId) : null
         );
+    }
+
+    private Map<UUID, String> resolveStudentNumbers(Collection<User> users) {
+        Set<UUID> recordIds = users
+            .stream()
+            .map(User::studentRecordId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (recordIds.isEmpty()) {
+            return Map.of();
+        }
+        return studentDirectoryRepository
+            .findAllByIds(recordIds)
+            .stream()
+            .filter(directory -> directory.studentNumber() != null)
+            .collect(
+                Collectors.toMap(
+                    StudentDirectory::id,
+                    StudentDirectory::studentNumber
+                )
+            );
     }
 }

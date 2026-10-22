@@ -17,6 +17,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Payment endpoints available to students and to both student and organizer roles.
+ *
+ * <p>Organizer-only endpoints live in {@link AdminPaymentHistoryController} so each
+ * controller maps only the routes its role policy covers.
+ */
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor

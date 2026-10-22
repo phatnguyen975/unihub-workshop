@@ -43,4 +43,14 @@ public interface IamApi {
      * @return optional containing StudentProfileDto if student exists and is active, empty otherwise
      */
     Optional<StudentProfileDto> getStudentProfile(UUID studentUserId);
+
+    /**
+     * Resolves multiple active student profiles in one batch by their user IDs.
+     *
+     * @param studentUserIds student user identifiers to resolve
+     * @return active student profiles keyed by user ID; empty when no ids are supplied
+     */
+    Map<UUID, StudentProfileDto> getStudentProfilesByIds(
+        Collection<UUID> studentUserIds
+    );
 }

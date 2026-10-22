@@ -159,7 +159,8 @@ class CancelRegistrationUseCaseFreeTest {
             studentUserId,
             UUID.randomUUID(),
             "Alice Smith",
-            "alice@example.com"
+            "alice@example.com",
+            "23123456"
         );
     }
 

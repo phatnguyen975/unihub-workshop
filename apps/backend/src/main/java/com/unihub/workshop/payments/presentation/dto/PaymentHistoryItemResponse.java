@@ -15,5 +15,6 @@ public record PaymentHistoryItemResponse(
     String providerReferenceMasked,
     Instant statusOccurredAt,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    PaymentStudentResponse student
 ) {}

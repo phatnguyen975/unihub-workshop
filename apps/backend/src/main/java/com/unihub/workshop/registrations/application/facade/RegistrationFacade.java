@@ -196,6 +196,7 @@ public class RegistrationFacade implements RegistrationApi {
                     new RegistrationPaymentContextDto(
                         registration.id(),
                         registration.workshopId(),
+                        registration.studentUserId(),
                         registration.status() != null
                             ? registration.status().name()
                             : null
