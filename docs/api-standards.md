@@ -20,13 +20,15 @@ We use URI path versioning (e.g., `/api/v1/...`) because it is explicit, cache-f
       "id": "cdaa5550-c106-4412-b4d5-67f0f11c1494",
       "sortField": "createdAt",
       "primaryValue": "2026-09-29T03:00:00Z",
-      "secondaryValue": null
+      "secondaryValue": null,
+      "filterFingerprint": null
     }
     ```
     - `id` (UUID, mandatory): Unique record identifier serving as the deterministic tie-breaker.
     - `sortField` (string, mandatory): Name of the sorted attribute (e.g., `createdAt`, `startsAt`, `price`, `capacity`, `completedAt`). If a client changes sort parameters between pages while passing a cursor issued for another sort field, the backend strictly rejects the request with RFC 7807 `400 Bad Request` ("Cursor was issued for sort='...' but current request uses sort='...'").
     - `primaryValue` (string, nullable): Serialized string value of the primary sorted attribute (e.g., ISO-8601 UTC timestamp, numeric decimal string, or null).
     - `secondaryValue` (string, nullable): Serialized string value of the secondary tie-breaker attribute (typically `createdAt` ISO-8601 UTC timestamp, or null when sorting directly by `createdAt`).
+    - `filterFingerprint` (string, nullable): Server-derived canonical string over the filter parameters that narrow the result set (never `sort`, `size`, or `cursor`). It binds a cursor to the filter set that produced it: if a client replays a cursor against a different filter set, the backend strictly rejects the request with RFC 7807 `400 Bad Request`. Cursors without a fingerprint (minted before this contract, or collections with no filters) skip the check. Clients must treat this value as opaque and must not construct or compare it.
   - **NULLS LAST & Multi-Column Tie-Breaking Rules:**
     - Any `NULL` value in the sorted attribute is strictly pushed to the end of the collection (`NULLS LAST`).
     - When two items have identical or null primary sort values, they are deterministically broken first by secondary timestamp (`createdAt DESC` or `startsAt DESC` so the newest record appears first), and finally by `id DESC`.

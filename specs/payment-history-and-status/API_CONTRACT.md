@@ -2,7 +2,7 @@
 
 > **Status:** APPROVED  
 > **Spec:** `specs/payment-history-and-status/SPEC.md`  
-> **Last Revised:** 2026-10-21
+> **Last Revised:** 2026-10-22
 
 ## 1. Overview
 
@@ -11,7 +11,7 @@ This contract exposes read-only payment history, payment detail, and an organiza
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** URI path versioning under `/api/v1`; organizer routes use the established `/api/v1/admin/...` namespace.
-- **Pagination convention:** Opaque Base64 keyset cursor in `cursor`, optional `size` with default `20` and maximum `100`, and `data.items` plus `data.cursor.nextCursor` and `data.cursor.hasMore`. Payment collections sort by `createdAt,desc` with payment ID as the tie-breaker.
+- **Pagination convention:** Opaque Base64 keyset cursor in `cursor`, optional `size` with default `20` and maximum `100`, and `data.items` plus `data.cursor.nextCursor` and `data.cursor.hasMore`. Payment collections sort by `createdAt,desc` with payment ID as the tie-breaker. Each issued cursor is bound to the filter set that produced it (`status`, and `workshopId` where applicable); presenting it with a different filter set is rejected with `400` rather than silently re-queried.
 - **Success response shape:** Standard `{ success, message, data, metadata }` JSON envelope; null values are omitted.
 - **Error response format:** Standard `{ success: false, error: RFC 7807 Problem Details, metadata }` envelope with `application/problem+json`.
 - **Idempotency-key convention:** Not required for any endpoint because all endpoints are read-only and side-effect free.
@@ -88,7 +88,7 @@ This contract exposes read-only payment history, payment detail, and an organiza
 }
 ```
 
-`statusOccurredAt` is the timestamp of the current visible status (`createdAt` for `PENDING`, otherwise the terminal-status timestamp). `providerReferenceMasked` contains only the final four characters of the gateway reference.
+`statusOccurredAt` is the timestamp of the current visible status (`createdAt` for `PENDING`, otherwise the terminal-status timestamp). `providerReferenceMasked` contains only the final four characters of the gateway reference; when the gateway reference is shorter than four characters, the whole value is masked and no character is revealed.
 
 **Error Responses:**
 
@@ -341,7 +341,7 @@ Not applicable. These four endpoints are safe to repeat because they are read-on
 ## 6. Cross-Endpoint Consistency Notes
 
 - All payment resources use the same names and types for `paymentId`, `registration`, `amount`, `currency`, `status`, `providerReferenceMasked`, `statusOccurredAt`, `createdAt`, and `updatedAt`.
-- All collection endpoints use the shared cursor contract; `cursor` must not be combined with changed filters.
+- All collection endpoints use the shared cursor contract; `cursor` must not be combined with changed filters. The cursor is opaque and carries a server-derived binding to the filter set that issued it, so replaying it against different `status` or `workshopId` values returns `400`, not a reinterpreted page.
 - Student data is absent from student-visible resources and limited to `fullName` and `studentNumber` for organizer-visible resources.
 - All visibility failures for an existing payment or workshop use `404` where stated, preventing cross-student and cross-organization resource enumeration.
 - The contract deliberately omits `providerPaymentId`, `providerRefundId`, `paymentClientSecret`, QR data, `failureCode`, and `failureReason` from every response.

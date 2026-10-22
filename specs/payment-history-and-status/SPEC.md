@@ -3,7 +3,7 @@
 > **Status:** APPROVED  
 > **Domain:** 5 — Payment Processing  
 > **Owner/area:** `payments` backend module  
-> **Last Revised:** 2026-10-21 — first version
+> **Last Revised:** 2026-10-22 — first version
 
 ## 1. Overview
 
@@ -42,7 +42,7 @@ This feature gives students transparent, read-only visibility of their own paid-
 ### Read consistency and pagination
 
 - **FR-13:** The system SHALL treat payment history and summary as eventually consistent, non-critical read views and may return a short-lived stale result after a payment state transition.
-- **FR-14:** The system SHALL use opaque cursor pagination for every payment collection and return the continuation cursor and whether another page exists.
+- **FR-14:** The system SHALL use opaque cursor pagination for every payment collection, return the continuation cursor and whether another page exists, and SHALL reject a continuation cursor that was issued for a different filter set.
 
 ## 4. Business Rules
 
@@ -54,6 +54,7 @@ This feature gives students transparent, read-only visibility of their own paid-
 - **BR-06:** Organizer visibility is determined by the linked workshop's organization and the caller's organization claim; an inaccessible record is treated as not visible.
 - **BR-07:** Payment status and registration status are read-only in this feature. Their transitions remain owned by the established payment outcome and registration reconciliation flows.
 - **BR-08:** A masked provider reference reveals only the final four characters of the provider payment reference; the complete value is never returned.
+- **BR-09:** When the provider payment reference is shorter than four characters, the entire value is masked so that no provider reference is ever disclosed in full.
 
 ## 5. State Transitions
 
@@ -74,6 +75,8 @@ This feature introduces no state transition. It displays the existing lifecycle 
 ## 6. Non-Functional Requirements
 
 - **Performance:** Collection reads SHALL be keyset-paginated with a default page size of 20 and a maximum of 100; they must not perform unbounded payment scans or per-item dependent reads.
+- **Read-path architecture:** Ownership and organization visibility SHALL be evaluated in the same database statement that produces the keyset window, through a read-only projection over `payments` joined to the owning module's tables. Joined tables contribute only a visibility predicate; every response field they own SHALL be resolved through that module's public API. This projection SHALL NOT be used by any write, idempotency, capacity, or state-transition path (see `docs/project-structure.md` §3).
+- **Cursor integrity:** A continuation cursor SHALL be bound to the filter set that produced it; replaying it against a different filter set is a client error and SHALL be rejected rather than silently reinterpreted.
 - **Consistency:** These read views may route to a replica and may be briefly stale. Authorization and any future state-changing check-then-act operation must not rely on a replica result.
 - **Security:** JWT authentication, role enforcement, student ownership, and organizer organization isolation are mandatory. Sensitive gateway, QR, refund, and failure-detail fields are excluded by contract.
 - **Idempotency:** No idempotency key is required because all feature operations are read-only and have no side effects.
@@ -104,6 +107,7 @@ Then the response contains no payment in another status
 And it contains an opaque next cursor when another page exists
 When the STUDENT submits that cursor unchanged
 Then the response returns the next stable page without repeating an earlier item
+And a cursor issued for a different status filter is rejected with the standard bad-request response
 ```
 
 _Traces to FR-02, FR-14._
@@ -180,4 +184,4 @@ _Traces to FR-13._
 - `docs/database-schema.md` §3 tables `registrations` and `payments`; §4 Replication Lag & Read-After-Write Consistency.
 - `docs/adrs.md` ADR-006, ADR-014, ADR-015, and ADR-022.
 - `docs/api-standards.md` — pagination, response/error envelopes, auth headers, timestamps, and rate limiting.
-- `docs/project-structure.md` §3 Core Backend and Internal Module Communication.
+- `docs/project-structure.md` §3 Core Backend and Internal Module Communication (including the bounded read-only cross-module projection rule).

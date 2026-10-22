@@ -14,6 +14,8 @@ This plan delivers the four approved read endpoints as small, independently test
 - **Cursor ordering is fixed at payment creation time** — all list tasks use the existing shared keyset pagination contract with `createdAt DESC, id DESC`; status and workshop filters are carried consistently between pages.
 - **Scoped query capability precedes detail and aggregate views** — organization filtering and minimal student identity are proven through the organizer collection endpoint before they are reused by payment detail and summary, reducing tenant-isolation risk.
 - **No schema task is planned** — the approved schema already contains the payment and registration keyset indexes needed by this feature. Query implementation must use those shapes; if implementation demonstrates an additional index is necessary, it must follow the approved mid-build improvement process rather than being added ad hoc.
+- **Scoping and ordering share one statement** — student ownership and organization scope are not stored on `payments`, and post-filtering a fetched page would corrupt page size, `hasMore`, and cursor continuity. T1/T2 therefore use the bounded read-only cross-module projection rule in `docs/project-structure.md` §3: one read-only statement joins `payments` to the owning module's tables to produce the keyset window, while every response field owned by another module (registration id, workshop id, registration status, student identity) is still resolved through `registrations/api`.
+- **Cursors are bound to their filter set** — issuing and validating cursors goes through the shared cursor contract, extended with an optional server-derived filter fingerprint so a cursor replayed against a different `status`/`workshopId` filter is rejected with `400` instead of silently producing an inconsistent page.
 
 ## Task List
 
@@ -35,10 +37,29 @@ This plan delivers the four approved read endpoints as small, independently test
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/PaymentHistoryController.java` (new)
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/{dto,mapper}/...` (new payment-history response DTO and MapStruct mapper)
     - `apps/backend/src/test/java/com/unihub/workshop/{registrations,payments}/...` (new facade, use-case, persistence-adapter, and controller unit tests)
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/KeysetCursor.java` (add nullable `filterFingerprint`)
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/pagination/KeysetCursorCodec.java` (add filter-aware `decode` overload; keep the existing two-argument behavior unchanged)
+    - `apps/backend/src/test/java/com/unihub/workshop/shared/pagination/KeysetCursorCodecTest.java` (filter-binding and backward-compatibility tests)
+    - `apps/backend/src/test/java/com/unihub/workshop/payments/infrastructure/persistence/PaymentRepositoryAdapterTest.java` (update constructor; the adapter now injects `EntityManager`)
+  - **Notes:** `JpaKeysetPagination` is Criteria-based and can only address a single entity root, so it cannot express the ownership join. The adapter composes the row-value keyset predicate in the native projection query while still using `KeysetCursorCodec` for the shared opaque cursor format. The projection selects only `payments` columns; `registration` context comes from `RegistrationApi`. Exact T1 shape:
+
+    ```sql
+    SELECT p.id, p.registration_id, p.provider, p.provider_payment_id, p.provider_refund_id,
+           p.status, p.amount, p.currency, p.completed_at, p.failed_at, p.refunded_at,
+           p.failure_code, p.failure_reason, p.created_at, p.updated_at, p.created_by, p.updated_by
+    FROM payments p
+    JOIN registrations r ON r.id = p.registration_id
+    WHERE r.student_user_id = :studentUserId
+        AND (:status IS NULL OR p.status = :status)
+        AND (:cursorCreatedAt IS NULL OR (p.created_at, p.id) < (:cursorCreatedAt, :cursorId))
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT :limit
+    ```
+
   - **Acceptance Criteria:**
     - An authenticated STUDENT calling `GET /api/v1/payments/me` receives only payment records linked to their registrations, newest first, with the standard page envelope. _(FR-01, FR-10, FR-14; Scenario 1)_
-    - A valid `status` filter returns only that status; a valid returned cursor gives the next non-duplicated page; invalid filters, size, or cursor receive the contract-defined 400/422 response. _(FR-02, FR-14; Scenario 2)_
-    - Each item contains exactly the student-safe payment and registration context in the contract, including a final-four-only masked provider reference and progress timestamp, while omitting all prohibited secrets and failure details. _(FR-04, FR-12; Scenario 1)_
+    - A valid `status` filter returns only that status; a valid returned cursor gives the next non-duplicated page; a cursor replayed against a different `status` filter receives the contract-defined `400`; invalid filters, size, or cursor receive the contract-defined `400`/`422` response. _(FR-02, FR-14; Scenario 2)_
+    - Each item contains exactly the student-safe payment and registration context in the contract, including a final-four-only masked provider reference and progress timestamp, while omitting all prohibited secrets and failure details. A provider reference shorter than four characters is fully masked. _(FR-04, FR-12, BR-09; Scenario 1)_
     - Unit tests cover application authorization/filter orchestration, query mapping/keyset behavior with mocked persistence, and controller response/error mapping; `ModulithArchitectureTest` passes.
 
 #### Checkpoint: Student history foundation
@@ -62,10 +83,14 @@ This plan delivers the four approved read endpoints as small, independently test
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/PaymentHistoryController.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/{dto,mapper}/...` (organizer item response and MapStruct mapping)
     - `apps/backend/src/test/java/com/unihub/workshop/{registrations,payments}/...` (new/updated facade, use-case, persistence-adapter, and controller unit tests)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/api/dto/StudentProfileDto.java` (add `studentNumber`)
+    - `apps/backend/src/main/java/com/unihub/workshop/iam/application/facade/IamFacade.java` (populate `studentNumber` from `student_directory` through `users.student_record_id`)
+    - `apps/backend/src/test/java/com/unihub/workshop/iam/application/facade/IamFacadeTest.java` (student-number mapping)
+  - **Notes:** `studentNumber` is resolved through `IamApi`, never from the join. `StudentProfileDto` is an additive record component; the six `registrations` test fixtures that construct it must be updated with the new component. The T1 projection gains `JOIN workshops w ON w.id = r.workshop_id`, with `w.organization_id = :organizationId` plus the optional `r.workshop_id = :workshopId` filter; both remain predicate-only and no `workshops` column is selected.
   - **Acceptance Criteria:**
     - An authenticated ORGANIZER calling `GET /api/v1/admin/payments` receives only payment records for workshops in the JWT organization scope, in the contracted cursor order. _(FR-05, FR-10, FR-14; Scenario 4)_
     - A valid accessible `workshopId` and/or payment `status` narrows results without changing cursor semantics; an inaccessible or nonexistent workshop is reported as the contracted non-enumerating 404. _(FR-06; Scenario 5)_
-    - Each organizer item contains only `fullName` and `studentNumber` as student identity and contains none of the excluded gateway, QR, refund, or failure-detail fields. _(FR-08, FR-12; Scenario 4)_
+    - Each organizer item contains only `fullName` and `studentNumber` as student identity, both resolved through the IAM facade, and contains none of the excluded gateway, QR, refund, or failure-detail fields. _(FR-08, FR-12; Scenario 4)_
     - STUDENT and STAFF callers receive the contract-defined forbidden response; unit tests verify tenant filtering and response minimization; `ModulithArchitectureTest` passes. _(FR-11)_
 
 #### Checkpoint: Organization history
@@ -119,15 +144,23 @@ This plan delivers the four approved read endpoints as small, independently test
 
 ## Risks and Mitigations
 
-| Risk                                                                                                               | Impact | Mitigation                                                                                                                                                                               |
-| :----------------------------------------------------------------------------------------------------------------- | :----- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A payments query bypasses registrations ownership or organization boundaries through a direct internal dependency. | High   | Establish/extend only a minimal `registrations/api` read DTO in T1; enforce Modulith architecture tests in every task.                                                                   |
-| Enriching each payment with registration/student data produces an N+1 query pattern.                               | High   | Design the public registration lookup as a bounded batch/read-page capability and test the persistence/query interaction with mocks; do not perform per-item remote or repository calls. |
-| Cursor pages drift, repeat, or skip records when status/workshop filters change.                                   | Medium | Reuse `shared/pagination` opaque keyset cursor and reject cursors that do not match the requested sort/filter contract.                                                                  |
-| Replica staleness is interpreted as an immediate payment outcome.                                                  | Medium | Keep the eventual-consistency notice explicit in responses/UI-facing contract and never use these reads for mutations or idempotency decisions.                                          |
-| Gateway identifiers or sensitive failure/refund fields leak through a new DTO or mapper.                           | High   | Make response DTOs allow-list only contract fields; add controller mapping tests that assert excluded fields are absent.                                                                 |
-| Summary accidentally aggregates unlike currencies or omits a status bucket.                                        | Medium | Group before aggregation by currency and status; cover mixed-currency and empty-result cases in application and persistence-adapter unit tests.                                          |
+| Risk                                                                                                               | Impact | Mitigation                                                                                                                                                                                                              |
+| :----------------------------------------------------------------------------------------------------------------- | :----- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A payments query bypasses registrations ownership or organization boundaries through a direct internal dependency. | High   | Establish/extend only a minimal `registrations/api` read DTO in T1; enforce Modulith architecture tests in every task; scope the read-only projection to the six conditions recorded in `docs/project-structure.md` §3. |
+| A read-only projection query is reused for a non-read purpose or starts selecting foreign-module columns.          | High   | The projection rule forbids both; the persistence-adapter test asserts read-only usage and a `payments`-only select list, and `/review` re-checks it under `performance-and-efficiency-engineering`.                    |
+| Enriching each payment with registration/student data produces an N+1 query pattern.                               | High   | Design the public registration lookup as a bounded batch/read-page capability and test the persistence/query interaction with mocks; do not perform per-item remote or repository calls.                                |
+| Cursor pages drift, repeat, or skip records when status/workshop filters change.                                   | Medium | Reuse `shared/pagination` opaque keyset cursor, extend it with the server-derived filter fingerprint, and reject a cursor whose fingerprint does not match the current filter set.                                      |
+| Replica staleness is interpreted as an immediate payment outcome.                                                  | Medium | Keep the eventual-consistency notice explicit in responses/UI-facing contract and never use these reads for mutations or idempotency decisions.                                                                         |
+| Gateway identifiers or sensitive failure/refund fields leak through a new DTO or mapper.                           | High   | Make response DTOs allow-list only contract fields; add controller mapping tests that assert excluded fields are absent.                                                                                                |
+| Summary accidentally aggregates unlike currencies or omits a status bucket.                                        | Medium | Group before aggregation by currency and status; cover mixed-currency and empty-result cases in application and persistence-adapter unit tests.                                                                         |
 
 ## Open Questions
 
-None. The approved spec and contract resolve endpoint scope, visibility semantics, status set, masking rule, summary shape, pagination, and replica consistency behavior.
+None outstanding.
+
+## Execution Notes
+
+Human-directed working rules for this feature:
+
+- **Scoped test runs only.** Run only the tests related to the files touched by the current task, plus `ModulithArchitectureTest` (static boundary check, no I/O). The human runs the full backend suite and reports any fallout.
+- **Complete imports, zero ignored warnings.** Every type must be imported explicitly before it is used; any compiler or IDE warning in a touched file must be fixed at the root — never suppressed, `@SuppressWarnings`-ed away, or left behind.
