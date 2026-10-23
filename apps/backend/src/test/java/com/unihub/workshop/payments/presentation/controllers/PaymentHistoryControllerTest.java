@@ -5,19 +5,23 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.unihub.workshop.payments.application.ports.in.GetPaymentDetailUseCase;
 import com.unihub.workshop.payments.application.ports.in.GetStudentPaymentHistoryQuery;
 import com.unihub.workshop.payments.application.ports.in.GetStudentPaymentHistoryUseCase;
+import com.unihub.workshop.payments.domain.model.OrganizerPaymentHistoryItem;
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentHistoryItem;
 import com.unihub.workshop.payments.domain.model.PaymentStatus;
 import com.unihub.workshop.payments.presentation.mapper.PaymentHistoryPresentationMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
@@ -58,15 +62,19 @@ class PaymentHistoryControllerTest {
 
     private MockMvc mockMvc;
     private GetStudentPaymentHistoryUseCase useCase;
+    private GetPaymentDetailUseCase detailUseCase;
 
     private final UUID studentUserId = UUID.randomUUID();
+    private final UUID organizationId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         useCase = mock(GetStudentPaymentHistoryUseCase.class);
+        detailUseCase = mock(GetPaymentDetailUseCase.class);
 
         PaymentHistoryController controller = new PaymentHistoryController(
             useCase,
+            detailUseCase,
             new PaymentHistoryPresentationMapperImpl()
         );
 
@@ -79,9 +87,17 @@ class PaymentHistoryControllerTest {
     }
 
     private TestingAuthenticationToken createAuth(UUID userId, String role) {
+        return createAuth(userId, role, null);
+    }
+
+    private TestingAuthenticationToken createAuth(
+        UUID userId,
+        String role,
+        String organizationId
+    ) {
         JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
             userId.toString(),
-            null,
+            organizationId,
             "jti-test",
             role,
             UUID.randomUUID().toString(),
@@ -107,6 +123,19 @@ class PaymentHistoryControllerTest {
             .updatedAt(STATUS_OCCURRED_AT)
             .build();
         return new PaymentHistoryItem(payment, WORKSHOP_ID, "CONFIRMED");
+    }
+
+    private OrganizerPaymentHistoryItem organizerHistoryItem(
+        String providerPaymentId
+    ) {
+        PaymentHistoryItem item = historyItem(providerPaymentId);
+        return new OrganizerPaymentHistoryItem(
+            item.payment(),
+            item.workshopId(),
+            item.registrationStatus(),
+            "Nguyen Van A",
+            "23123456"
+        );
     }
 
     @Test
@@ -373,6 +402,233 @@ class PaymentHistoryControllerTest {
         throws Exception {
         mockMvc
             .perform(get("/api/v1/payments/me"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: returns a student's own payment with the student-safe shape"
+    )
+    void getPaymentDetail_asStudentOwner_returnsContractShape()
+        throws Exception {
+        when(
+            detailUseCase.getStudentPaymentDetail(PAYMENT_ID, studentUserId)
+        ).thenReturn(historyItem(GATEWAY_REFERENCE));
+
+        mockMvc
+            .perform(
+                get("/api/v1/payments/{paymentId}", PAYMENT_ID).principal(
+                    createAuth(studentUserId, "STUDENT")
+                )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Payment retrieved"))
+            .andExpect(
+                jsonPath("$.data.paymentId").value(PAYMENT_ID.toString())
+            )
+            .andExpect(
+                jsonPath("$.data.registration.id").value(
+                    REGISTRATION_ID.toString()
+                )
+            )
+            .andExpect(
+                jsonPath("$.data.registration.workshopId").value(
+                    WORKSHOP_ID.toString()
+                )
+            )
+            .andExpect(
+                jsonPath("$.data.registration.status").value("CONFIRMED")
+            )
+            .andExpect(jsonPath("$.data.amount").value(50.0))
+            .andExpect(jsonPath("$.data.currency").value("USD"))
+            .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+            .andExpect(
+                jsonPath("$.data.providerReferenceMasked").value("••••a1b2")
+            )
+            .andExpect(
+                jsonPath("$.data.statusOccurredAt").value(
+                    STATUS_OCCURRED_AT.toString()
+                )
+            )
+            .andExpect(jsonPath("$.data.student").doesNotExist())
+            .andExpect(jsonPath("$.data.providerPaymentId").doesNotExist())
+            .andExpect(jsonPath("$.data.providerRefundId").doesNotExist())
+            .andExpect(jsonPath("$.data.failureCode").doesNotExist())
+            .andExpect(jsonPath("$.data.failureReason").doesNotExist())
+            .andExpect(content().string(not(containsString(GATEWAY_REFERENCE))))
+            .andExpect(
+                content().string(not(containsString(PROHIBITED_FAILURE_CODE)))
+            )
+            .andExpect(
+                content().string(not(containsString(PROHIBITED_FAILURE_REASON)))
+            );
+
+        verify(detailUseCase).getStudentPaymentDetail(
+            PAYMENT_ID,
+            studentUserId
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: returns the organizer shape with only the minimal student identity"
+    )
+    void getPaymentDetail_asOrganizer_returnsContractShape() throws Exception {
+        when(
+            detailUseCase.getOrganizerPaymentDetail(PAYMENT_ID, organizationId)
+        ).thenReturn(organizerHistoryItem(GATEWAY_REFERENCE));
+
+        mockMvc
+            .perform(
+                get("/api/v1/payments/{paymentId}", PAYMENT_ID).principal(
+                    createAuth(
+                        UUID.randomUUID(),
+                        "ORGANIZER",
+                        organizationId.toString()
+                    )
+                )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Payment retrieved"))
+            .andExpect(
+                jsonPath("$.data.paymentId").value(PAYMENT_ID.toString())
+            )
+            .andExpect(
+                jsonPath("$.data.student.fullName").value("Nguyen Van A")
+            )
+            .andExpect(
+                jsonPath("$.data.student.studentNumber").value("23123456")
+            )
+            .andExpect(jsonPath("$.data.student.email").doesNotExist())
+            .andExpect(jsonPath("$.data.providerPaymentId").doesNotExist())
+            .andExpect(jsonPath("$.data.providerRefundId").doesNotExist())
+            .andExpect(jsonPath("$.data.failureCode").doesNotExist())
+            .andExpect(jsonPath("$.data.failureReason").doesNotExist())
+            .andExpect(
+                content().string(not(containsString(GATEWAY_REFERENCE)))
+            );
+
+        verify(detailUseCase).getOrganizerPaymentDetail(
+            PAYMENT_ID,
+            organizationId
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: hides a cross-student payment behind the not-found response"
+    )
+    void getPaymentDetail_asStudent_withNonVisiblePayment_returns404()
+        throws Exception {
+        when(
+            detailUseCase.getStudentPaymentDetail(PAYMENT_ID, studentUserId)
+        ).thenThrow(new NotFoundException("Payment not found"));
+
+        mockMvc
+            .perform(
+                get("/api/v1/payments/{paymentId}", PAYMENT_ID).principal(
+                    createAuth(studentUserId, "STUDENT")
+                )
+            )
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:not-found")
+            );
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: hides a cross-organization payment behind the not-found response"
+    )
+    void getPaymentDetail_asOrganizer_withNonVisiblePayment_returns404()
+        throws Exception {
+        when(
+            detailUseCase.getOrganizerPaymentDetail(PAYMENT_ID, organizationId)
+        ).thenThrow(new NotFoundException("Payment not found"));
+
+        mockMvc
+            .perform(
+                get("/api/v1/payments/{paymentId}", PAYMENT_ID).principal(
+                    createAuth(
+                        UUID.randomUUID(),
+                        "ORGANIZER",
+                        organizationId.toString()
+                    )
+                )
+            )
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:not-found")
+            );
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: returns 400 for a non-UUID payment identifier"
+    )
+    void getPaymentDetail_withMalformedPaymentId_returns400() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/payments/not-a-uuid").principal(
+                    createAuth(studentUserId, "STUDENT")
+                )
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verifyNoInteractions(detailUseCase);
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: returns 403 for a STAFF caller"
+    )
+    void getPaymentDetail_asStaff_returns403() throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/payments/{paymentId}", PAYMENT_ID).principal(
+                    createAuth(UUID.randomUUID(), "STAFF")
+                )
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false));
+
+        verifyNoInteractions(detailUseCase);
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: returns 403 when an organizer has no organization scope"
+    )
+    void getPaymentDetail_asOrganizerWithoutOrganization_returns403()
+        throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/payments/{paymentId}", PAYMENT_ID).principal(
+                    createAuth(UUID.randomUUID(), "ORGANIZER")
+                )
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false));
+
+        verifyNoInteractions(detailUseCase);
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/payments/{paymentId}: returns 401 Unauthorized without an authenticated caller"
+    )
+    void getPaymentDetail_withoutAuthentication_returns401() throws Exception {
+        mockMvc
+            .perform(get("/api/v1/payments/{paymentId}", PAYMENT_ID))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.success").value(false));
     }

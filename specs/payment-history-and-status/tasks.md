@@ -104,7 +104,7 @@ This plan delivers the four approved read endpoints as small, independently test
 
 ### Phase 3: Reusable payment lookup and organization summary
 
-- [ ] **T3 — An eligible student or organizer can retrieve one payment without learning about an inaccessible record.**
+- [x] **T3 — An eligible student or organizer can retrieve one payment without learning about an inaccessible record.**
   - **Size:** S
   - **Depends on:** T1, T2
   - **Layers touched:** Payments application ports/use case, Payments persistence adapter, Payments presentation, unit tests.

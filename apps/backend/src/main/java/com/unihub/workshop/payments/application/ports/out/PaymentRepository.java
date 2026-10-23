@@ -13,6 +13,17 @@ public interface PaymentRepository {
 
     Optional<Payment> findByRegistrationId(UUID registrationId);
 
+    /**
+     * Finds one payment by its own identifier.
+     *
+     * <p>This lookup evaluates no ownership or tenant scope; callers must enforce
+     * visibility before returning any data.
+     *
+     * @param paymentId payment identifier
+     * @return the payment when it exists
+     */
+    Optional<Payment> findById(UUID paymentId);
+
     boolean existsByProviderPaymentId(String providerPaymentId);
 
     /**

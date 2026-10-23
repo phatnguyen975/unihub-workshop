@@ -1,10 +1,14 @@
 package com.unihub.workshop.payments.presentation.controllers;
 
+import com.unihub.workshop.payments.application.ports.in.GetPaymentDetailUseCase;
 import com.unihub.workshop.payments.application.ports.in.GetStudentPaymentHistoryQuery;
 import com.unihub.workshop.payments.application.ports.in.GetStudentPaymentHistoryUseCase;
+import com.unihub.workshop.payments.domain.model.OrganizerPaymentHistoryItem;
 import com.unihub.workshop.payments.domain.model.PaymentHistoryItem;
+import com.unihub.workshop.payments.presentation.dto.PaymentHistoryItemResponse;
 import com.unihub.workshop.payments.presentation.dto.PaymentHistoryListResponse;
 import com.unihub.workshop.payments.presentation.mapper.PaymentHistoryPresentationMapper;
+import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
@@ -13,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentHistoryController {
 
     private final GetStudentPaymentHistoryUseCase getStudentPaymentHistoryUseCase;
+    private final GetPaymentDetailUseCase getPaymentDetailUseCase;
     private final PaymentHistoryPresentationMapper paymentHistoryMapper;
 
     /**
@@ -65,5 +71,54 @@ public class PaymentHistoryController {
             paymentHistoryMapper.toListResponse(page);
 
         return ApiResponse.success(response, "Payment history page");
+    }
+
+    /**
+     * Returns one visible payment to its student owner or to an organizer whose
+     * organization owns the linked workshop.
+     *
+     * @param authentication current security context
+     * @param paymentId requested payment identifier
+     * @return 200 OK with the role-specific payment shape
+     */
+    @GetMapping("/{paymentId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ORGANIZER')")
+    public ApiResponse<PaymentHistoryItemResponse> getPaymentDetail(
+        Authentication authentication,
+        @PathVariable("paymentId") UUID paymentId
+    ) {
+        String callerRole = SecurityContextUtils.extractRole(authentication);
+
+        if ("STUDENT".equalsIgnoreCase(callerRole)) {
+            UUID studentUserId = SecurityContextUtils.extractUserId(
+                authentication
+            );
+            PaymentHistoryItem item =
+                getPaymentDetailUseCase.getStudentPaymentDetail(
+                    paymentId,
+                    studentUserId
+                );
+            return ApiResponse.success(
+                paymentHistoryMapper.toItemResponse(item),
+                "Payment retrieved"
+            );
+        }
+
+        if ("ORGANIZER".equalsIgnoreCase(callerRole)) {
+            UUID organizationId = SecurityContextUtils.extractOrganizationId(
+                authentication
+            );
+            OrganizerPaymentHistoryItem item =
+                getPaymentDetailUseCase.getOrganizerPaymentDetail(
+                    paymentId,
+                    organizationId
+                );
+            return ApiResponse.success(
+                paymentHistoryMapper.toOrganizerItemResponse(item),
+                "Payment retrieved"
+            );
+        }
+
+        throw new ForbiddenException("Access denied");
     }
 }

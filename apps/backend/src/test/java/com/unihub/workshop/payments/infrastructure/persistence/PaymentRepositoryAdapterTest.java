@@ -115,6 +115,50 @@ class PaymentRepositoryAdapterTest {
     }
 
     @Test
+    @DisplayName("Finds a payment by identifier and maps it to the domain")
+    void shouldFindById() {
+        UUID paymentId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        PaymentJpaEntity entity = PaymentJpaEntity.builder()
+            .id(paymentId)
+            .registrationId(registrationId)
+            .provider("STRIPE")
+            .providerPaymentId("pi_by_id")
+            .status(PaymentStatus.REFUNDED)
+            .amount(BigDecimal.valueOf(75.00))
+            .currency("USD")
+            .refundedAt(now)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        when(jpaRepository.findById(paymentId)).thenReturn(Optional.of(entity));
+
+        Optional<Payment> result = adapter.findById(paymentId);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().id()).isEqualTo(paymentId);
+        assertThat(result.get().registrationId()).isEqualTo(registrationId);
+        assertThat(result.get().status()).isEqualTo(PaymentStatus.REFUNDED);
+        verify(jpaRepository).findById(paymentId);
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName("Returns empty when no payment exists for the identifier")
+    void shouldReturnEmptyWhenIdNotFound() {
+        UUID paymentId = UUID.randomUUID();
+        when(jpaRepository.findById(paymentId)).thenReturn(Optional.empty());
+
+        Optional<Payment> result = adapter.findById(paymentId);
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
     void shouldFindByProviderPaymentId() {
         UUID paymentId = UUID.randomUUID();
         UUID regId = UUID.randomUUID();

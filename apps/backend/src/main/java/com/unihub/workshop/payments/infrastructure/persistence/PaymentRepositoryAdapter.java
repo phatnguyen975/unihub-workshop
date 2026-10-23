@@ -87,6 +87,12 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<Payment> findById(UUID paymentId) {
+        return paymentJpaRepository.findById(paymentId).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean existsByProviderPaymentId(String providerPaymentId) {
         return paymentJpaRepository.existsByProviderPaymentId(
             providerPaymentId
