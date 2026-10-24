@@ -13,10 +13,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.unihub.workshop.payments.application.ports.in.GetOrganizerPaymentHistoryQuery;
 import com.unihub.workshop.payments.application.ports.in.GetOrganizerPaymentHistoryUseCase;
+import com.unihub.workshop.payments.application.ports.in.GetOrganizerPaymentSummaryUseCase;
+import com.unihub.workshop.payments.domain.model.CurrencyPaymentSummary;
 import com.unihub.workshop.payments.domain.model.OrganizerPaymentHistoryItem;
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentStatus;
+import com.unihub.workshop.payments.domain.model.PaymentSummaryBucket;
 import com.unihub.workshop.payments.presentation.mapper.PaymentHistoryPresentationMapperImpl;
+import com.unihub.workshop.payments.presentation.mapper.PaymentSummaryPresentationMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
@@ -59,17 +63,21 @@ class AdminPaymentHistoryControllerTest {
 
     private MockMvc mockMvc;
     private GetOrganizerPaymentHistoryUseCase organizerUseCase;
+    private GetOrganizerPaymentSummaryUseCase summaryUseCase;
 
     private final UUID organizationId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         organizerUseCase = mock(GetOrganizerPaymentHistoryUseCase.class);
+        summaryUseCase = mock(GetOrganizerPaymentSummaryUseCase.class);
 
         AdminPaymentHistoryController controller =
             new AdminPaymentHistoryController(
                 organizerUseCase,
-                new PaymentHistoryPresentationMapperImpl()
+                summaryUseCase,
+                new PaymentHistoryPresentationMapperImpl(),
+                new PaymentSummaryPresentationMapperImpl()
             );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -457,6 +465,158 @@ class AdminPaymentHistoryControllerTest {
         throws Exception {
         mockMvc
             .perform(get("/api/v1/admin/payments"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/admin/payments/summary: returns 200 with currency-separated status buckets"
+    )
+    void getOrganizationPaymentSummary_asOrganizer_returnsContractShape()
+        throws Exception {
+        when(summaryUseCase.getSummary(organizationId)).thenReturn(
+            List.of(
+                new CurrencyPaymentSummary(
+                    "USD",
+                    new PaymentSummaryBucket(2, new BigDecimal("100.00")),
+                    new PaymentSummaryBucket(18, new BigDecimal("900.00")),
+                    new PaymentSummaryBucket(1, new BigDecimal("50.00")),
+                    new PaymentSummaryBucket(3, new BigDecimal("150.00"))
+                ),
+                new CurrencyPaymentSummary(
+                    "VND",
+                    PaymentSummaryBucket.empty(),
+                    new PaymentSummaryBucket(1, new BigDecimal("250000.00")),
+                    PaymentSummaryBucket.empty(),
+                    PaymentSummaryBucket.empty()
+                )
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/admin/payments/summary").principal(
+                    createAuth(
+                        UUID.randomUUID(),
+                        "ORGANIZER",
+                        organizationId.toString()
+                    )
+                )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Payment summary"))
+            .andExpect(jsonPath("$.data.byCurrency[0].currency").value("USD"))
+            .andExpect(jsonPath("$.data.byCurrency[0].pending.count").value(2))
+            .andExpect(
+                jsonPath("$.data.byCurrency[0].pending.amount").value(100.0)
+            )
+            .andExpect(
+                jsonPath("$.data.byCurrency[0].completed.count").value(18)
+            )
+            .andExpect(
+                jsonPath("$.data.byCurrency[0].completed.amount").value(900.0)
+            )
+            .andExpect(jsonPath("$.data.byCurrency[0].failed.count").value(1))
+            .andExpect(
+                jsonPath("$.data.byCurrency[0].failed.amount").value(50.0)
+            )
+            .andExpect(jsonPath("$.data.byCurrency[0].refunded.count").value(3))
+            .andExpect(
+                jsonPath("$.data.byCurrency[0].refunded.amount").value(150.0)
+            )
+            .andExpect(jsonPath("$.data.byCurrency[1].currency").value("VND"))
+            .andExpect(jsonPath("$.data.byCurrency[1].pending.count").value(0))
+            .andExpect(
+                jsonPath("$.data.byCurrency[1].pending.amount").value(0.0)
+            )
+            .andExpect(
+                jsonPath("$.data.byCurrency[1].completed.count").value(1)
+            )
+            .andExpect(
+                jsonPath("$.data.byCurrency[1].completed.amount").value(
+                    250000.0
+                )
+            )
+            .andExpect(jsonPath("$.data.total").doesNotExist());
+
+        verify(summaryUseCase).getSummary(organizationId);
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/admin/payments/summary: returns an empty byCurrency collection when the organization has no payments"
+    )
+    void getOrganizationPaymentSummary_withNoPayments_returnsEmptyCollection()
+        throws Exception {
+        when(summaryUseCase.getSummary(organizationId)).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                get("/api/v1/admin/payments/summary").principal(
+                    createAuth(
+                        UUID.randomUUID(),
+                        "ORGANIZER",
+                        organizationId.toString()
+                    )
+                )
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.byCurrency").isArray())
+            .andExpect(jsonPath("$.data.byCurrency").isEmpty())
+            .andExpect(jsonPath("$.data.total").doesNotExist());
+
+        verify(summaryUseCase).getSummary(organizationId);
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/admin/payments/summary: returns 403 for STUDENT and STAFF callers"
+    )
+    void getOrganizationPaymentSummary_withoutOrganizerRole_returns403()
+        throws Exception {
+        for (String role : List.of("STUDENT", "STAFF")) {
+            mockMvc
+                .perform(
+                    get("/api/v1/admin/payments/summary").principal(
+                        createAuth(
+                            UUID.randomUUID(),
+                            role,
+                            organizationId.toString()
+                        )
+                    )
+                )
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+        }
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/admin/payments/summary: returns 403 when the organizer has no organization scope"
+    )
+    void getOrganizationPaymentSummary_withoutOrganizationClaim_returns403()
+        throws Exception {
+        mockMvc
+            .perform(
+                get("/api/v1/admin/payments/summary").principal(
+                    createAuth(UUID.randomUUID(), "ORGANIZER", null)
+                )
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName(
+        "GET /api/v1/admin/payments/summary: returns 401 Unauthorized without an authenticated caller"
+    )
+    void getOrganizationPaymentSummary_withoutAuthentication_returns401()
+        throws Exception {
+        mockMvc
+            .perform(get("/api/v1/admin/payments/summary"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.success").value(false));
     }

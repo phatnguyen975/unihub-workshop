@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentStatus;
+import com.unihub.workshop.payments.domain.model.PaymentSummaryAggregate;
 import com.unihub.workshop.payments.infrastructure.persistence.mapper.PaymentPersistenceMapper;
 import com.unihub.workshop.payments.infrastructure.persistence.mapper.PaymentPersistenceMapperImpl;
 import com.unihub.workshop.shared.exception.BadRequestException;
@@ -654,5 +655,84 @@ class PaymentRepositoryAdapterTest {
         assertThat(page.nextCursor()).isNull();
         verify(nativeQuery).setMaxResults(21);
         verify(nativeQuery).setParameter("organizationId", organizationId);
+    }
+
+    @Test
+    @DisplayName(
+        "Organization summary runs one payments-only aggregate with tenant visibility"
+    )
+    void shouldSummarizeOrganizationPaymentsWithTenantVisibility() {
+        UUID organizationId = UUID.randomUUID();
+        when(
+            jpaRepository.summarizeByOrganizationId(organizationId)
+        ).thenReturn(
+            List.<Object[]>of(
+                new Object[] {
+                    "USD",
+                    "COMPLETED",
+                    18L,
+                    new BigDecimal("900.00"),
+                },
+                new Object[] { "USD", "PENDING", 2L, new BigDecimal("100.00") }
+            )
+        );
+
+        List<PaymentSummaryAggregate> result =
+            adapter.summarizeByOrganizationId(organizationId);
+
+        assertThat(result).containsExactly(
+            new PaymentSummaryAggregate(
+                "USD",
+                PaymentStatus.COMPLETED,
+                18L,
+                new BigDecimal("900.00")
+            ),
+            new PaymentSummaryAggregate(
+                "USD",
+                PaymentStatus.PENDING,
+                2L,
+                new BigDecimal("100.00")
+            )
+        );
+
+        verify(jpaRepository).summarizeByOrganizationId(organizationId);
+        verifyNoInteractions(entityManager);
+
+        String statement = PaymentJpaRepository.ORGANIZATION_SUMMARY_SQL;
+        String selectList = statement.substring(
+            0,
+            statement.indexOf("FROM payments")
+        );
+        assertThat(selectList)
+            .contains("SELECT p.currency")
+            .contains("p.status")
+            .contains("COUNT(*)")
+            .contains("SUM(p.amount)")
+            .doesNotContain("r.")
+            .doesNotContain("w.");
+        assertThat(statement)
+            .contains("JOIN registrations r ON r.id = p.registration_id")
+            .contains("JOIN workshops w ON w.id = r.workshop_id")
+            .contains("WHERE w.organization_id = :organizationId")
+            .contains("GROUP BY p.currency, p.status")
+            .contains("ORDER BY p.currency ASC, p.status ASC");
+    }
+
+    @Test
+    @DisplayName(
+        "Organization summary returns an empty list when the organization has no payments"
+    )
+    void shouldReturnEmptyOrganizationSummary() {
+        UUID organizationId = UUID.randomUUID();
+        when(
+            jpaRepository.summarizeByOrganizationId(organizationId)
+        ).thenReturn(List.<Object[]>of());
+
+        List<PaymentSummaryAggregate> result =
+            adapter.summarizeByOrganizationId(organizationId);
+
+        assertThat(result).isEmpty();
+        verify(jpaRepository).summarizeByOrganizationId(organizationId);
+        verifyNoInteractions(entityManager);
     }
 }

@@ -122,7 +122,7 @@ This plan delivers the four approved read endpoints as small, independently test
     - An absent, cross-student, or cross-organization payment returns the same 404 contract response with no data leakage; STAFF receives 403. _(FR-07, FR-11, FR-12; Scenarios 3, 5, 6)_
     - Unit tests cover both role-specific response shapes and indistinguishable-not-found behavior; `ModulithArchitectureTest` passes.
 
-- [ ] **T4 — An organizer can retrieve a currency-separated operational payment summary.**
+- [x] **T4 — An organizer can retrieve a currency-separated operational payment summary.**
   - **Size:** S
   - **Depends on:** T2
   - **Layers touched:** Payments application ports/use case, Payments persistence adapter, Payments presentation, unit tests.
@@ -134,6 +134,20 @@ This plan delivers the four approved read endpoints as small, independently test
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/controllers/AdminPaymentHistoryController.java`
     - `apps/backend/src/main/java/com/unihub/workshop/payments/presentation/{dto,mapper}/...` (summary response and MapStruct mapping)
     - `apps/backend/src/test/java/com/unihub/workshop/payments/{application,infrastructure,presentation}/...` (new unit tests)
+  - **Notes:** The summary is produced by one read-only aggregate statement. Exact T4 shape:
+
+    ```sql
+    SELECT p.currency, p.status, COUNT(*), SUM(p.amount)
+    FROM payments p
+    JOIN registrations r ON r.id = p.registration_id
+    JOIN workshops w ON w.id = r.workshop_id
+    WHERE w.organization_id = :organizationId
+    GROUP BY p.currency, p.status
+    ORDER BY p.currency ASC, p.status ASC
+    ```
+
+    The `SELECT` list contains only `payments` columns; `registrations` and `workshops` appear only in `JOIN`/`WHERE` as the organization visibility predicate. The query is reachable only from a `@Transactional(readOnly = true)` path and uses existing documented identifiers/indexes; no schema or index change is introduced. Feature-specific query detail stays in `specs/`, not `docs/`.
+
   - **Acceptance Criteria:**
     - An authenticated ORGANIZER calling `GET /api/v1/admin/payments/summary` receives one bucket per visible ISO 4217 currency, with count and amount separated by `PENDING`, `COMPLETED`, `FAILED`, and `REFUNDED`. _(FR-09; Scenario 4)_
     - An organization with no payment records receives a successful empty `byCurrency` collection; no response provides a cross-currency grand total. _(FR-09)_
@@ -142,10 +156,10 @@ This plan delivers the four approved read endpoints as small, independently test
 
 #### Checkpoint: Feature complete
 
-- [ ] T3 and T4 acceptance criteria pass.
-- [ ] Every acceptance criterion across T1–T4 has been verified through the required unit-test layers and API-controller tests with mocked dependencies.
-- [ ] The backend unit-test suite and `ModulithArchitectureTest` pass under the project testing policy.
-- [ ] Ready for `/review` after all tasks have been explicitly built and reviewed.
+- [x] T3 and T4 acceptance criteria pass.
+- [x] Every acceptance criterion across T1–T4 has been verified through the required unit-test layers and API-controller tests with mocked dependencies.
+- [x] The backend unit-test suite and `ModulithArchitectureTest` pass under the project testing policy.
+- [x] Ready for `/review` after all tasks have been explicitly built and reviewed.
 
 ## Risks and Mitigations
 

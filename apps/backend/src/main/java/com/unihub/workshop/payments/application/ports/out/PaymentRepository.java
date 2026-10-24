@@ -2,7 +2,9 @@ package com.unihub.workshop.payments.application.ports.out;
 
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentStatus;
+import com.unihub.workshop.payments.domain.model.PaymentSummaryAggregate;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -65,5 +67,19 @@ public interface PaymentRepository {
         PaymentStatus status,
         String cursor,
         int size
+    );
+
+    /**
+     * Aggregates payments for workshops owned by an organization by currency and status.
+     *
+     * <p>The tenant visibility predicate and aggregation are evaluated in the same
+     * read-only statement so a row can never aggregate another organization's payments.
+     *
+     * @param organizationId caller's organization scope
+     * @return one aggregate row per currency and status with at least one payment,
+     *     ordered by currency then status
+     */
+    List<PaymentSummaryAggregate> summarizeByOrganizationId(
+        UUID organizationId
     );
 }

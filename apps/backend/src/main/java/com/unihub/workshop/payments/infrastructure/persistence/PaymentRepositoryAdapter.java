@@ -3,6 +3,7 @@ package com.unihub.workshop.payments.infrastructure.persistence;
 import com.unihub.workshop.payments.application.ports.out.PaymentRepository;
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentStatus;
+import com.unihub.workshop.payments.domain.model.PaymentSummaryAggregate;
 import com.unihub.workshop.payments.infrastructure.persistence.mapper.PaymentPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
@@ -11,6 +12,7 @@ import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -164,6 +166,30 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
             parameters,
             filterFingerprint,
             size
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentSummaryAggregate> summarizeByOrganizationId(
+        UUID organizationId
+    ) {
+        List<Object[]> rows = paymentJpaRepository.summarizeByOrganizationId(
+            organizationId
+        );
+        List<PaymentSummaryAggregate> aggregates = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            aggregates.add(toSummaryAggregate(row));
+        }
+        return aggregates;
+    }
+
+    private PaymentSummaryAggregate toSummaryAggregate(Object[] row) {
+        return new PaymentSummaryAggregate(
+            (String) row[0],
+            PaymentStatus.valueOf((String) row[1]),
+            ((Number) row[2]).longValue(),
+            (BigDecimal) row[3]
         );
     }
 
