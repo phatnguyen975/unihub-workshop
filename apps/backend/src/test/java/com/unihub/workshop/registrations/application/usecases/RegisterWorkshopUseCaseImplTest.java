@@ -91,7 +91,8 @@ class RegisterWorkshopUseCaseImplTest {
             studentUserId,
             studentRecordId,
             "Alice Smith",
-            "alice@uni.edu"
+            "alice@uni.edu",
+            "23123456"
         );
     }
 
@@ -135,7 +136,8 @@ class RegisterWorkshopUseCaseImplTest {
             studentUserId,
             null,
             "Bob",
-            "bob@uni.edu"
+            "bob@uni.edu",
+            null
         );
         when(iamApi.getStudentProfile(studentUserId)).thenReturn(
             Optional.of(unlinked)

@@ -18,7 +18,7 @@ All endpoints are strictly ORGANIZER-only, scoped to the caller's organization (
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** All endpoints are prefixed with `/api/v1/admin/workshops/{id}/staff`. Resources follow plural noun RESTful conventions nested under the admin workshop aggregate. _(Source: `docs/api-standards.md`)_
-- **Pagination convention:** Collection endpoints (`GET .../staff` and `GET .../staff/available`) use universal keyset cursor pagination (`cursor`, `size` with default 20, max 100) returning `{ "items": [...], "cursor": { "nextCursor": "...", "hasMore": boolean } }`. Single-mutation and deletion endpoints do not paginate. _(Source: `docs/api-standards.md`)_
+- **Pagination convention:** Collection endpoints (`GET .../staff` and `GET .../staff/available`) use universal keyset cursor pagination (`cursor`, `size` with default 20, max 100) returning `{ "items": [...], "cursor": { "nextCursor": "...", "hasMore": boolean } }`. Cursors are bound to the filter set that produced them (`q` on the available-staff list; the assigned-staff list has no filter); replaying a cursor across filter sets is rejected with `400 Bad Request`. Single-mutation and deletion endpoints do not paginate. _(Source: `docs/api-standards.md`)_
 - **Success response shape:** Unified `ApiResponse<T>` envelope — `{ "success": true, "message": "...", "data": { ... }, "metadata": { "processedBy": "...", "traceId": "..." } }`. `204 No Content` responses carry no body. Null fields dropped via non-null serialization (`@JsonInclude(Include.NON_NULL)`). _(Source: `docs/api-standards.md`)_
 - **Error response format:** RFC 7807 Problem Details wrapped inside the standard response envelope with `success = false`, `error` object (`type`, `title`, `status`, `detail`, `instance`, and optional `validationErrors`), and `metadata` (`processedBy`, `traceId`) with `Content-Type: application/problem+json`. _(Source: `docs/api-standards.md`)_
 - **Idempotency-key convention:** Not required for endpoints in this contract. Mutation safety is guaranteed by database unique constraints and state pre-checks. _(Source: Section 5 of this document)_
@@ -164,11 +164,11 @@ None. This read-only query routes to PostgreSQL Read Replica via `@Transactional
 
 **Query Parameters:**
 
-| Parameter | Type    | Required | Default | Description                                                                                                |
-| :-------- | :------ | :------- | :------ | :--------------------------------------------------------------------------------------------------------- |
-| `q`       | String  | No       | —       | Free-text keyword search matched case-insensitively against `fullName` and `email` (max 100 characters).   |
-| `cursor`  | String  | No       | —       | Keyset pagination cursor (opaque Base64-encoded string representing the last item from the previous page). |
-| `size`    | Integer | No       | `20`    | Number of staff members per page. Min: 1, Max: 100.                                                        |
+| Parameter | Type    | Required | Default | Description                                                                                                                                          |
+| :-------- | :------ | :------- | :------ | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `q`       | String  | No       | —       | Free-text keyword search matched case-insensitively against `fullName` and `email` (max 100 characters).                                             |
+| `cursor`  | String  | No       | —       | Keyset pagination cursor (opaque Base64-encoded string representing the last item from the previous page). Bound to the `q` filter that produced it. |
+| `size`    | Integer | No       | `20`    | Number of staff members per page. Min: 1, Max: 100.                                                                                                  |
 
 > **Sorting:** Always sorted by `fullName ASC, id ASC` (alphabetical order with user ID tiebreaker).
 
@@ -218,15 +218,15 @@ None. This read-only query routes to PostgreSQL Read Replica via `@Transactional
 
 **Error Responses:**
 
-| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                      |
-| :-------------------------- | :------------------------------ | :-------------------- | :--------------------------------------------------------------------------------------------- |
-| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Invalid UUID syntax for `{id}`, invalid `size`, or query parameter `q` exceeds 100 characters. |
-| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                          |
-| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Forbidden             | Caller `role` is not `ORGANIZER`, or workshop does not belong to the caller's organization.    |
-| `404 Not Found`             | `urn:unihub:error:not-found`    | Not Found             | No workshop exists with the specified `id`.                                                    |
-| `409 Conflict`              | `urn:unihub:error:conflict`     | Conflict              | Workshop status is not `PUBLISHED` (e.g. `DRAFT`, `COMPLETED`, or `CANCELED`).                 |
-| `422 Unprocessable Content` | `urn:unihub:error:validation`   | Unprocessable Content | Workshop has already started (`now() >= starts_at`), where staff discovery is disabled.        |
-| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database query failure.                                                             |
+| Status                      | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                                            |
+| :-------------------------- | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | `urn:unihub:error:bad-request`  | Bad Request           | Invalid UUID syntax for `{id}`, invalid `size`, query parameter `q` exceeds 100 characters, malformed `cursor`, or a `cursor` issued for a different `q` filter set. |
+| `401 Unauthorized`          | `urn:unihub:error:unauthorized` | Unauthorized          | Missing, expired, invalid-signature, or Redis-blacklisted Bearer JWT.                                                                                                |
+| `403 Forbidden`             | `urn:unihub:error:forbidden`    | Forbidden             | Caller `role` is not `ORGANIZER`, or workshop does not belong to the caller's organization.                                                                          |
+| `404 Not Found`             | `urn:unihub:error:not-found`    | Not Found             | No workshop exists with the specified `id`.                                                                                                                          |
+| `409 Conflict`              | `urn:unihub:error:conflict`     | Conflict              | Workshop status is not `PUBLISHED` (e.g. `DRAFT`, `COMPLETED`, or `CANCELED`).                                                                                       |
+| `422 Unprocessable Content` | `urn:unihub:error:validation`   | Unprocessable Content | Workshop has already started (`now() >= starts_at`), where staff discovery is disabled.                                                                              |
+| `500 Internal Server Error` | `urn:unihub:error:internal`     | Internal Server Error | Unexpected database query failure.                                                                                                                                   |
 
 **Error Response Example (409 Conflict — Workshop in DRAFT):**
 

@@ -14,6 +14,7 @@ import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.api.dto.CreatePaymentIntentCommand;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.usecases.PendingPaidRegistrationPersistenceService;
 import com.unihub.workshop.registrations.application.usecases.RegisterWorkshopUseCaseImpl;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
@@ -40,6 +41,7 @@ class PaidRegistrationStrategyResilienceTest {
     private IdempotencyPort idempotencyPort;
     private CapacityPort capacityPort;
     private RegistrationPaymentPort registrationPaymentPort;
+    private PendingPaidRegistrationPersistenceService persistenceService;
 
     private PaidRegistrationStrategy paidRegistrationStrategy;
     private RegisterWorkshopUseCaseImpl useCase;
@@ -57,10 +59,13 @@ class PaidRegistrationStrategyResilienceTest {
         idempotencyPort = mock(IdempotencyPort.class);
         capacityPort = mock(CapacityPort.class);
         registrationPaymentPort = mock(RegistrationPaymentPort.class);
+        persistenceService = mock(
+            PendingPaidRegistrationPersistenceService.class
+        );
 
         paidRegistrationStrategy = new PaidRegistrationStrategy(
-            registrationRepository,
             registrationPaymentPort,
+            persistenceService,
             30L
         );
 
@@ -78,7 +83,8 @@ class PaidRegistrationStrategyResilienceTest {
             studentUserId,
             UUID.randomUUID(),
             "Nguyen Van A",
-            "student@uni.edu"
+            "student@uni.edu",
+            "23123456"
         );
         when(iamApi.getStudentProfile(studentUserId)).thenReturn(
             Optional.of(student)
@@ -200,9 +206,9 @@ class PaidRegistrationStrategyResilienceTest {
             )
         );
 
-        when(registrationRepository.save(any(Registration.class))).thenThrow(
-            new RuntimeException("Database connection terminated")
-        );
+        when(
+            persistenceService.persist(any(Registration.class), any())
+        ).thenThrow(new RuntimeException("Database connection terminated"));
 
         assertThatThrownBy(() ->
             useCase.register(studentUserId, workshopId, idempotencyKey)

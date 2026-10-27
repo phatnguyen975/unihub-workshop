@@ -1061,6 +1061,10 @@ The backend securely holds the private key used to sign QR codes. QR payloads ar
 
 ## 6. System Protection Mechanisms
 
+### Primary–Replica Read Routing
+
+All mutations, idempotency operations, check-then-act decisions, and immediate read-after-write views use the Primary PostgreSQL database. Non-mutating history and reporting queries may use a Read Replica only when the caller can tolerate short-lived stale results. Such replica-backed queries must not make authorization decisions that change state, drive a subsequent mutation, or promise immediate visibility after a write. This preserves primary capacity during traffic spikes without weakening exactly-once guarantees.
+
 ### Traffic Spike Management
 
 Registration demand peaks at 12,000 concurrent users within the first 10 minutes, with 60% concentrated in the initial 3-minute window. To keep the backend stable under that burst, the Core Backend Monolith enforces a distributed **Token Bucket** rate limiter at the application filter layer using **Bucket4j** with **Redis** as the shared state store. The API Gateway remains a forwarding proxy and does not perform rate limiting.

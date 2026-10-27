@@ -11,6 +11,7 @@ import com.unihub.workshop.iam.api.IamApi;
 import com.unihub.workshop.iam.api.dto.StudentProfileDto;
 import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
+import com.unihub.workshop.registrations.api.dto.RegistrationPaymentContextDto;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
@@ -22,7 +23,10 @@ import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -100,7 +104,8 @@ class RegistrationFacadeTest {
             STUDENT_USER_ID,
             UUID.randomUUID(),
             "John Doe",
-            "student@unihub.edu.vn"
+            "student@unihub.edu.vn",
+            "23123456"
         );
 
         WorkshopRegistrationDetailsDto workshop =
@@ -219,5 +224,67 @@ class RegistrationFacadeTest {
         assertThat(result).isNull();
         verify(registrationRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Resolves registration payment contexts in one batch read")
+    void getPaymentContexts_returnsBatchContextsKeyedByRegistrationId() {
+        UUID secondRegistrationId = UUID.fromString(
+            "e0000002-0000-4000-a000-000000000002"
+        );
+        Set<UUID> registrationIds = Set.of(
+            REGISTRATION_ID,
+            secondRegistrationId
+        );
+
+        Registration pending = Registration.builder()
+            .id(REGISTRATION_ID)
+            .workshopId(WORKSHOP_ID)
+            .studentUserId(STUDENT_USER_ID)
+            .status(RegistrationStatus.PENDING)
+            .build();
+        Registration confirmed = Registration.builder()
+            .id(secondRegistrationId)
+            .workshopId(WORKSHOP_ID)
+            .studentUserId(STUDENT_USER_ID)
+            .status(RegistrationStatus.CONFIRMED)
+            .build();
+
+        when(registrationRepository.findAllByIds(registrationIds)).thenReturn(
+            List.of(pending, confirmed)
+        );
+
+        Map<UUID, RegistrationPaymentContextDto> contexts =
+            registrationFacade.getPaymentContexts(registrationIds);
+
+        assertThat(contexts).containsExactlyInAnyOrderEntriesOf(
+            Map.of(
+                REGISTRATION_ID,
+                new RegistrationPaymentContextDto(
+                    REGISTRATION_ID,
+                    WORKSHOP_ID,
+                    STUDENT_USER_ID,
+                    "PENDING"
+                ),
+                secondRegistrationId,
+                new RegistrationPaymentContextDto(
+                    secondRegistrationId,
+                    WORKSHOP_ID,
+                    STUDENT_USER_ID,
+                    "CONFIRMED"
+                )
+            )
+        );
+        verify(registrationRepository).findAllByIds(registrationIds);
+    }
+
+    @Test
+    @DisplayName(
+        "Returns an empty payment context map without querying when no ids are supplied"
+    )
+    void getPaymentContexts_withNoIds_returnsEmptyMapWithoutQuerying() {
+        assertThat(registrationFacade.getPaymentContexts(Set.of())).isEmpty();
+        assertThat(registrationFacade.getPaymentContexts(null)).isEmpty();
+        verify(registrationRepository, never()).findAllByIds(any());
     }
 }

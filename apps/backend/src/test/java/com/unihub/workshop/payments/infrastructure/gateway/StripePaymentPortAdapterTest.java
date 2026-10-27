@@ -1,7 +1,6 @@
 package com.unihub.workshop.payments.infrastructure.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -216,16 +215,14 @@ class StripePaymentPortAdapterTest {
 
     @Test
     @DisplayName(
-        "recordPendingPayment: DataIntegrityViolationException on duplicate insert is swallowed gracefully"
+        "recordPendingPayment: duplicate insert failure is propagated so the caller can roll back atomically"
     )
-    void recordPendingPayment_DuplicateInsert_HandledGracefully() {
-        doThrow(
+    void recordPendingPayment_DuplicateInsert_PropagatesFailure() {
+        DataIntegrityViolationException failure =
             new DataIntegrityViolationException(
                 "duplicate key value violates unique constraint"
-            )
-        )
-            .when(paymentRepository)
-            .save(any(Payment.class));
+            );
+        doThrow(failure).when(paymentRepository).save(any(Payment.class));
 
         RecordPendingPaymentCommand command = new RecordPendingPaymentCommand(
             registrationId,
@@ -234,8 +231,8 @@ class StripePaymentPortAdapterTest {
             "USD"
         );
 
-        assertThatCode(() ->
+        assertThatThrownBy(() ->
             adapter.recordPendingPayment(command)
-        ).doesNotThrowAnyException();
+        ).isSameAs(failure);
     }
 }

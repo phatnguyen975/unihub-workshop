@@ -239,10 +239,12 @@ class SearchWorkshopsUseCaseImplTest {
         "search: cursor sort field mismatch throws BadRequestException"
     )
     void shouldRejectMismatchedCursorSortField() {
-        KeysetCursor staleCursor = KeysetCursor.of(
+        KeysetCursor staleCursor = new KeysetCursor(
             UUID.randomUUID(),
             "startsAt",
-            "2026-11-15T08:00:00Z"
+            "2026-11-15T08:00:00Z",
+            null,
+            null
         );
         String encodedCursor = KeysetCursorCodec.encode(staleCursor);
         SearchWorkshopsQuery query = new SearchWorkshopsQuery(
@@ -259,6 +261,37 @@ class SearchWorkshopsUseCaseImplTest {
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining("startsAt")
             .hasMessageContaining("price");
+
+        verify(searchRepository, never()).search(any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "search: cursor bound to a different filter set throws BadRequestException"
+    )
+    void shouldRejectCursorBoundToAnotherFilterSet() {
+        String encodedCursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "startsAt",
+                "2026-11-15T08:00:00Z",
+                null,
+                "q=alice&priceType=*&from=*&to=*"
+            )
+        );
+        SearchWorkshopsQuery query = new SearchWorkshopsQuery(
+            "bob",
+            null,
+            null,
+            null,
+            "startsAt,asc",
+            encodedCursor,
+            20
+        );
+
+        assertThatThrownBy(() -> useCase.search(query))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
 
         verify(searchRepository, never()).search(any(), any());
     }

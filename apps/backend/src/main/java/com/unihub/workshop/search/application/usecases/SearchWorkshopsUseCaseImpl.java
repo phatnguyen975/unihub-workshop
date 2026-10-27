@@ -69,7 +69,8 @@ public class SearchWorkshopsUseCaseImpl implements SearchWorkshopsUseCase {
                 : "startsAt";
         KeysetCursor decodedCursor = KeysetCursorCodec.decode(
             query.cursor(),
-            sortField
+            sortField,
+            query.filterFingerprint()
         );
 
         String cacheKey = buildCacheKey(query);

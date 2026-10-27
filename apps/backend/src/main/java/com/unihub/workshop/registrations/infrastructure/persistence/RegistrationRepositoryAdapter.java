@@ -6,6 +6,7 @@ import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.registrations.infrastructure.persistence.mapper.RegistrationPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.FilterFingerprint;
 import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
@@ -17,6 +18,7 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -91,13 +93,29 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public List<Registration> findAllByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return mapper.toDomainList(repository.findAllById(ids));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public CursorPage<Registration> findByStudentUserId(
         UUID studentUserId,
         RegistrationStatus status,
         String cursor,
         int size
     ) {
-        KeysetCursor cursorData = KeysetCursorCodec.decode(cursor, "createdAt");
+        String filterFingerprint = FilterFingerprint.builder()
+            .with("status", status)
+            .build();
+        KeysetCursor cursorData = KeysetCursorCodec.decode(
+            cursor,
+            "createdAt",
+            filterFingerprint
+        );
         if (cursorData != null && cursorData.asInstant() == null) {
             throw new BadRequestException("Invalid cursor format");
         }
@@ -158,10 +176,12 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
                 .items()
                 .get(slice.items().size() - 1);
             nextCursor = KeysetCursorCodec.encode(
-                KeysetCursor.of(
+                new KeysetCursor(
                     lastItem.getId(),
                     "createdAt",
-                    lastItem.getCreatedAt().toString()
+                    lastItem.getCreatedAt().toString(),
+                    null,
+                    filterFingerprint
                 )
             );
         }

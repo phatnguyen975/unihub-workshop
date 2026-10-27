@@ -43,4 +43,20 @@ public interface IamApi {
      * @return optional containing StudentProfileDto if student exists and is active, empty otherwise
      */
     Optional<StudentProfileDto> getStudentProfile(UUID studentUserId);
+
+    /**
+     * Resolves multiple student profiles in one batch by their user IDs, including
+     * students whose accounts are no longer active.
+     *
+     * <p>This read surface exists for historical and audit-oriented views (for example,
+     * payment history), where an inactive student's identity must remain resolvable.
+     * Callers must still enforce their own visibility rules before exposing the data.
+     *
+     * @param studentUserIds student user identifiers to resolve
+     * @return student profiles keyed by user ID, including inactive students; empty when
+     *     no ids are supplied
+     */
+    Map<UUID, StudentProfileDto> getStudentProfilesByIds(
+        Collection<UUID> studentUserIds
+    );
 }

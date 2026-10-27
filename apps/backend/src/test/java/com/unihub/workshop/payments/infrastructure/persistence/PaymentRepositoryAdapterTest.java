@@ -1,33 +1,64 @@
 package com.unihub.workshop.payments.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.payments.domain.model.Payment;
 import com.unihub.workshop.payments.domain.model.PaymentStatus;
+import com.unihub.workshop.payments.domain.model.PaymentSummaryAggregate;
 import com.unihub.workshop.payments.infrastructure.persistence.mapper.PaymentPersistenceMapper;
 import com.unihub.workshop.payments.infrastructure.persistence.mapper.PaymentPersistenceMapperImpl;
+import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.annotation.Transactional;
 
 class PaymentRepositoryAdapterTest {
 
     private PaymentJpaRepository jpaRepository;
     private final PaymentPersistenceMapper mapper =
         new PaymentPersistenceMapperImpl();
+    private EntityManager entityManager;
+    private Query nativeQuery;
     private PaymentRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
         jpaRepository = mock(PaymentJpaRepository.class);
-        adapter = new PaymentRepositoryAdapter(jpaRepository, mapper);
+        entityManager = mock(EntityManager.class);
+        nativeQuery = mock(Query.class);
+        adapter = new PaymentRepositoryAdapter(
+            jpaRepository,
+            mapper,
+            entityManager
+        );
+        when(
+            entityManager.createNativeQuery(
+                anyString(),
+                eq(PaymentJpaEntity.class)
+            )
+        ).thenReturn(nativeQuery);
     }
 
     @Test
@@ -84,6 +115,50 @@ class PaymentRepositoryAdapterTest {
         assertThat(result.currency()).isEqualTo("USD");
         assertThat(result.refundedAt()).isEqualTo(now);
         verify(jpaRepository).save(any(PaymentJpaEntity.class));
+    }
+
+    @Test
+    @DisplayName("Finds a payment by identifier and maps it to the domain")
+    void shouldFindById() {
+        UUID paymentId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        PaymentJpaEntity entity = PaymentJpaEntity.builder()
+            .id(paymentId)
+            .registrationId(registrationId)
+            .provider("STRIPE")
+            .providerPaymentId("pi_by_id")
+            .status(PaymentStatus.REFUNDED)
+            .amount(BigDecimal.valueOf(75.00))
+            .currency("USD")
+            .refundedAt(now)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        when(jpaRepository.findById(paymentId)).thenReturn(Optional.of(entity));
+
+        Optional<Payment> result = adapter.findById(paymentId);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().id()).isEqualTo(paymentId);
+        assertThat(result.get().registrationId()).isEqualTo(registrationId);
+        assertThat(result.get().status()).isEqualTo(PaymentStatus.REFUNDED);
+        verify(jpaRepository).findById(paymentId);
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName("Returns empty when no payment exists for the identifier")
+    void shouldReturnEmptyWhenIdNotFound() {
+        UUID paymentId = UUID.randomUUID();
+        when(jpaRepository.findById(paymentId)).thenReturn(Optional.empty());
+
+        Optional<Payment> result = adapter.findById(paymentId);
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(entityManager);
     }
 
     @Test
@@ -175,5 +250,554 @@ class PaymentRepositoryAdapterTest {
         assertThat(
             adapter.existsByProviderPaymentId("pi_not_exists")
         ).isFalse();
+    }
+
+    private PaymentJpaEntity paymentEntity(
+        UUID paymentId,
+        UUID registrationId,
+        Instant createdAt
+    ) {
+        return PaymentJpaEntity.builder()
+            .id(paymentId)
+            .registrationId(registrationId)
+            .provider("STRIPE")
+            .providerPaymentId("pi_" + paymentId)
+            .status(PaymentStatus.COMPLETED)
+            .amount(BigDecimal.valueOf(50.00))
+            .currency("USD")
+            .completedAt(createdAt)
+            .createdAt(createdAt)
+            .updatedAt(createdAt)
+            .build();
+    }
+
+    @Test
+    @DisplayName(
+        "Student history projects payments only, joins registrations for ownership, and mints a filter-bound cursor"
+    )
+    void shouldQueryStudentHistoryWithOwnershipJoinAndFilterBoundCursor() {
+        UUID studentUserId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        Instant newest = Instant.parse("2026-10-21T05:14:00Z");
+        Instant middle = Instant.parse("2026-10-21T05:12:00Z");
+        Instant oldest = Instant.parse("2026-10-21T05:10:00Z");
+
+        UUID newestId = UUID.randomUUID();
+        UUID middleId = UUID.randomUUID();
+        UUID oldestId = UUID.randomUUID();
+
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(newestId, registrationId, newest),
+                paymentEntity(middleId, registrationId, middle),
+                paymentEntity(oldestId, registrationId, oldest)
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByStudentUserId(
+            studentUserId,
+            PaymentStatus.COMPLETED,
+            null,
+            2
+        );
+
+        assertThat(page.items())
+            .extracting(Payment::id)
+            .containsExactly(newestId, middleId);
+        assertThat(page.hasMore()).isTrue();
+
+        KeysetCursor nextCursor = KeysetCursorCodec.decode(
+            page.nextCursor(),
+            "createdAt",
+            "status=COMPLETED"
+        );
+        assertThat(nextCursor.id()).isEqualTo(middleId);
+        assertThat(nextCursor.asInstant()).isEqualTo(middle);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(entityManager).createNativeQuery(
+            sql.capture(),
+            eq(PaymentJpaEntity.class)
+        );
+
+        String statement = sql.getValue();
+        String selectList = statement.substring(
+            0,
+            statement.indexOf("FROM payments")
+        );
+        assertThat(selectList).contains("SELECT p.id");
+        assertThat(selectList).doesNotContain("r.");
+        assertThat(statement)
+            .contains("JOIN registrations r ON r.id = p.registration_id")
+            .contains("r.student_user_id = :studentUserId")
+            .contains("p.status = :status")
+            .contains("ORDER BY p.created_at DESC, p.id DESC");
+
+        verify(nativeQuery).setParameter("studentUserId", studentUserId);
+        verify(nativeQuery).setParameter("status", "COMPLETED");
+        verify(nativeQuery).setMaxResults(3);
+    }
+
+    @Test
+    @DisplayName(
+        "Student history applies the row-value keyset predicate and omits the status filter when absent"
+    )
+    void shouldApplyKeysetPredicateWithoutStatusFilter() {
+        UUID studentUserId = UUID.randomUUID();
+        UUID cursorId = UUID.randomUUID();
+        Instant cursorCreatedAt = Instant.parse("2026-10-21T05:12:00Z");
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                cursorId,
+                "createdAt",
+                cursorCreatedAt.toString(),
+                null,
+                "status=*"
+            )
+        );
+
+        when(nativeQuery.getResultList()).thenReturn(List.of());
+
+        CursorPage<Payment> page = adapter.findByStudentUserId(
+            studentUserId,
+            null,
+            cursor,
+            20
+        );
+
+        assertThat(page.items()).isEmpty();
+        assertThat(page.nextCursor()).isNull();
+        assertThat(page.hasMore()).isFalse();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(entityManager).createNativeQuery(
+            sql.capture(),
+            eq(PaymentJpaEntity.class)
+        );
+        assertThat(sql.getValue())
+            .contains("(p.created_at, p.id) < (:cursorCreatedAt, :cursorId)")
+            .doesNotContain("p.status = :status");
+
+        verify(nativeQuery).setParameter("cursorCreatedAt", cursorCreatedAt);
+        verify(nativeQuery).setParameter("cursorId", cursorId);
+        verify(nativeQuery, never()).setParameter(eq("status"), any());
+    }
+
+    @Test
+    @DisplayName(
+        "Student history rejects a cursor issued for a different status filter"
+    )
+    void shouldRejectCursorBoundToAnotherStatusFilter() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "status=COMPLETED"
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByStudentUserId(
+                UUID.randomUUID(),
+                PaymentStatus.FAILED,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
+
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Student history rejects a cursor whose primary timestamp cannot be parsed"
+    )
+    void shouldRejectCursorWithInvalidPrimaryTimestamp() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "not-a-timestamp",
+                null,
+                "status=*"
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByStudentUserId(UUID.randomUUID(), null, cursor, 20)
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Student history omits the continuation cursor when the window is not exceeded"
+    )
+    void shouldOmitCursorWhenNoFurtherPageExists() {
+        UUID registrationId = UUID.randomUUID();
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(
+                    UUID.randomUUID(),
+                    registrationId,
+                    Instant.parse("2026-10-21T05:12:00Z")
+                )
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByStudentUserId(
+            UUID.randomUUID(),
+            null,
+            null,
+            20
+        );
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.hasMore()).isFalse();
+        assertThat(page.nextCursor()).isNull();
+        verify(nativeQuery).setMaxResults(21);
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history projects payments only, joins workshops for tenant visibility, and binds both filters into the cursor"
+    )
+    void shouldQueryOrganizerHistoryWithTenantJoinAndFilterBoundCursor() {
+        UUID organizationId = UUID.randomUUID();
+        UUID workshopId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        Instant newest = Instant.parse("2026-10-21T05:14:00Z");
+        Instant middle = Instant.parse("2026-10-21T05:12:00Z");
+        Instant oldest = Instant.parse("2026-10-21T05:10:00Z");
+        UUID newestId = UUID.randomUUID();
+        UUID middleId = UUID.randomUUID();
+        UUID oldestId = UUID.randomUUID();
+
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(newestId, registrationId, newest),
+                paymentEntity(middleId, registrationId, middle),
+                paymentEntity(oldestId, registrationId, oldest)
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByOrganizationId(
+            organizationId,
+            workshopId,
+            PaymentStatus.COMPLETED,
+            null,
+            2
+        );
+
+        assertThat(page.items())
+            .extracting(Payment::id)
+            .containsExactly(newestId, middleId);
+        assertThat(page.hasMore()).isTrue();
+
+        String expectedFingerprint =
+            "status=COMPLETED&workshopId=" + workshopId;
+        KeysetCursor nextCursor = KeysetCursorCodec.decode(
+            page.nextCursor(),
+            "createdAt",
+            expectedFingerprint
+        );
+        assertThat(nextCursor.id()).isEqualTo(middleId);
+        assertThat(nextCursor.asInstant()).isEqualTo(middle);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(entityManager).createNativeQuery(
+            sql.capture(),
+            eq(PaymentJpaEntity.class)
+        );
+
+        String statement = sql.getValue();
+        String selectList = statement.substring(
+            0,
+            statement.indexOf("FROM payments")
+        );
+        assertThat(selectList).contains("SELECT p.id");
+        assertThat(selectList).doesNotContain("r.");
+        assertThat(selectList).doesNotContain("w.");
+        assertThat(statement)
+            .contains("JOIN registrations r ON r.id = p.registration_id")
+            .contains("JOIN workshops w ON w.id = r.workshop_id")
+            .contains("w.organization_id = :organizationId")
+            .contains("r.workshop_id = :workshopId")
+            .contains("p.status = :status")
+            .contains("ORDER BY p.created_at DESC, p.id DESC");
+
+        verify(nativeQuery).setParameter("organizationId", organizationId);
+        verify(nativeQuery).setParameter("workshopId", workshopId);
+        verify(nativeQuery).setParameter("status", "COMPLETED");
+        verify(nativeQuery).setMaxResults(3);
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history omits optional filters while keeping the cursor bound to their absence"
+    )
+    void shouldQueryOrganizerHistoryWithoutOptionalFilters() {
+        UUID organizationId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        Instant newest = Instant.parse("2026-10-21T05:14:00Z");
+        UUID newestId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(newestId, registrationId, newest),
+                paymentEntity(secondId, registrationId, newest.minusSeconds(60))
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByOrganizationId(
+            organizationId,
+            null,
+            null,
+            null,
+            1
+        );
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.hasMore()).isTrue();
+
+        KeysetCursor nextCursor = KeysetCursorCodec.decode(
+            page.nextCursor(),
+            "createdAt",
+            "status=*&workshopId=*"
+        );
+        assertThat(nextCursor.id()).isEqualTo(newestId);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(entityManager).createNativeQuery(
+            sql.capture(),
+            eq(PaymentJpaEntity.class)
+        );
+        assertThat(sql.getValue())
+            .contains("w.organization_id = :organizationId")
+            .doesNotContain("r.workshop_id = :workshopId")
+            .doesNotContain("p.status = :status");
+
+        verify(nativeQuery).setParameter("organizationId", organizationId);
+        verify(nativeQuery, never()).setParameter(eq("workshopId"), any());
+        verify(nativeQuery, never()).setParameter(eq("status"), any());
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history rejects a cursor issued for a different workshop filter"
+    )
+    void shouldRejectOrganizerCursorBoundToAnotherWorkshopFilter() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "status=*&workshopId=" + UUID.randomUUID()
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByOrganizationId(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
+
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history rejects a cursor issued for a different status filter"
+    )
+    void shouldRejectOrganizerCursorBoundToAnotherStatusFilter() {
+        UUID workshopId = UUID.randomUUID();
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "status=COMPLETED&workshopId=" + workshopId
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByOrganizationId(
+                UUID.randomUUID(),
+                workshopId,
+                PaymentStatus.FAILED,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
+
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Organizer history omits the continuation cursor when the window is not exceeded"
+    )
+    void shouldOmitOrganizerCursorWhenNoFurtherPageExists() {
+        UUID organizationId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        when(nativeQuery.getResultList()).thenReturn(
+            List.of(
+                paymentEntity(
+                    UUID.randomUUID(),
+                    registrationId,
+                    Instant.parse("2026-10-21T05:12:00Z")
+                )
+            )
+        );
+
+        CursorPage<Payment> page = adapter.findByOrganizationId(
+            organizationId,
+            null,
+            null,
+            null,
+            20
+        );
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.hasMore()).isFalse();
+        assertThat(page.nextCursor()).isNull();
+        verify(nativeQuery).setMaxResults(21);
+        verify(nativeQuery).setParameter("organizationId", organizationId);
+    }
+
+    @Test
+    @DisplayName(
+        "Organization summary runs one payments-only aggregate with tenant visibility"
+    )
+    void shouldSummarizeOrganizationPaymentsWithTenantVisibility() {
+        UUID organizationId = UUID.randomUUID();
+        when(
+            jpaRepository.summarizeByOrganizationId(organizationId)
+        ).thenReturn(
+            List.<Object[]>of(
+                new Object[] {
+                    "USD",
+                    "COMPLETED",
+                    18L,
+                    new BigDecimal("900.00"),
+                },
+                new Object[] { "USD", "PENDING", 2L, new BigDecimal("100.00") }
+            )
+        );
+
+        List<PaymentSummaryAggregate> result =
+            adapter.summarizeByOrganizationId(organizationId);
+
+        assertThat(result).containsExactly(
+            new PaymentSummaryAggregate(
+                "USD",
+                PaymentStatus.COMPLETED,
+                18L,
+                new BigDecimal("900.00")
+            ),
+            new PaymentSummaryAggregate(
+                "USD",
+                PaymentStatus.PENDING,
+                2L,
+                new BigDecimal("100.00")
+            )
+        );
+
+        verify(jpaRepository).summarizeByOrganizationId(organizationId);
+        verifyNoInteractions(entityManager);
+
+        String statement = PaymentJpaRepository.ORGANIZATION_SUMMARY_SQL;
+        String selectList = statement.substring(
+            0,
+            statement.indexOf("FROM payments")
+        );
+        assertThat(selectList)
+            .contains("SELECT p.currency")
+            .contains("p.status")
+            .contains("COUNT(*)")
+            .contains("SUM(p.amount)")
+            .doesNotContain("r.")
+            .doesNotContain("w.");
+        assertThat(statement)
+            .contains("JOIN registrations r ON r.id = p.registration_id")
+            .contains("JOIN workshops w ON w.id = r.workshop_id")
+            .contains("WHERE w.organization_id = :organizationId")
+            .contains("GROUP BY p.currency, p.status")
+            .contains("ORDER BY p.currency ASC, p.status ASC");
+    }
+
+    @Test
+    @DisplayName(
+        "Organization summary returns an empty list when the organization has no payments"
+    )
+    void shouldReturnEmptyOrganizationSummary() {
+        UUID organizationId = UUID.randomUUID();
+        when(
+            jpaRepository.summarizeByOrganizationId(organizationId)
+        ).thenReturn(List.<Object[]>of());
+
+        List<PaymentSummaryAggregate> result =
+            adapter.summarizeByOrganizationId(organizationId);
+
+        assertThat(result).isEmpty();
+        verify(jpaRepository).summarizeByOrganizationId(organizationId);
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Payment-history projections and the organization summary run in read-only transactions"
+    )
+    void shouldDeclareReadOnlyProjectionMethods() throws NoSuchMethodException {
+        assertReadOnly(
+            "findByStudentUserId",
+            UUID.class,
+            PaymentStatus.class,
+            String.class,
+            int.class
+        );
+        assertReadOnly(
+            "findByOrganizationId",
+            UUID.class,
+            UUID.class,
+            PaymentStatus.class,
+            String.class,
+            int.class
+        );
+        assertReadOnly("summarizeByOrganizationId", UUID.class);
+    }
+
+    private void assertReadOnly(String methodName, Class<?>... parameterTypes)
+        throws NoSuchMethodException {
+        Method method = PaymentRepositoryAdapter.class.getMethod(
+            methodName,
+            parameterTypes
+        );
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional)
+            .as("%s must be transactional", methodName)
+            .isNotNull();
+        assertThat(transactional.readOnly())
+            .as("%s must be read-only", methodName)
+            .isTrue();
     }
 }

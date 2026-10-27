@@ -58,7 +58,11 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
         String cursor,
         int size
     ) {
-        KeysetCursor cursorData = KeysetCursorCodec.decode(cursor, "createdAt");
+        KeysetCursor cursorData = KeysetCursorCodec.decode(
+            cursor,
+            "createdAt",
+            null
+        );
         if (cursorData != null && cursorData.asInstant() == null) {
             throw new BadRequestException("Invalid cursor format");
         }
@@ -116,10 +120,12 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 .items()
                 .get(slice.items().size() - 1);
             nextCursor = KeysetCursorCodec.encode(
-                KeysetCursor.of(
+                new KeysetCursor(
                     lastItem.getId(),
                     "createdAt",
-                    lastItem.getCreatedAt().toString()
+                    lastItem.getCreatedAt().toString(),
+                    null,
+                    null
                 )
             );
         }

@@ -1,12 +1,17 @@
 package com.unihub.workshop.registrations.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.registrations.domain.model.Registration;
+import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.registrations.infrastructure.persistence.mapper.RegistrationPersistenceMapper;
+import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.pagination.KeysetCursor;
+import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -181,5 +186,32 @@ class RegistrationRepositoryAdapterTest {
             start,
             end
         );
+    }
+
+    @Test
+    @DisplayName(
+        "findByStudentUserId rejects a cursor issued for a different status filter"
+    )
+    void findByStudentUserId_CursorBoundToAnotherStatus_ThrowsBadRequest() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "2026-10-21T05:12:00Z",
+                null,
+                "status=CONFIRMED"
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByStudentUserId(
+                UUID.randomUUID(),
+                RegistrationStatus.CANCELED,
+                cursor,
+                20
+            )
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
     }
 }

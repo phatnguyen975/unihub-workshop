@@ -4,6 +4,7 @@ import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -83,6 +84,14 @@ public interface RegistrationRepository {
         String cursor,
         int size
     );
+
+    /**
+     * Finds registrations by their identifiers in a single read.
+     *
+     * @param ids registration identifiers to resolve
+     * @return found registrations, in unspecified order; unknown identifiers are absent
+     */
+    List<Registration> findAllByIds(Collection<UUID> ids);
 
     /**
      * Atomically transitions a registration from CONFIRMED to CANCELED status.

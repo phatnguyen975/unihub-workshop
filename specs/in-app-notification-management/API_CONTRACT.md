@@ -11,7 +11,7 @@ This contract specifies the HTTP REST interface for the **In-App Notification Ma
 ## 2. Global Standards Applied
 
 - **URI structure / versioning:** URI path versioning with prefix `/api/v1/...` and resource name `/notifications` (plural, lowercase, kebab-case), conforming to `docs/api-standards.md §Versioning Strategy`.
-- **Pagination convention:** Keyset (cursor-based) pagination conforming to `docs/api-standards.md §Pagination, Search & Filtering`. Clients pass `?cursor=` (opaque Base64-encoded string representing `{ id, sortField, primaryValue, secondaryValue }`) and optional `?size=` (integer, default `20`, max `100`). The response container uses `PageResponse<T>` containing `items` and `cursor: { nextCursor, hasMore }`.
+- **Pagination convention:** Keyset (cursor-based) pagination conforming to `docs/api-standards.md §Pagination, Search & Filtering`. Clients pass `?cursor=` (opaque Base64-encoded string representing `{ id, sortField, primaryValue, secondaryValue, filterFingerprint }`, bound to the filter set that produced it) and optional `?size=` (integer, default `20`, max `100`). The response container uses `PageResponse<T>` containing `items` and `cursor: { nextCursor, hasMore }`.
 - **Success response shape:** Unified `ApiResponse<T>` envelope conforming to `docs/api-standards.md §Standard JSON Payloads`:
   ```json
   {
@@ -67,7 +67,7 @@ This contract specifies the HTTP REST interface for the **In-App Notification Ma
 
 **Validation Rules:**
 
-- `cursor` — optional; if present, must be a valid Base64-encoded keyset cursor JSON matching sort attribute `createdAt`. An undecodable cursor or a cursor issued for another sort field returns `400 Bad Request` (`urn:unihub:error:bad-request`).
+- `cursor` — optional; if present, must be a valid Base64-encoded keyset cursor JSON matching sort attribute `createdAt`. An undecodable cursor, a cursor issued for another sort field, or a cursor issued for a different `isRead` filter set returns `400 Bad Request` (`urn:unihub:error:bad-request`).
 - `size` — optional; if present, must be an integer between 1 and 100 inclusive. Values `< 1` or `> 100` return `422 Unprocessable Content` (`urn:unihub:error:validation`).
 - `isRead` — optional; if present, must parse to a boolean (`true` or `false`). Unparseable values return `400 Bad Request` (`urn:unihub:error:bad-request`).
 
@@ -147,12 +147,12 @@ This contract specifies the HTTP REST interface for the **In-App Notification Ma
 
 **Error Responses (RFC 7807):**
 
-| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                   |
-| :----: | :------------------------------ | :-------------------- | :------------------------------------------------------------------------------------------ |
-| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed Base64 cursor, cursor sortField mismatch, or invalid boolean syntax for `isRead`. |
-| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing Bearer token, expired JWT, invalid signature, or revoked `jti` in Redis.            |
-| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Validation failure (`size < 1` or `size > 100`). Contains `validationErrors`.               |
-| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                                                                    |
+| Status | Error Type (`error.type`)       | Title                 | Condition                                                                                                                                  |
+| :----: | :------------------------------ | :-------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `urn:unihub:error:bad-request`  | Bad Request           | Malformed Base64 cursor, cursor sortField mismatch, cursor filter-fingerprint mismatch (`isRead`), or invalid boolean syntax for `isRead`. |
+| `401`  | `urn:unihub:error:unauthorized` | Unauthorized          | Missing Bearer token, expired JWT, invalid signature, or revoked `jti` in Redis.                                                           |
+| `422`  | `urn:unihub:error:validation`   | Unprocessable Content | Validation failure (`size < 1` or `size > 100`). Contains `validationErrors`.                                                              |
+| `500`  | `urn:unihub:error:internal`     | Internal Server Error | Unexpected server error.                                                                                                                   |
 
 **Error Response Example (400 Bad Request — Malformed Cursor):**
 

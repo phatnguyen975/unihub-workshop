@@ -20,17 +20,22 @@ class KeysetCursorCodecTest {
     void shouldRoundtripWithPrimaryAndSecondaryValues() {
         UUID id = UUID.randomUUID();
         Instant now = Instant.now();
-        KeysetCursor cursor = KeysetCursor.of(
+        KeysetCursor cursor = new KeysetCursor(
             id,
             "startsAt",
             now.toString(),
-            now.minusSeconds(10).toString()
+            now.minusSeconds(10).toString(),
+            null
         );
 
         String encoded = KeysetCursorCodec.encode(cursor);
         assertThat(encoded).isNotNull();
 
-        KeysetCursor decoded = KeysetCursorCodec.decode(encoded, "startsAt");
+        KeysetCursor decoded = KeysetCursorCodec.decode(
+            encoded,
+            "startsAt",
+            null
+        );
         assertThat(decoded).isNotNull();
         assertThat(decoded.id()).isEqualTo(id);
         assertThat(decoded.sortField()).isEqualTo("startsAt");
@@ -43,9 +48,9 @@ class KeysetCursorCodecTest {
     @Test
     @DisplayName("decode returns null for null or blank input")
     void shouldReturnNullForNullOrBlank() {
-        assertThat(KeysetCursorCodec.decode(null, "createdAt")).isNull();
-        assertThat(KeysetCursorCodec.decode("", "createdAt")).isNull();
-        assertThat(KeysetCursorCodec.decode("   ", "createdAt")).isNull();
+        assertThat(KeysetCursorCodec.decode(null, "createdAt", null)).isNull();
+        assertThat(KeysetCursorCodec.decode("", "createdAt", null)).isNull();
+        assertThat(KeysetCursorCodec.decode("   ", "createdAt", null)).isNull();
     }
 
     @Test
@@ -54,10 +59,18 @@ class KeysetCursorCodecTest {
     )
     void shouldThrowBadRequestWhenSortFieldMismatches() {
         UUID id = UUID.randomUUID();
-        KeysetCursor cursor = KeysetCursor.of(id, "price", "100.00");
+        KeysetCursor cursor = new KeysetCursor(
+            id,
+            "price",
+            "100.00",
+            null,
+            null
+        );
         String encoded = KeysetCursorCodec.encode(cursor);
 
-        assertThatThrownBy(() -> KeysetCursorCodec.decode(encoded, "createdAt"))
+        assertThatThrownBy(() ->
+            KeysetCursorCodec.decode(encoded, "createdAt", null)
+        )
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining(
                 "Cursor was issued for sort='price' but current request uses sort='createdAt'"
@@ -70,7 +83,7 @@ class KeysetCursorCodecTest {
     )
     void shouldThrowBadRequestOnMalformedInput() {
         assertThatThrownBy(() ->
-            KeysetCursorCodec.decode("not-base64!@#$", "createdAt")
+            KeysetCursorCodec.decode("not-base64!@#$", "createdAt", null)
         )
             .isInstanceOf(BadRequestException.class)
             .hasMessage("Invalid cursor format");
@@ -79,10 +92,69 @@ class KeysetCursorCodecTest {
             "{\"invalid\":\"field\"}".getBytes()
         );
         assertThatThrownBy(() ->
-            KeysetCursorCodec.decode(invalidJsonBase64, "createdAt")
+            KeysetCursorCodec.decode(invalidJsonBase64, "createdAt", null)
         )
             .isInstanceOf(BadRequestException.class)
             .hasMessage("Invalid cursor format");
+    }
+
+    @Test
+    @DisplayName(
+        "decode rejects a cursor that omits the mandatory sort field even when the caller does not name one"
+    )
+    void shouldRejectCursorWithoutSortField() {
+        UUID id = UUID.randomUUID();
+        String json = String.format(
+            "{\"id\":\"%s\",\"primaryValue\":\"2026-10-21T05:12:00Z\"}",
+            id
+        );
+        String encoded = Base64.getEncoder().encodeToString(json.getBytes());
+
+        assertThatThrownBy(() -> KeysetCursorCodec.decode(encoded, null, null))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+    }
+
+    @Test
+    @DisplayName(
+        "typed cursor values reject malformed representations as bad requests"
+    )
+    void shouldRejectMalformedTypedCursorValues() {
+        UUID id = UUID.randomUUID();
+        KeysetCursor cursor = new KeysetCursor(
+            id,
+            "createdAt",
+            "not-a-timestamp",
+            "not-a-timestamp",
+            null
+        );
+
+        assertThatThrownBy(cursor::asInstant)
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+        assertThatThrownBy(cursor::asSecondaryInstant)
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+
+        KeysetCursor numericCursor = new KeysetCursor(
+            id,
+            "price",
+            "not-a-number",
+            null,
+            null
+        );
+        assertThatThrownBy(numericCursor::asBigDecimal).isInstanceOf(
+            BadRequestException.class
+        );
+        assertThatThrownBy(numericCursor::asInteger).isInstanceOf(
+            BadRequestException.class
+        );
+        assertThatThrownBy(numericCursor::asLong).isInstanceOf(
+            BadRequestException.class
+        );
+        assertThatThrownBy(numericCursor::asDouble).isInstanceOf(
+            BadRequestException.class
+        );
     }
 
     @Test
@@ -99,7 +171,11 @@ class KeysetCursorCodecTest {
         );
         String encoded = Base64.getEncoder().encodeToString(json.getBytes());
 
-        KeysetCursor decoded = KeysetCursorCodec.decode(encoded, "createdAt");
+        KeysetCursor decoded = KeysetCursorCodec.decode(
+            encoded,
+            "createdAt",
+            null
+        );
         assertThat(decoded).isNotNull();
         assertThat(decoded.id()).isEqualTo(id);
         assertThat(decoded.asInstant()).isEqualTo(now);
@@ -115,7 +191,8 @@ class KeysetCursorCodecTest {
             id,
             "price",
             "49.99",
-            "2026-09-04T10:00:00Z"
+            "2026-09-04T10:00:00Z",
+            null
         );
         assertThat(priceCursor.asBigDecimal()).isEqualByComparingTo(
             new BigDecimal("49.99")
@@ -125,8 +202,104 @@ class KeysetCursorCodecTest {
             Instant.parse("2026-09-04T10:00:00Z")
         );
 
-        KeysetCursor intCursor = new KeysetCursor(id, "capacity", "50", null);
+        KeysetCursor intCursor = new KeysetCursor(
+            id,
+            "capacity",
+            "50",
+            null,
+            null
+        );
         assertThat(intCursor.asInteger()).isEqualTo(50);
         assertThat(intCursor.asLong()).isEqualTo(50L);
+    }
+
+    @Test
+    @DisplayName("encode and decode roundtrip preserves the filter fingerprint")
+    void shouldRoundtripWithFilterFingerprint() {
+        UUID id = UUID.randomUUID();
+        String filterFingerprint = "status=COMPLETED";
+        KeysetCursor cursor = new KeysetCursor(
+            id,
+            "createdAt",
+            "2026-10-21T05:12:00Z",
+            null,
+            filterFingerprint
+        );
+
+        String encoded = KeysetCursorCodec.encode(cursor);
+        KeysetCursor decoded = KeysetCursorCodec.decode(
+            encoded,
+            "createdAt",
+            filterFingerprint
+        );
+
+        assertThat(decoded.id()).isEqualTo(id);
+        assertThat(decoded.filterFingerprint()).isEqualTo(filterFingerprint);
+    }
+
+    @Test
+    @DisplayName("decode rejects a cursor issued for a different filter set")
+    void shouldThrowBadRequestWhenFilterFingerprintMismatches() {
+        KeysetCursor cursor = new KeysetCursor(
+            UUID.randomUUID(),
+            "createdAt",
+            "2026-10-21T05:12:00Z",
+            null,
+            "status=COMPLETED"
+        );
+        String encoded = KeysetCursorCodec.encode(cursor);
+
+        assertThatThrownBy(() ->
+            KeysetCursorCodec.decode(encoded, "createdAt", "status=FAILED")
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("different filter set");
+    }
+
+    @Test
+    @DisplayName(
+        "decode skips the filter check when the cursor carries no fingerprint"
+    )
+    void shouldSkipFilterCheckWhenCursorHasNoFingerprint() {
+        KeysetCursor cursor = new KeysetCursor(
+            UUID.randomUUID(),
+            "createdAt",
+            "2026-10-21T05:12:00Z",
+            null,
+            null
+        );
+        String encoded = KeysetCursorCodec.encode(cursor);
+
+        KeysetCursor decoded = KeysetCursorCodec.decode(
+            encoded,
+            "createdAt",
+            "status=*"
+        );
+
+        assertThat(decoded).isNotNull();
+        assertThat(decoded.filterFingerprint()).isNull();
+    }
+
+    @Test
+    @DisplayName(
+        "decode accepts a filter-bound cursor when the caller binds no filters"
+    )
+    void shouldAcceptFilterBoundCursorWhenExpectedFingerprintIsNull() {
+        KeysetCursor cursor = new KeysetCursor(
+            UUID.randomUUID(),
+            "createdAt",
+            "2026-10-21T05:12:00Z",
+            null,
+            "status=PENDING"
+        );
+        String encoded = KeysetCursorCodec.encode(cursor);
+
+        KeysetCursor decoded = KeysetCursorCodec.decode(
+            encoded,
+            "createdAt",
+            null
+        );
+
+        assertThat(decoded.filterFingerprint()).isEqualTo("status=PENDING");
     }
 }

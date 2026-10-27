@@ -6,6 +6,7 @@ import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.FailPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
+import com.unihub.workshop.registrations.api.dto.RegistrationPaymentContextDto;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
@@ -16,8 +17,11 @@ import com.unihub.workshop.shared.events.WorkshopRegisteredEvent;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -174,6 +178,31 @@ public class RegistrationFacade implements RegistrationApi {
         );
 
         return true;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, RegistrationPaymentContextDto> getPaymentContexts(
+        Collection<UUID> registrationIds
+    ) {
+        if (registrationIds == null || registrationIds.isEmpty()) {
+            return Map.of();
+        }
+        return registrationRepository
+            .findAllByIds(registrationIds)
+            .stream()
+            .collect(
+                Collectors.toMap(Registration::id, registration ->
+                    new RegistrationPaymentContextDto(
+                        registration.id(),
+                        registration.workshopId(),
+                        registration.studentUserId(),
+                        registration.status() != null
+                            ? registration.status().name()
+                            : null
+                    )
+                )
+            );
     }
 
     private void registerPostCommitCapacityRelease(UUID workshopId) {

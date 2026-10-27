@@ -39,7 +39,7 @@ Workshop Staff Assignment enables an Organizer to administer the roster of Check
 - **FR-10:** The system SHALL reject the available-staff query with HTTP 409 when the target workshop status is not `PUBLISHED` (i.e. `DRAFT`, `COMPLETED`, or `CANCELED`).
 - **FR-11:** The system SHALL reject the available-staff query with HTTP 422 when the workshop has already started (`now() >= starts_at`).
 - **FR-12:** The system SHALL support keyset cursor pagination for the available-staff list, defaulting to 20 items per page (maximum 100), sorted by `fullName ASC, id ASC`.
-- **FR-13:** The system SHALL support optional keyword filtering on the available-staff list via query parameter `q` (maximum 100 characters), matched case-insensitively against `fullName` and `email`.
+- **FR-13:** The system SHALL support optional keyword filtering on the available-staff list via query parameter `q` (maximum 100 characters), matched case-insensitively against `fullName` and `email`. The pagination cursor SHALL be bound to the `q` value that produced it; replaying it with a different `q` SHALL be rejected with HTTP 400.
 - **FR-14:** A staff member SHALL be included in the available-staff list only when all of the following conditions hold simultaneously:
   - (a) their `organization_id` matches the workshop's `organization_id`;
   - (b) their role is `STAFF` and account status is active (`is_active = true`);

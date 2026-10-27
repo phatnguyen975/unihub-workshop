@@ -147,7 +147,8 @@ class CancelRegistrationUseCasePaidTest {
             studentUserId,
             UUID.randomUUID(),
             "John Doe",
-            "john.doe@university.edu"
+            "john.doe@university.edu",
+            "23123456"
         );
     }
 

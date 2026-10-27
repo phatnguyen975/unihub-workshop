@@ -140,7 +140,13 @@ class RefreshTokenRepositoryAdapterTest {
         Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
 
         String cursor = KeysetCursorCodec.encode(
-            KeysetCursor.of(cursorId, "createdAt", cursorTime.toString())
+            new KeysetCursor(
+                cursorId,
+                "createdAt",
+                cursorTime.toString(),
+                null,
+                null
+            )
         );
 
         UUID id3 = UUID.randomUUID();
@@ -247,7 +253,13 @@ class RefreshTokenRepositoryAdapterTest {
         Instant cursorTime = Instant.parse("2026-09-04T09:00:00Z");
 
         String cursorJson = KeysetCursorCodec.encode(
-            KeysetCursor.of(cursorId, "createdAt", cursorTime.toString())
+            new KeysetCursor(
+                cursorId,
+                "createdAt",
+                cursorTime.toString(),
+                null,
+                null
+            )
         );
         String cursor = "   " + cursorJson + "   ";
 

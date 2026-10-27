@@ -44,7 +44,8 @@ public class WorkshopAssignmentRepositoryAdapter
     ) {
         KeysetCursor cursor = KeysetCursorCodec.decode(
             cursorString,
-            "assignedAt"
+            "assignedAt",
+            null
         );
 
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
@@ -274,7 +275,8 @@ public class WorkshopAssignmentRepositoryAdapter
             entity.getId(),
             "assignedAt",
             primaryVal,
-            primaryVal
+            primaryVal,
+            null
         );
         return KeysetCursorCodec.encode(cursor);
     }

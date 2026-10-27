@@ -5,6 +5,7 @@ import com.unihub.workshop.notifications.domain.model.InAppNotification;
 import com.unihub.workshop.notifications.infrastructure.persistence.mapper.NotificationPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.FilterFingerprint;
 import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
@@ -47,7 +48,14 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
         String cursor,
         int size
     ) {
-        KeysetCursor cursorData = KeysetCursorCodec.decode(cursor, "createdAt");
+        String filterFingerprint = FilterFingerprint.builder()
+            .with("isRead", isRead)
+            .build();
+        KeysetCursor cursorData = KeysetCursorCodec.decode(
+            cursor,
+            "createdAt",
+            filterFingerprint
+        );
         if (cursorData != null && cursorData.asInstant() == null) {
             throw new BadRequestException("Invalid cursor format");
         }
@@ -106,10 +114,12 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
                 .items()
                 .get(slice.items().size() - 1);
             nextCursor = KeysetCursorCodec.encode(
-                KeysetCursor.of(
+                new KeysetCursor(
                     lastItem.getId(),
                     "createdAt",
-                    lastItem.getCreatedAt().toString()
+                    lastItem.getCreatedAt().toString(),
+                    null,
+                    filterFingerprint
                 )
             );
         }

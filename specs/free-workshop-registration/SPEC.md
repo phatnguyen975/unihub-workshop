@@ -51,7 +51,7 @@ Feature 4.1 enables a student to register for a free (zero-price) workshop, view
 
 - **FR-16:** The system SHALL return a paginated list of the authenticated student's own registrations, containing only records where `student_user_id == jwt.sub`.
 - **FR-17:** The system SHALL support optional filtering by registration `status` (`PENDING`, `CONFIRMED`, `CANCELED`, `FAILED`) via query parameter; when omitted, all statuses are returned.
-- **FR-18:** The system SHALL paginate results using keyset cursor pagination (`?cursor=` and `?size=`, default 20, max 50) ordered by `(created_at DESC, id ASC)`.
+- **FR-18:** The system SHALL paginate results using keyset cursor pagination (`?cursor=` and `?size=`, default 20, max 100) ordered by `(created_at DESC, id ASC)`.
 - **FR-19:** The system SHALL route read queries for `GET /registrations/me` to the Read Replica via `@Transactional(readOnly = true)` to offload the Primary database.
 - **FR-20:** The system SHALL return `200 OK` with an empty `items` array and `cursor.hasMore = false` when no matching registrations exist.
 
@@ -102,7 +102,7 @@ Feature 4.1 enables a student to register for a free (zero-price) workshop, view
   - All writes and critical pre-checks (duplicate check, schedule conflict, idempotency) execute on the Primary DB.
   - Read endpoints (`GET /registrations/me`, `GET /registrations/{id}`) execute with `@Transactional(readOnly = true)`, automatically routed to the Read Replica by `TransactionAwareRoutingDataSource`. _(Ref: docs/adrs.md ADR-015; docs/database-schema.md §4)_
 - **BR-16 (Ownership Isolation):** A student can only view their own registrations (`student_user_id == jwt.sub`). Attempting to read another student's registration via `GET /{id}` returns `403 Forbidden`. _(Ref: docs/feature-catalog.md §4.1)_
-- **BR-17 (Keyset Cursor Pagination):** `GET /me` uses keyset cursor pagination with opaque Base64-encoded cursor `{id, sortField: "createdAt", primaryValue, secondaryValue: null}`. Stable under concurrent writes. _(Ref: docs/api-standards.md)_
+- **BR-17 (Keyset Cursor Pagination):** `GET /me` uses keyset cursor pagination with opaque Base64-encoded cursor `{id, sortField: "createdAt", primaryValue, secondaryValue: null, filterFingerprint}`. The `filterFingerprint` encodes the `status` filter (as `status=*` when absent); replaying a cursor against a different `status` filter set is rejected with `400 Bad Request`. Stable under concurrent writes. _(Ref: docs/api-standards.md)_
 - **BR-18 (WorkshopApi Cross-Module Facade):** The `registrations` module communicates with `workshops` exclusively via `com.unihub.workshop.workshops.api.WorkshopApi`:
   ```java
   public interface WorkshopApi {

@@ -5,6 +5,11 @@
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Payments Module",
-    allowedDependencies = { "shared", "registrations::api" }
+    allowedDependencies = {
+        "shared",
+        "registrations::api",
+        "iam::api",
+        "workshops::api",
+    }
 )
 package com.unihub.workshop.payments;

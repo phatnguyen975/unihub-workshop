@@ -42,7 +42,8 @@ public class IngestionJobReportRepositoryAdapter
     ) {
         KeysetCursor cursorData = KeysetCursorCodec.decode(
             cursor,
-            "completedAt"
+            "completedAt",
+            null
         );
         if (cursorData != null && cursorData.asInstant() == null) {
             throw new BadRequestException("Invalid cursor format");
@@ -98,10 +99,12 @@ public class IngestionJobReportRepositoryAdapter
                 .items()
                 .get(slice.items().size() - 1);
             nextCursor = KeysetCursorCodec.encode(
-                KeysetCursor.of(
+                new KeysetCursor(
                     lastItem.getId(),
                     "completedAt",
-                    lastItem.getCompletedAt().toString()
+                    lastItem.getCompletedAt().toString(),
+                    null,
+                    null
                 )
             );
         }

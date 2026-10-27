@@ -3,6 +3,7 @@ package com.unihub.workshop.workshops.infrastructure.persistence;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.shared.pagination.FilterFingerprint;
 import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
@@ -268,9 +269,17 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             );
         }
 
+        String filterFingerprint = FilterFingerprint.builder()
+            .with("status", query.status())
+            .with("priceType", effectivePriceType(query.priceType()))
+            .with("q", effectiveQuery(query.q()))
+            .with("from", query.from())
+            .with("to", query.to())
+            .build();
         KeysetCursor cursor = KeysetCursorCodec.decode(
             query.cursor(),
-            sortField
+            sortField,
+            filterFingerprint
         );
 
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
@@ -317,7 +326,8 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         if (slice.hasMore() && !pageEntities.isEmpty()) {
             nextCursor = encodeCursor(
                 pageEntities.get(pageEntities.size() - 1),
-                sortField
+                sortField,
+                filterFingerprint
             );
         }
 
@@ -596,7 +606,27 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
         );
     }
 
-    private String encodeCursor(WorkshopJpaEntity entity, String sortField) {
+    private String effectiveQuery(String q) {
+        return q != null && !q.isBlank()
+            ? q.trim().toLowerCase(Locale.ROOT)
+            : null;
+    }
+
+    private String effectivePriceType(String priceType) {
+        if ("FREE".equalsIgnoreCase(priceType)) {
+            return "FREE";
+        }
+        if ("PAID".equalsIgnoreCase(priceType)) {
+            return "PAID";
+        }
+        return null;
+    }
+
+    private String encodeCursor(
+        WorkshopJpaEntity entity,
+        String sortField,
+        String filterFingerprint
+    ) {
         String primaryVal = switch (sortField) {
             case "price" -> entity.getPrice() != null
                 ? entity.getPrice().toString()
@@ -620,7 +650,8 @@ public class WorkshopRepositoryAdapter implements WorkshopRepository {
             entity.getId(),
             sortField,
             primaryVal,
-            secondaryVal
+            secondaryVal,
+            filterFingerprint
         );
         return KeysetCursorCodec.encode(cursor);
     }
