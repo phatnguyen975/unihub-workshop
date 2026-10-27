@@ -385,7 +385,7 @@
 
 ### 5.2 `payment-history-and-status`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Provides authenticated users with read-only access to their payment history and individual payment status. `STUDENT` users can view all of their own payment records (`PENDING`, `COMPLETED`, `FAILED`, or `REFUNDED`) linked to registrations, including amount, status, a masked provider reference, and timestamps. `ORGANIZER` users can view payment records for workshops within their organization, including the minimal student identity needed for operations (name and student number), and an organization-wide operational summary grouped by currency. Full provider gateway identifiers, payment client secrets, QR data, refund identifiers, and provider failure details are never exposed. All payment state transitions are exclusively handled by `payment-webhook-handling` and `registration-reconciliation-and-cancellation`.
 

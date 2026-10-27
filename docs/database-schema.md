@@ -511,8 +511,8 @@ erDiagram
 
 - B-Tree on `workshop_id` for workshop-scoped registration lookups.
 - B-Tree on `student_user_id` for student registration history.
-- Composite B-Tree on `(student_user_id, created_at DESC, id DESC)` for stable, newest-first student-scoped registration and payment-history keyset pagination.
-- Composite B-Tree on `(workshop_id, created_at DESC, id DESC)` for stable, newest-first workshop-scoped operational reporting and payment-history keyset pagination.
+- Composite B-Tree on `(student_user_id, created_at DESC, id DESC)` for stable, newest-first student-scoped registration lookups; it also provides the ownership join/filter path for student-scoped payment-history reads, while payment ordering itself uses the `payments` keyset index.
+- Composite B-Tree on `(workshop_id, created_at DESC, id DESC)` for stable, newest-first workshop-scoped operational reporting; it also provides the join/filter path for organization- and workshop-scoped payment-history reads, while payment ordering itself uses the `payments` keyset index.
 - Partial unique B-Tree on `(workshop_id, student_user_id)` where `status IN ('PENDING','CONFIRMED')` to prevent duplicate active registrations.
 - Composite partial B-Tree on `(expires_at, workshop_id)` where `status = 'PENDING'` for the Dual-Case Reconciliation Sweeper. This index is small (only `PENDING` rows), supports the exact sweeper query `WHERE status = 'PENDING' AND expires_at < NOW()`, and includes `workshop_id` for efficient per-workshop capacity refund operations within the same sweep.
 
@@ -566,6 +566,7 @@ erDiagram
 - B-Tree on `refunded_at` for refund reporting queries (sparse; only rows with `status = 'REFUNDED'`).
 - Composite B-Tree on `(created_at DESC, id DESC)` for stable, newest-first payment-history keyset pagination.
 - Composite B-Tree on `(status, created_at DESC, id DESC)` for status-filtered payment-history keyset pagination.
+- Student- and organization-scoped payment history joins `registrations` and `workshops` only for the ownership/tenant predicate, then orders by `payments.created_at DESC, payments.id DESC`. The sort is bounded by the visible student's or organization's payment set, not by the global `payments` table; a single index cannot order a joined, tenant-scoped set without denormalizing ownership onto `payments`, which is intentionally not part of this schema.
 
 > [!CAUTION]
 > Payment status transitions must be idempotent and coordinated with registration status updates in the same transaction.

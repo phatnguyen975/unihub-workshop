@@ -77,8 +77,8 @@ This contract exposes read-only payment history, payment detail, and an organiza
       }
     ],
     "cursor": {
-      "nextCursor": "eyJpZCI6IjBhMWQ1MWJjLTY2ODktNDVjMC05ZTFkLTczNDg5OWY2ZTEyOSIsInNvcnRGaWVsZCI6ImNyZWF0ZWRBdCIsInByaW1hcnlWYWx1ZSI6IjIwMjYtMTAtMjFUMDU6MTI6MDBaIiwic2Vjb25kYXJ5VmFsdWUiOm51bGx9",
-      "hasMore": false
+      "nextCursor": "eyJpZCI6IjBhMWQ1MWJjLTY2ODktNDVjMC05ZTFkLTczNDg5OWY2ZTEyOSIsInNvcnRGaWVsZCI6ImNyZWF0ZWRBdCIsInByaW1hcnlWYWx1ZSI6IjIwMjYtMTAtMjFUMDU6MTI6MDBaIiwiZmlsdGVyRmluZ2VycHJpbnQiOiJzdGF0dXM9KiJ9",
+      "hasMore": true
     }
   },
   "metadata": {

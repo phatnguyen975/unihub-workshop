@@ -196,15 +196,16 @@ class IamFacadeTest {
 
     @Test
     @DisplayName(
-        "getStudentProfilesByIds: returns only active students with their directory student numbers"
+        "getStudentProfilesByIds: returns active and inactive students with their directory student numbers"
     )
-    void getStudentProfilesByIds_ReturnsActiveStudentsWithStudentNumbers() {
+    void getStudentProfilesByIds_ReturnsActiveAndInactiveStudentsWithStudentNumbers() {
         UUID firstUserId = UUID.randomUUID();
         UUID secondUserId = UUID.randomUUID();
         UUID inactiveUserId = UUID.randomUUID();
         UUID organizerUserId = UUID.randomUUID();
         UUID firstRecordId = UUID.randomUUID();
         UUID secondRecordId = UUID.randomUUID();
+        UUID inactiveRecordId = UUID.randomUUID();
 
         User first = User.builder()
             .id(firstUserId)
@@ -227,7 +228,7 @@ class IamFacadeTest {
             .role(UserRole.STUDENT)
             .isActive(false)
             .fullName("Inactive Student")
-            .studentRecordId(UUID.randomUUID())
+            .studentRecordId(inactiveRecordId)
             .build();
         User organizer = User.builder()
             .id(organizerUserId)
@@ -242,7 +243,11 @@ class IamFacadeTest {
             inactiveUserId,
             organizerUserId
         );
-        Set<UUID> recordIds = Set.of(firstRecordId, secondRecordId);
+        Set<UUID> recordIds = Set.of(
+            firstRecordId,
+            secondRecordId,
+            inactiveRecordId
+        );
 
         when(userRepository.findAllById(userIds)).thenReturn(
             List.of(first, second, inactive, organizer)
@@ -250,7 +255,8 @@ class IamFacadeTest {
         when(studentDirectoryRepository.findAllByIds(recordIds)).thenReturn(
             List.of(
                 studentDirectory(firstRecordId, "23123456"),
-                studentDirectory(secondRecordId, "23999999")
+                studentDirectory(secondRecordId, "23999999"),
+                studentDirectory(inactiveRecordId, "23888888")
             )
         );
 
@@ -258,7 +264,11 @@ class IamFacadeTest {
             userIds
         );
 
-        assertThat(result).containsOnlyKeys(firstUserId, secondUserId);
+        assertThat(result).containsOnlyKeys(
+            firstUserId,
+            secondUserId,
+            inactiveUserId
+        );
         assertThat(result.get(firstUserId).fullName()).isEqualTo("Alice Smith");
         assertThat(result.get(firstUserId).studentNumber()).isEqualTo(
             "23123456"
@@ -266,6 +276,12 @@ class IamFacadeTest {
         assertThat(result.get(secondUserId).fullName()).isEqualTo("Bob Tran");
         assertThat(result.get(secondUserId).studentNumber()).isEqualTo(
             "23999999"
+        );
+        assertThat(result.get(inactiveUserId).fullName()).isEqualTo(
+            "Inactive Student"
+        );
+        assertThat(result.get(inactiveUserId).studentNumber()).isEqualTo(
+            "23888888"
         );
     }
 

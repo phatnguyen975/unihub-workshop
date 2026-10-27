@@ -60,7 +60,7 @@ public final class KeysetCursorCodec {
      * @param expectedSortField the expected primary sort field of the current request, or null to skip check
      * @param expectedFilterFingerprint the canonical fingerprint of the current request's filters, or null to skip check
      * @return the decoded {@link KeysetCursor}, or null if input is null or blank
-     * @throws BadRequestException if the cursor is malformed, missing an ID, issued for a different sort field, or issued for a different filter set
+     * @throws BadRequestException if the cursor is malformed, missing an ID or sort field, issued for a different sort field, or issued for a different filter set
      */
     public static KeysetCursor decode(
         String cursorStr,
@@ -85,13 +85,17 @@ public final class KeysetCursorCodec {
                 KeysetCursor.class
             );
 
-            if (cursor == null || cursor.id() == null) {
+            if (
+                cursor == null ||
+                cursor.id() == null ||
+                cursor.sortField() == null ||
+                cursor.sortField().isBlank()
+            ) {
                 throw new BadRequestException("Invalid cursor format");
             }
 
             if (
                 expectedSortField != null &&
-                cursor.sortField() != null &&
                 !cursor.sortField().equalsIgnoreCase(expectedSortField)
             ) {
                 throw new BadRequestException(

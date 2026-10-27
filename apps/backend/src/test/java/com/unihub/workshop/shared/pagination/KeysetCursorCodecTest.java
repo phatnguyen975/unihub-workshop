@@ -100,6 +100,65 @@ class KeysetCursorCodecTest {
 
     @Test
     @DisplayName(
+        "decode rejects a cursor that omits the mandatory sort field even when the caller does not name one"
+    )
+    void shouldRejectCursorWithoutSortField() {
+        UUID id = UUID.randomUUID();
+        String json = String.format(
+            "{\"id\":\"%s\",\"primaryValue\":\"2026-10-21T05:12:00Z\"}",
+            id
+        );
+        String encoded = Base64.getEncoder().encodeToString(json.getBytes());
+
+        assertThatThrownBy(() -> KeysetCursorCodec.decode(encoded, null, null))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+    }
+
+    @Test
+    @DisplayName(
+        "typed cursor values reject malformed representations as bad requests"
+    )
+    void shouldRejectMalformedTypedCursorValues() {
+        UUID id = UUID.randomUUID();
+        KeysetCursor cursor = new KeysetCursor(
+            id,
+            "createdAt",
+            "not-a-timestamp",
+            "not-a-timestamp",
+            null
+        );
+
+        assertThatThrownBy(cursor::asInstant)
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+        assertThatThrownBy(cursor::asSecondaryInstant)
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+
+        KeysetCursor numericCursor = new KeysetCursor(
+            id,
+            "price",
+            "not-a-number",
+            null,
+            null
+        );
+        assertThatThrownBy(numericCursor::asBigDecimal).isInstanceOf(
+            BadRequestException.class
+        );
+        assertThatThrownBy(numericCursor::asInteger).isInstanceOf(
+            BadRequestException.class
+        );
+        assertThatThrownBy(numericCursor::asLong).isInstanceOf(
+            BadRequestException.class
+        );
+        assertThatThrownBy(numericCursor::asDouble).isInstanceOf(
+            BadRequestException.class
+        );
+    }
+
+    @Test
+    @DisplayName(
         "decode parses standard JSON with primaryValue, sortField, and id"
     )
     void shouldDecodeStandardJsonPayload() {

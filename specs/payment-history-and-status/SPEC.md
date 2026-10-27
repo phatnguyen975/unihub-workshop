@@ -74,7 +74,7 @@ This feature introduces no state transition. It displays the existing lifecycle 
 
 ## 6. Non-Functional Requirements
 
-- **Performance:** Collection reads SHALL be keyset-paginated with a default page size of 20 and a maximum of 100; they must not perform unbounded payment scans or per-item dependent reads.
+- **Performance:** Collection reads SHALL be keyset-paginated with a default page size of 20 and a maximum of 100; they must not perform unbounded payment scans or per-item dependent reads. A history read is scoped to one student or one organization before ordering, so any sort is bounded by that student's or organization's payment set and never by the global `payments` table.
 - **Read-path architecture:** Ownership and organization visibility SHALL be evaluated in the same database statement that produces the result window — the keyset page for history or the grouped aggregate for summary — through a read-only projection over `payments` joined to the owning module's tables. Joined tables contribute only a visibility predicate; every response field they own SHALL be resolved through that module's public API. This projection SHALL NOT be used by any write, idempotency, capacity, or state-transition path (see `docs/project-structure.md` §3).
 - **Cursor integrity:** A continuation cursor SHALL be bound to the filter set that produced it; replaying it against a different filter set is a client error and SHALL be rejected rather than silently reinterpreted.
 - **Consistency:** These read views may route to a replica and may be briefly stale. Authorization and any future state-changing check-then-act operation must not rely on a replica result.

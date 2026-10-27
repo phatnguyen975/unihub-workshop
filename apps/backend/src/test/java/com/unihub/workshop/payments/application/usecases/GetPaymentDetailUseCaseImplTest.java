@@ -297,7 +297,7 @@ class GetPaymentDetailUseCaseImplTest {
 
     @Test
     @DisplayName(
-        "Keeps the payment visible with a null identity when the student profile is unavailable"
+        "Keeps the payment visible with a null identity when IAM has no matching student record"
     )
     void getOrganizerPaymentDetail_withoutStudentProfile_returnsNullIdentity() {
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(

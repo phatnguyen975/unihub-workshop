@@ -22,6 +22,7 @@ import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.annotation.Transactional;
 
 class PaymentRepositoryAdapterTest {
 
@@ -412,6 +414,30 @@ class PaymentRepositoryAdapterTest {
 
     @Test
     @DisplayName(
+        "Student history rejects a cursor whose primary timestamp cannot be parsed"
+    )
+    void shouldRejectCursorWithInvalidPrimaryTimestamp() {
+        String cursor = KeysetCursorCodec.encode(
+            new KeysetCursor(
+                UUID.randomUUID(),
+                "createdAt",
+                "not-a-timestamp",
+                null,
+                "status=*"
+            )
+        );
+
+        assertThatThrownBy(() ->
+            adapter.findByStudentUserId(UUID.randomUUID(), null, cursor, 20)
+        )
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Invalid cursor format");
+
+        verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
         "Student history omits the continuation cursor when the window is not exceeded"
     )
     void shouldOmitCursorWhenNoFurtherPageExists() {
@@ -734,5 +760,44 @@ class PaymentRepositoryAdapterTest {
         assertThat(result).isEmpty();
         verify(jpaRepository).summarizeByOrganizationId(organizationId);
         verifyNoInteractions(entityManager);
+    }
+
+    @Test
+    @DisplayName(
+        "Payment-history projections and the organization summary run in read-only transactions"
+    )
+    void shouldDeclareReadOnlyProjectionMethods() throws NoSuchMethodException {
+        assertReadOnly(
+            "findByStudentUserId",
+            UUID.class,
+            PaymentStatus.class,
+            String.class,
+            int.class
+        );
+        assertReadOnly(
+            "findByOrganizationId",
+            UUID.class,
+            UUID.class,
+            PaymentStatus.class,
+            String.class,
+            int.class
+        );
+        assertReadOnly("summarizeByOrganizationId", UUID.class);
+    }
+
+    private void assertReadOnly(String methodName, Class<?>... parameterTypes)
+        throws NoSuchMethodException {
+        Method method = PaymentRepositoryAdapter.class.getMethod(
+            methodName,
+            parameterTypes
+        );
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional)
+            .as("%s must be transactional", methodName)
+            .isNotNull();
+        assertThat(transactional.readOnly())
+            .as("%s must be read-only", methodName)
+            .isTrue();
     }
 }

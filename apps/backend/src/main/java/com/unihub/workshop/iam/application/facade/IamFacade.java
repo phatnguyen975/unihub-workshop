@@ -100,7 +100,6 @@ public class IamFacade implements IamApi {
         List<User> students = userRepository
             .findAllById(studentUserIds)
             .stream()
-            .filter(User::isActive)
             .filter(user -> user.role() == UserRole.STUDENT)
             .toList();
         if (students.isEmpty()) {

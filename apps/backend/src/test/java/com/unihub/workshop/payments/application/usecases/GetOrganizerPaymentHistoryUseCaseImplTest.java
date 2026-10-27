@@ -324,7 +324,7 @@ class GetOrganizerPaymentHistoryUseCaseImplTest {
 
     @Test
     @DisplayName(
-        "Keeps a payment visible with a null identity when the student profile is unavailable"
+        "Keeps a payment visible with a null identity when IAM has no matching student record"
     )
     void getPaymentHistory_withoutStudentProfile_returnsNullIdentity() {
         Payment payment = payment(UUID.randomUUID(), FIRST_REGISTRATION_ID);
