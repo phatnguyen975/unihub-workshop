@@ -9,6 +9,7 @@ import com.unihub.workshop.registrations.application.ports.in.CancelRegistration
 import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationUseCase;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.CancelledRegistrationResult;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
@@ -19,9 +20,6 @@ import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
-import com.unihub.workshop.shared.realtime.api.RealtimeEvent;
-import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
-import com.unihub.workshop.shared.realtime.api.RealtimeEventType;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.math.BigDecimal;
@@ -30,7 +28,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +47,7 @@ public class CancelRegistrationUseCaseImpl
     private final IamApi iamApi;
     private final IdempotencyPort idempotencyPort;
     private final CapacityPort capacityPort;
-    private final RealtimeEventPublisher realtimeEventPublisher;
+    private final WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionOperations transactionOperations;
     private final RegistrationPaymentPort registrationPaymentPort;
@@ -473,26 +470,7 @@ public class CancelRegistrationUseCaseImpl
     }
 
     private void publishRealtimeUpdate(UUID workshopId) {
-        try {
-            Map<String, Object> workshopPayload = Map.of(
-                "workshopId",
-                workshopId,
-                "status",
-                "CANCELED"
-            );
-            RealtimeEvent<Map<String, Object>> workshopEvent = RealtimeEvent.of(
-                RealtimeEventType.REGISTRATION_UPDATED,
-                workshopPayload
-            );
-            realtimeEventPublisher.publishToWorkshop(workshopId, workshopEvent);
-        } catch (Exception e) {
-            log.error(
-                "Failed to publish registration.updated SSE for workshop [{}]: {}",
-                workshopId,
-                e.getMessage(),
-                e
-            );
-        }
+        workshopRegistrationBroadcaster.broadcast(workshopId);
     }
 
     private static String computeRequestHash(

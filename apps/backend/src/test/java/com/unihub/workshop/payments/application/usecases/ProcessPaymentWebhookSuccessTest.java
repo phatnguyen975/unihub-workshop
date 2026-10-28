@@ -204,16 +204,7 @@ class ProcessPaymentWebhookSuccessTest {
                 "{\"reg\":\"" + REGISTRATION_ID + "\"}"
             );
 
-        ArgumentCaptor<RealtimeEvent<?>> workshopEventCaptor =
-            ArgumentCaptor.captor();
-        verify(realtimeEventPublisher).publishToWorkshop(
-            eq(WORKSHOP_ID),
-            workshopEventCaptor.capture()
-        );
-        RealtimeEvent<?> workshopEvent = workshopEventCaptor.getValue();
-        assertThat(workshopEvent.eventType()).isEqualTo(
-            RealtimeEventType.REGISTRATION_UPDATED.getValue()
-        );
+        verify(registrationApi).broadcastSeatCountSnapshot(WORKSHOP_ID);
     }
 
     @Test

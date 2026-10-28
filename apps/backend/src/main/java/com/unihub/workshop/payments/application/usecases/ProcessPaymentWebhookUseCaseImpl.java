@@ -517,21 +517,9 @@ public class ProcessPaymentWebhookUseCaseImpl
                     userEvent
                 );
 
-                // 2. registration.updated to workshop's stream: unihub:stream:workshop:{workshopId}
-                Map<String, Object> workshopPayload = Map.of(
-                    "workshopId",
-                    confirmedDto.workshopId(),
-                    "status",
-                    "CONFIRMED"
-                );
-                RealtimeEvent<Map<String, Object>> workshopEvent =
-                    RealtimeEvent.of(
-                        RealtimeEventType.REGISTRATION_UPDATED,
-                        workshopPayload
-                    );
-                realtimeEventPublisher.publishToWorkshop(
-                    confirmedDto.workshopId(),
-                    workshopEvent
+                // 2. registration.updated to workshop's stream: unihub:stream:workshop:{workshopId} with 6-field seat count snapshot
+                registrationApi.broadcastSeatCountSnapshot(
+                    confirmedDto.workshopId()
                 );
             } catch (Exception ex) {
                 log.error(

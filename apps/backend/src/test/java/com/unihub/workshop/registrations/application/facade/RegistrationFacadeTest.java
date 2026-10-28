@@ -15,6 +15,7 @@ import com.unihub.workshop.registrations.api.dto.RegistrationPaymentContextDto;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.QrTicket;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
@@ -42,6 +43,7 @@ class RegistrationFacadeTest {
     private IamApi iamApi;
     private WorkshopApi workshopApi;
     private CapacityPort capacityPort;
+    private WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
     private RegistrationFacade registrationFacade;
 
     private static final UUID REGISTRATION_ID = UUID.fromString(
@@ -67,13 +69,18 @@ class RegistrationFacadeTest {
         workshopApi = mock(WorkshopApi.class);
         capacityPort = mock(CapacityPort.class);
 
+        workshopRegistrationBroadcaster = mock(
+            WorkshopRegistrationBroadcaster.class
+        );
+
         registrationFacade = new RegistrationFacade(
             registrationRepository,
             qrSignaturePort,
             eventPublisher,
             iamApi,
             workshopApi,
-            capacityPort
+            capacityPort,
+            workshopRegistrationBroadcaster
         );
     }
 
@@ -286,5 +293,14 @@ class RegistrationFacadeTest {
         assertThat(registrationFacade.getPaymentContexts(Set.of())).isEmpty();
         assertThat(registrationFacade.getPaymentContexts(null)).isEmpty();
         verify(registrationRepository, never()).findAllByIds(any());
+    }
+
+    @Test
+    @DisplayName(
+        "broadcastSeatCountSnapshot delegates directly to WorkshopRegistrationBroadcaster"
+    )
+    void broadcastSeatCountSnapshot_DelegatesToBroadcaster() {
+        registrationFacade.broadcastSeatCountSnapshot(WORKSHOP_ID);
+        verify(workshopRegistrationBroadcaster).broadcast(WORKSHOP_ID);
     }
 }

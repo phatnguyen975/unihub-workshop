@@ -77,7 +77,7 @@ This plan defines the engineering tasks to implement Feature 4.4 — **Workshop 
 
 ### Phase 2: Live Seat Count Broadcasting Synchronization
 
-- [ ] **T3 — Real-Time 6-Field Seat Count Snapshot Broadcasting on Registration State Transitions**
+- [x] **T3 — Real-Time 6-Field Seat Count Snapshot Broadcasting on Registration State Transitions**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Application, Infrastructure
@@ -97,11 +97,11 @@ This plan defines the engineering tasks to implement Feature 4.4 — **Workshop 
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks above (T1, T2, T3) are checked off.
-- [ ] Every acceptance criterion across all tasks has been verified.
-- [ ] Architecture tests pass: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
-- [ ] Full backend test suite passes: `./gradlew test`.
-- [ ] Ready for `/review`.
+- [x] All tasks above (T1, T2, T3) are checked off.
+- [x] Every acceptance criterion across all tasks has been verified.
+- [x] Architecture tests pass: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
+- [x] Full backend test suite passes: `./gradlew test`.
+- [x] Ready for `/review`.
 
 ## 4. Risks and Mitigations
 

@@ -19,6 +19,7 @@ import com.unihub.workshop.registrations.api.RegistrationPaymentPort;
 import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationCommand;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.CancelledRegistrationResult;
 import com.unihub.workshop.registrations.domain.model.QrTicket;
 import com.unihub.workshop.registrations.domain.model.Registration;
@@ -29,8 +30,6 @@ import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
-import com.unihub.workshop.shared.realtime.api.RealtimeEvent;
-import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.math.BigDecimal;
@@ -54,7 +53,7 @@ class CancelRegistrationUseCaseFreeTest {
     private IamApi iamApi;
     private IdempotencyPort idempotencyPort;
     private CapacityPort capacityPort;
-    private RealtimeEventPublisher realtimeEventPublisher;
+    private WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
     private ApplicationEventPublisher eventPublisher;
     private TransactionOperations transactionOperations;
     private RegistrationPaymentPort registrationPaymentPort;
@@ -78,7 +77,9 @@ class CancelRegistrationUseCaseFreeTest {
         iamApi = mock(IamApi.class);
         idempotencyPort = mock(IdempotencyPort.class);
         capacityPort = mock(CapacityPort.class);
-        realtimeEventPublisher = mock(RealtimeEventPublisher.class);
+        workshopRegistrationBroadcaster = mock(
+            WorkshopRegistrationBroadcaster.class
+        );
         eventPublisher = mock(ApplicationEventPublisher.class);
         transactionOperations = mock(TransactionOperations.class);
         registrationPaymentPort = mock(RegistrationPaymentPort.class);
@@ -114,7 +115,7 @@ class CancelRegistrationUseCaseFreeTest {
             iamApi,
             idempotencyPort,
             capacityPort,
-            realtimeEventPublisher,
+            workshopRegistrationBroadcaster,
             eventPublisher,
             transactionOperations,
             registrationPaymentPort
@@ -226,10 +227,7 @@ class CancelRegistrationUseCaseFreeTest {
 
         // Verify post-commit side effects
         verify(capacityPort).releaseCapacity(workshopId);
-        verify(realtimeEventPublisher).publishToWorkshop(
-            eq(workshopId),
-            any(RealtimeEvent.class)
-        );
+        verify(workshopRegistrationBroadcaster).broadcast(workshopId);
         verify(idempotencyPort).complete(
             eq(studentUserId),
             eq(idempotencyKeyRecordId),
@@ -295,10 +293,7 @@ class CancelRegistrationUseCaseFreeTest {
         assertThat(event.canceledByRole()).isEqualTo("ORGANIZER");
 
         verify(capacityPort).releaseCapacity(workshopId);
-        verify(realtimeEventPublisher).publishToWorkshop(
-            eq(workshopId),
-            any(RealtimeEvent.class)
-        );
+        verify(workshopRegistrationBroadcaster).broadcast(workshopId);
     }
 
     @Test
@@ -341,7 +336,7 @@ class CancelRegistrationUseCaseFreeTest {
         verify(registrationRepository, never()).findById(any());
         verify(capacityPort, never()).releaseCapacity(any());
         verifyNoInteractions(eventPublisher);
-        verifyNoInteractions(realtimeEventPublisher);
+        verifyNoInteractions(workshopRegistrationBroadcaster);
     }
 
     @Test
@@ -782,7 +777,7 @@ class CancelRegistrationUseCaseFreeTest {
 
         verify(capacityPort, never()).releaseCapacity(any());
         verifyNoInteractions(eventPublisher);
-        verifyNoInteractions(realtimeEventPublisher);
+        verifyNoInteractions(workshopRegistrationBroadcaster);
     }
 
     @Test

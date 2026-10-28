@@ -12,6 +12,7 @@ import com.unihub.workshop.registrations.api.dto.FailPaidRegistrationCommand;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.workshops.api.WorkshopApi;
@@ -35,6 +36,7 @@ class RegistrationFacadeFailureTest {
     private IamApi iamApi;
     private WorkshopApi workshopApi;
     private CapacityPort capacityPort;
+    private WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
     private RegistrationFacade registrationFacade;
 
     private static final UUID REGISTRATION_ID = UUID.fromString(
@@ -59,13 +61,18 @@ class RegistrationFacadeFailureTest {
         workshopApi = mock(WorkshopApi.class);
         capacityPort = mock(CapacityPort.class);
 
+        workshopRegistrationBroadcaster = mock(
+            WorkshopRegistrationBroadcaster.class
+        );
+
         registrationFacade = new RegistrationFacade(
             registrationRepository,
             qrSignaturePort,
             eventPublisher,
             iamApi,
             workshopApi,
-            capacityPort
+            capacityPort,
+            workshopRegistrationBroadcaster
         );
     }
 

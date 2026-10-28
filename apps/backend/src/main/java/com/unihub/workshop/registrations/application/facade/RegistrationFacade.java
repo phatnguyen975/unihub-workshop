@@ -10,6 +10,7 @@ import com.unihub.workshop.registrations.api.dto.RegistrationPaymentContextDto;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.QrTicket;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
@@ -45,6 +46,7 @@ public class RegistrationFacade implements RegistrationApi {
     private final IamApi iamApi;
     private final WorkshopApi workshopApi;
     private final CapacityPort capacityPort;
+    private final WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
 
     @Override
     @Transactional
@@ -203,6 +205,11 @@ public class RegistrationFacade implements RegistrationApi {
                     )
                 )
             );
+    }
+
+    @Override
+    public void broadcastSeatCountSnapshot(UUID workshopId) {
+        workshopRegistrationBroadcaster.broadcast(workshopId);
     }
 
     private void registerPostCommitCapacityRelease(UUID workshopId) {

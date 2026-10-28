@@ -21,6 +21,7 @@ import com.unihub.workshop.registrations.api.dto.RefundPaymentResult;
 import com.unihub.workshop.registrations.application.ports.in.CancelRegistrationCommand;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.CancelledRegistrationResult;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
@@ -30,7 +31,6 @@ import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
-import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -55,7 +55,7 @@ class CancelRegistrationUseCasePaidTest {
     private IamApi iamApi;
     private IdempotencyPort idempotencyPort;
     private CapacityPort capacityPort;
-    private RealtimeEventPublisher realtimeEventPublisher;
+    private WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
     private ApplicationEventPublisher eventPublisher;
     private TransactionOperations transactionOperations;
     private RegistrationPaymentPort registrationPaymentPort;
@@ -79,7 +79,9 @@ class CancelRegistrationUseCasePaidTest {
         iamApi = mock(IamApi.class);
         idempotencyPort = mock(IdempotencyPort.class);
         capacityPort = mock(CapacityPort.class);
-        realtimeEventPublisher = mock(RealtimeEventPublisher.class);
+        workshopRegistrationBroadcaster = mock(
+            WorkshopRegistrationBroadcaster.class
+        );
         eventPublisher = mock(ApplicationEventPublisher.class);
         transactionOperations = mock(TransactionOperations.class);
         registrationPaymentPort = mock(RegistrationPaymentPort.class);
@@ -108,7 +110,7 @@ class CancelRegistrationUseCasePaidTest {
             iamApi,
             idempotencyPort,
             capacityPort,
-            realtimeEventPublisher,
+            workshopRegistrationBroadcaster,
             eventPublisher,
             transactionOperations,
             registrationPaymentPort
@@ -250,7 +252,7 @@ class CancelRegistrationUseCasePaidTest {
         assertEquals(currency, event.currency());
 
         verify(capacityPort).releaseCapacity(workshopId);
-        verify(realtimeEventPublisher).publishToWorkshop(eq(workshopId), any());
+        verify(workshopRegistrationBroadcaster).broadcast(workshopId);
         verify(idempotencyPort).complete(
             eq(studentUserId),
             eq(idempotencyKeyRecordId),
