@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.unihub.workshop.registrations.application.ports.in.GetWorkshopAttendeeRosterUseCase;
 import com.unihub.workshop.registrations.application.ports.in.GetWorkshopRegistrationSummaryQuery;
 import com.unihub.workshop.registrations.application.ports.in.GetWorkshopRegistrationSummaryUseCase;
 import com.unihub.workshop.registrations.domain.model.WorkshopRegistrationSeatCounts;
@@ -30,6 +31,7 @@ class WorkshopRegistrationSummaryControllerTest {
 
     private MockMvc mockMvc;
     private GetWorkshopRegistrationSummaryUseCase getSummaryUseCase;
+    private GetWorkshopAttendeeRosterUseCase getRosterUseCase;
 
     private final UUID organizerUserId = UUID.randomUUID();
     private final UUID organizationId = UUID.randomUUID();
@@ -39,9 +41,13 @@ class WorkshopRegistrationSummaryControllerTest {
     @BeforeEach
     void setUp() {
         getSummaryUseCase = mock(GetWorkshopRegistrationSummaryUseCase.class);
+        getRosterUseCase = mock(GetWorkshopAttendeeRosterUseCase.class);
 
         WorkshopRegistrationMonitoringController controller =
-            new WorkshopRegistrationMonitoringController(getSummaryUseCase);
+            new WorkshopRegistrationMonitoringController(
+                getSummaryUseCase,
+                getRosterUseCase
+            );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(

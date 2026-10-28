@@ -248,4 +248,93 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
             latestUpdatedAt
         );
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CursorPage<Registration> findByWorkshopId(
+        UUID workshopId,
+        RegistrationStatus status,
+        String cursor,
+        int size
+    ) {
+        String filterFingerprint = FilterFingerprint.builder()
+            .with("status", status)
+            .build();
+        KeysetCursor cursorData = KeysetCursorCodec.decode(
+            cursor,
+            "createdAt",
+            filterFingerprint
+        );
+        if (cursorData != null && cursorData.asInstant() == null) {
+            throw new BadRequestException("Invalid cursor format");
+        }
+
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<RegistrationJpaEntity> cq = cb.createQuery(
+            RegistrationJpaEntity.class
+        );
+        Root<RegistrationJpaEntity> root = cq.from(RegistrationJpaEntity.class);
+
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.equal(root.get("workshopId"), workshopId));
+        if (status != null) {
+            predicates.add(cb.equal(root.get("status"), status.name()));
+        }
+
+        Path<Instant> createdAtPath = root.get("createdAt");
+        Path<UUID> idPath = root.get("id");
+
+        if (cursorData != null) {
+            predicates.add(
+                JpaKeysetPagination.buildKeysetPredicate(
+                    cb,
+                    createdAtPath,
+                    cursorData.asInstant(),
+                    true,
+                    createdAtPath,
+                    cursorData.asInstant(),
+                    idPath,
+                    cursorData.id()
+                )
+            );
+        }
+
+        cq.where(predicates.toArray(new Predicate[0]));
+        JpaKeysetPagination.applyOrders(
+            cb,
+            cq,
+            createdAtPath,
+            true,
+            null,
+            idPath
+        );
+
+        int pageSize = Math.max(1, Math.min(size, 100));
+        JpaKeysetPagination.KeysetSlice<RegistrationJpaEntity> slice =
+            JpaKeysetPagination.execute(entityManager, cq, pageSize);
+
+        List<Registration> items = slice
+            .items()
+            .stream()
+            .map(mapper::toDomain)
+            .toList();
+
+        String nextCursor = null;
+        if (slice.hasMore() && !slice.items().isEmpty()) {
+            RegistrationJpaEntity lastItem = slice
+                .items()
+                .get(slice.items().size() - 1);
+            nextCursor = KeysetCursorCodec.encode(
+                new KeysetCursor(
+                    lastItem.getId(),
+                    "createdAt",
+                    lastItem.getCreatedAt().toString(),
+                    null,
+                    filterFingerprint
+                )
+            );
+        }
+
+        return new CursorPage<>(items, nextCursor, slice.hasMore());
+    }
 }

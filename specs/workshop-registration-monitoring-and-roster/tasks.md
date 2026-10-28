@@ -45,7 +45,7 @@ This plan defines the engineering tasks to implement Feature 4.4 — **Workshop 
     - Unauthenticated request returns `401 Unauthorized` and caller with `STUDENT`/`STAFF` role returns `403 Forbidden` (traced to FR-01, Scenario 6, Scenario 7).
     - Query executes under `@Transactional(readOnly = true)` ensuring read replica routing (traced to FR-09, BR-02).
 
-- [ ] **T2 — Workshop Attendee Roster Endpoint with Keyset Pagination and Status Filter (`GET .../registrations`)**
+- [x] **T2 — Workshop Attendee Roster Endpoint with Keyset Pagination and Status Filter (`GET .../registrations`)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure, Presentation
@@ -71,9 +71,9 @@ This plan defines the engineering tasks to implement Feature 4.4 — **Workshop 
 
 #### Checkpoint: Core Dashboard Monitoring & Attendee Roster Complete
 
-- [ ] All T1 and T2 acceptance criteria pass in unit and WebMvc tests.
-- [ ] Keyset pagination verifies correct ordering and cursor decoding without N+1 cross-module queries.
-- [ ] Build is clean and `./gradlew test --tests "com.unihub.workshop.registrations.*"` passes.
+- [x] All T1 and T2 acceptance criteria pass in unit and WebMvc tests.
+- [x] Keyset pagination verifies correct ordering and cursor decoding without N+1 cross-module queries.
+- [x] Build is clean and `./gradlew test --tests "com.unihub.workshop.registrations.*"` passes.
 
 ### Phase 2: Live Seat Count Broadcasting Synchronization
 

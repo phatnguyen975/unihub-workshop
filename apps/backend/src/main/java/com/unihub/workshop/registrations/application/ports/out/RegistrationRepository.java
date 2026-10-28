@@ -111,4 +111,20 @@ public interface RegistrationRepository {
      * @return raw counts snapshot
      */
     WorkshopRegistrationRawCounts getRegistrationRawCounts(UUID workshopId);
+
+    /**
+     * Finds keyset cursor-paginated registrations belonging to the specified workshop.
+     *
+     * @param workshopId workshop ID
+     * @param status optional status filter
+     * @param cursor optional keyset cursor
+     * @param size page window size
+     * @return CursorPage of Registration items
+     */
+    CursorPage<Registration> findByWorkshopId(
+        UUID workshopId,
+        RegistrationStatus status,
+        String cursor,
+        int size
+    );
 }
