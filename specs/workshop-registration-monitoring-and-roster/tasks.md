@@ -20,7 +20,7 @@ This plan defines the engineering tasks to implement Feature 4.4 — **Workshop 
 
 ### Phase 1: Core Dashboard Monitoring & Attendee Roster
 
-- [ ] **T1 — Workshop Registration Summary Endpoint (`GET .../registrations/summary`)**
+- [x] **T1 — Workshop Registration Summary Endpoint (`GET .../registrations/summary`)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure, Presentation

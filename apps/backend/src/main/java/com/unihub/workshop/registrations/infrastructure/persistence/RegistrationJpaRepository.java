@@ -2,6 +2,7 @@ package com.unihub.workshop.registrations.infrastructure.persistence;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -78,5 +79,28 @@ public interface RegistrationJpaRepository
         @Param("id") UUID id,
         @Param("updatedBy") UUID updatedBy,
         @Param("now") Instant now
+    );
+
+    @Query(
+        """
+        SELECT r.status, COUNT(r.id)
+        FROM RegistrationJpaEntity r
+        WHERE r.workshopId = :workshopId
+        GROUP BY r.status
+        """
+    )
+    List<Object[]> countRegistrationsByStatusGrouped(
+        @Param("workshopId") UUID workshopId
+    );
+
+    @Query(
+        """
+        SELECT MAX(r.updatedAt)
+        FROM RegistrationJpaEntity r
+        WHERE r.workshopId = :workshopId
+        """
+    )
+    Optional<Instant> findMaxUpdatedAtByWorkshopId(
+        @Param("workshopId") UUID workshopId
     );
 }

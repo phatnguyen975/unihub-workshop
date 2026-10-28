@@ -3,6 +3,7 @@ package com.unihub.workshop.registrations.infrastructure.persistence;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
+import com.unihub.workshop.registrations.domain.model.WorkshopRegistrationRawCounts;
 import com.unihub.workshop.registrations.infrastructure.persistence.mapper.RegistrationPersistenceMapper;
 import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
@@ -210,5 +211,41 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
             return false;
         }
         return repository.cancelRegistration(id, updatedBy, now) > 0;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WorkshopRegistrationRawCounts getRegistrationRawCounts(
+        UUID workshopId
+    ) {
+        if (workshopId == null) {
+            return WorkshopRegistrationRawCounts.empty();
+        }
+
+        List<Object[]> rows = repository.countRegistrationsByStatusGrouped(
+            workshopId
+        );
+        long confirmed = 0L;
+        long pending = 0L;
+
+        for (Object[] row : rows) {
+            if (row != null && row.length >= 2) {
+                String status = row[0] != null ? row[0].toString() : "";
+                long count = row[1] instanceof Number n ? n.longValue() : 0L;
+                if ("CONFIRMED".equalsIgnoreCase(status)) {
+                    confirmed = count;
+                } else if ("PENDING".equalsIgnoreCase(status)) {
+                    pending = count;
+                }
+            }
+        }
+
+        Optional<Instant> latestUpdatedAt =
+            repository.findMaxUpdatedAtByWorkshopId(workshopId);
+        return new WorkshopRegistrationRawCounts(
+            confirmed,
+            pending,
+            latestUpdatedAt
+        );
     }
 }
