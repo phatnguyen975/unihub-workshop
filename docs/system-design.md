@@ -807,14 +807,35 @@ This sequence illustrates offline capture, local persistence, and server-authori
 ```mermaid
 sequenceDiagram
   actor Staff as Check-in Staff
-  participant Mobile as Mobile App
+  participant Mobile as Mobile App / Client
   participant GW as API Gateway
   participant API as Core Backend Monolith
   participant DB as Neon PostgreSQL
   participant Redis as Redis Pub/Sub
   participant Client as Web / Mobile (SSE)
 
-  Staff->>Mobile: Point camera at Student's QR Code
+  rect rgb(240, 248, 255)
+    note over Staff,API: Phase 1: Online Data Download & Key Provisioning
+    Staff->>Mobile: Log in with credentials
+    Mobile->>GW: POST /api/v1/auth/login
+    GW->>API: Authenticate & issue STAFF JWT
+    API-->>Mobile: 200 OK (access_token with STAFF role)
+    Mobile->>GW: GET /api/v1/auth/public-key
+    GW->>API: Fetch current RSA Public Key PEM
+    API-->>Mobile: 200 OK { keyId, publicKeyPem, issuedAt }
+    Mobile->>Mobile: Cache public key in SQLite (mobile_public_keys)
+    Mobile->>GW: GET /api/v1/workshops/assigned (cursor, size, status=PUBLISHED)
+    GW->>API: Query assigned workshops for jwt.sub
+    API->>DB: Read workshop_assignments joined with workshops (Primary DB)
+    DB-->>API: Assigned workshop records
+    API-->>Mobile: 200 OK (Keyset-paginated assigned workshops)
+    Mobile->>Mobile: Cache assigned workshops in SQLite (mobile_assigned_workshops)
+  end
+
+  rect rgb(255, 250, 240)
+    note over Staff,Mobile: Phase 2: Offline Selection & Zero-Trust QR Scanning
+    Staff->>Mobile: Select target workshop & point camera at Student's QR Code
+  end
   Mobile->>Mobile: Verify QR payload signature using local Public Key
   alt Invalid Signature (Forged Ticket)
     Mobile->>Mobile: Display "Invalid/Fake Ticket" error and drop
@@ -858,6 +879,7 @@ sequenceDiagram
   end
 ```
 
+- **Online Workshop Data Provisioning:** When a `STAFF` user authenticates, the client fetches the active RSA public key (`GET /api/v1/auth/public-key`, F-1.3) and queries their assigned workshops (`GET /api/v1/workshops/assigned`, F-6.1) with keyset pagination. This provisions the client with authorized workshop metadata before moving into disconnected venue zones.
 - **Zero-Trust Offline Payload:** The mobile app verifies the QR signature locally before any record is queued for synchronization. This blocks forged tickets at the edge and ensures the backend only reconciles payloads that were cryptographically issued by the platform.
 - **Bulk Operations:** The API resolves all `registration_id` values with one workshop-scoped bulk fetch and then performs a single bulk upsert for pending inserts. This eliminates per-row database chatter, protects the PostgreSQL connection pool, and keeps the sync path stable under high concurrency.
 - **Workshop Boundary Enforcement:** Every read and write is constrained by `{workshopId}`, so a valid ticket from one workshop cannot be synchronized against another workshop. This closes the Cross-Workshop Ticket Spoofing gap at the data-access layer, not just at the endpoint layer.
