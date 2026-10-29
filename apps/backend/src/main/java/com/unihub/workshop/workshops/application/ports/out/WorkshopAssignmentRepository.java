@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.application.ports.out;
 
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.domain.model.StaffAssignedWorkshop;
+import com.unihub.workshop.workshops.domain.model.StaffWorkshopFilter;
 import com.unihub.workshop.workshops.domain.model.WorkshopAssignment;
 import java.time.Instant;
 import java.util.Collection;
@@ -18,13 +19,31 @@ public interface WorkshopAssignmentRepository {
      * @param staffUserId staff user identifier
      * @param cursor keyset cursor string
      * @param size page size
+     * @param filter multi-criteria filter (status, from, to, q)
      * @return cursor page of assigned workshops
      */
     CursorPage<StaffAssignedWorkshop> findAssignedWorkshopsByStaffUserId(
         UUID staffUserId,
         String cursor,
-        int size
+        int size,
+        StaffWorkshopFilter filter
     );
+
+    /**
+     * Overload defaulting to no additional filter.
+     */
+    default CursorPage<StaffAssignedWorkshop> findAssignedWorkshopsByStaffUserId(
+        UUID staffUserId,
+        String cursor,
+        int size
+    ) {
+        return findAssignedWorkshopsByStaffUserId(
+            staffUserId,
+            cursor,
+            size,
+            null
+        );
+    }
 
     /**
      * Finds paginated staff assignments for a workshop, sorted by assigned_at DESC, id DESC.

@@ -2,6 +2,9 @@ package com.unihub.workshop.workshops.application.usecases;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -10,6 +13,7 @@ import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.workshops.application.ports.in.ListStaffAssignedWorkshopsQuery;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopAssignmentRepository;
 import com.unihub.workshop.workshops.domain.model.StaffAssignedWorkshop;
+import com.unihub.workshop.workshops.domain.model.StaffWorkshopFilter;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -63,9 +68,10 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
         );
         when(
             assignmentRepository.findAssignedWorkshopsByStaffUserId(
-                staffUserId,
-                null,
-                20
+                eq(staffUserId),
+                eq(null),
+                eq(20),
+                any(StaffWorkshopFilter.class)
             )
         ).thenReturn(expectedPage);
 
@@ -79,9 +85,10 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
         assertThat(result.nextCursor()).isEqualTo("next-cursor");
         assertThat(result.hasMore()).isTrue();
         verify(assignmentRepository).findAssignedWorkshopsByStaffUserId(
-            staffUserId,
-            null,
-            20
+            eq(staffUserId),
+            eq(null),
+            eq(20),
+            any(StaffWorkshopFilter.class)
         );
     }
 
@@ -95,9 +102,10 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
         );
         when(
             assignmentRepository.findAssignedWorkshopsByStaffUserId(
-                staffUserId,
-                null,
-                20
+                eq(staffUserId),
+                eq(null),
+                eq(20),
+                any(StaffWorkshopFilter.class)
             )
         ).thenReturn(expectedPage);
 
@@ -108,9 +116,10 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
         assertThat(result).isNotNull();
         assertThat(result.items()).isEmpty();
         verify(assignmentRepository).findAssignedWorkshopsByStaffUserId(
-            staffUserId,
-            null,
-            20
+            eq(staffUserId),
+            eq(null),
+            eq(20),
+            any(StaffWorkshopFilter.class)
         );
     }
 
@@ -125,6 +134,15 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
             .hasMessageContaining(
                 "The 'size' parameter must be between 1 and 100."
             );
+        verify(
+            assignmentRepository,
+            never()
+        ).findAssignedWorkshopsByStaffUserId(
+            any(),
+            any(),
+            any(int.class),
+            any()
+        );
     }
 
     @Test
@@ -140,6 +158,15 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
             .hasMessageContaining(
                 "The 'size' parameter must be between 1 and 100."
             );
+        verify(
+            assignmentRepository,
+            never()
+        ).findAssignedWorkshopsByStaffUserId(
+            any(),
+            any(),
+            any(int.class),
+            any()
+        );
     }
 
     @Test
@@ -152,9 +179,10 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
         );
         when(
             assignmentRepository.findAssignedWorkshopsByStaffUserId(
-                staffUserId,
-                "prev-cursor",
-                50
+                eq(staffUserId),
+                eq("prev-cursor"),
+                eq(50),
+                any(StaffWorkshopFilter.class)
             )
         ).thenReturn(expectedPage);
 
@@ -164,9 +192,155 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
 
         assertThat(result).isNotNull();
         verify(assignmentRepository).findAssignedWorkshopsByStaffUserId(
-            staffUserId,
-            "prev-cursor",
-            50
+            eq(staffUserId),
+            eq("prev-cursor"),
+            eq(50),
+            any(StaffWorkshopFilter.class)
+        );
+    }
+
+    @Test
+    @DisplayName("Should parse and propagate active filters to repository")
+    void shouldParseAndPropagateActiveFilters_whenProvided() {
+        CursorPage<StaffAssignedWorkshop> expectedPage = new CursorPage<>(
+            List.of(),
+            null,
+            false
+        );
+        when(
+            assignmentRepository.findAssignedWorkshopsByStaffUserId(
+                eq(staffUserId),
+                eq("cursor-1"),
+                eq(20),
+                any(StaffWorkshopFilter.class)
+            )
+        ).thenReturn(expectedPage);
+
+        ListStaffAssignedWorkshopsQuery query =
+            new ListStaffAssignedWorkshopsQuery(
+                staffUserId,
+                "cursor-1",
+                20,
+                "PUBLISHED",
+                "2026-11-12T00:00:00Z",
+                "2026-11-18T00:00:00Z",
+                "python"
+            );
+
+        CursorPage<StaffAssignedWorkshop> result = useCase.execute(query);
+
+        assertThat(result).isNotNull();
+        ArgumentCaptor<StaffWorkshopFilter> filterCaptor =
+            ArgumentCaptor.forClass(StaffWorkshopFilter.class);
+        verify(assignmentRepository).findAssignedWorkshopsByStaffUserId(
+            eq(staffUserId),
+            eq("cursor-1"),
+            eq(20),
+            filterCaptor.capture()
+        );
+
+        StaffWorkshopFilter captured = filterCaptor.getValue();
+        assertThat(captured.status()).isEqualTo(WorkshopStatus.PUBLISHED);
+        assertThat(captured.from()).isEqualTo(
+            Instant.parse("2026-11-12T00:00:00Z")
+        );
+        assertThat(captured.to()).isEqualTo(
+            Instant.parse("2026-11-18T00:00:00Z")
+        );
+        assertThat(captured.q()).isEqualTo("python");
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw BadRequestException when invalid status provided"
+    )
+    void shouldThrowBadRequestException_whenInvalidStatusProvided() {
+        ListStaffAssignedWorkshopsQuery query =
+            new ListStaffAssignedWorkshopsQuery(
+                staffUserId,
+                null,
+                20,
+                "CANCELED",
+                null,
+                null,
+                null
+            );
+
+        assertThatThrownBy(() -> useCase.execute(query))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining(
+                "The 'status' parameter must be 'PUBLISHED' or 'COMPLETED'."
+            );
+        verify(
+            assignmentRepository,
+            never()
+        ).findAssignedWorkshopsByStaffUserId(
+            any(),
+            any(),
+            any(int.class),
+            any()
+        );
+    }
+
+    @Test
+    @DisplayName("Should throw BadRequestException when from is after to")
+    void shouldThrowBadRequestException_whenFromIsAfterTo() {
+        ListStaffAssignedWorkshopsQuery query =
+            new ListStaffAssignedWorkshopsQuery(
+                staffUserId,
+                null,
+                20,
+                null,
+                "2026-11-20T00:00:00Z",
+                "2026-11-10T00:00:00Z",
+                null
+            );
+
+        assertThatThrownBy(() -> useCase.execute(query))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining(
+                "The 'from' timestamp must be before or equal to the 'to' timestamp."
+            );
+        verify(
+            assignmentRepository,
+            never()
+        ).findAssignedWorkshopsByStaffUserId(
+            any(),
+            any(),
+            any(int.class),
+            any()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "Should throw BadRequestException when q exceeds 200 characters"
+    )
+    void shouldThrowBadRequestException_whenQExceeds200Characters() {
+        ListStaffAssignedWorkshopsQuery query =
+            new ListStaffAssignedWorkshopsQuery(
+                staffUserId,
+                null,
+                20,
+                null,
+                null,
+                null,
+                "a".repeat(201)
+            );
+
+        assertThatThrownBy(() -> useCase.execute(query))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining(
+                "The 'q' parameter must not exceed 200 characters."
+            );
+        verify(
+            assignmentRepository,
+            never()
+        ).findAssignedWorkshopsByStaffUserId(
+            any(),
+            any(),
+            any(int.class),
+            any()
         );
     }
 }

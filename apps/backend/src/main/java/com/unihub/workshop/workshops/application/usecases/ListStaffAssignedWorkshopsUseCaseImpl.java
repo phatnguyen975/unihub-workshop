@@ -6,6 +6,7 @@ import com.unihub.workshop.workshops.application.ports.in.ListStaffAssignedWorks
 import com.unihub.workshop.workshops.application.ports.in.ListStaffAssignedWorkshopsUseCase;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopAssignmentRepository;
 import com.unihub.workshop.workshops.domain.model.StaffAssignedWorkshop;
+import com.unihub.workshop.workshops.domain.model.StaffWorkshopFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +28,8 @@ public class ListStaffAssignedWorkshopsUseCaseImpl
     public CursorPage<StaffAssignedWorkshop> execute(
         ListStaffAssignedWorkshopsQuery query
     ) {
-        int effectiveSize = query.size() != null ? query.size() : DEFAULT_PAGE_SIZE;
+        int effectiveSize =
+            query.size() != null ? query.size() : DEFAULT_PAGE_SIZE;
 
         if (effectiveSize < MIN_PAGE_SIZE || effectiveSize > MAX_PAGE_SIZE) {
             throw new BadRequestException(
@@ -35,10 +37,18 @@ public class ListStaffAssignedWorkshopsUseCaseImpl
             );
         }
 
+        StaffWorkshopFilter filter = StaffWorkshopFilter.of(
+            query.status(),
+            query.from(),
+            query.to(),
+            query.q()
+        );
+
         return assignmentRepository.findAssignedWorkshopsByStaffUserId(
             query.staffUserId(),
             query.cursor(),
-            effectiveSize
+            effectiveSize,
+            filter
         );
     }
 }

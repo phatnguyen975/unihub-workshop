@@ -275,4 +275,162 @@ class StaffWorkshopControllerTest {
                 )
             );
     }
+
+    @Test
+    @DisplayName("Should bind and forward filter parameters to use case")
+    void shouldBindAndForwardFilterParameters_whenProvided() throws Exception {
+        CursorPage<StaffAssignedWorkshop> emptyPage = new CursorPage<>(
+            List.of(),
+            null,
+            false
+        );
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenReturn(emptyPage);
+        when(presentationMapper.toPageResponse(emptyPage)).thenReturn(
+            PageResponse.of(List.of(), null, false)
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned")
+                    .principal(staffAuth(STAFF_ID))
+                    .param("status", "PUBLISHED")
+                    .param("from", "2026-11-12T00:00:00Z")
+                    .param("to", "2026-11-18T00:00:00Z")
+                    .param("q", "python")
+            )
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<ListStaffAssignedWorkshopsQuery> captor =
+            ArgumentCaptor.forClass(ListStaffAssignedWorkshopsQuery.class);
+        verify(useCase).execute(captor.capture());
+        assertThat(captor.getValue().status()).isEqualTo("PUBLISHED");
+        assertThat(captor.getValue().from()).isEqualTo("2026-11-12T00:00:00Z");
+        assertThat(captor.getValue().to()).isEqualTo("2026-11-18T00:00:00Z");
+        assertThat(captor.getValue().q()).isEqualTo("python");
+    }
+
+    @Test
+    @DisplayName(
+        "Should return 400 Bad Request when invalid status is provided"
+    )
+    void shouldReturnBadRequest_whenInvalidStatusProvided() throws Exception {
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenThrow(
+            new BadRequestException(
+                "The 'status' parameter must be 'PUBLISHED' or 'COMPLETED'."
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned")
+                    .principal(staffAuth(STAFF_ID))
+                    .param("status", "CANCELED")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "The 'status' parameter must be 'PUBLISHED' or 'COMPLETED'."
+                )
+            );
+    }
+
+    @Test
+    @DisplayName("Should return 400 Bad Request when from is after to")
+    void shouldReturnBadRequest_whenFromIsAfterTo() throws Exception {
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenThrow(
+            new BadRequestException(
+                "The 'from' timestamp must be before or equal to the 'to' timestamp."
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned")
+                    .principal(staffAuth(STAFF_ID))
+                    .param("from", "2026-11-20T00:00:00Z")
+                    .param("to", "2026-11-10T00:00:00Z")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "The 'from' timestamp must be before or equal to the 'to' timestamp."
+                )
+            );
+    }
+
+    @Test
+    @DisplayName("Should return 400 Bad Request when q exceeds 200 characters")
+    void shouldReturnBadRequest_whenQExceeds200Characters() throws Exception {
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenThrow(
+            new BadRequestException(
+                "The 'q' parameter must not exceed 200 characters."
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned")
+                    .principal(staffAuth(STAFF_ID))
+                    .param("q", "a".repeat(201))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "The 'q' parameter must not exceed 200 characters."
+                )
+            );
+    }
+
+    @Test
+    @DisplayName(
+        "Should return 400 Bad Request when cursor filter fingerprint mismatches"
+    )
+    void shouldReturnBadRequest_whenCursorFilterFingerprintMismatches()
+        throws Exception {
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenThrow(
+            new BadRequestException(
+                "Cursor was issued for a different filter set. Discard the cursor and start from page 1."
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned")
+                    .principal(staffAuth(STAFF_ID))
+                    .param("cursor", "mismatched-cursor")
+                    .param("status", "COMPLETED")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "Cursor was issued for a different filter set. Discard the cursor and start from page 1."
+                )
+            );
+    }
 }

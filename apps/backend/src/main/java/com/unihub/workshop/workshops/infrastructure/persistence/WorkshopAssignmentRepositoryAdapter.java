@@ -1,11 +1,13 @@
 package com.unihub.workshop.workshops.infrastructure.persistence;
 
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import com.unihub.workshop.shared.pagination.JpaKeysetPagination;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopAssignmentRepository;
 import com.unihub.workshop.workshops.domain.model.StaffAssignedWorkshop;
+import com.unihub.workshop.workshops.domain.model.StaffWorkshopFilter;
 import com.unihub.workshop.workshops.domain.model.WorkshopAssignment;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.infrastructure.persistence.mapper.WorkshopAssignmentPersistenceMapper;
@@ -19,6 +21,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -254,9 +257,7 @@ public class WorkshopAssignmentRepositoryAdapter
             organizationId,
             staffUserIds
         );
-        Map<UUID, Integer> result = new java.util.HashMap<>(
-            staffUserIds.size()
-        );
+        Map<UUID, Integer> result = new HashMap<>(staffUserIds.size());
         for (UUID userId : staffUserIds) {
             result.put(userId, 0);
         }
@@ -290,54 +291,125 @@ public class WorkshopAssignmentRepositoryAdapter
         String cursorString,
         int size
     ) {
+        return findAssignedWorkshopsByStaffUserId(
+            staffUserId,
+            cursorString,
+            size,
+            null
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CursorPage<StaffAssignedWorkshop> findAssignedWorkshopsByStaffUserId(
+        UUID staffUserId,
+        String cursorString,
+        int size,
+        StaffWorkshopFilter filter
+    ) {
         if (staffUserId == null) {
             return new CursorPage<>(Collections.emptyList(), null, false);
         }
 
         int effectiveSize = size > 0 ? size : 20;
+        String filterFingerprint =
+            filter != null
+                ? filter.toFingerprint()
+                : StaffWorkshopFilter.empty().toFingerprint();
+
         KeysetCursor cursor = KeysetCursorCodec.decode(
             cursorString,
             "startsAt",
-            null
+            filterFingerprint
         );
+
+        if (
+            cursor != null &&
+            cursor.filterFingerprint() == null &&
+            filter != null &&
+            !filter.isEmpty()
+        ) {
+            throw new BadRequestException(
+                "Cursor was issued for a different filter set. Discard the cursor and start from page 1."
+            );
+        }
+
         Instant cursorStartsAt = cursor != null ? cursor.asInstant() : null;
         UUID cursorId = cursor != null ? cursor.id() : null;
 
-        String sql = """
-            SELECT
-                w.id AS workshop_id,
-                w.title,
-                w.slug,
-                w.description,
-                w.cover_image_url,
-                w.location,
-                w.starts_at,
-                w.ends_at,
-                w.status,
-                o.name AS organization_name,
-                a.assigned_at
-            FROM workshop_assignments a
-            INNER JOIN workshops w ON a.workshop_id = w.id
-            INNER JOIN organizations o ON w.organization_id = o.id
-            WHERE a.staff_user_id = :staffUserId
-              AND w.status <> 'CANCELED'
-              AND (
-                (:cursorId IS NULL)
-                OR (:cursorStartsAt IS NOT NULL AND (
-                    w.starts_at > :cursorStartsAt
-                    OR (w.starts_at = :cursorStartsAt AND w.id > :cursorId)
-                    OR w.starts_at IS NULL
-                ))
-                OR (:cursorStartsAt IS NULL AND :cursorId IS NOT NULL AND (
-                    w.starts_at IS NULL AND w.id > :cursorId
-                ))
-              )
-            ORDER BY w.starts_at ASC NULLS LAST, w.id ASC
-            LIMIT :queryLimit
-        """;
+        StringBuilder sql = new StringBuilder(
+            """
+                SELECT
+                    w.id AS workshop_id,
+                    w.title,
+                    w.slug,
+                    w.description,
+                    w.cover_image_url,
+                    w.location,
+                    w.starts_at,
+                    w.ends_at,
+                    w.status,
+                    o.name AS organization_name,
+                    a.assigned_at
+                FROM workshop_assignments a
+                INNER JOIN workshops w ON a.workshop_id = w.id
+                INNER JOIN organizations o ON w.organization_id = o.id
+                WHERE a.staff_user_id = :staffUserId
+                  AND w.status <> 'CANCELED'
+            """
+        );
 
-        jakarta.persistence.Query query = entityManager.createNativeQuery(sql);
-        query.setParameter("staffUserId", staffUserId);
+        Map<String, Object> params = new HashMap<>();
+        params.put("staffUserId", staffUserId);
+
+        if (filter != null) {
+            if (filter.status() != null) {
+                sql.append(" AND w.status = :status");
+                params.put("status", filter.status().name());
+            }
+            if (filter.from() != null) {
+                sql.append(" AND w.starts_at >= :fromTimestamp");
+                params.put(
+                    "fromTimestamp",
+                    java.sql.Timestamp.from(filter.from())
+                );
+            }
+            if (filter.to() != null) {
+                sql.append(" AND w.starts_at <= :toTimestamp");
+                params.put("toTimestamp", java.sql.Timestamp.from(filter.to()));
+            }
+            if (filter.q() != null && !filter.q().isBlank()) {
+                sql.append(
+                    " AND (LOWER(w.title) LIKE :qPattern OR LOWER(w.slug) LIKE :qPattern OR (w.location IS NOT NULL AND LOWER(w.location) LIKE :qPattern))"
+                );
+                params.put("qPattern", "%" + filter.q().toLowerCase() + "%");
+            }
+        }
+
+        sql.append(
+            """
+                  AND (
+                    (:cursorId IS NULL)
+                    OR (:cursorStartsAt IS NOT NULL AND (
+                        w.starts_at > :cursorStartsAt
+                        OR (w.starts_at = :cursorStartsAt AND w.id > :cursorId)
+                        OR w.starts_at IS NULL
+                    ))
+                    OR (:cursorStartsAt IS NULL AND :cursorId IS NOT NULL AND (
+                        w.starts_at IS NULL AND w.id > :cursorId
+                    ))
+                  )
+                ORDER BY w.starts_at ASC NULLS LAST, w.id ASC
+                LIMIT :queryLimit
+            """
+        );
+
+        jakarta.persistence.Query query = entityManager.createNativeQuery(
+            sql.toString()
+        );
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            query.setParameter(entry.getKey(), entry.getValue());
+        }
         query.setParameter(
             "cursorStartsAt",
             cursorStartsAt != null
@@ -405,7 +477,7 @@ public class WorkshopAssignmentRepositoryAdapter
                 "startsAt",
                 primaryVal,
                 null,
-                null
+                filterFingerprint
             );
             nextCursor = KeysetCursorCodec.encode(nextKeysetCursor);
         }

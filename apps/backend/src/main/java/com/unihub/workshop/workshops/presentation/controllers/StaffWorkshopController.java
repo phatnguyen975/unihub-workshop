@@ -33,13 +33,25 @@ public class StaffWorkshopController {
     > getAssignedWorkshops(
         @RequestParam(name = "cursor", required = false) String cursor,
         @RequestParam(name = "size", required = false) Integer size,
+        @RequestParam(name = "status", required = false) String status,
+        @RequestParam(name = "from", required = false) String from,
+        @RequestParam(name = "to", required = false) String to,
+        @RequestParam(name = "q", required = false) String q,
         Authentication authentication
     ) {
         SecurityContextUtils.verifyRole(authentication, "STAFF");
         UUID staffUserId = SecurityContextUtils.extractUserId(authentication);
 
         ListStaffAssignedWorkshopsQuery query =
-            new ListStaffAssignedWorkshopsQuery(staffUserId, cursor, size);
+            new ListStaffAssignedWorkshopsQuery(
+                staffUserId,
+                cursor,
+                size,
+                status,
+                from,
+                to,
+                q
+            );
 
         CursorPage<StaffAssignedWorkshop> page =
             listStaffAssignedWorkshopsUseCase.execute(query);

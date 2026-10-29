@@ -52,7 +52,7 @@ This plan decomposes the backend data provisioning capability (`GET /api/v1/work
 
 ### Phase 2: Filtering & Cursor Integrity
 
-- [ ] **T2 — Filtered Provisioning with Fingerprint Integrity Verification (Filtered Slice)**
+- [x] **T2 — Filtered Provisioning with Fingerprint Integrity Verification (Filtered Slice)**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Domain, Application, Infrastructure (Persistence), Presentation (Web/REST)
@@ -75,11 +75,11 @@ This plan decomposes the backend data provisioning capability (`GET /api/v1/work
 
 #### Checkpoint: Feature Complete
 
-- [ ] All tasks (T1, T2) are checked off.
-- [ ] Every acceptance criterion across Scenarios 1 through 14 has been verified.
-- [ ] Full backend test suite passes: `./gradlew test`.
-- [ ] Spring Modulith module boundaries verified via `ModulithArchitectureTest`.
-- [ ] Ready for `/review mobile-offline-checkin`.
+- [x] All tasks (T1, T2) are checked off.
+- [x] Every acceptance criterion across Scenarios 1 through 14 has been verified.
+- [x] Spring Modulith module boundaries verified via `ModulithArchitectureTest`.
+- [x] Full backend test suite passes: `./gradlew test`.
+- [x] Ready for `/review mobile-offline-checkin`.
 
 ## 4. Risks and Mitigations
 
