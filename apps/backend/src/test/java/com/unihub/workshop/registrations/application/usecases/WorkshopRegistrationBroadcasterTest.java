@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,15 +25,29 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+@ExtendWith(MockitoExtension.class)
 class WorkshopRegistrationBroadcasterTest {
 
+    @Mock
     private RegistrationRepository registrationRepository;
+
+    @Mock
     private WorkshopApi workshopApi;
+
+    @Mock
     private RealtimeEventPublisher realtimeEventPublisher;
+
+    @Captor
+    private ArgumentCaptor<RealtimeEvent<Map<String, Object>>> eventCaptor;
+
     private WorkshopRegistrationBroadcasterImpl broadcaster;
 
     private final UUID workshopId = UUID.randomUUID();
@@ -42,10 +55,6 @@ class WorkshopRegistrationBroadcasterTest {
 
     @BeforeEach
     void setUp() {
-        registrationRepository = mock(RegistrationRepository.class);
-        workshopApi = mock(WorkshopApi.class);
-        realtimeEventPublisher = mock(RealtimeEventPublisher.class);
-
         broadcaster = new WorkshopRegistrationBroadcasterImpl(
             registrationRepository,
             workshopApi,
@@ -101,9 +110,6 @@ class WorkshopRegistrationBroadcasterTest {
 
         broadcaster.broadcast(workshopId);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<RealtimeEvent<Map<String, Object>>> eventCaptor =
-            ArgumentCaptor.forClass(RealtimeEvent.class);
         verify(realtimeEventPublisher).publishToWorkshop(
             eq(workshopId),
             eventCaptor.capture()
@@ -146,9 +152,6 @@ class WorkshopRegistrationBroadcasterTest {
 
         broadcaster.broadcast(workshopId);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<RealtimeEvent<Map<String, Object>>> eventCaptor =
-            ArgumentCaptor.forClass(RealtimeEvent.class);
         verify(realtimeEventPublisher).publishToWorkshop(
             eq(workshopId),
             eventCaptor.capture()
@@ -180,9 +183,6 @@ class WorkshopRegistrationBroadcasterTest {
 
         broadcaster.broadcast(workshopId);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<RealtimeEvent<Map<String, Object>>> eventCaptor =
-            ArgumentCaptor.forClass(RealtimeEvent.class);
         verify(realtimeEventPublisher).publishToWorkshop(
             eq(workshopId),
             eventCaptor.capture()
@@ -216,9 +216,6 @@ class WorkshopRegistrationBroadcasterTest {
 
         broadcaster.broadcast(workshopId);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<RealtimeEvent<Map<String, Object>>> eventCaptor =
-            ArgumentCaptor.forClass(RealtimeEvent.class);
         verify(realtimeEventPublisher).publishToWorkshop(
             eq(workshopId),
             eventCaptor.capture()

@@ -372,7 +372,7 @@ erDiagram
 | slug            | VARCHAR(255)  | NOT NULL, UNIQUE                                                          | URL-safe identifier for SEO-friendly and shareable workshop links. Synchronized with title. |
 | description     | TEXT          | NULL                                                                      | Long-form details for the workshop page. Optional in DRAFT; mandatory in PUBLISHED.         |
 | cover_image_url | TEXT          | NULL                                                                      | Catalog image banner. Optional in DRAFT; mandatory in PUBLISHED.                            |
-| location        | VARCHAR(255)  | NULL                                                                      | Physical location for the workshop. Optional in DRAFT; mandatory in PUBLISHED.              |
+| location        | VARCHAR(255)  | NOT NULL                                                                  | Physical location for the workshop. Optional in DRAFT; mandatory in PUBLISHED.              |
 | timezone        | VARCHAR(64)   | NOT NULL, DEFAULT 'Asia/Ho_Chi_Minh'                                      | IANA time zone (e.g., Asia/Ho_Chi_Minh, Asia/Singapore).                                    |
 | starts_at       | TIMESTAMPTZ   | NULL                                                                      | Start time. Optional in DRAFT; mandatory in PUBLISHED.                                      |
 | ends_at         | TIMESTAMPTZ   | NULL, CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at > starts_at) | End time. Optional in DRAFT; mandatory in PUBLISHED.                                        |
