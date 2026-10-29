@@ -19,7 +19,7 @@ This plan decomposes the backend data provisioning capability (`GET /api/v1/work
 
 ### Phase 1: Core Assigned Workshops Provisioning Flow
 
-- [ ] **T1 — Authenticated Keyset-Paginated Assigned Workshop Provisioning (Core Slice)**
+- [x] **T1 — Authenticated Keyset-Paginated Assigned Workshop Provisioning (Core Slice)**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure (Persistence), Presentation (Web/REST)
@@ -47,8 +47,8 @@ This plan decomposes the backend data provisioning capability (`GET /api/v1/work
 
 #### Checkpoint: Core Provisioning Baseline
 
-- [ ] Task T1 passes all unit and MockMvc slice tests.
-- [ ] Spring Modulith architecture test passes: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
+- [x] Task T1 passes all unit and MockMvc slice tests.
+- [x] Spring Modulith architecture test passes: `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"`.
 
 ### Phase 2: Filtering & Cursor Integrity
 

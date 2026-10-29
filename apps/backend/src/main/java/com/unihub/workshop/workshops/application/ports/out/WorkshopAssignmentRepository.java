@@ -1,6 +1,7 @@
 package com.unihub.workshop.workshops.application.ports.out;
 
 import com.unihub.workshop.shared.pagination.CursorPage;
+import com.unihub.workshop.workshops.domain.model.StaffAssignedWorkshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopAssignment;
 import java.time.Instant;
 import java.util.Collection;
@@ -10,6 +11,21 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface WorkshopAssignmentRepository {
+    /**
+     * Finds paginated workshops assigned to a staff user, sorted by starts_at ASC, id ASC.
+     * Excludes CANCELED workshops.
+     *
+     * @param staffUserId staff user identifier
+     * @param cursor keyset cursor string
+     * @param size page size
+     * @return cursor page of assigned workshops
+     */
+    CursorPage<StaffAssignedWorkshop> findAssignedWorkshopsByStaffUserId(
+        UUID staffUserId,
+        String cursor,
+        int size
+    );
+
     /**
      * Finds paginated staff assignments for a workshop, sorted by assigned_at DESC, id DESC.
      *
