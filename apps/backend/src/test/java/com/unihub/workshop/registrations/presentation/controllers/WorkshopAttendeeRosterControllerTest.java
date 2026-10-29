@@ -360,4 +360,46 @@ class WorkshopAttendeeRosterControllerTest {
             )
             .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @DisplayName(
+        "Whitespace in cursor and status parameters is trimmed and normalized"
+    )
+    void getRoster_WhitespaceInCursorAndStatus_TrimsBeforeQuery()
+        throws Exception {
+        CursorPage<WorkshopAttendeeRosterItem> emptyPage = new CursorPage<>(
+            List.of(),
+            null,
+            false
+        );
+        when(
+            getRosterUseCase.getRoster(
+                any(GetWorkshopAttendeeRosterQuery.class)
+            )
+        ).thenReturn(emptyPage);
+
+        mockMvc
+            .perform(
+                get(
+                    "/api/v1/admin/workshops/{workshopId}/registrations",
+                    workshopId
+                )
+                    .param("cursor", "   trimmed-cursor   ")
+                    .param("status", "   CONFIRMED   ")
+                    .principal(
+                        createOrganizerAuth(organizerUserId, organizationId)
+                    )
+            )
+            .andExpect(status().isOk());
+
+        verify(getRosterUseCase).getRoster(
+            new GetWorkshopAttendeeRosterQuery(
+                workshopId,
+                organizationId,
+                "CONFIRMED",
+                "trimmed-cursor",
+                null
+            )
+        );
+    }
 }

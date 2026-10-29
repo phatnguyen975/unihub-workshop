@@ -29,6 +29,7 @@ public record WorkshopAttendeeRosterResponse(
      * @param currency ISO currency code
      * @param registeredAt registration creation timestamp
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record AttendeeRosterItemResponse(
         UUID id,
         StudentSummaryResponse student,
@@ -46,6 +47,7 @@ public record WorkshopAttendeeRosterResponse(
      * @param studentNumber student institutional registration number
      * @param email student institutional email address
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record StudentSummaryResponse(
         UUID id,
         String fullName,
@@ -59,6 +61,7 @@ public record WorkshopAttendeeRosterResponse(
      * @param nextCursor opaque base64 cursor token, or null if no further pages
      * @param hasMore true if subsequent pages exist
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record CursorResponse(String nextCursor, boolean hasMore) {}
 
     /**

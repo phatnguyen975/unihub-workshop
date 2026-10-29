@@ -22,9 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Controller for workshop registration monitoring and roster management by organizers.
- */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/admin/workshops/{workshopId}/registrations")
@@ -61,15 +58,7 @@ public class WorkshopRegistrationMonitoringController {
             getWorkshopRegistrationSummaryUseCase.getSummary(query);
 
         WorkshopRegistrationSummaryResponse response =
-            new WorkshopRegistrationSummaryResponse(
-                summary.workshopId(),
-                summary.capacity(),
-                summary.confirmedCount(),
-                summary.pendingCount(),
-                summary.availableSeats(),
-                summary.occupancyPercentage(),
-                summary.lastUpdatedAt()
-            );
+            WorkshopRegistrationSummaryResponse.of(summary);
 
         return ApiResponse.success(response, "Registration summary retrieved");
     }
@@ -101,12 +90,17 @@ public class WorkshopRegistrationMonitoringController {
             authentication
         );
 
+        String normalizedCursor =
+            cursor != null && !cursor.isBlank() ? cursor.trim() : null;
+        String normalizedStatus =
+            status != null && !status.isBlank() ? status.trim() : null;
+
         GetWorkshopAttendeeRosterQuery query =
             new GetWorkshopAttendeeRosterQuery(
                 workshopId,
                 callerOrgId,
-                status,
-                cursor,
+                normalizedStatus,
+                normalizedCursor,
                 size
             );
 

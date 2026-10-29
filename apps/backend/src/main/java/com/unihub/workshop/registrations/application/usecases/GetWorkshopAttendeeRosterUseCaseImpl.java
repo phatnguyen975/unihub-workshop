@@ -83,11 +83,16 @@ public class GetWorkshopAttendeeRosterUseCaseImpl
         }
 
         // 5. Query keyset paginated registrations from read replica
+        String normalizedCursor =
+            query.cursor() != null && !query.cursor().isBlank()
+                ? query.cursor().trim()
+                : null;
+
         CursorPage<Registration> registrationPage =
             registrationRepository.findByWorkshopId(
                 query.workshopId(),
                 status,
-                query.cursor(),
+                normalizedCursor,
                 size
             );
 

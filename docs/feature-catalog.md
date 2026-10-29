@@ -346,7 +346,7 @@
 
 ### 4.4 `workshop-registration-monitoring-and-roster`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Provides `ORGANIZER` users with operational visibility into workshop registration progress and attendee details. Exposes two primary capabilities: (1) **Registration Summary Endpoint (`GET /api/v1/admin/workshops/{workshopId}/registrations/summary`)** returning real-time operational metrics: total capacity, confirmed registrations count, pending registrations count, available seats (`Math.max(0, capacity - confirmedCount - pendingCount)`), and occupancy percentage (`(confirmedCount * 100.0) / capacity`, rounded to 2 decimal places). (2) **Attendee Roster Endpoint (`GET /api/v1/admin/workshops/{workshopId}/registrations`)** returning a cursor-paginated list of registered students (with nested `student: { id, fullName, studentNumber, email }`, registration status `CONFIRMED`/`PENDING`/`CANCELED`, ticket price, currency, registration timestamp), filterable by `status`. When a registration transitions to `CONFIRMED` or `CANCELED` (via free registration, payment webhook, or sweeper/cancellation), the backend immediately publishes a `registration.updated` event to the Redis Pub/Sub workshop channel (`unihub:stream:workshop:{workshopId}`). The Real-Time Event Streaming Hub (F-10.5) pushes this event over the active multiplexed SSE stream (`GET /api/v1/stream/events`) of authorized organizers viewing that workshop's management dashboard, dynamically updating the registration counter and progress indicators in real time without manual polling or page reloads.
 
