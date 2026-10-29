@@ -3,6 +3,7 @@ package com.unihub.workshop.registrations.application.strategy;
 import com.unihub.workshop.iam.api.dto.StudentProfileDto;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.QrTicket;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.shared.events.WorkshopRegisteredEvent;
@@ -26,6 +27,7 @@ public class FreeRegistrationStrategy implements RegistrationStrategy {
     private final RegistrationRepository registrationRepository;
     private final QrSignaturePort qrSignatureService;
     private final ApplicationEventPublisher eventPublisher;
+    private final WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
 
     @Override
     public boolean supports(WorkshopRegistrationDetailsDto workshop) {
@@ -81,6 +83,7 @@ public class FreeRegistrationStrategy implements RegistrationStrategy {
             now
         );
         eventPublisher.publishEvent(event);
+        workshopRegistrationBroadcaster.broadcast(workshop.id());
 
         return saved;
     }

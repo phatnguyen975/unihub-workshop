@@ -2,6 +2,7 @@ package com.unihub.workshop.registrations.application.ports.out;
 
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
+import com.unihub.workshop.registrations.domain.model.WorkshopRegistrationRawCounts;
 import com.unihub.workshop.shared.pagination.CursorPage;
 import java.time.Instant;
 import java.util.Collection;
@@ -102,4 +103,28 @@ public interface RegistrationRepository {
      * @return true if updated, false if registration was not found or was not in CONFIRMED status
      */
     boolean cancelRegistration(UUID id, UUID updatedBy, Instant now);
+
+    /**
+     * Retrieves aggregated raw seat counts (CONFIRMED, PENDING) and latest registration update timestamp.
+     *
+     * @param workshopId workshop ID
+     * @return raw counts snapshot
+     */
+    WorkshopRegistrationRawCounts getRegistrationRawCounts(UUID workshopId);
+
+    /**
+     * Finds keyset cursor-paginated registrations belonging to the specified workshop.
+     *
+     * @param workshopId workshop ID
+     * @param status optional status filter
+     * @param cursor optional keyset cursor
+     * @param size page window size
+     * @return CursorPage of Registration items
+     */
+    CursorPage<Registration> findByWorkshopId(
+        UUID workshopId,
+        RegistrationStatus status,
+        String cursor,
+        int size
+    );
 }

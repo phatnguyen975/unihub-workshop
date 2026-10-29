@@ -48,4 +48,12 @@ public interface RegistrationApi {
     Map<UUID, RegistrationPaymentContextDto> getPaymentContexts(
         Collection<UUID> registrationIds
     );
+
+    /**
+     * Broadcasts the real-time 6-field seat count snapshot for a given workshop
+     * to the workshop channel on registration state changes.
+     *
+     * @param workshopId unique identifier of the target workshop
+     */
+    void broadcastSeatCountSnapshot(UUID workshopId);
 }

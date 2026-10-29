@@ -7,6 +7,7 @@ import com.unihub.workshop.registrations.api.dto.FailPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentStatusResult;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.shared.idempotency.IdempotencyKeyJpaRepository;
@@ -57,6 +58,7 @@ public class RegistrationReconciliationSweeper {
     private final StringRedisTemplate redisTemplate;
     private final IdempotencyKeyJpaRepository idempotencyKeyJpaRepository;
     private final RealtimeEventPublisher realtimeEventPublisher;
+    private final WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
     private final TransactionOperations transactionOperations;
     private final int batchSize;
 
@@ -67,6 +69,7 @@ public class RegistrationReconciliationSweeper {
         StringRedisTemplate redisTemplate,
         IdempotencyKeyJpaRepository idempotencyKeyJpaRepository,
         RealtimeEventPublisher realtimeEventPublisher,
+        WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster,
         TransactionOperations transactionOperations,
         @Value("${app.registrations.sweeper.batch-size:100}") int batchSize
     ) {
@@ -76,6 +79,7 @@ public class RegistrationReconciliationSweeper {
         this.redisTemplate = redisTemplate;
         this.idempotencyKeyJpaRepository = idempotencyKeyJpaRepository;
         this.realtimeEventPublisher = realtimeEventPublisher;
+        this.workshopRegistrationBroadcaster = workshopRegistrationBroadcaster;
         this.transactionOperations = transactionOperations;
         this.batchSize = batchSize;
     }
@@ -467,20 +471,9 @@ public class RegistrationReconciliationSweeper {
                 userEvent
             );
 
-            // 2. registration.updated to workshop's stream: unihub:stream:workshop:{workshopId}
-            Map<String, Object> workshopPayload = Map.of(
-                "workshopId",
-                confirmedDto.workshopId(),
-                "status",
-                "CONFIRMED"
-            );
-            RealtimeEvent<Map<String, Object>> workshopEvent = RealtimeEvent.of(
-                RealtimeEventType.REGISTRATION_UPDATED,
-                workshopPayload
-            );
-            realtimeEventPublisher.publishToWorkshop(
-                confirmedDto.workshopId(),
-                workshopEvent
+            // 2. registration.updated to workshop's stream: unihub:stream:workshop:{workshopId} with 6-field seat count snapshot
+            workshopRegistrationBroadcaster.broadcast(
+                confirmedDto.workshopId()
             );
         } catch (Exception e) {
             log.error(

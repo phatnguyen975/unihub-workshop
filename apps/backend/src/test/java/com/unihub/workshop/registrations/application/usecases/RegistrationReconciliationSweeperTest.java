@@ -23,6 +23,7 @@ import com.unihub.workshop.registrations.api.dto.FailPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.PaymentStatusResult;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
+import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrationBroadcaster;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
@@ -55,6 +56,7 @@ class RegistrationReconciliationSweeperTest {
     private ValueOperations<String, String> valueOperations;
     private IdempotencyKeyJpaRepository idempotencyKeyJpaRepository;
     private RealtimeEventPublisher realtimeEventPublisher;
+    private WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
     private TransactionOperations transactionOperations;
     private RegistrationReconciliationSweeper sweeper;
 
@@ -74,6 +76,9 @@ class RegistrationReconciliationSweeperTest {
 
         idempotencyKeyJpaRepository = mock(IdempotencyKeyJpaRepository.class);
         realtimeEventPublisher = mock(RealtimeEventPublisher.class);
+        workshopRegistrationBroadcaster = mock(
+            WorkshopRegistrationBroadcaster.class
+        );
         transactionOperations = mock(TransactionOperations.class);
 
         when(transactionOperations.execute(any())).thenAnswer(invocation -> {
@@ -97,6 +102,7 @@ class RegistrationReconciliationSweeperTest {
             redisTemplate,
             idempotencyKeyJpaRepository,
             realtimeEventPublisher,
+            workshopRegistrationBroadcaster,
             transactionOperations,
             100
         );
@@ -264,7 +270,7 @@ class RegistrationReconciliationSweeperTest {
         assertThat(keyCaptor.getValue().getStatus()).isEqualTo("COMPLETED");
 
         verify(realtimeEventPublisher).publishToUser(eq(studentUserId), any());
-        verify(realtimeEventPublisher).publishToWorkshop(eq(workshopId), any());
+        verify(workshopRegistrationBroadcaster).broadcast(workshopId);
         verify(redisTemplate, never()).delete(
             "lock:sweeper:registration-reconciliation"
         );
@@ -423,7 +429,7 @@ class RegistrationReconciliationSweeperTest {
             any()
         );
         verify(realtimeEventPublisher).publishToUser(eq(studentUserId), any());
-        verify(realtimeEventPublisher).publishToWorkshop(eq(workshopId), any());
+        verify(workshopRegistrationBroadcaster).broadcast(workshopId);
     }
 
     @Test
