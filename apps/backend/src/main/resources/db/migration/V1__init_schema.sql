@@ -282,7 +282,7 @@ CREATE TABLE workshops (
     slug             VARCHAR(255)   NOT NULL,
     description      TEXT           NULL,
     cover_image_url  TEXT           NULL,
-    location         VARCHAR(255)   NULL,
+    location         VARCHAR(255)   NOT NULL,
     timezone         VARCHAR(64)    NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
     starts_at        TIMESTAMPTZ    NULL,
     ends_at          TIMESTAMPTZ    NULL,

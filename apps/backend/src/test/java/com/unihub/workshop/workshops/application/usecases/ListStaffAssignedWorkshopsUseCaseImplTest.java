@@ -343,4 +343,73 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
             any()
         );
     }
+
+    @Test
+    @DisplayName(
+        "Should forward the exact size to the repository without defaulting in the adapter layer"
+    )
+    void shouldForwardExactSizeToRepository_sf03Regression() {
+        // Use size=1 (minimum valid) — if adapter applied "size > 0 ? size : 20"
+        // this would still pass, but size=1 proves the contract boundary is honored.
+        // More critically, this verifies the use case layer — not the adapter —
+        // is the sole owner of size semantics.
+        CursorPage<StaffAssignedWorkshop> expectedPage = new CursorPage<>(
+            List.of(),
+            null,
+            false
+        );
+        when(
+            assignmentRepository.findAssignedWorkshopsByStaffUserId(
+                eq(staffUserId),
+                eq(null),
+                eq(1),
+                any(StaffWorkshopFilter.class)
+            )
+        ).thenReturn(expectedPage);
+
+        ListStaffAssignedWorkshopsQuery query =
+            new ListStaffAssignedWorkshopsQuery(staffUserId, null, 1);
+        CursorPage<StaffAssignedWorkshop> result = useCase.execute(query);
+
+        assertThat(result).isNotNull();
+        // The strict eq(1) mock expectation verifies size=1 was forwarded exactly.
+        verify(assignmentRepository).findAssignedWorkshopsByStaffUserId(
+            eq(staffUserId),
+            eq(null),
+            eq(1),
+            any(StaffWorkshopFilter.class)
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "[SF-03] Should forward the exact size=100 (maximum) to repository without capping"
+    )
+    void shouldForwardMaxSizeToRepository_sf03Regression() {
+        CursorPage<StaffAssignedWorkshop> expectedPage = new CursorPage<>(
+            List.of(),
+            null,
+            false
+        );
+        when(
+            assignmentRepository.findAssignedWorkshopsByStaffUserId(
+                eq(staffUserId),
+                eq(null),
+                eq(100),
+                any(StaffWorkshopFilter.class)
+            )
+        ).thenReturn(expectedPage);
+
+        ListStaffAssignedWorkshopsQuery query =
+            new ListStaffAssignedWorkshopsQuery(staffUserId, null, 100);
+        CursorPage<StaffAssignedWorkshop> result = useCase.execute(query);
+
+        assertThat(result).isNotNull();
+        verify(assignmentRepository).findAssignedWorkshopsByStaffUserId(
+            eq(staffUserId),
+            eq(null),
+            eq(100),
+            any(StaffWorkshopFilter.class)
+        );
+    }
 }

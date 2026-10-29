@@ -405,7 +405,7 @@
 
 ### 6.1 `mobile-offline-checkin`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Implements the authenticated backend data provisioning endpoint (`GET /api/v1/workshops/assigned`) enabling Check-in Staff (`STAFF` role) to query, browse, and download their assigned workshops with keyset cursor pagination (`cursor`, `size`), filtering (by status, date range `from`/`to`, search query `q`), and schedule sorting (defaulting to `starts_at,asc`). This endpoint provides the prerequisite server-side data feed for mobile check-in clients to cache workshop metadata in local SQLite (`mobile_assigned_workshops`) before proceeding to offline on-site check-in.
 
@@ -421,7 +421,7 @@
 
 ### 6.2 `attendance-sync-reconciliation`
 
-> **Status:** BLOCKED
+> **Status:** READY
 
 **Description:** Implements the server-side `POST /api/v1/workshops/{workshopId}/attendances/sync` endpoint that authoritatively reconciles batched attendance events from the mobile app. The endpoint: (1) validates the `STAFF` JWT and confirms the caller is assigned to `{workshopId}` via `workshop_assignments`; (2) extracts all `registration_id` values from the batch payload and performs a single **workshop-scoped bulk fetch** of existing attendance records from the primary DB; (3) classifies each entry in-memory as `SUCCESS` (new scan), `ALREADY_USED` (same `registration_id`, different `sync_id`), or `INVALID_TICKET` (registration not found or not `CONFIRMED` for this workshop); (4) performs a **single bulk upsert** using DB-level unique constraints on `(workshop_id, registration_id)` and `(workshop_id, sync_id)` to resolve microsecond races — the `sync_id` unique constraint is the idempotency mechanism that guarantees a retried sync for the same scan does not create a duplicate row; (5) returns `207 Multi-Status` with per-entry `{ sync_id, status }` objects.
 
