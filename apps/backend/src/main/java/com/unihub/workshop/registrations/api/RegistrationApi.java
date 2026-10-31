@@ -4,6 +4,7 @@ import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.FailPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
 import com.unihub.workshop.registrations.api.dto.RegistrationPaymentContextDto;
+import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
@@ -46,6 +47,19 @@ public interface RegistrationApi {
      * @return registration context keyed by registration identifier; empty when no ids are supplied
      */
     Map<UUID, RegistrationPaymentContextDto> getPaymentContexts(
+        Collection<UUID> registrationIds
+    );
+
+    /**
+     * Resolves the ticket-validation context of several registrations in a single read.
+     *
+     * <p>Callers use this to decide whether a scanned ticket may be admitted without
+     * performing per-entry lookups. Unknown identifiers are simply absent from the result.
+     *
+     * @param registrationIds registration identifiers to resolve
+     * @return registration context keyed by registration identifier; empty when no ids are supplied
+     */
+    Map<UUID, RegistrationTicketContextDto> getTicketContexts(
         Collection<UUID> registrationIds
     );
 

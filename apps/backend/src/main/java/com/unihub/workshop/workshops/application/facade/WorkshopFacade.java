@@ -2,6 +2,7 @@ package com.unihub.workshop.workshops.application.facade;
 
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
+import com.unihub.workshop.workshops.application.ports.out.WorkshopAssignmentRepository;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import java.util.Collection;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkshopFacade implements WorkshopApi {
 
     private final WorkshopRepository workshopRepository;
+    private final WorkshopAssignmentRepository workshopAssignmentRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -55,6 +57,21 @@ public class WorkshopFacade implements WorkshopApi {
                     Function.identity()
                 )
             );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isStaffAssignedToWorkshop(
+        UUID workshopId,
+        UUID staffUserId
+    ) {
+        if (workshopId == null || staffUserId == null) {
+            return false;
+        }
+        return workshopAssignmentRepository.existsByWorkshopIdAndStaffUserId(
+            workshopId,
+            staffUserId
+        );
     }
 
     private WorkshopRegistrationDetailsDto toDetailsDto(Workshop workshop) {

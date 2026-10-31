@@ -26,7 +26,7 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 ### Phase 1: Core Reconciliation Path
 
-- [ ] **T1 — A batch of scans from an assigned STAFF user is reconciled, persisted as `VALID` / `OFFLINE_SYNC` records, and answered with one `207` outcome per entry**
+- [x] **T1 — A batch of scans from an assigned STAFF user is reconciled, persisted as `VALID` / `OFFLINE_SYNC` records, and answered with one `207` outcome per entry**
   - **Size:** M
   - **Depends on:** —
   - **Layers touched:** Domain, Application, Infrastructure (Persistence), Presentation (REST), plus additive edits to the `workshops::api` and `registrations::api` surfaces

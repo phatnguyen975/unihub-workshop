@@ -7,6 +7,7 @@ import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.FailPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
 import com.unihub.workshop.registrations.api.dto.RegistrationPaymentContextDto;
+import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
@@ -199,6 +200,30 @@ public class RegistrationFacade implements RegistrationApi {
                         registration.id(),
                         registration.workshopId(),
                         registration.studentUserId(),
+                        registration.status() != null
+                            ? registration.status().name()
+                            : null
+                    )
+                )
+            );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, RegistrationTicketContextDto> getTicketContexts(
+        Collection<UUID> registrationIds
+    ) {
+        if (registrationIds == null || registrationIds.isEmpty()) {
+            return Map.of();
+        }
+        return registrationRepository
+            .findAllByIds(registrationIds)
+            .stream()
+            .collect(
+                Collectors.toMap(Registration::id, registration ->
+                    new RegistrationTicketContextDto(
+                        registration.id(),
+                        registration.workshopId(),
                         registration.status() != null
                             ? registration.status().name()
                             : null
