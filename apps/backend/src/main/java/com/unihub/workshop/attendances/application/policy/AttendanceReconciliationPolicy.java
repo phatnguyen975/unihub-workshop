@@ -1,7 +1,9 @@
 package com.unihub.workshop.attendances.application.policy;
 
+import com.unihub.workshop.attendances.domain.model.Attendance;
 import com.unihub.workshop.attendances.domain.model.AttendanceClassification;
 import com.unihub.workshop.attendances.domain.model.AttendanceOutcome;
+import com.unihub.workshop.attendances.domain.model.AttendanceStatus;
 import com.unihub.workshop.attendances.domain.model.SyncEntry;
 import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import java.util.ArrayList;
@@ -72,21 +74,67 @@ public final class AttendanceReconciliationPolicy {
     }
 
     /**
-     * Classifies every submitted entry, preserving the submitted order.
+     * Selects the entries the reconciliation must attempt to persist.
      *
-     * <p>An entry is {@code SUCCESS} only when it was admissible and its {@code syncId}
-     * came back from the bulk write. Any other admissible entry lost the race or reused
-     * a {@code syncId}, so it is {@code ALREADY_USED}. An inadmissible entry is always
-     * {@code INVALID_TICKET}, regardless of the write outcome.
+     * <p>An entry qualifies only when its registration is admissible and no
+     * attendance record exists yet for that registration. A record that already
+     * exists — {@code VALID} or {@code INVALIDATED} — is never rewritten or
+     * reactivated, so it removes the entry from the insert set.
      *
      * @param entries submitted batch entries
      * @param admissibleRegistrationIds registrations that passed ticket validation
+     * @param existingByRegistrationId attendance records already stored for the batch
+     * @return the entries to insert, in the submitted order
+     */
+    public List<SyncEntry> resolveEntriesToInsert(
+        List<SyncEntry> entries,
+        Set<UUID> admissibleRegistrationIds,
+        Map<UUID, Attendance> existingByRegistrationId
+    ) {
+        if (entries == null || entries.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> admissible =
+            admissibleRegistrationIds != null
+                ? admissibleRegistrationIds
+                : Set.of();
+        Map<UUID, Attendance> existing =
+            existingByRegistrationId != null
+                ? existingByRegistrationId
+                : Map.of();
+        List<SyncEntry> toInsert = new ArrayList<>(entries.size());
+        for (SyncEntry entry : entries) {
+            if (!admissible.contains(entry.registrationId())) {
+                continue;
+            }
+            if (existing.containsKey(entry.registrationId())) {
+                continue;
+            }
+            toInsert.add(entry);
+        }
+        return List.copyOf(toInsert);
+    }
+
+    /**
+     * Classifies every submitted entry, preserving the submitted order.
+     *
+     * <p>The verdict follows a fixed precedence: an invalid ticket always wins;
+     * then an existing {@code INVALIDATED} record, which is terminal for this flow;
+     * then an existing {@code VALID} record carrying the same {@code syncId}, which
+     * means the scan was already applied; then an existing {@code VALID} record
+     * carrying a different {@code syncId}, which is a double scan; and only then a
+     * new insert, whose verdict depends on whether the bulk write persisted it.
+     *
+     * @param entries submitted batch entries
+     * @param admissibleRegistrationIds registrations that passed ticket validation
+     * @param existingByRegistrationId attendance records already stored for the batch
      * @param persistedSyncIds sync identifiers actually persisted by the bulk write
      * @return one outcome per submitted entry, in the submitted order
      */
     public List<AttendanceOutcome> classify(
         List<SyncEntry> entries,
         Set<UUID> admissibleRegistrationIds,
+        Map<UUID, Attendance> existingByRegistrationId,
         Set<UUID> persistedSyncIds
     ) {
         if (entries == null || entries.isEmpty()) {
@@ -96,33 +144,48 @@ public final class AttendanceReconciliationPolicy {
             admissibleRegistrationIds != null
                 ? admissibleRegistrationIds
                 : Set.of();
+        Map<UUID, Attendance> existing =
+            existingByRegistrationId != null
+                ? existingByRegistrationId
+                : Map.of();
         Set<UUID> persisted =
             persistedSyncIds != null ? persistedSyncIds : Set.of();
         List<AttendanceOutcome> outcomes = new ArrayList<>(entries.size());
         for (SyncEntry entry : entries) {
-            if (!admissible.contains(entry.registrationId())) {
-                outcomes.add(
-                    new AttendanceOutcome(
-                        entry.syncId(),
-                        AttendanceClassification.INVALID_TICKET
-                    )
-                );
-            } else if (persisted.contains(entry.syncId())) {
-                outcomes.add(
-                    new AttendanceOutcome(
-                        entry.syncId(),
-                        AttendanceClassification.SUCCESS
-                    )
-                );
-            } else {
-                outcomes.add(
-                    new AttendanceOutcome(
-                        entry.syncId(),
-                        AttendanceClassification.ALREADY_USED
-                    )
-                );
-            }
+            outcomes.add(
+                new AttendanceOutcome(
+                    entry.syncId(),
+                    classifyEntry(entry, admissible, existing, persisted)
+                )
+            );
         }
         return List.copyOf(outcomes);
+    }
+
+    private static AttendanceClassification classifyEntry(
+        SyncEntry entry,
+        Set<UUID> admissibleRegistrationIds,
+        Map<UUID, Attendance> existingByRegistrationId,
+        Set<UUID> persistedSyncIds
+    ) {
+        if (!admissibleRegistrationIds.contains(entry.registrationId())) {
+            return AttendanceClassification.INVALID_TICKET;
+        }
+
+        Attendance existing = existingByRegistrationId.get(
+            entry.registrationId()
+        );
+        if (existing != null) {
+            if (existing.status() != AttendanceStatus.VALID) {
+                return AttendanceClassification.ALREADY_USED;
+            }
+            return Objects.equals(entry.syncId(), existing.syncId())
+                ? AttendanceClassification.SUCCESS
+                : AttendanceClassification.ALREADY_USED;
+        }
+
+        return persistedSyncIds.contains(entry.syncId())
+            ? AttendanceClassification.SUCCESS
+            : AttendanceClassification.ALREADY_USED;
     }
 }

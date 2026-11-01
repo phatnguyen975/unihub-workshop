@@ -17,7 +17,6 @@ import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -38,21 +37,19 @@ public class NotificationController {
     private final NotificationPresentationMapper notificationPresentationMapper;
 
     @GetMapping("/unread-count")
-    public ResponseEntity<ApiResponse<UnreadCountResponse>> getUnreadCount(
+    public ApiResponse<UnreadCountResponse> getUnreadCount(
         Authentication authentication
     ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
         long count = getUnreadCountUseCase.getUnreadCount(userId);
-        return ResponseEntity.ok(
-            ApiResponse.success(
-                UnreadCountResponse.of(count),
-                "Unread count retrieved successfully"
-            )
+        return ApiResponse.success(
+            UnreadCountResponse.of(count),
+            "Unread count retrieved successfully"
         );
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<NotificationPageData>> getNotifications(
+    public ApiResponse<NotificationPageData> getNotifications(
         @RequestParam(required = false) String cursor,
         @RequestParam(required = false, defaultValue = "20") Integer size,
         @RequestParam(required = false) Boolean isRead,
@@ -73,13 +70,14 @@ public class NotificationController {
             result
         );
 
-        return ResponseEntity.ok(
-            ApiResponse.success(data, "Notifications retrieved successfully")
+        return ApiResponse.success(
+            data,
+            "Notifications retrieved successfully"
         );
     }
 
     @PatchMapping("/read-all")
-    public ResponseEntity<ApiResponse<MarkAllReadResponse>> markAllAsRead(
+    public ApiResponse<MarkAllReadResponse> markAllAsRead(
         Authentication authentication
     ) {
         UUID userId = SecurityContextUtils.extractUserId(authentication);
@@ -87,13 +85,11 @@ public class NotificationController {
             markAllNotificationsReadUseCase.markAllAsRead(userId);
         MarkAllReadResponse data =
             notificationPresentationMapper.toMarkAllReadResponse(result);
-        return ResponseEntity.ok(
-            ApiResponse.success(data, "All notifications marked as read")
-        );
+        return ApiResponse.success(data, "All notifications marked as read");
     }
 
     @PatchMapping("/{id}/read")
-    public ResponseEntity<ApiResponse<MarkNotificationReadResponse>> markAsRead(
+    public ApiResponse<MarkNotificationReadResponse> markAsRead(
         @PathVariable UUID id,
         Authentication authentication
     ) {
@@ -102,8 +98,6 @@ public class NotificationController {
             markNotificationReadUseCase.markAsRead(id, userId);
         MarkNotificationReadResponse data =
             notificationPresentationMapper.toMarkReadResponse(result);
-        return ResponseEntity.ok(
-            ApiResponse.success(data, "Notification marked as read")
-        );
+        return ApiResponse.success(data, "Notification marked as read");
     }
 }

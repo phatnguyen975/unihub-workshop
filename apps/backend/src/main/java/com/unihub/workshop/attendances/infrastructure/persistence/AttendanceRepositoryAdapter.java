@@ -2,11 +2,17 @@ package com.unihub.workshop.attendances.infrastructure.persistence;
 
 import com.unihub.workshop.attendances.application.ports.out.AttendanceRepository;
 import com.unihub.workshop.attendances.domain.model.Attendance;
+import com.unihub.workshop.attendances.domain.model.AttendanceStatus;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +56,9 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
         "updatedBy",
     };
 
+    private static final String SELECT_PREFIX =
+        "SELECT " + String.join(", ", COLUMN_NAMES) + " FROM attendances ";
+
     private static final String INSERT_PREFIX =
         "INSERT INTO attendances (" +
         String.join(", ", COLUMN_NAMES) +
@@ -57,6 +66,10 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
 
     private static final String CONFLICT_CLAUSE =
         " ON CONFLICT DO NOTHING RETURNING sync_id";
+
+    private static final String WORKSHOP_SCOPED_REGISTRATION_PREDICATE =
+        "WHERE workshop_id = :workshopId" +
+        " AND registration_id IN (:registrationIds)";
 
     private static final String SYNC_ID_COLUMN = "sync_id";
 
@@ -90,6 +103,36 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
                 resultSet.getObject(SYNC_ID_COLUMN, UUID.class)
         );
         return new HashSet<>(persisted);
+    }
+
+    @Override
+    public Map<UUID, Attendance> findByWorkshopIdAndRegistrationIds(
+        UUID workshopId,
+        Collection<UUID> registrationIds
+    ) {
+        if (
+            workshopId == null ||
+            registrationIds == null ||
+            registrationIds.isEmpty()
+        ) {
+            return Map.of();
+        }
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+            .addValue("workshopId", workshopId)
+            .addValue("registrationIds", registrationIds);
+
+        List<Attendance> rows = namedJdbcTemplate.query(
+            SELECT_PREFIX + WORKSHOP_SCOPED_REGISTRATION_PREDICATE,
+            parameters,
+            (resultSet, rowNumber) -> mapRow(resultSet)
+        );
+
+        Map<UUID, Attendance> byRegistrationId = new LinkedHashMap<>();
+        for (Attendance row : rows) {
+            byRegistrationId.put(row.registrationId(), row);
+        }
+        return Map.copyOf(byRegistrationId);
     }
 
     private static void appendPlaceholders(StringBuilder sql, int rowIndex) {
@@ -157,6 +200,46 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
             parameterName("updatedBy", rowIndex),
             attendance.updatedBy()
         );
+    }
+
+    private static Attendance mapRow(ResultSet resultSet) throws SQLException {
+        return Attendance.builder()
+            .id(resultSet.getObject("id", UUID.class))
+            .workshopId(resultSet.getObject("workshop_id", UUID.class))
+            .registrationId(resultSet.getObject("registration_id", UUID.class))
+            .checkedInByUserId(
+                resultSet.getObject("checked_in_by_user_id", UUID.class)
+            )
+            .syncId(resultSet.getObject("sync_id", UUID.class))
+            .deviceId(resultSet.getString("device_id"))
+            .checkInMethod(resultSet.getString("check_in_method"))
+            .status(toStatus(resultSet.getString("status")))
+            .checkedInAt(toInstant(resultSet.getObject("checked_in_at")))
+            .createdAt(toInstant(resultSet.getObject("created_at")))
+            .updatedAt(toInstant(resultSet.getObject("updated_at")))
+            .createdBy(resultSet.getObject("created_by", UUID.class))
+            .updatedBy(resultSet.getObject("updated_by", UUID.class))
+            .build();
+    }
+
+    private static AttendanceStatus toStatus(String value) {
+        return value != null ? AttendanceStatus.valueOf(value) : null;
+    }
+
+    private static Instant toInstant(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        if (value instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toInstant();
+        }
+        return Instant.parse(value.toString());
     }
 
     private static Timestamp toTimestamp(Instant instant) {

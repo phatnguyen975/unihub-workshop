@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -66,6 +67,9 @@ class SyncAttendancesUseCaseImplTest {
     @Captor
     private ArgumentCaptor<Collection<Attendance>> attendancesCaptor;
 
+    @Captor
+    private ArgumentCaptor<Collection<UUID>> attendanceLookupIdsCaptor;
+
     private SyncAttendancesUseCaseImpl useCase;
 
     @BeforeEach
@@ -125,6 +129,28 @@ class SyncAttendancesUseCaseImplTest {
             map.put(ticket.registrationId(), ticket);
         }
         return map;
+    }
+
+    private static Attendance storedAttendance(
+        UUID registrationId,
+        UUID syncId,
+        AttendanceStatus status
+    ) {
+        return Attendance.builder()
+            .id(UUID.randomUUID())
+            .workshopId(WORKSHOP_ID)
+            .registrationId(registrationId)
+            .checkedInByUserId(STAFF_ID)
+            .syncId(syncId)
+            .deviceId(DEVICE_ID)
+            .checkInMethod(Attendance.CHECK_IN_METHOD_OFFLINE_SYNC)
+            .status(status)
+            .checkedInAt(SCANNED_AT)
+            .createdAt(SCANNED_AT)
+            .updatedAt(SCANNED_AT)
+            .createdBy(STAFF_ID)
+            .updatedBy(STAFF_ID)
+            .build();
     }
 
     @Test
@@ -218,6 +244,10 @@ class SyncAttendancesUseCaseImplTest {
         verify(workshopApi).getWorkshopForRegistration(WORKSHOP_ID);
         verify(workshopApi).isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID);
         verify(registrationApi).getTicketContexts(anyCollection());
+        verify(attendanceRepository).findByWorkshopIdAndRegistrationIds(
+            eq(WORKSHOP_ID),
+            anyCollection()
+        );
         verify(attendanceRepository).insertAll(anyCollection());
     }
 
@@ -692,6 +722,323 @@ class SyncAttendancesUseCaseImplTest {
         assertThat(outcomes).containsExactly(
             new AttendanceOutcome(
                 syncId,
+                AttendanceClassification.INVALID_TICKET
+            )
+        );
+        verify(attendanceRepository, never()).insertAll(anyCollection());
+    }
+
+    @Test
+    @DisplayName(
+        "execute reports SUCCESS for a retried batch with identical syncIds and performs no write"
+    )
+    void execute_identicalRetry_reportsSuccessWithoutWriting() {
+        UUID firstRegistration = UUID.randomUUID();
+        UUID secondRegistration = UUID.randomUUID();
+        UUID firstSync = UUID.randomUUID();
+        UUID secondSync = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(
+            entry(firstRegistration, firstSync),
+            entry(secondRegistration, secondSync)
+        );
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            ticketMap(
+                ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
+                ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(
+            attendanceRepository.findByWorkshopIdAndRegistrationIds(
+                eq(WORKSHOP_ID),
+                anyCollection()
+            )
+        ).thenReturn(
+            Map.of(
+                firstRegistration,
+                storedAttendance(
+                    firstRegistration,
+                    firstSync,
+                    AttendanceStatus.VALID
+                ),
+                secondRegistration,
+                storedAttendance(
+                    secondRegistration,
+                    secondSync,
+                    AttendanceStatus.VALID
+                )
+            )
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                DEVICE_ID,
+                entries
+            )
+        );
+
+        assertThat(outcomes)
+            .extracting(AttendanceOutcome::classification)
+            .containsExactly(
+                AttendanceClassification.SUCCESS,
+                AttendanceClassification.SUCCESS
+            );
+        verify(attendanceRepository, never()).insertAll(anyCollection());
+    }
+
+    @Test
+    @DisplayName(
+        "execute reports ALREADY_USED for a double scan carrying a different syncId and leaves the stored record untouched"
+    )
+    void execute_doubleScanWithDifferentSyncId_reportsAlreadyUsed() {
+        UUID registrationId = UUID.randomUUID();
+        UUID storedSync = UUID.randomUUID();
+        UUID submittedSync = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(
+            attendanceRepository.findByWorkshopIdAndRegistrationIds(
+                eq(WORKSHOP_ID),
+                anyCollection()
+            )
+        ).thenReturn(
+            Map.of(
+                registrationId,
+                storedAttendance(
+                    registrationId,
+                    storedSync,
+                    AttendanceStatus.VALID
+                )
+            )
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(entry(registrationId, submittedSync))
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(
+                submittedSync,
+                AttendanceClassification.ALREADY_USED
+            )
+        );
+        verify(attendanceRepository, never()).insertAll(anyCollection());
+    }
+
+    @Test
+    @DisplayName(
+        "execute reports ALREADY_USED for an INVALIDATED record and never reactivates it"
+    )
+    void execute_invalidatedRecord_reportsAlreadyUsedWithoutWriting() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(
+            attendanceRepository.findByWorkshopIdAndRegistrationIds(
+                eq(WORKSHOP_ID),
+                anyCollection()
+            )
+        ).thenReturn(
+            Map.of(
+                registrationId,
+                storedAttendance(
+                    registrationId,
+                    syncId,
+                    AttendanceStatus.INVALIDATED
+                )
+            )
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(entry(registrationId, syncId))
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(syncId, AttendanceClassification.ALREADY_USED)
+        );
+        verify(attendanceRepository, never()).insertAll(anyCollection());
+    }
+
+    @Test
+    @DisplayName(
+        "execute persists only the entries without an existing record while reporting the retried one as SUCCESS"
+    )
+    void execute_mixedRetryAndNewScan_persistsOnlyNewEntries() {
+        UUID retriedRegistration = UUID.randomUUID();
+        UUID newRegistration = UUID.randomUUID();
+        UUID retriedSync = UUID.randomUUID();
+        UUID newSync = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            ticketMap(
+                ticket(retriedRegistration, WORKSHOP_ID, "CONFIRMED"),
+                ticket(newRegistration, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(
+            attendanceRepository.findByWorkshopIdAndRegistrationIds(
+                eq(WORKSHOP_ID),
+                anyCollection()
+            )
+        ).thenReturn(
+            Map.of(
+                retriedRegistration,
+                storedAttendance(
+                    retriedRegistration,
+                    retriedSync,
+                    AttendanceStatus.VALID
+                )
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenReturn(
+            Set.of(newSync)
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(
+                entry(retriedRegistration, retriedSync),
+                entry(newRegistration, newSync)
+            )
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(
+                retriedSync,
+                AttendanceClassification.SUCCESS
+            ),
+            new AttendanceOutcome(newSync, AttendanceClassification.SUCCESS)
+        );
+        verify(attendanceRepository).insertAll(attendancesCaptor.capture());
+        assertThat(attendancesCaptor.getValue())
+            .extracting(Attendance::registrationId)
+            .containsExactly(newRegistration);
+        assertThat(attendancesCaptor.getValue())
+            .extracting(Attendance::syncId)
+            .containsExactly(newSync);
+    }
+
+    @Test
+    @DisplayName(
+        "execute reads the workshop's existing attendances exactly once for the whole batch"
+    )
+    void execute_readsExistingAttendancesOnceForTheBatch() {
+        UUID firstRegistration = UUID.randomUUID();
+        UUID secondRegistration = UUID.randomUUID();
+        UUID firstSync = UUID.randomUUID();
+        UUID secondSync = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            ticketMap(
+                ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
+                ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenReturn(
+            Set.of(firstSync, secondSync)
+        );
+
+        useCase.execute(
+            command(
+                entry(firstRegistration, firstSync),
+                entry(secondRegistration, secondSync)
+            )
+        );
+
+        verify(attendanceRepository).findByWorkshopIdAndRegistrationIds(
+            eq(WORKSHOP_ID),
+            attendanceLookupIdsCaptor.capture()
+        );
+        assertThat(
+            attendanceLookupIdsCaptor.getValue()
+        ).containsExactlyInAnyOrder(firstRegistration, secondRegistration);
+    }
+
+    @Test
+    @DisplayName(
+        "execute reports INVALID_TICKET for a registration canceled after check-in and never alters the stored record"
+    )
+    void execute_canceledAfterCheckIn_reportsInvalidTicket() {
+        UUID registrationId = UUID.randomUUID();
+        UUID storedSync = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CANCELED")
+            )
+        );
+        when(
+            attendanceRepository.findByWorkshopIdAndRegistrationIds(
+                eq(WORKSHOP_ID),
+                anyCollection()
+            )
+        ).thenReturn(
+            Map.of(
+                registrationId,
+                storedAttendance(
+                    registrationId,
+                    storedSync,
+                    AttendanceStatus.VALID
+                )
+            )
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(entry(registrationId, storedSync))
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(
+                storedSync,
                 AttendanceClassification.INVALID_TICKET
             )
         );

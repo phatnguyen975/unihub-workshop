@@ -2,8 +2,10 @@ package com.unihub.workshop.attendances.application.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.unihub.workshop.attendances.domain.model.Attendance;
 import com.unihub.workshop.attendances.domain.model.AttendanceClassification;
 import com.unihub.workshop.attendances.domain.model.AttendanceOutcome;
+import com.unihub.workshop.attendances.domain.model.AttendanceStatus;
 import com.unihub.workshop.attendances.domain.model.SyncEntry;
 import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import java.time.Instant;
@@ -44,6 +46,28 @@ class AttendanceReconciliationPolicyTest {
             workshopId,
             status
         );
+    }
+
+    private static Attendance existing(
+        UUID registrationId,
+        UUID syncId,
+        AttendanceStatus status
+    ) {
+        return Attendance.builder()
+            .id(UUID.randomUUID())
+            .workshopId(WORKSHOP_ID)
+            .registrationId(registrationId)
+            .checkedInByUserId(UUID.randomUUID())
+            .syncId(syncId)
+            .deviceId("device-abc-123")
+            .checkInMethod(Attendance.CHECK_IN_METHOD_OFFLINE_SYNC)
+            .status(status)
+            .checkedInAt(SCANNED_AT)
+            .createdAt(SCANNED_AT)
+            .updatedAt(SCANNED_AT)
+            .createdBy(UUID.randomUUID())
+            .updatedBy(UUID.randomUUID())
+            .build();
     }
 
     @Test
@@ -168,6 +192,7 @@ class AttendanceReconciliationPolicyTest {
         List<AttendanceOutcome> outcomes = policy.classify(
             entries,
             Set.of(registrationId),
+            Map.of(),
             Set.of(syncId)
         );
 
@@ -188,6 +213,7 @@ class AttendanceReconciliationPolicyTest {
         List<AttendanceOutcome> outcomes = policy.classify(
             entries,
             Set.of(registrationId),
+            Map.of(),
             Set.of()
         );
 
@@ -208,6 +234,7 @@ class AttendanceReconciliationPolicyTest {
         List<AttendanceOutcome> outcomes = policy.classify(
             entries,
             Set.of(),
+            Map.of(),
             Set.of(syncId)
         );
 
@@ -238,6 +265,7 @@ class AttendanceReconciliationPolicyTest {
         List<AttendanceOutcome> outcomes = policy.classify(
             entries,
             Set.of(validRegistration),
+            Map.of(),
             Set.of(firstSyncId)
         );
 
@@ -256,6 +284,231 @@ class AttendanceReconciliationPolicyTest {
     @Test
     @DisplayName("classify returns an empty list for an empty batch")
     void classify_emptyBatch_returnsEmptyList() {
-        assertThat(policy.classify(List.of(), Set.of(), Set.of())).isEmpty();
+        assertThat(
+            policy.classify(List.of(), Set.of(), Map.of(), Set.of())
+        ).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+        "classify reports INVALID_TICKET for an inadmissible entry regardless of the attendance record it already has"
+    )
+    void classify_inadmissibleWithExistingRecord_reportsInvalidTicket() {
+        UUID sameSyncRegistration = UUID.randomUUID();
+        UUID invalidatedRegistration = UUID.randomUUID();
+        UUID sameSync = UUID.randomUUID();
+        UUID invalidatedSync = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(
+            entry(sameSyncRegistration, sameSync),
+            entry(invalidatedRegistration, invalidatedSync)
+        );
+
+        List<AttendanceOutcome> outcomes = policy.classify(
+            entries,
+            Set.of(),
+            Map.of(
+                sameSyncRegistration,
+                existing(
+                    sameSyncRegistration,
+                    sameSync,
+                    AttendanceStatus.VALID
+                ),
+                invalidatedRegistration,
+                existing(
+                    invalidatedRegistration,
+                    invalidatedSync,
+                    AttendanceStatus.INVALIDATED
+                )
+            ),
+            Set.of()
+        );
+
+        assertThat(outcomes)
+            .extracting(AttendanceOutcome::classification)
+            .containsExactly(
+                AttendanceClassification.INVALID_TICKET,
+                AttendanceClassification.INVALID_TICKET
+            );
+    }
+
+    @Test
+    @DisplayName(
+        "classify reports SUCCESS for a VALID record carrying the same syncId, without requiring a write"
+    )
+    void classify_validRecordWithSameSyncId_reportsSuccess() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(entry(registrationId, syncId));
+
+        List<AttendanceOutcome> outcomes = policy.classify(
+            entries,
+            Set.of(registrationId),
+            Map.of(
+                registrationId,
+                existing(registrationId, syncId, AttendanceStatus.VALID)
+            ),
+            Set.of()
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(syncId, AttendanceClassification.SUCCESS)
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "classify reports ALREADY_USED for a VALID record carrying a different syncId"
+    )
+    void classify_validRecordWithDifferentSyncId_reportsAlreadyUsed() {
+        UUID registrationId = UUID.randomUUID();
+        UUID storedSyncId = UUID.randomUUID();
+        UUID submittedSyncId = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(
+            entry(registrationId, submittedSyncId)
+        );
+
+        List<AttendanceOutcome> outcomes = policy.classify(
+            entries,
+            Set.of(registrationId),
+            Map.of(
+                registrationId,
+                existing(registrationId, storedSyncId, AttendanceStatus.VALID)
+            ),
+            Set.of()
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(
+                submittedSyncId,
+                AttendanceClassification.ALREADY_USED
+            )
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "classify reports ALREADY_USED for an INVALIDATED record even when the syncId matches exactly"
+    )
+    void classify_invalidatedRecordWithSameSyncId_reportsAlreadyUsed() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(entry(registrationId, syncId));
+
+        List<AttendanceOutcome> outcomes = policy.classify(
+            entries,
+            Set.of(registrationId),
+            Map.of(
+                registrationId,
+                existing(registrationId, syncId, AttendanceStatus.INVALIDATED)
+            ),
+            Set.of()
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(syncId, AttendanceClassification.ALREADY_USED)
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "classify reports ALREADY_USED for an INVALIDATED record carrying a different syncId"
+    )
+    void classify_invalidatedRecordWithDifferentSyncId_reportsAlreadyUsed() {
+        UUID registrationId = UUID.randomUUID();
+        UUID storedSyncId = UUID.randomUUID();
+        UUID submittedSyncId = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(
+            entry(registrationId, submittedSyncId)
+        );
+
+        List<AttendanceOutcome> outcomes = policy.classify(
+            entries,
+            Set.of(registrationId),
+            Map.of(
+                registrationId,
+                existing(
+                    registrationId,
+                    storedSyncId,
+                    AttendanceStatus.INVALIDATED
+                )
+            ),
+            Set.of(submittedSyncId)
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(
+                submittedSyncId,
+                AttendanceClassification.ALREADY_USED
+            )
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "resolveEntriesToInsert keeps only admissible entries without an existing record, in submitted order"
+    )
+    void resolveEntriesToInsert_keepsOnlyNewAdmissibleEntries() {
+        UUID retriedRegistration = UUID.randomUUID();
+        UUID newRegistration = UUID.randomUUID();
+        UUID inadmissibleRegistration = UUID.randomUUID();
+        UUID retriedSync = UUID.randomUUID();
+        UUID newSync = UUID.randomUUID();
+        UUID inadmissibleSync = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(
+            entry(retriedRegistration, retriedSync),
+            entry(newRegistration, newSync),
+            entry(inadmissibleRegistration, inadmissibleSync)
+        );
+
+        List<SyncEntry> toInsert = policy.resolveEntriesToInsert(
+            entries,
+            Set.of(retriedRegistration, newRegistration),
+            Map.of(
+                retriedRegistration,
+                existing(
+                    retriedRegistration,
+                    retriedSync,
+                    AttendanceStatus.VALID
+                )
+            )
+        );
+
+        assertThat(toInsert).containsExactly(entry(newRegistration, newSync));
+    }
+
+    @Test
+    @DisplayName(
+        "resolveEntriesToInsert never reinserts an INVALIDATED record, even with a different syncId"
+    )
+    void resolveEntriesToInsert_invalidatedRecord_isNeverReinserted() {
+        UUID registrationId = UUID.randomUUID();
+        UUID storedSyncId = UUID.randomUUID();
+        UUID submittedSyncId = UUID.randomUUID();
+
+        List<SyncEntry> toInsert = policy.resolveEntriesToInsert(
+            List.of(entry(registrationId, submittedSyncId)),
+            Set.of(registrationId),
+            Map.of(
+                registrationId,
+                existing(
+                    registrationId,
+                    storedSyncId,
+                    AttendanceStatus.INVALIDATED
+                )
+            )
+        );
+
+        assertThat(toInsert).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+        "resolveEntriesToInsert returns an empty list for an empty batch or absent inputs"
+    )
+    void resolveEntriesToInsert_emptyBatch_returnsEmptyList() {
+        assertThat(
+            policy.resolveEntriesToInsert(List.of(), Set.of(), Map.of())
+        ).isEmpty();
+        assertThat(policy.resolveEntriesToInsert(null, null, null)).isEmpty();
     }
 }

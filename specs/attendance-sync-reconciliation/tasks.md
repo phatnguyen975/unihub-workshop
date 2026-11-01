@@ -66,14 +66,14 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 #### Checkpoint: Core Reconciliation Path
 
-- [ ] T1 passes through `AttendanceSyncControllerTest` (MockMvc slice, use case mocked) and `SyncAttendancesUseCaseImplTest` (all outbound ports mocked); the adapter test asserts a single bulk statement and returned-identifier reconciliation.
-- [ ] `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` passes with `attendances` registered as a business module.
-- [ ] The T1 test classes pass; the human runs the full backend suite separately (see §6).
-- [ ] Human reviewed the T1 diff before T2 starts.
+- [x] T1 passes through `AttendanceSyncControllerTest` (MockMvc slice, use case mocked) and `SyncAttendancesUseCaseImplTest` (all outbound ports mocked); the adapter test asserts a single bulk statement and returned-identifier reconciliation.
+- [x] `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` passes with `attendances` registered as a business module.
+- [x] The T1 test classes pass; the human runs the full backend suite separately (see §6).
+- [x] Human reviewed the T1 diff before T2 starts.
 
 ### Phase 2: Durable Per-Scan Idempotency
 
-- [ ] **T2 — A retried scan is reported `SUCCESS` without a second record, while a genuine double scan, an `INVALIDATED` row, or a reused `syncId` is reported `ALREADY_USED`**
+- [x] **T2 — A retried scan is reported `SUCCESS` without a second record, while a genuine double scan, an `INVALIDATED` row, or a reused `syncId` is reported `ALREADY_USED`**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Application (policy + use case), Infrastructure (bulk read), Domain (existing `Attendance` reused as the read model)
@@ -93,9 +93,9 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 #### Checkpoint: Durable Per-Scan Idempotency
 
-- [ ] T2 acceptance criteria pass at the use-case, policy and adapter layers.
-- [ ] The T2 test classes and `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` pass; the human runs the full backend suite separately (see §6).
-- [ ] Human reviewed the T2 diff before T3 starts.
+- [x] T2 acceptance criteria pass at the use-case, policy and adapter layers.
+- [x] The T2 test classes and `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` pass; the human runs the full backend suite separately (see §6).
+- [x] Human reviewed the T2 diff before T3 starts.
 
 ### Phase 3: Request-Level Idempotency
 

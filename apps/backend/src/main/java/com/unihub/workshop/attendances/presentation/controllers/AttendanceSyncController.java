@@ -14,12 +14,12 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -37,9 +37,8 @@ public class AttendanceSyncController {
 
     @PostMapping(SYNC_PATH)
     @PreAuthorize("hasRole('STAFF')")
-    public ResponseEntity<
-        ApiResponse<List<AttendanceSyncOutcomeResponse>>
-    > syncAttendances(
+    @ResponseStatus(HttpStatus.MULTI_STATUS)
+    public ApiResponse<List<AttendanceSyncOutcomeResponse>> syncAttendances(
         @PathVariable UUID workshopId,
         @RequestBody AttendanceSyncRequest request,
         Authentication authentication
@@ -59,9 +58,7 @@ public class AttendanceSyncController {
         List<AttendanceSyncOutcomeResponse> responses =
             presentationMapper.toResponses(outcomes);
 
-        return ResponseEntity.status(HttpStatus.MULTI_STATUS).body(
-            ApiResponse.success(responses, SUCCESS_MESSAGE)
-        );
+        return ApiResponse.success(responses, SUCCESS_MESSAGE);
     }
 
     private static void requireValidBatch(AttendanceSyncRequest request) {

@@ -88,16 +88,29 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
                 command.workshopId()
             );
 
-        Set<UUID> persistedSyncIds = persistAdmissibleEntries(
+        Map<UUID, Attendance> existingByRegistrationId =
+            attendanceRepository.findByWorkshopIdAndRegistrationIds(
+                command.workshopId(),
+                registrationIds
+            );
+
+        List<SyncEntry> entriesToInsert =
+            reconciliationPolicy.resolveEntriesToInsert(
+                entries,
+                admissibleRegistrationIds,
+                existingByRegistrationId
+            );
+
+        Set<UUID> persistedSyncIds = persistEntries(
             command,
-            entries,
-            admissibleRegistrationIds,
+            entriesToInsert,
             workshop.startsAt()
         );
 
         return reconciliationPolicy.classify(
             entries,
             admissibleRegistrationIds,
+            existingByRegistrationId,
             persistedSyncIds
         );
     }
@@ -130,18 +143,17 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
         }
     }
 
-    private Set<UUID> persistAdmissibleEntries(
+    private Set<UUID> persistEntries(
         SyncAttendancesCommand command,
-        List<SyncEntry> entries,
-        Set<UUID> admissibleRegistrationIds,
+        List<SyncEntry> entriesToInsert,
         Instant workshopStartsAt
     ) {
+        if (entriesToInsert.isEmpty()) {
+            return Set.of();
+        }
         Instant receivedAt = Instant.now();
-        List<Attendance> toPersist = entries
+        List<Attendance> toPersist = entriesToInsert
             .stream()
-            .filter(entry ->
-                admissibleRegistrationIds.contains(entry.registrationId())
-            )
             .map(entry ->
                 Attendance.createOfflineSync(
                     command.workshopId(),
@@ -155,10 +167,6 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
                 )
             )
             .toList();
-
-        if (toPersist.isEmpty()) {
-            return Set.of();
-        }
         return attendanceRepository.insertAll(toPersist);
     }
 }

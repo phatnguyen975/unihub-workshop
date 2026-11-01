@@ -14,7 +14,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +49,9 @@ class AttendanceRepositoryAdapterTest {
 
     @Captor
     private ArgumentCaptor<RowMapper<UUID>> rowMapperCaptor;
+
+    @Captor
+    private ArgumentCaptor<RowMapper<Attendance>> attendanceRowMapperCaptor;
 
     private AttendanceRepositoryAdapter adapter;
 
@@ -282,5 +288,168 @@ class AttendanceRepositoryAdapterTest {
         assertThat(rowMapperCaptor.getValue().mapRow(resultSet, 0)).isEqualTo(
             syncId
         );
+    }
+
+    @Test
+    @DisplayName(
+        "findByWorkshopIdAndRegistrationIds returns an empty map without touching the database for an absent or empty lookup"
+    )
+    void findByWorkshopIdAndRegistrationIds_absentOrEmptyLookup_returnsEmptyMap() {
+        assertThat(
+            adapter.findByWorkshopIdAndRegistrationIds(
+                UUID.randomUUID(),
+                List.of()
+            )
+        ).isEmpty();
+        assertThat(
+            adapter.findByWorkshopIdAndRegistrationIds(UUID.randomUUID(), null)
+        ).isEmpty();
+        assertThat(
+            adapter.findByWorkshopIdAndRegistrationIds(
+                null,
+                List.of(UUID.randomUUID())
+            )
+        ).isEmpty();
+
+        verifyNoInteractions(namedJdbcTemplate);
+    }
+
+    @Test
+    @DisplayName(
+        "findByWorkshopIdAndRegistrationIds issues exactly one workshop-scoped SELECT over the requested registrations"
+    )
+    void findByWorkshopIdAndRegistrationIds_issuesSingleWorkshopScopedSelect() {
+        UUID workshopId = UUID.randomUUID();
+        List<UUID> registrationIds = List.of(
+            UUID.randomUUID(),
+            UUID.randomUUID()
+        );
+
+        adapter.findByWorkshopIdAndRegistrationIds(workshopId, registrationIds);
+
+        verify(namedJdbcTemplate).query(
+            sqlCaptor.capture(),
+            parameterCaptor.capture(),
+            attendanceRowMapperCaptor.capture()
+        );
+
+        String sql = sqlCaptor.getValue();
+        assertThat(sql).startsWith("SELECT ");
+        assertThat(sql).contains("FROM attendances");
+        assertThat(sql).contains("WHERE workshop_id = :workshopId");
+        assertThat(sql).contains("registration_id IN (:registrationIds)");
+        assertThat(parameterCaptor.getValue().getValue("workshopId")).isEqualTo(
+            workshopId
+        );
+        assertThat(
+            parameterCaptor.getValue().getValue("registrationIds")
+        ).isEqualTo(registrationIds);
+    }
+
+    @Test
+    @DisplayName(
+        "findByWorkshopIdAndRegistrationIds keys every loaded record by its registration identifier"
+    )
+    void findByWorkshopIdAndRegistrationIds_keysRecordsByRegistrationId() {
+        Attendance first = attendance(UUID.randomUUID(), UUID.randomUUID());
+        Attendance second = attendance(UUID.randomUUID(), UUID.randomUUID());
+
+        when(
+            namedJdbcTemplate.query(
+                anyString(),
+                any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<Attendance>>any()
+            )
+        ).thenReturn(List.of(first, second));
+
+        Map<UUID, Attendance> byRegistrationId =
+            adapter.findByWorkshopIdAndRegistrationIds(
+                UUID.randomUUID(),
+                List.of(first.registrationId(), second.registrationId())
+            );
+
+        assertThat(byRegistrationId).hasSize(2);
+        assertThat(byRegistrationId.get(first.registrationId())).isEqualTo(
+            first
+        );
+        assertThat(byRegistrationId.get(second.registrationId())).isEqualTo(
+            second
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "the attendance row mapper reads all thirteen columns, parsing status and every timestamp shape"
+    )
+    void attendanceRowMapper_readsEveryColumn() throws SQLException {
+        UUID id = UUID.randomUUID();
+        UUID workshopId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+        UUID checkedInByUserId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        UUID createdBy = UUID.randomUUID();
+        UUID updatedBy = UUID.randomUUID();
+
+        adapter.findByWorkshopIdAndRegistrationIds(
+            workshopId,
+            List.of(registrationId)
+        );
+
+        verify(namedJdbcTemplate).query(
+            sqlCaptor.capture(),
+            parameterCaptor.capture(),
+            attendanceRowMapperCaptor.capture()
+        );
+
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getObject("id", UUID.class)).thenReturn(id);
+        when(resultSet.getObject("workshop_id", UUID.class)).thenReturn(
+            workshopId
+        );
+        when(resultSet.getObject("registration_id", UUID.class)).thenReturn(
+            registrationId
+        );
+        when(
+            resultSet.getObject("checked_in_by_user_id", UUID.class)
+        ).thenReturn(checkedInByUserId);
+        when(resultSet.getObject("sync_id", UUID.class)).thenReturn(syncId);
+        when(resultSet.getString("device_id")).thenReturn("device-abc-123");
+        when(resultSet.getString("check_in_method")).thenReturn(
+            Attendance.CHECK_IN_METHOD_OFFLINE_SYNC
+        );
+        when(resultSet.getString("status")).thenReturn("INVALIDATED");
+        when(resultSet.getObject("checked_in_at")).thenReturn(
+            Timestamp.from(NOW)
+        );
+        when(resultSet.getObject("created_at")).thenReturn(
+            OffsetDateTime.ofInstant(NOW.plusSeconds(5), ZoneOffset.UTC)
+        );
+        when(resultSet.getObject("updated_at")).thenReturn(NOW.plusSeconds(10));
+        when(resultSet.getObject("created_by", UUID.class)).thenReturn(
+            createdBy
+        );
+        when(resultSet.getObject("updated_by", UUID.class)).thenReturn(
+            updatedBy
+        );
+
+        Attendance mapped = attendanceRowMapperCaptor
+            .getValue()
+            .mapRow(resultSet, 0);
+
+        assertThat(mapped.id()).isEqualTo(id);
+        assertThat(mapped.workshopId()).isEqualTo(workshopId);
+        assertThat(mapped.registrationId()).isEqualTo(registrationId);
+        assertThat(mapped.checkedInByUserId()).isEqualTo(checkedInByUserId);
+        assertThat(mapped.syncId()).isEqualTo(syncId);
+        assertThat(mapped.deviceId()).isEqualTo("device-abc-123");
+        assertThat(mapped.checkInMethod()).isEqualTo(
+            Attendance.CHECK_IN_METHOD_OFFLINE_SYNC
+        );
+        assertThat(mapped.status()).isEqualTo(AttendanceStatus.INVALIDATED);
+        assertThat(mapped.checkedInAt()).isEqualTo(NOW);
+        assertThat(mapped.createdAt()).isEqualTo(NOW.plusSeconds(5));
+        assertThat(mapped.updatedAt()).isEqualTo(NOW.plusSeconds(10));
+        assertThat(mapped.createdBy()).isEqualTo(createdBy);
+        assertThat(mapped.updatedBy()).isEqualTo(updatedBy);
     }
 }
