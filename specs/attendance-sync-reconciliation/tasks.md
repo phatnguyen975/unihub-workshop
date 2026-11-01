@@ -99,7 +99,7 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 ### Phase 3: Request-Level Idempotency
 
-- [ ] **T3 — A batch replayed under the same `Idempotency-Key` returns the stored `207` without re-executing, and conflicting reuse is `409`**
+- [x] **T3 — A batch replayed under the same `Idempotency-Key` returns the stored `207` without re-executing, and conflicting reuse is `409`**
   - **Size:** M
   - **Depends on:** T1
   - **Layers touched:** Application (use case), Presentation (controller)
@@ -120,9 +120,9 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 #### Checkpoint: Request-Level Idempotency
 
-- [ ] T3 acceptance criteria pass at the use-case and MockMvc layers, including the `400` vs `422` distinction for a bad header.
-- [ ] The T3 test classes and `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` pass; the human runs the full backend suite separately (see §6).
-- [ ] Human reviewed the T3 diff before T4 starts.
+- [x] T3 acceptance criteria pass at the use-case and MockMvc layers, including the `400` vs `422` distinction for a bad header.
+- [x] The T3 test classes and `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` pass; the human runs the full backend suite separately (see §6).
+- [x] Human reviewed the T3 diff before T4 starts.
 
 ### Phase 4: Request Boundary Hardening
 

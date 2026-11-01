@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,9 +19,11 @@ import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncEntryReque
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncOutcomeResponse;
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncRequest;
 import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapper;
+import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.idempotency.IdempotencyConflictException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -53,6 +56,8 @@ class AttendanceSyncControllerTest {
     private static final UUID THIRD_SYNC_ID = UUID.fromString(
         "c0000001-0000-4000-a000-000000000003"
     );
+    private static final String IDEMPOTENCY_KEY =
+        "d0000001-0000-4000-a000-000000000001";
     private static final String SYNC_PATH =
         "/api/v1/workshops/" + WORKSHOP_ID + "/attendances/sync";
 
@@ -158,10 +163,13 @@ class AttendanceSyncControllerTest {
         when(useCase.execute(any(SyncAttendancesCommand.class))).thenReturn(
             outcomes
         );
-        when(presentationMapper.toCommand(any(), any(), any())).thenReturn(
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
             new SyncAttendancesCommand(
                 WORKSHOP_ID,
                 STAFF_ID,
+                IDEMPOTENCY_KEY,
                 "device-abc-123",
                 List.of()
             )
@@ -172,6 +180,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody(3))
             )
@@ -203,10 +212,13 @@ class AttendanceSyncControllerTest {
         when(useCase.execute(any(SyncAttendancesCommand.class))).thenReturn(
             List.of()
         );
-        when(presentationMapper.toCommand(any(), any(), any())).thenReturn(
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
             new SyncAttendancesCommand(
                 WORKSHOP_ID,
                 STAFF_ID,
+                IDEMPOTENCY_KEY,
                 "device-abc-123",
                 List.of()
             )
@@ -217,6 +229,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", "  " + IDEMPOTENCY_KEY + "  ")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody(1))
             )
@@ -228,14 +241,19 @@ class AttendanceSyncControllerTest {
             UUID.class
         );
         ArgumentCaptor<UUID> callerCaptor = ArgumentCaptor.forClass(UUID.class);
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(
+            String.class
+        );
         verify(presentationMapper).toCommand(
             requestCaptor.capture(),
             workshopCaptor.capture(),
-            callerCaptor.capture()
+            callerCaptor.capture(),
+            keyCaptor.capture()
         );
 
         assertThat(workshopCaptor.getValue()).isEqualTo(WORKSHOP_ID);
         assertThat(callerCaptor.getValue()).isEqualTo(STAFF_ID);
+        assertThat(keyCaptor.getValue()).isEqualTo(IDEMPOTENCY_KEY);
         assertThat(requestCaptor.getValue().deviceId()).isEqualTo(
             "device-abc-123"
         );
@@ -295,6 +313,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post("/api/v1/workshops/not-a-uuid/attendances/sync")
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody(1))
             )
@@ -310,14 +329,23 @@ class AttendanceSyncControllerTest {
         when(useCase.execute(any(SyncAttendancesCommand.class))).thenThrow(
             new NotFoundException("Workshop not found: " + WORKSHOP_ID)
         );
-        when(presentationMapper.toCommand(any(), any(), any())).thenReturn(
-            new SyncAttendancesCommand(WORKSHOP_ID, STAFF_ID, null, List.of())
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                List.of()
+            )
         );
 
         mockMvc
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody(1))
             )
@@ -338,14 +366,23 @@ class AttendanceSyncControllerTest {
                 "Staff member is not assigned to this workshop"
             )
         );
-        when(presentationMapper.toCommand(any(), any(), any())).thenReturn(
-            new SyncAttendancesCommand(WORKSHOP_ID, STAFF_ID, null, List.of())
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                List.of()
+            )
         );
 
         mockMvc
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody(1))
             )
@@ -364,14 +401,23 @@ class AttendanceSyncControllerTest {
         when(useCase.execute(any(SyncAttendancesCommand.class))).thenThrow(
             new ValidationException("workshopId", "Workshop is DRAFT")
         );
-        when(presentationMapper.toCommand(any(), any(), any())).thenReturn(
-            new SyncAttendancesCommand(WORKSHOP_ID, STAFF_ID, null, List.of())
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                List.of()
+            )
         );
 
         mockMvc
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody(1))
             )
@@ -391,6 +437,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"deviceId\":\"device-abc-123\",\"entries\":[]}")
             )
@@ -399,7 +446,12 @@ class AttendanceSyncControllerTest {
             .andExpect(jsonPath("$.error.validationErrors").isArray());
 
         verify(useCase, never()).execute(any());
-        verify(presentationMapper, never()).toCommand(any(), any(), any());
+        verify(presentationMapper, never()).toCommand(
+            any(),
+            any(),
+            any(),
+            any()
+        );
     }
 
     @Test
@@ -409,6 +461,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"deviceId\":\"device-abc-123\"}")
             )
@@ -430,6 +483,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body)
             )
@@ -447,6 +501,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"entries\":[null]}")
             )
@@ -463,6 +518,7 @@ class AttendanceSyncControllerTest {
             .perform(
                 post(SYNC_PATH)
                     .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"entries\":[")
             )
@@ -470,5 +526,192 @@ class AttendanceSyncControllerTest {
             .andExpect(jsonPath("$.success").value(false));
 
         verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 400 when the Idempotency-Key header is absent"
+    )
+    void sync_missingIdempotencyKey_returnsBadRequest() throws Exception {
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody(1))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verify(presentationMapper, never()).toCommand(
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 400 when the Idempotency-Key header is not a UUID"
+    )
+    void sync_nonUuidIdempotencyKey_returnsBadRequest() throws Exception {
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", "not-a-uuid")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody(1))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verify(presentationMapper, never()).toCommand(
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 400 when the Idempotency-Key header exceeds 64 characters"
+    )
+    void sync_overlongIdempotencyKey_returnsBadRequest() throws Exception {
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", "x".repeat(65))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody(1))
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verify(presentationMapper, never()).toCommand(
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync reports the missing header as 400 even when the body is also invalid"
+    )
+    void sync_missingIdempotencyKey_winsOverInvalidBody() throws Exception {
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"deviceId\":\"device-abc-123\",\"entries\":[]}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:bad-request")
+            );
+
+        verify(presentationMapper, never()).toCommand(
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 409 with Retry-After when the key is still being processed"
+    )
+    void sync_inFlightKey_returnsConflictWithRetryAfter() throws Exception {
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                List.of()
+            )
+        );
+        when(useCase.execute(any(SyncAttendancesCommand.class))).thenThrow(
+            new IdempotencyConflictException(
+                "Request is currently in progress",
+                2
+            )
+        );
+
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody(1))
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:conflict")
+            )
+            .andExpect(header().string("Retry-After", "2"));
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 409 when the key was already used with a different body"
+    )
+    void sync_reusedKeyWithDifferentBody_returnsConflict() throws Exception {
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                List.of()
+            )
+        );
+        when(useCase.execute(any(SyncAttendancesCommand.class))).thenThrow(
+            new ConflictException(
+                "Idempotency key was previously used with a different request payload"
+            )
+        );
+
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody(1))
+            )
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:conflict")
+            )
+            .andExpect(header().doesNotExist("Retry-After"));
     }
 }

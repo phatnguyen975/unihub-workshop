@@ -7,7 +7,9 @@ import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncEntryReque
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncOutcomeResponse;
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncRequest;
 import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapper;
+import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.idempotency.IdempotencyKeyValidator;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import java.util.List;
@@ -19,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,17 +43,23 @@ public class AttendanceSyncController {
     @ResponseStatus(HttpStatus.MULTI_STATUS)
     public ApiResponse<List<AttendanceSyncOutcomeResponse>> syncAttendances(
         @PathVariable UUID workshopId,
+        @RequestHeader(
+            value = IdempotencyKeyValidator.HEADER_NAME,
+            required = false
+        ) String idempotencyKeyHeader,
         @RequestBody AttendanceSyncRequest request,
         Authentication authentication
     ) {
         SecurityContextUtils.verifyRole(authentication, STAFF_ROLE);
         UUID staffUserId = SecurityContextUtils.extractUserId(authentication);
+        String idempotencyKey = requireIdempotencyKey(idempotencyKeyHeader);
         requireValidBatch(request);
 
         SyncAttendancesCommand command = presentationMapper.toCommand(
             request,
             workshopId,
-            staffUserId
+            staffUserId,
+            idempotencyKey
         );
         List<AttendanceOutcome> outcomes = syncAttendancesUseCase.execute(
             command
@@ -59,6 +68,14 @@ public class AttendanceSyncController {
             presentationMapper.toResponses(outcomes);
 
         return ApiResponse.success(responses, SUCCESS_MESSAGE);
+    }
+
+    private static String requireIdempotencyKey(String header) {
+        try {
+            return IdempotencyKeyValidator.validateAndNormalize(header);
+        } catch (ValidationException ex) {
+            throw new BadRequestException(ex.getMessage());
+        }
     }
 
     private static void requireValidBatch(AttendanceSyncRequest request) {

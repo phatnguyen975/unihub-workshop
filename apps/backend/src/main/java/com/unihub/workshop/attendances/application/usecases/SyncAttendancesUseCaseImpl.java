@@ -12,9 +12,15 @@ import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.idempotency.ClaimResult;
+import com.unihub.workshop.shared.idempotency.IdempotencyPort;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>The use case is deliberately non-read-only transactional: every read and write of
  * this check-then-act mutation must be routed to the primary database so a
  * just-committed check-in can never be missed.
+ *
+ * <p>The request-level idempotency claim is taken before the first business read, so a
+ * replayed batch returns the stored outcomes without touching the workshop,
+ * registration or attendance tables at all.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,10 +51,21 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
         PUBLISHED_STATUS,
         COMPLETED_STATUS
     );
+    private static final String REQUEST_METHOD = "POST";
+    private static final String SYNC_PATH_TEMPLATE =
+        "/api/v1/workshops/{workshopId}/attendances/sync";
+    private static final String WORKSHOP_ID_PLACEHOLDER = "{workshopId}";
+    private static final String SHA_256_ALGORITHM = "SHA-256";
+    private static final int MULTI_STATUS_CODE = 207;
+    private static final String ENTRIES_FIELD = "entries";
+    private static final String IDEMPOTENCY_KEY_FIELD = "Idempotency-Key";
+    private static final String BATCH_BOUNDS_MESSAGE =
+        "Attendance sync batch must contain between 1 and 500 entries";
 
     private final WorkshopApi workshopApi;
     private final RegistrationApi registrationApi;
     private final AttendanceRepository attendanceRepository;
+    private final IdempotencyPort idempotencyPort;
     private final AttendanceReconciliationPolicy reconciliationPolicy =
         new AttendanceReconciliationPolicy();
 
@@ -53,6 +74,53 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
     public List<AttendanceOutcome> execute(SyncAttendancesCommand command) {
         List<SyncEntry> entries = validate(command);
 
+        String requestPath = requestPath(command.workshopId());
+        String requestHash = computeRequestHash(command, requestPath);
+
+        ClaimResult<AttendanceOutcome[]> claimResult = idempotencyPort.claim(
+            command.staffUserId(),
+            command.idempotencyKey(),
+            REQUEST_METHOD,
+            requestPath,
+            requestHash,
+            AttendanceOutcome[].class
+        );
+
+        if (
+            claimResult instanceof
+                ClaimResult.Replayed<AttendanceOutcome[]> replayed
+        ) {
+            return List.of(replayed.response());
+        }
+
+        ClaimResult.Acquired<AttendanceOutcome[]> acquired =
+            (ClaimResult.Acquired<AttendanceOutcome[]>) claimResult;
+        UUID idempotencyKeyRecordId = acquired.idempotencyKeyId();
+
+        try {
+            List<AttendanceOutcome> outcomes = reconcile(command, entries);
+            idempotencyPort.complete(
+                command.staffUserId(),
+                idempotencyKeyRecordId,
+                command.idempotencyKey(),
+                requestHash,
+                MULTI_STATUS_CODE,
+                outcomes.toArray(AttendanceOutcome[]::new)
+            );
+            return outcomes;
+        } catch (RuntimeException ex) {
+            idempotencyPort.fail(
+                command.staffUserId(),
+                command.idempotencyKey()
+            );
+            throw ex;
+        }
+    }
+
+    private List<AttendanceOutcome> reconcile(
+        SyncAttendancesCommand command,
+        List<SyncEntry> entries
+    ) {
         WorkshopRegistrationDetailsDto workshop = workshopApi
             .getWorkshopForRegistration(command.workshopId())
             .orElseThrow(() ->
@@ -116,17 +184,25 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
     }
 
     private static List<SyncEntry> validate(SyncAttendancesCommand command) {
+        if (command == null) {
+            throw new ValidationException(ENTRIES_FIELD, BATCH_BOUNDS_MESSAGE);
+        }
         if (
-            command == null ||
+            command.idempotencyKey() == null ||
+            command.idempotencyKey().isBlank()
+        ) {
+            throw new ValidationException(
+                IDEMPOTENCY_KEY_FIELD,
+                "Idempotency-Key header is required"
+            );
+        }
+        if (
             command.workshopId() == null ||
             command.staffUserId() == null ||
             command.entries() == null ||
             command.entries().isEmpty()
         ) {
-            throw new ValidationException(
-                "entries",
-                "Attendance sync batch must contain between 1 and 500 entries"
-            );
+            throw new ValidationException(ENTRIES_FIELD, BATCH_BOUNDS_MESSAGE);
         }
         return command.entries();
     }
@@ -141,6 +217,57 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
                 "Workshop does not accept attendance sync in status " + status
             );
         }
+    }
+
+    private static String requestPath(UUID workshopId) {
+        return SYNC_PATH_TEMPLATE.replace(
+            WORKSHOP_ID_PLACEHOLDER,
+            workshopId.toString()
+        );
+    }
+
+    private static String computeRequestHash(
+        SyncAttendancesCommand command,
+        String requestPath
+    ) {
+        String canonicalRequest =
+            REQUEST_METHOD + requestPath + canonicalBody(command);
+        try {
+            MessageDigest digest = MessageDigest.getInstance(SHA_256_ALGORITHM);
+            return HexFormat.of().formatHex(
+                digest.digest(canonicalRequest.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(
+                "SHA-256 algorithm not available",
+                e
+            );
+        }
+    }
+
+    private static String canonicalBody(SyncAttendancesCommand command) {
+        StringBuilder body = new StringBuilder("{\"deviceId\":");
+        if (command.deviceId() == null) {
+            body.append("null");
+        } else {
+            body.append('"').append(command.deviceId()).append('"');
+        }
+        body.append(",\"entries\":[");
+        List<SyncEntry> entries = command.entries();
+        for (int index = 0; index < entries.size(); index++) {
+            if (index > 0) {
+                body.append(',');
+            }
+            SyncEntry entry = entries.get(index);
+            body.append("{\"syncId\":\"")
+                .append(entry.syncId())
+                .append("\",\"registrationId\":\"")
+                .append(entry.registrationId())
+                .append("\",\"scannedAt\":\"")
+                .append(entry.scannedAt())
+                .append("\"}");
+        }
+        return body.append("]}").toString();
     }
 
     private Set<UUID> persistEntries(

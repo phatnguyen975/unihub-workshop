@@ -4,8 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,6 +27,9 @@ import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
+import com.unihub.workshop.shared.idempotency.ClaimResult;
+import com.unihub.workshop.shared.idempotency.IdempotencyConflictException;
+import com.unihub.workshop.shared.idempotency.IdempotencyPort;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.math.BigDecimal;
@@ -39,6 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -48,6 +57,8 @@ class SyncAttendancesUseCaseImplTest {
     private static final UUID WORKSHOP_ID = UUID.randomUUID();
     private static final UUID OTHER_WORKSHOP_ID = UUID.randomUUID();
     private static final UUID STAFF_ID = UUID.randomUUID();
+    private static final UUID IDEMPOTENCY_KEY_ID = UUID.randomUUID();
+    private static final String IDEMPOTENCY_KEY = UUID.randomUUID().toString();
     private static final String DEVICE_ID = "device-abc-123";
     private static final Instant STARTS_AT = Instant.now().minusSeconds(3600);
     private static final Instant SCANNED_AT = Instant.now().minusSeconds(60);
@@ -61,6 +72,9 @@ class SyncAttendancesUseCaseImplTest {
     @Mock
     private AttendanceRepository attendanceRepository;
 
+    @Mock
+    private IdempotencyPort idempotencyPort;
+
     @Captor
     private ArgumentCaptor<Collection<UUID>> registrationIdsCaptor;
 
@@ -70,14 +84,34 @@ class SyncAttendancesUseCaseImplTest {
     @Captor
     private ArgumentCaptor<Collection<UUID>> attendanceLookupIdsCaptor;
 
+    @Captor
+    private ArgumentCaptor<String> requestHashCaptor;
+
+    @Captor
+    private ArgumentCaptor<AttendanceOutcome[]> completedPayloadCaptor;
+
     private SyncAttendancesUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
+        lenient()
+            .when(
+                idempotencyPort.claim(
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                    eq(AttendanceOutcome[].class)
+                )
+            )
+            .thenReturn(new ClaimResult.Acquired<>(IDEMPOTENCY_KEY_ID));
+
         useCase = new SyncAttendancesUseCaseImpl(
             workshopApi,
             registrationApi,
-            attendanceRepository
+            attendanceRepository,
+            idempotencyPort
         );
     }
 
@@ -116,6 +150,7 @@ class SyncAttendancesUseCaseImplTest {
         return new SyncAttendancesCommand(
             WORKSHOP_ID,
             STAFF_ID,
+            IDEMPOTENCY_KEY,
             DEVICE_ID,
             List.of(entries)
         );
@@ -151,6 +186,40 @@ class SyncAttendancesUseCaseImplTest {
             .createdBy(STAFF_ID)
             .updatedBy(STAFF_ID)
             .build();
+    }
+
+    private void stubClaimResult(ClaimResult<AttendanceOutcome[]> result) {
+        when(
+            idempotencyPort.claim(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(AttendanceOutcome[].class)
+            )
+        ).thenReturn(result);
+    }
+
+    private void stubSuccessfulReconciliation(
+        UUID registrationId,
+        UUID syncId
+    ) {
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenReturn(
+            Set.of(syncId)
+        );
     }
 
     @Test
@@ -191,6 +260,7 @@ class SyncAttendancesUseCaseImplTest {
             new SyncAttendancesCommand(
                 WORKSHOP_ID,
                 STAFF_ID,
+                IDEMPOTENCY_KEY,
                 DEVICE_ID,
                 entries
             )
@@ -238,7 +308,13 @@ class SyncAttendancesUseCaseImplTest {
         );
 
         useCase.execute(
-            new SyncAttendancesCommand(WORKSHOP_ID, STAFF_ID, null, entries)
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                entries
+            )
         );
 
         verify(workshopApi).getWorkshopForRegistration(WORKSHOP_ID);
@@ -274,7 +350,13 @@ class SyncAttendancesUseCaseImplTest {
         );
 
         useCase.execute(
-            new SyncAttendancesCommand(WORKSHOP_ID, STAFF_ID, null, entries)
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                entries
+            )
         );
 
         verify(registrationApi).getTicketContexts(
@@ -437,6 +519,7 @@ class SyncAttendancesUseCaseImplTest {
             new SyncAttendancesCommand(
                 WORKSHOP_ID,
                 STAFF_ID,
+                IDEMPOTENCY_KEY,
                 DEVICE_ID,
                 entries
             )
@@ -658,6 +741,7 @@ class SyncAttendancesUseCaseImplTest {
                 new SyncAttendancesCommand(
                     WORKSHOP_ID,
                     STAFF_ID,
+                    IDEMPOTENCY_KEY,
                     DEVICE_ID,
                     List.of()
                 )
@@ -665,6 +749,7 @@ class SyncAttendancesUseCaseImplTest {
         ).isInstanceOf(ValidationException.class);
 
         verifyNoInteractions(
+            idempotencyPort,
             workshopApi,
             registrationApi,
             attendanceRepository
@@ -684,6 +769,7 @@ class SyncAttendancesUseCaseImplTest {
                 new SyncAttendancesCommand(
                     WORKSHOP_ID,
                     STAFF_ID,
+                    IDEMPOTENCY_KEY,
                     DEVICE_ID,
                     null
                 )
@@ -691,6 +777,7 @@ class SyncAttendancesUseCaseImplTest {
         ).isInstanceOf(ValidationException.class);
 
         verifyNoInteractions(
+            idempotencyPort,
             workshopApi,
             registrationApi,
             attendanceRepository
@@ -780,6 +867,7 @@ class SyncAttendancesUseCaseImplTest {
             new SyncAttendancesCommand(
                 WORKSHOP_ID,
                 STAFF_ID,
+                IDEMPOTENCY_KEY,
                 DEVICE_ID,
                 entries
             )
@@ -1043,5 +1131,283 @@ class SyncAttendancesUseCaseImplTest {
             )
         );
         verify(attendanceRepository, never()).insertAll(anyCollection());
+    }
+
+    @Test
+    @DisplayName(
+        "execute replays the stored outcomes for a completed key without touching any business port"
+    )
+    void execute_completedKey_replaysStoredOutcomesWithoutBusinessReads() {
+        UUID firstSync = UUID.randomUUID();
+        UUID secondSync = UUID.randomUUID();
+        AttendanceOutcome[] stored = {
+            new AttendanceOutcome(firstSync, AttendanceClassification.SUCCESS),
+            new AttendanceOutcome(
+                secondSync,
+                AttendanceClassification.ALREADY_USED
+            ),
+        };
+        stubClaimResult(new ClaimResult.Replayed<>(stored));
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(
+                entry(UUID.randomUUID(), firstSync),
+                entry(UUID.randomUUID(), secondSync)
+            )
+        );
+
+        assertThat(outcomes).containsExactly(stored);
+        verifyNoInteractions(
+            workshopApi,
+            registrationApi,
+            attendanceRepository
+        );
+        verify(idempotencyPort, never()).complete(
+            any(),
+            any(),
+            any(),
+            any(),
+            anyInt(),
+            any()
+        );
+        verify(idempotencyPort, never()).fail(any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "execute propagates an in-flight conflict without releasing the claim or reading any business state"
+    )
+    void execute_inFlightKey_propagatesConflictWithoutBusinessReads() {
+        IdempotencyConflictException conflict =
+            new IdempotencyConflictException(
+                "Request is currently in progress",
+                2
+            );
+        when(
+            idempotencyPort.claim(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(AttendanceOutcome[].class)
+            )
+        ).thenThrow(conflict);
+
+        assertThatThrownBy(() ->
+            useCase.execute(
+                command(entry(UUID.randomUUID(), UUID.randomUUID()))
+            )
+        ).isSameAs(conflict);
+
+        verifyNoInteractions(
+            workshopApi,
+            registrationApi,
+            attendanceRepository
+        );
+        verify(idempotencyPort, never()).fail(any(), any());
+        verify(idempotencyPort, never()).complete(
+            any(),
+            any(),
+            any(),
+            any(),
+            anyInt(),
+            any()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute claims the caller-scoped key before the first business read"
+    )
+    void execute_claimsKeyBeforeFirstBusinessRead() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        stubSuccessfulReconciliation(registrationId, syncId);
+
+        useCase.execute(command(entry(registrationId, syncId)));
+
+        InOrder inOrder = inOrder(idempotencyPort, workshopApi);
+        inOrder
+            .verify(idempotencyPort)
+            .claim(
+                eq(STAFF_ID),
+                eq(IDEMPOTENCY_KEY),
+                eq("POST"),
+                eq("/api/v1/workshops/" + WORKSHOP_ID + "/attendances/sync"),
+                requestHashCaptor.capture(),
+                eq(AttendanceOutcome[].class)
+            );
+        inOrder.verify(workshopApi).getWorkshopForRegistration(WORKSHOP_ID);
+        assertThat(requestHashCaptor.getValue()).matches("[0-9a-f]{64}");
+    }
+
+    @Test
+    @DisplayName(
+        "execute completes the claim with 207 and the domain outcome payload"
+    )
+    void execute_success_completesClaimWithMultiStatusAndOutcomes() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        stubSuccessfulReconciliation(registrationId, syncId);
+
+        useCase.execute(command(entry(registrationId, syncId)));
+
+        verify(idempotencyPort).complete(
+            eq(STAFF_ID),
+            eq(IDEMPOTENCY_KEY_ID),
+            eq(IDEMPOTENCY_KEY),
+            anyString(),
+            eq(207),
+            completedPayloadCaptor.capture()
+        );
+        assertThat(completedPayloadCaptor.getValue()).containsExactly(
+            new AttendanceOutcome(syncId, AttendanceClassification.SUCCESS)
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute releases the claim and rethrows when reconciliation throws"
+    )
+    void execute_reconciliationFailure_releasesClaimAndRethrows() {
+        IllegalStateException failure = new IllegalStateException(
+            "reconciliation failed"
+        );
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenThrow(
+            failure
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(
+                command(entry(UUID.randomUUID(), UUID.randomUUID()))
+            )
+        ).isSameAs(failure);
+
+        verify(idempotencyPort).fail(STAFF_ID, IDEMPOTENCY_KEY);
+        verify(idempotencyPort, never()).complete(
+            any(),
+            any(),
+            any(),
+            any(),
+            anyInt(),
+            any()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute derives one stable hash per request body and isolates the workshop in that hash"
+    )
+    void execute_requestHash_isolatesBodyAndWorkshop() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        List<SyncEntry> entries = List.of(entry(registrationId, syncId));
+        when(workshopApi.getWorkshopForRegistration(any())).thenReturn(
+            Optional.empty()
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new SyncAttendancesCommand(
+                    WORKSHOP_ID,
+                    STAFF_ID,
+                    IDEMPOTENCY_KEY,
+                    DEVICE_ID,
+                    entries
+                )
+            )
+        ).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new SyncAttendancesCommand(
+                    WORKSHOP_ID,
+                    STAFF_ID,
+                    IDEMPOTENCY_KEY,
+                    "other-device",
+                    entries
+                )
+            )
+        ).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new SyncAttendancesCommand(
+                    OTHER_WORKSHOP_ID,
+                    STAFF_ID,
+                    IDEMPOTENCY_KEY,
+                    DEVICE_ID,
+                    entries
+                )
+            )
+        ).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new SyncAttendancesCommand(
+                    WORKSHOP_ID,
+                    STAFF_ID,
+                    IDEMPOTENCY_KEY,
+                    DEVICE_ID,
+                    entries
+                )
+            )
+        ).isInstanceOf(NotFoundException.class);
+
+        verify(idempotencyPort, times(4)).claim(
+            eq(STAFF_ID),
+            eq(IDEMPOTENCY_KEY),
+            eq("POST"),
+            anyString(),
+            requestHashCaptor.capture(),
+            eq(AttendanceOutcome[].class)
+        );
+
+        List<String> hashes = requestHashCaptor.getAllValues();
+        assertThat(hashes.get(0)).isEqualTo(hashes.get(3));
+        assertThat(hashes.get(0)).isNotEqualTo(hashes.get(1));
+        assertThat(hashes.get(0)).isNotEqualTo(hashes.get(2));
+    }
+
+    @Test
+    @DisplayName(
+        "execute rejects a blank idempotency key before claiming or reading anything"
+    )
+    void execute_blankIdempotencyKey_throwsValidation() {
+        SyncEntry entry = entry(UUID.randomUUID(), UUID.randomUUID());
+
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new SyncAttendancesCommand(
+                    WORKSHOP_ID,
+                    STAFF_ID,
+                    "   ",
+                    DEVICE_ID,
+                    List.of(entry)
+                )
+            )
+        ).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new SyncAttendancesCommand(
+                    WORKSHOP_ID,
+                    STAFF_ID,
+                    null,
+                    DEVICE_ID,
+                    List.of(entry)
+                )
+            )
+        ).isInstanceOf(ValidationException.class);
+
+        verifyNoInteractions(
+            idempotencyPort,
+            workshopApi,
+            registrationApi,
+            attendanceRepository
+        );
     }
 }

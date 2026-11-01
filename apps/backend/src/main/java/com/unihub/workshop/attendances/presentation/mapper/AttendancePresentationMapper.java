@@ -15,10 +15,12 @@ import org.mapstruct.Mapping;
 public interface AttendancePresentationMapper {
     @Mapping(target = "workshopId", source = "workshopId")
     @Mapping(target = "staffUserId", source = "staffUserId")
+    @Mapping(target = "idempotencyKey", source = "idempotencyKey")
     SyncAttendancesCommand toCommand(
         AttendanceSyncRequest request,
         UUID workshopId,
-        UUID staffUserId
+        UUID staffUserId,
+        String idempotencyKey
     );
 
     SyncEntry toSyncEntry(AttendanceSyncEntryRequest request);

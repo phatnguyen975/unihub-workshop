@@ -9,12 +9,14 @@ import java.util.UUID;
  *
  * @param workshopId workshop targeted by the request
  * @param staffUserId caller identified by {@code jwt.sub}
+ * @param idempotencyKey normalized {@code Idempotency-Key} header scoping the request
  * @param deviceId optional identifier of the device that produced the batch
  * @param entries submitted scans, in the order outcomes must be returned
  */
 public record SyncAttendancesCommand(
     UUID workshopId,
     UUID staffUserId,
+    String idempotencyKey,
     String deviceId,
     List<SyncEntry> entries
 ) {
