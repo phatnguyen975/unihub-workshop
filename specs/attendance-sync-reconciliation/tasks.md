@@ -126,7 +126,7 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 ### Phase 4: Request Boundary Hardening
 
-- [ ] **T4 — Malformed, oversized, or internally duplicated batches are rejected with `422` before any database work**
+- [x] **T4 — Malformed, oversized, or internally duplicated batches are rejected with `422` before any database work**
   - **Size:** S
   - **Depends on:** T1, T3
   - **Layers touched:** Presentation (DTO constraints, validator, mapper), Application (command input)
@@ -148,9 +148,9 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 #### Checkpoint: Request Boundary Hardening
 
-- [ ] T4 acceptance criteria pass through the MockMvc slice, including the `400`-wins ordering case and the `400` vs `422` field-format split.
-- [ ] The T4 test classes and `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` pass; the human runs the full backend suite separately (see §6).
-- [ ] Human reviewed the T4 diff before T5 starts.
+- [x] T4 acceptance criteria pass through the MockMvc slice, including the `400`-wins ordering case and the `400` vs `422` field-format split.
+- [x] The T4 test classes and `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` pass; the human runs the full backend suite separately (see §6).
+- [x] Human reviewed the T4 diff before T5 starts.
 
 ### Phase 5: Post-Commit Counter Event and Operational Behavior
 

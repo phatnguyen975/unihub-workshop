@@ -1,6 +1,7 @@
 package com.unihub.workshop.attendances.presentation.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -19,6 +20,7 @@ import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncEntryReque
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncOutcomeResponse;
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncRequest;
 import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapper;
+import com.unihub.workshop.attendances.presentation.validation.AttendanceSyncBatchValidator;
 import com.unihub.workshop.shared.exception.ConflictException;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
@@ -27,6 +29,7 @@ import com.unihub.workshop.shared.idempotency.IdempotencyConflictException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
+import jakarta.validation.Validation;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -58,6 +61,8 @@ class AttendanceSyncControllerTest {
     );
     private static final String IDEMPOTENCY_KEY =
         "d0000001-0000-4000-a000-000000000001";
+    private static final String DEVICE_ID = "device-abc-123";
+    private static final String SCANNED_AT = "2026-11-15T09:30:00Z";
     private static final String SYNC_PATH =
         "/api/v1/workshops/" + WORKSHOP_ID + "/attendances/sync";
 
@@ -72,7 +77,10 @@ class AttendanceSyncControllerTest {
 
         AttendanceSyncController controller = new AttendanceSyncController(
             useCase,
-            presentationMapper
+            presentationMapper,
+            new AttendanceSyncBatchValidator(
+                Validation.buildDefaultValidatorFactory().getValidator()
+            )
         );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -119,7 +127,7 @@ class AttendanceSyncControllerTest {
 
     private static String requestBody(int entryCount) {
         StringBuilder body = new StringBuilder(
-            "{\"deviceId\":\"device-abc-123\",\"entries\":["
+            "{\"deviceId\":\"" + DEVICE_ID + "\",\"entries\":["
         );
         for (int index = 0; index < entryCount; index++) {
             if (index > 0) {
@@ -129,10 +137,39 @@ class AttendanceSyncControllerTest {
                 .append(UUID.randomUUID())
                 .append("\",\"registrationId\":\"")
                 .append(UUID.randomUUID())
-                .append("\",\"scannedAt\":\"2026-11-15T09:30:00Z\"}");
+                .append("\",\"scannedAt\":\"")
+                .append(SCANNED_AT)
+                .append("\"}");
         }
         body.append("]}");
         return body.toString();
+    }
+
+    private static String entryJson(
+        String syncId,
+        String registrationId,
+        String scannedAt
+    ) {
+        return (
+            "{\"syncId\":\"" +
+            syncId +
+            "\",\"registrationId\":\"" +
+            registrationId +
+            "\",\"scannedAt\":\"" +
+            scannedAt +
+            "\"}"
+        );
+    }
+
+    private static String body(String deviceId, String... entries) {
+        String deviceField = deviceId == null ? "null" : "\"" + deviceId + "\"";
+        return (
+            "{\"deviceId\":" +
+            deviceField +
+            ",\"entries\":[" +
+            String.join(",", entries) +
+            "]}"
+        );
     }
 
     @Test
@@ -713,5 +750,280 @@ class AttendanceSyncControllerTest {
                 jsonPath("$.error.type").value("urn:unihub:error:conflict")
             )
             .andExpect(header().doesNotExist("Retry-After"));
+    }
+
+    @Test
+    @DisplayName("POST sync returns 422 when the batch exceeds 500 entries")
+    void sync_oversizedBatch_returnsValidationErrorOnEntries()
+        throws Exception {
+        StringBuilder entries = new StringBuilder();
+        for (int index = 0; index < 501; index++) {
+            if (index > 0) {
+                entries.append(',');
+            }
+            entries.append(
+                entryJson(
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    SCANNED_AT
+                )
+            );
+        }
+
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body(DEVICE_ID, entries.toString()))
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    containsString("entries")
+                )
+            );
+
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 422 naming the duplicate syncId index and writes nothing"
+    )
+    void sync_duplicateSyncId_returnsValidationErrorNamingTheIndex()
+        throws Exception {
+        String sharedSyncId = UUID.randomUUID().toString();
+
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        body(
+                            DEVICE_ID,
+                            entryJson(
+                                sharedSyncId,
+                                UUID.randomUUID().toString(),
+                                SCANNED_AT
+                            ),
+                            entryJson(
+                                sharedSyncId,
+                                UUID.randomUUID().toString(),
+                                SCANNED_AT
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    containsString("entries[1].syncId")
+                )
+            );
+
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 422 naming the duplicate registrationId index and writes nothing"
+    )
+    void sync_duplicateRegistrationId_returnsValidationErrorNamingTheIndex()
+        throws Exception {
+        String sharedRegistrationId = UUID.randomUUID().toString();
+
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        body(
+                            DEVICE_ID,
+                            entryJson(
+                                UUID.randomUUID().toString(),
+                                sharedRegistrationId,
+                                SCANNED_AT
+                            ),
+                            entryJson(
+                                UUID.randomUUID().toString(),
+                                sharedRegistrationId,
+                                SCANNED_AT
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    containsString("entries[1].registrationId")
+                )
+            );
+
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 422 rather than 400 when a present UUID value is malformed"
+    )
+    void sync_invalidUuidValue_returnsValidationError() throws Exception {
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        body(
+                            DEVICE_ID,
+                            entryJson(
+                                "not-a-uuid",
+                                UUID.randomUUID().toString(),
+                                SCANNED_AT
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    containsString("entries[0].syncId")
+                )
+            );
+
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync returns 422 rather than 400 when scannedAt is not an ISO-8601 instant"
+    )
+    void sync_invalidScannedAt_returnsValidationError() throws Exception {
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        body(
+                            DEVICE_ID,
+                            entryJson(
+                                UUID.randomUUID().toString(),
+                                UUID.randomUUID().toString(),
+                                "2026-11-15T09:30:00"
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    containsString("entries[0].scannedAt")
+                )
+            );
+
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName("POST sync returns 422 when deviceId exceeds 100 characters")
+    void sync_oversizedDeviceId_returnsValidationError() throws Exception {
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        body(
+                            "d".repeat(101),
+                            entryJson(
+                                UUID.randomUUID().toString(),
+                                UUID.randomUUID().toString(),
+                                SCANNED_AT
+                            )
+                        )
+                    )
+            )
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(
+                jsonPath("$.error.validationErrors[0]").value(
+                    containsString("deviceId")
+                )
+            );
+
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    @DisplayName(
+        "POST sync forwards a null device id when the field is omitted"
+    )
+    void sync_omittedDeviceId_forwardsNullDeviceId() throws Exception {
+        UUID syncId = UUID.randomUUID();
+        UUID registrationId = UUID.randomUUID();
+
+        when(useCase.execute(any(SyncAttendancesCommand.class))).thenReturn(
+            List.of()
+        );
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(
+            new SyncAttendancesCommand(
+                WORKSHOP_ID,
+                STAFF_ID,
+                IDEMPOTENCY_KEY,
+                null,
+                List.of()
+            )
+        );
+        when(presentationMapper.toResponses(List.of())).thenReturn(List.of());
+
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"entries\":[" +
+                            entryJson(
+                                syncId.toString(),
+                                registrationId.toString(),
+                                SCANNED_AT
+                            ) +
+                            "]}"
+                    )
+            )
+            .andExpect(status().isMultiStatus());
+
+        ArgumentCaptor<AttendanceSyncRequest> requestCaptor =
+            ArgumentCaptor.forClass(AttendanceSyncRequest.class);
+        verify(presentationMapper).toCommand(
+            requestCaptor.capture(),
+            any(),
+            any(),
+            any()
+        );
+
+        AttendanceSyncRequest forwarded = requestCaptor.getValue();
+        assertThat(forwarded.deviceId()).isNull();
+        assertThat(forwarded.entries()).hasSize(1);
+        assertThat(forwarded.entries().get(0).syncId()).isEqualTo(
+            syncId.toString()
+        );
     }
 }
