@@ -1,6 +1,7 @@
 package com.unihub.workshop.attendances.application.usecases;
 
 import com.unihub.workshop.attendances.application.events.AttendanceSyncEventPublisher;
+import com.unihub.workshop.attendances.application.observability.AttendanceSyncMetrics;
 import com.unihub.workshop.attendances.application.policy.AttendanceReconciliationPolicy;
 import com.unihub.workshop.attendances.application.ports.in.SyncAttendancesCommand;
 import com.unihub.workshop.attendances.application.ports.in.SyncAttendancesUseCase;
@@ -12,6 +13,7 @@ import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
@@ -28,6 +30,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +45,17 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>The request-level idempotency claim is taken before the first business read, so a
  * replayed batch returns the stored outcomes without touching the workshop,
  * registration or attendance tables at all.
+ *
+ * <p>Every request is counted and timed from the moment it reaches the use case and is
+ * closed out with exactly one structured log line, whatever its outcome. A replayed
+ * request is logged but never re-tallies the outcomes of the original request.
+ *
+ * <p>A primary-database failure is contained: the request is answered with a
+ * {@link ServiceUnavailableException} carrying a {@code Retry-After} indication instead
+ * of a generic server error, the idempotency claim is released so the client can retry,
+ * and the flow never falls back to a replica.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
@@ -62,18 +76,38 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
     private static final String IDEMPOTENCY_KEY_FIELD = "Idempotency-Key";
     private static final String BATCH_BOUNDS_MESSAGE =
         "Attendance sync batch must contain between 1 and 500 entries";
+    private static final int RETRY_AFTER_SECONDS = 30;
+    private static final String PRIMARY_DATABASE_UNAVAILABLE_MESSAGE =
+        "Attendance sync is temporarily unavailable. Please retry.";
 
     private final WorkshopApi workshopApi;
     private final RegistrationApi registrationApi;
     private final AttendanceRepository attendanceRepository;
     private final IdempotencyPort idempotencyPort;
     private final AttendanceSyncEventPublisher attendanceSyncEventPublisher;
+    private final AttendanceSyncMetrics attendanceSyncMetrics;
     private final AttendanceReconciliationPolicy reconciliationPolicy =
         new AttendanceReconciliationPolicy();
 
     @Override
     @Transactional
     public List<AttendanceOutcome> execute(SyncAttendancesCommand command) {
+        AttendanceSyncMetrics.RequestScope scope =
+            attendanceSyncMetrics.startRequest(command);
+        List<AttendanceOutcome> outcomes = List.of();
+        try {
+            outcomes = reconcileRequest(command);
+            return outcomes;
+        } catch (RuntimeException ex) {
+            throw translateFailure(ex);
+        } finally {
+            attendanceSyncMetrics.recordCompleted(scope, outcomes);
+        }
+    }
+
+    private List<AttendanceOutcome> reconcileRequest(
+        SyncAttendancesCommand command
+    ) {
         List<SyncEntry> entries = validate(command);
 
         String requestPath = requestPath(command.workshopId());
@@ -109,14 +143,63 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
                 MULTI_STATUS_CODE,
                 outcomes.toArray(AttendanceOutcome[]::new)
             );
+            attendanceSyncMetrics.recordOutcomes(outcomes);
             return outcomes;
         } catch (RuntimeException ex) {
+            releaseClaim(command, ex);
+            throw ex;
+        }
+    }
+
+    /**
+     * Releases the idempotency claim acquired for this request so the client can retry.
+     *
+     * <p>A failure of the release itself is never allowed to replace the failure that
+     * triggered it: it is attached to the original error as a suppressed exception and
+     * logged, and the original error keeps propagating.
+     *
+     * @param command the request whose claim is being released
+     * @param failure the failure that triggered the release
+     */
+    private void releaseClaim(
+        SyncAttendancesCommand command,
+        RuntimeException failure
+    ) {
+        try {
             idempotencyPort.fail(
                 command.staffUserId(),
                 command.idempotencyKey()
             );
-            throw ex;
+        } catch (RuntimeException releaseFailure) {
+            if (releaseFailure != failure) {
+                failure.addSuppressed(releaseFailure);
+            }
+            log.warn(
+                "Failed to release the attendance sync idempotency claim for user {} on workshop {}",
+                command.staffUserId(),
+                command.workshopId(),
+                releaseFailure
+            );
         }
+    }
+
+    /**
+     * Translates an unreachable primary database into the endpoint's documented
+     * {@code 503} response, so the caller receives a retryable error instead of a
+     * generic server error. Every other failure is returned unchanged.
+     *
+     * @param failure failure raised while processing the request
+     * @return the failure to propagate
+     */
+    private static RuntimeException translateFailure(RuntimeException failure) {
+        if (failure instanceof DataAccessResourceFailureException) {
+            return new ServiceUnavailableException(
+                PRIMARY_DATABASE_UNAVAILABLE_MESSAGE,
+                RETRY_AFTER_SECONDS,
+                failure
+            );
+        }
+        return failure;
     }
 
     private List<AttendanceOutcome> reconcile(
@@ -303,6 +386,11 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
                 )
             )
             .toList();
-        return attendanceRepository.insertAll(toPersist);
+        try {
+            return attendanceRepository.insertAll(toPersist);
+        } catch (RuntimeException ex) {
+            attendanceSyncMetrics.recordBulkWriteFailure();
+            throw ex;
+        }
     }
 }

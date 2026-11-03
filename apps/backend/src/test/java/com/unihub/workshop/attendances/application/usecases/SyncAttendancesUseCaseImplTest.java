@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -16,6 +17,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.attendances.application.events.AttendanceSyncEventPublisher;
+import com.unihub.workshop.attendances.application.observability.AttendanceSyncMetrics;
 import com.unihub.workshop.attendances.application.ports.in.SyncAttendancesCommand;
 import com.unihub.workshop.attendances.application.ports.out.AttendanceRepository;
 import com.unihub.workshop.attendances.domain.model.Attendance;
@@ -27,12 +29,15 @@ import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
 import com.unihub.workshop.shared.idempotency.IdempotencyConflictException;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
@@ -51,6 +56,9 @@ import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class SyncAttendancesUseCaseImplTest {
@@ -79,6 +87,9 @@ class SyncAttendancesUseCaseImplTest {
     @Mock
     private AttendanceSyncEventPublisher attendanceSyncEventPublisher;
 
+    @Mock
+    private AttendanceSyncMetrics attendanceSyncMetrics;
+
     @Captor
     private ArgumentCaptor<Collection<UUID>> registrationIdsCaptor;
 
@@ -96,8 +107,20 @@ class SyncAttendancesUseCaseImplTest {
 
     private SyncAttendancesUseCaseImpl useCase;
 
+    private AttendanceSyncMetrics.RequestScope requestScope;
+
     @BeforeEach
     void setUp() {
+        requestScope = new AttendanceSyncMetrics.RequestScope(
+            Timer.start(new SimpleMeterRegistry()),
+            STAFF_ID,
+            WORKSHOP_ID,
+            1
+        );
+        lenient()
+            .when(attendanceSyncMetrics.startRequest(any()))
+            .thenReturn(requestScope);
+
         lenient()
             .when(
                 idempotencyPort.claim(
@@ -116,7 +139,8 @@ class SyncAttendancesUseCaseImplTest {
             registrationApi,
             attendanceRepository,
             idempotencyPort,
-            attendanceSyncEventPublisher
+            attendanceSyncEventPublisher,
+            attendanceSyncMetrics
         );
     }
 
@@ -1573,5 +1597,349 @@ class SyncAttendancesUseCaseImplTest {
         useCase.execute(command(entry(UUID.randomUUID(), syncId)));
 
         verifyNoInteractions(attendanceSyncEventPublisher);
+    }
+
+    @Test
+    @DisplayName(
+        "execute counts the request, tallies every outcome and completes the scope exactly once on success"
+    )
+    void execute_successfulReconciliation_recordsOutcomesAndCompletesOnce() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenReturn(
+            Set.of(syncId)
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(entry(registrationId, syncId))
+        );
+
+        verify(attendanceSyncMetrics).startRequest(any());
+        verify(attendanceSyncMetrics).recordOutcomes(outcomes);
+        verify(attendanceSyncMetrics, times(1)).recordCompleted(
+            requestScope,
+            outcomes
+        );
+        verify(attendanceSyncMetrics, never()).recordBulkWriteFailure();
+    }
+
+    @Test
+    @DisplayName(
+        "execute counts a replayed request but never re-tallies its stored outcomes"
+    )
+    void execute_replayedRequest_countsButDoesNotRecordOutcomes() {
+        UUID syncId = UUID.randomUUID();
+        stubClaimResult(
+            new ClaimResult.Replayed<>(new AttendanceOutcome[] {
+                new AttendanceOutcome(syncId, AttendanceClassification.SUCCESS),
+            })
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(entry(UUID.randomUUID(), syncId))
+        );
+
+        verify(attendanceSyncMetrics).startRequest(any());
+        verify(attendanceSyncMetrics, never()).recordOutcomes(any());
+        verify(attendanceSyncMetrics, times(1)).recordCompleted(
+            requestScope,
+            outcomes
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute completes the scope without outcome tallies when reconciliation fails"
+    )
+    void execute_failedReconciliation_completesWithoutOutcomeCounts() {
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.empty()
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(
+                command(entry(UUID.randomUUID(), UUID.randomUUID()))
+            )
+        ).isInstanceOf(NotFoundException.class);
+
+        verify(attendanceSyncMetrics).startRequest(any());
+        verify(attendanceSyncMetrics, never()).recordOutcomes(any());
+        verify(attendanceSyncMetrics, times(1)).recordCompleted(
+            requestScope,
+            List.of()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute counts a failed bulk write and completes the scope without outcome tallies"
+    )
+    void execute_bulkWriteFailure_incrementsBulkWriteFailureCounter() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenThrow(
+            new IllegalStateException("primary write failed")
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(command(entry(registrationId, syncId)))
+        ).isInstanceOf(IllegalStateException.class);
+
+        verify(attendanceSyncMetrics).recordBulkWriteFailure();
+        verify(attendanceSyncMetrics, never()).recordOutcomes(any());
+        verify(attendanceSyncMetrics, times(1)).recordCompleted(
+            requestScope,
+            List.of()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute translates a primary-database failure of the bulk write into 503 with Retry-After"
+    )
+    void execute_primaryDatabaseFailureOnBulkWrite_returnsServiceUnavailable() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        DataAccessResourceFailureException failure =
+            new DataAccessResourceFailureException(
+                "primary database is unreachable"
+            );
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenThrow(
+            failure
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(command(entry(registrationId, syncId)))
+        ).isInstanceOfSatisfying(
+            ServiceUnavailableException.class,
+            serviceUnavailable -> {
+                assertThat(serviceUnavailable.getStatus()).isEqualTo(
+                    HttpStatus.SERVICE_UNAVAILABLE
+                );
+                assertThat(serviceUnavailable.getType()).isEqualTo(
+                    "urn:unihub:error:service-unavailable"
+                );
+                assertThat(serviceUnavailable.getRetryAfterSeconds())
+                    .isNotNull()
+                    .isPositive();
+                assertThat(serviceUnavailable.getCause()).isSameAs(failure);
+            }
+        );
+
+        verify(idempotencyPort).fail(STAFF_ID, IDEMPOTENCY_KEY);
+        verify(idempotencyPort, never()).complete(
+            any(),
+            any(),
+            any(),
+            any(),
+            anyInt(),
+            any()
+        );
+        verifyNoInteractions(attendanceSyncEventPublisher);
+        verify(attendanceSyncMetrics, never()).recordOutcomes(any());
+    }
+
+    @Test
+    @DisplayName(
+        "execute translates a primary-database failure of a reconciliation read into 503"
+    )
+    void execute_primaryDatabaseFailureOnRead_returnsServiceUnavailable() {
+        DataAccessResourceFailureException failure =
+            new DataAccessResourceFailureException(
+                "primary database is unreachable"
+            );
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenThrow(
+            failure
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(
+                command(entry(UUID.randomUUID(), UUID.randomUUID()))
+            )
+        ).isInstanceOfSatisfying(
+            ServiceUnavailableException.class,
+            serviceUnavailable ->
+                assertThat(serviceUnavailable.getCause()).isSameAs(failure)
+        );
+
+        verify(idempotencyPort).fail(STAFF_ID, IDEMPOTENCY_KEY);
+        verifyNoInteractions(attendanceSyncEventPublisher);
+    }
+
+    @Test
+    @DisplayName(
+        "execute translates a primary-database failure while completing the claim into 503"
+    )
+    void execute_primaryDatabaseFailureOnClaimCompletion_returnsServiceUnavailable() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        DataAccessResourceFailureException failure =
+            new DataAccessResourceFailureException(
+                "primary database is unreachable"
+            );
+
+        stubSuccessfulReconciliation(registrationId, syncId);
+        doThrow(failure)
+            .when(idempotencyPort)
+            .complete(any(), any(), any(), any(), anyInt(), any());
+
+        assertThatThrownBy(() ->
+            useCase.execute(command(entry(registrationId, syncId)))
+        ).isInstanceOfSatisfying(
+            ServiceUnavailableException.class,
+            serviceUnavailable ->
+                assertThat(serviceUnavailable.getCause()).isSameAs(failure)
+        );
+
+        verify(idempotencyPort).fail(STAFF_ID, IDEMPOTENCY_KEY);
+        verify(attendanceSyncMetrics, never()).recordOutcomes(any());
+    }
+
+    @Test
+    @DisplayName(
+        "execute keeps the original 503 when releasing the claim fails a second time"
+    )
+    void execute_releaseFailure_doesNotMaskTheOriginalFailure() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        DataAccessResourceFailureException failure =
+            new DataAccessResourceFailureException(
+                "primary database is unreachable"
+            );
+        DataAccessResourceFailureException releaseFailure =
+            new DataAccessResourceFailureException(
+                "primary database is still unreachable"
+            );
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenThrow(
+            failure
+        );
+        doThrow(releaseFailure)
+            .when(idempotencyPort)
+            .fail(STAFF_ID, IDEMPOTENCY_KEY);
+
+        assertThatThrownBy(() ->
+            useCase.execute(command(entry(registrationId, syncId)))
+        ).isInstanceOfSatisfying(
+            ServiceUnavailableException.class,
+            serviceUnavailable -> {
+                assertThat(serviceUnavailable.getCause()).isSameAs(failure);
+                assertThat(failure.getSuppressed()).contains(releaseFailure);
+            }
+        );
+
+        verify(attendanceSyncMetrics, times(1)).recordCompleted(
+            requestScope,
+            List.of()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute translates a primary-database failure of the idempotency claim into 503 without attempting a release"
+    )
+    void execute_claimFailure_returnsServiceUnavailableWithoutReleaseAttempt() {
+        DataAccessResourceFailureException failure =
+            new DataAccessResourceFailureException(
+                "primary database is unreachable"
+            );
+        when(
+            idempotencyPort.claim(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(AttendanceOutcome[].class)
+            )
+        ).thenThrow(failure);
+
+        assertThatThrownBy(() ->
+            useCase.execute(
+                command(entry(UUID.randomUUID(), UUID.randomUUID()))
+            )
+        ).isInstanceOfSatisfying(
+            ServiceUnavailableException.class,
+            serviceUnavailable ->
+                assertThat(serviceUnavailable.getCause()).isSameAs(failure)
+        );
+
+        verify(idempotencyPort, never()).fail(any(), any());
+        verifyNoInteractions(attendanceSyncEventPublisher);
+        verify(attendanceSyncMetrics, times(1)).recordCompleted(
+            requestScope,
+            List.of()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute stays non-read-only transactional so every read and write is routed to the primary"
+    )
+    void execute_isNonReadOnlyTransactional() throws NoSuchMethodException {
+        Transactional transactional = SyncAttendancesUseCaseImpl.class
+            .getMethod("execute", SyncAttendancesCommand.class)
+            .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.readOnly()).isFalse();
     }
 }

@@ -171,7 +171,7 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
     - The publisher is invoked from `afterCommit`, never while the transaction is still open (FR-44).
     - `lastSyncedAt` is the server time of the sync, not `max(checked_in_at)` (FR-45).
 
-- [ ] **T6 — Every sync request is observable through Micrometer metrics and one structured log line, without leaking ticket data**
+- [x] **T6 — Every sync request is observable through Micrometer metrics and one structured log line, without leaking ticket data**
   - **Size:** S
   - **Depends on:** T1
   - **Layers touched:** Application (observability component + use case)
@@ -186,7 +186,7 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
     - Exactly one structured log line per request carries `user_id`, `workshopId`, entry count, per-classification counts, latency and trace id; no QR payload, signature, or full request body is logged (NFR Security / Observability).
     - The metrics are visible at `/actuator/prometheus` through the existing registry, with no new registry or configuration class.
 
-- [ ] **T7 — Primary-database failure is contained: `503` with `Retry-After`, claim released, no partial write, no replica fallback**
+- [x] **T7 — Primary-database failure is contained: `503` with `Retry-After`, claim released, no partial write, no replica fallback**
   - **Size:** S
   - **Depends on:** T1, T3
   - **Layers touched:** Application (use case)
@@ -202,12 +202,12 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 #### Checkpoint: Feature Complete
 
-- [ ] All seven tasks are checked off.
-- [ ] Every acceptance criterion across Scenarios 1–24 is traced to a passing unit/MockMvc test; no integration test was introduced.
-- [ ] `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` passes.
-- [ ] The targeted test classes for T1–T7 pass; the human runs the full backend suite separately and reports any failure (see §6).
-- [ ] Human reviewed the T5–T7 diffs.
-- [ ] Ready for `/review attendance-sync-reconciliation`.
+- [x] All seven tasks are checked off.
+- [x] Every acceptance criterion across Scenarios 1–24 is traced to a passing unit/MockMvc test; no integration test was introduced.
+- [x] `./gradlew test --tests "com.unihub.workshop.ModulithArchitectureTest"` passes.
+- [x] The targeted test classes for T1–T7 pass; the human runs the full backend suite separately and reports any failure (see §6).
+- [x] Human reviewed the T5–T7 diffs.
+- [x] Ready for `/review attendance-sync-reconciliation`.
 
 ## 4. Risks and Mitigations
 
