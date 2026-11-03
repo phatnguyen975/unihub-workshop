@@ -71,6 +71,11 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
         "WHERE workshop_id = :workshopId" +
         " AND registration_id IN (:registrationIds)";
 
+    private static final String COUNT_VALID_BY_WORKSHOP_STATEMENT =
+        "SELECT COUNT(*) FROM attendances" +
+        " WHERE workshop_id = :workshopId" +
+        " AND status = :status";
+
     private static final String SYNC_ID_COLUMN = "sync_id";
 
     private final NamedParameterJdbcTemplate namedJdbcTemplate;
@@ -133,6 +138,24 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
             byRegistrationId.put(row.registrationId(), row);
         }
         return Map.copyOf(byRegistrationId);
+    }
+
+    @Override
+    public long countValidByWorkshopId(UUID workshopId) {
+        if (workshopId == null) {
+            return 0L;
+        }
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+            .addValue("workshopId", workshopId)
+            .addValue("status", AttendanceStatus.VALID.name());
+
+        Long count = namedJdbcTemplate.queryForObject(
+            COUNT_VALID_BY_WORKSHOP_STATEMENT,
+            parameters,
+            Long.class
+        );
+        return count != null ? count : 0L;
     }
 
     private static void appendPlaceholders(StringBuilder sql, int rowIndex) {

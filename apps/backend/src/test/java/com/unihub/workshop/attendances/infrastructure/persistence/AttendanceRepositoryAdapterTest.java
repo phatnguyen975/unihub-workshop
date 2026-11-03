@@ -3,6 +3,7 @@ package com.unihub.workshop.attendances.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -451,5 +452,69 @@ class AttendanceRepositoryAdapterTest {
         assertThat(mapped.updatedAt()).isEqualTo(NOW.plusSeconds(10));
         assertThat(mapped.createdBy()).isEqualTo(createdBy);
         assertThat(mapped.updatedBy()).isEqualTo(updatedBy);
+    }
+
+    @Test
+    @DisplayName(
+        "countValidByWorkshopId returns zero without touching the database when the workshop identifier is absent"
+    )
+    void countValidByWorkshopId_absentWorkshop_returnsZero() {
+        assertThat(adapter.countValidByWorkshopId(null)).isZero();
+
+        verifyNoInteractions(namedJdbcTemplate);
+    }
+
+    @Test
+    @DisplayName(
+        "countValidByWorkshopId issues exactly one workshop-scoped aggregate count restricted to VALID rows"
+    )
+    void countValidByWorkshopId_issuesSingleWorkshopScopedValidCount() {
+        UUID workshopId = UUID.randomUUID();
+
+        when(
+            namedJdbcTemplate.queryForObject(
+                anyString(),
+                any(SqlParameterSource.class),
+                eq(Long.class)
+            )
+        ).thenReturn(7L);
+
+        adapter.countValidByWorkshopId(workshopId);
+
+        verify(namedJdbcTemplate).queryForObject(
+            sqlCaptor.capture(),
+            parameterCaptor.capture(),
+            eq(Long.class)
+        );
+
+        String sql = sqlCaptor.getValue();
+        assertThat(sql).startsWith("SELECT COUNT(*)");
+        assertThat(sql).contains("FROM attendances");
+        assertThat(sql).contains("workshop_id = :workshopId");
+        assertThat(sql).contains("status = :status");
+        assertThat(parameterCaptor.getValue().getValue("workshopId")).isEqualTo(
+            workshopId
+        );
+        assertThat(parameterCaptor.getValue().getValue("status")).isEqualTo(
+            AttendanceStatus.VALID.name()
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "countValidByWorkshopId returns the aggregate reported by the database"
+    )
+    void countValidByWorkshopId_returnsDatabaseCount() {
+        when(
+            namedJdbcTemplate.queryForObject(
+                anyString(),
+                any(SqlParameterSource.class),
+                eq(Long.class)
+            )
+        ).thenReturn(128L);
+
+        assertThat(adapter.countValidByWorkshopId(UUID.randomUUID())).isEqualTo(
+            128L
+        );
     }
 }

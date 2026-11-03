@@ -37,4 +37,18 @@ public interface AttendanceRepository {
         UUID workshopId,
         Collection<UUID> registrationIds
     );
+
+    /**
+     * Counts the attendance records of one workshop that are still valid.
+     *
+     * <p>Used to build the live attendance counter snapshot after a committed
+     * check-in. The count is scoped by workshop and restricted to {@code VALID}
+     * rows, so records invalidated by an organizer are never reported as
+     * present.
+     *
+     * @param workshopId workshop whose valid attendance records are counted
+     * @return number of {@code VALID} records for the workshop; {@code 0} when the
+     *     workshop identifier is absent
+     */
+    long countValidByWorkshopId(UUID workshopId);
 }

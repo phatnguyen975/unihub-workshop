@@ -154,7 +154,7 @@ This plan builds the net-new `attendances` Spring Modulith module in `apps/backe
 
 ### Phase 5: Post-Commit Counter Event and Operational Behavior
 
-- [ ] **T5 — Exactly one `attendance.updated` event is published after commit, and only when new records were persisted**
+- [x] **T5 — Exactly one `attendance.updated` event is published after commit, and only when new records were persisted**
   - **Size:** S
   - **Depends on:** T1, T2
   - **Layers touched:** Application (event publisher + use case), Infrastructure (aggregate count query)

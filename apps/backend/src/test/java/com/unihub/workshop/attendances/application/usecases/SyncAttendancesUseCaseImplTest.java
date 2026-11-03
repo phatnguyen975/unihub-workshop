@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.unihub.workshop.attendances.application.events.AttendanceSyncEventPublisher;
 import com.unihub.workshop.attendances.application.ports.in.SyncAttendancesCommand;
 import com.unihub.workshop.attendances.application.ports.out.AttendanceRepository;
 import com.unihub.workshop.attendances.domain.model.Attendance;
@@ -75,6 +76,9 @@ class SyncAttendancesUseCaseImplTest {
     @Mock
     private IdempotencyPort idempotencyPort;
 
+    @Mock
+    private AttendanceSyncEventPublisher attendanceSyncEventPublisher;
+
     @Captor
     private ArgumentCaptor<Collection<UUID>> registrationIdsCaptor;
 
@@ -111,7 +115,8 @@ class SyncAttendancesUseCaseImplTest {
             workshopApi,
             registrationApi,
             attendanceRepository,
-            idempotencyPort
+            idempotencyPort,
+            attendanceSyncEventPublisher
         );
     }
 
@@ -1409,5 +1414,164 @@ class SyncAttendancesUseCaseImplTest {
             registrationApi,
             attendanceRepository
         );
+    }
+
+    @Test
+    @DisplayName(
+        "execute publishes exactly one attendance.updated event when new rows were persisted"
+    )
+    void execute_newRowsPersisted_publishesOneEvent() {
+        UUID firstRegistration = UUID.randomUUID();
+        UUID secondRegistration = UUID.randomUUID();
+        UUID firstSync = UUID.randomUUID();
+        UUID secondSync = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            ticketMap(
+                ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
+                ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenReturn(
+            Set.of(firstSync, secondSync)
+        );
+
+        useCase.execute(
+            command(
+                entry(firstRegistration, firstSync),
+                entry(secondRegistration, secondSync)
+            )
+        );
+
+        verify(attendanceSyncEventPublisher, times(1)).publishAfterCommit(
+            WORKSHOP_ID,
+            50
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "execute publishes no event for a batch made only of same-syncId retries"
+    )
+    void execute_pureRetryBatch_publishesNoEvent() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(
+            attendanceRepository.findByWorkshopIdAndRegistrationIds(
+                eq(WORKSHOP_ID),
+                anyCollection()
+            )
+        ).thenReturn(
+            Map.of(
+                registrationId,
+                storedAttendance(registrationId, syncId, AttendanceStatus.VALID)
+            )
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(entry(registrationId, syncId))
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(syncId, AttendanceClassification.SUCCESS)
+        );
+        verify(attendanceRepository, never()).insertAll(anyCollection());
+        verifyNoInteractions(attendanceSyncEventPublisher);
+    }
+
+    @Test
+    @DisplayName("execute publishes no event when the bulk write fails")
+    void execute_bulkWriteFailure_publishesNoEvent() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of(
+                registrationId,
+                ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
+            )
+        );
+        when(attendanceRepository.insertAll(anyCollection())).thenThrow(
+            new IllegalStateException("primary write failed")
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(command(entry(registrationId, syncId)))
+        ).isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(attendanceSyncEventPublisher);
+    }
+
+    @Test
+    @DisplayName(
+        "execute publishes no event when no entry is admissible and nothing is written"
+    )
+    void execute_noAdmissibleEntries_publishesNoEvent() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+
+        when(workshopApi.getWorkshopForRegistration(WORKSHOP_ID)).thenReturn(
+            Optional.of(workshop("PUBLISHED"))
+        );
+        when(
+            workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
+        ).thenReturn(true);
+        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+            Map.of()
+        );
+
+        List<AttendanceOutcome> outcomes = useCase.execute(
+            command(entry(registrationId, syncId))
+        );
+
+        assertThat(outcomes).containsExactly(
+            new AttendanceOutcome(
+                syncId,
+                AttendanceClassification.INVALID_TICKET
+            )
+        );
+        verifyNoInteractions(attendanceSyncEventPublisher);
+    }
+
+    @Test
+    @DisplayName(
+        "execute publishes no event when the request is replayed from the idempotency store"
+    )
+    void execute_replayedRequest_publishesNoEvent() {
+        UUID syncId = UUID.randomUUID();
+        stubClaimResult(
+            new ClaimResult.Replayed<>(new AttendanceOutcome[] {
+                new AttendanceOutcome(syncId, AttendanceClassification.SUCCESS),
+            })
+        );
+
+        useCase.execute(command(entry(UUID.randomUUID(), syncId)));
+
+        verifyNoInteractions(attendanceSyncEventPublisher);
     }
 }

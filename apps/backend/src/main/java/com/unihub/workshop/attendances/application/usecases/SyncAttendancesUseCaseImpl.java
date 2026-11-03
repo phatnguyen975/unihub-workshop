@@ -1,5 +1,6 @@
 package com.unihub.workshop.attendances.application.usecases;
 
+import com.unihub.workshop.attendances.application.events.AttendanceSyncEventPublisher;
 import com.unihub.workshop.attendances.application.policy.AttendanceReconciliationPolicy;
 import com.unihub.workshop.attendances.application.ports.in.SyncAttendancesCommand;
 import com.unihub.workshop.attendances.application.ports.in.SyncAttendancesUseCase;
@@ -66,6 +67,7 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
     private final RegistrationApi registrationApi;
     private final AttendanceRepository attendanceRepository;
     private final IdempotencyPort idempotencyPort;
+    private final AttendanceSyncEventPublisher attendanceSyncEventPublisher;
     private final AttendanceReconciliationPolicy reconciliationPolicy =
         new AttendanceReconciliationPolicy();
 
@@ -174,6 +176,13 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
             entriesToInsert,
             workshop.startsAt()
         );
+
+        if (!persistedSyncIds.isEmpty()) {
+            attendanceSyncEventPublisher.publishAfterCommit(
+                command.workshopId(),
+                workshop.capacity()
+            );
+        }
 
         return reconciliationPolicy.classify(
             entries,
