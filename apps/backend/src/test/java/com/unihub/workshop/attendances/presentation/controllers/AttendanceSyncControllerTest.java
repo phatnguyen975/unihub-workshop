@@ -41,8 +41,29 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.TransactionSystemException;
 
 class AttendanceSyncControllerTest {
+
+    @Test
+    void transactionCommitFailureReturnsServiceUnavailable() throws Exception {
+        when(useCase.execute(any())).thenThrow(
+            new TransactionSystemException("commit failed")
+        );
+        when(
+            presentationMapper.toCommand(any(), any(), any(), any())
+        ).thenReturn(mock(SyncAttendancesCommand.class));
+        mockMvc
+            .perform(
+                post(SYNC_PATH)
+                    .principal(staffAuth(STAFF_ID))
+                    .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody(1))
+            )
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(header().string("Retry-After", "30"));
+    }
 
     private static final UUID WORKSHOP_ID = UUID.fromString(
         "f0000001-0000-4000-a000-000000000001"

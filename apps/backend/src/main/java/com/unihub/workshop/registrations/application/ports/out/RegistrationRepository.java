@@ -94,6 +94,11 @@ public interface RegistrationRepository {
      */
     List<Registration> findAllByIds(Collection<UUID> ids);
 
+    List<Registration> findAllByWorkshopIdAndIds(
+        UUID workshopId,
+        Collection<UUID> ids
+    );
+
     /**
      * Atomically transitions a registration from CONFIRMED to CANCELED status.
      *

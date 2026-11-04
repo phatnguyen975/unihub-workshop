@@ -8,6 +8,7 @@ import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncRequest;
 import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapper;
 import com.unihub.workshop.attendances.presentation.validation.AttendanceSyncBatchValidator;
 import com.unihub.workshop.shared.exception.BadRequestException;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.IdempotencyKeyValidator;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
@@ -15,9 +16,11 @@ import com.unihub.workshop.shared.web.ApiResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +36,7 @@ public class AttendanceSyncController {
         "/api/v1/workshops/{workshopId}/attendances/sync";
     private static final String STAFF_ROLE = "STAFF";
     private static final String SUCCESS_MESSAGE = "Attendance sync processed";
+    private static final int RETRY_AFTER_SECONDS = 30;
 
     private final SyncAttendancesUseCase syncAttendancesUseCase;
     private final AttendancePresentationMapper presentationMapper;
@@ -61,9 +65,19 @@ public class AttendanceSyncController {
             staffUserId,
             idempotencyKey
         );
-        List<AttendanceOutcome> outcomes = syncAttendancesUseCase.execute(
-            command
-        );
+        List<AttendanceOutcome> outcomes;
+        try {
+            outcomes = syncAttendancesUseCase.execute(command);
+        } catch (
+            DataAccessResourceFailureException
+            | TransactionSystemException ex
+        ) {
+            throw new ServiceUnavailableException(
+                "Attendance sync is temporarily unavailable. Please retry.",
+                RETRY_AFTER_SECONDS,
+                ex
+            );
+        }
         List<AttendanceSyncOutcomeResponse> responses =
             presentationMapper.toResponses(outcomes);
 

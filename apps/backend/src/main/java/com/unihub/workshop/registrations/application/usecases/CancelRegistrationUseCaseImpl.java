@@ -19,6 +19,7 @@ import com.unihub.workshop.shared.exception.InternalServerException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
+import com.unihub.workshop.shared.idempotency.FailedKeyPolicy;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
@@ -83,7 +84,8 @@ public class CancelRegistrationUseCaseImpl
                 "POST",
                 "/api/v1/registrations/" + command.registrationId() + "/cancel",
                 requestHash,
-                CancelledRegistrationResult.class
+                CancelledRegistrationResult.class,
+                FailedKeyPolicy.RECLAIM
             );
 
         if (

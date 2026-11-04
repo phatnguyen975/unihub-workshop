@@ -16,6 +16,7 @@ import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
+import com.unihub.workshop.shared.idempotency.FailedKeyPolicy;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,7 +121,8 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
             REQUEST_METHOD,
             requestPath,
             requestHash,
-            AttendanceOutcome[].class
+            AttendanceOutcome[].class,
+            FailedKeyPolicy.RECLAIM
         );
 
         if (
@@ -232,7 +235,10 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
             .map(SyncEntry::registrationId)
             .collect(Collectors.toSet());
         Map<UUID, RegistrationTicketContextDto> ticketContexts =
-            registrationApi.getTicketContexts(registrationIds);
+            registrationApi.getTicketContexts(
+                command.workshopId(),
+                registrationIds
+            );
 
         Set<UUID> admissibleRegistrationIds =
             reconciliationPolicy.resolveAdmissibleRegistrationIds(
@@ -388,6 +394,16 @@ public class SyncAttendancesUseCaseImpl implements SyncAttendancesUseCase {
             .toList();
         try {
             return attendanceRepository.insertAll(toPersist);
+        } catch (DataAccessException ex) {
+            attendanceSyncMetrics.recordBulkWriteFailure();
+            if (ex instanceof DataAccessResourceFailureException) {
+                throw ex;
+            }
+            throw new ServiceUnavailableException(
+                PRIMARY_DATABASE_UNAVAILABLE_MESSAGE,
+                RETRY_AFTER_SECONDS,
+                ex
+            );
         } catch (RuntimeException ex) {
             attendanceSyncMetrics.recordBulkWriteFailure();
             throw ex;

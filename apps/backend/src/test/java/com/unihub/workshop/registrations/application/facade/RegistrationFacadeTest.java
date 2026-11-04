@@ -327,12 +327,15 @@ class RegistrationFacadeTest {
             .status(RegistrationStatus.CANCELED)
             .build();
 
-        when(registrationRepository.findAllByIds(registrationIds)).thenReturn(
-            List.of(confirmed, canceled)
-        );
+        when(
+            registrationRepository.findAllByWorkshopIdAndIds(
+                WORKSHOP_ID,
+                registrationIds
+            )
+        ).thenReturn(List.of(confirmed, canceled));
 
         Map<UUID, RegistrationTicketContextDto> contexts =
-            registrationFacade.getTicketContexts(registrationIds);
+            registrationFacade.getTicketContexts(WORKSHOP_ID, registrationIds);
 
         assertThat(contexts).containsExactlyInAnyOrderEntriesOf(
             Map.of(
@@ -350,7 +353,10 @@ class RegistrationFacadeTest {
                 )
             )
         );
-        verify(registrationRepository).findAllByIds(registrationIds);
+        verify(registrationRepository).findAllByWorkshopIdAndIds(
+            WORKSHOP_ID,
+            registrationIds
+        );
     }
 
     @Test
@@ -358,8 +364,15 @@ class RegistrationFacadeTest {
         "getTicketContexts returns an empty map without querying when no ids are supplied"
     )
     void getTicketContexts_withNoIds_returnsEmptyMapWithoutQuerying() {
-        assertThat(registrationFacade.getTicketContexts(Set.of())).isEmpty();
-        assertThat(registrationFacade.getTicketContexts(null)).isEmpty();
-        verify(registrationRepository, never()).findAllByIds(any());
+        assertThat(
+            registrationFacade.getTicketContexts(WORKSHOP_ID, Set.of())
+        ).isEmpty();
+        assertThat(
+            registrationFacade.getTicketContexts(WORKSHOP_ID, null)
+        ).isEmpty();
+        verify(registrationRepository, never()).findAllByWorkshopIdAndIds(
+            any(),
+            any()
+        );
     }
 }

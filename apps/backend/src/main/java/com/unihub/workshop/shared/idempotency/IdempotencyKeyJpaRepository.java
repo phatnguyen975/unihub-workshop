@@ -13,6 +13,16 @@ import org.springframework.stereotype.Repository;
 public interface IdempotencyKeyJpaRepository
     extends JpaRepository<IdempotencyKeyJpaEntity, UUID>
 {
+    @Modifying
+    @Query(
+        "UPDATE IdempotencyKeyJpaEntity k SET k.status = 'PENDING', k.updatedAt = :now WHERE k.id = :id AND k.status = 'FAILED' AND k.requestHash = :requestHash"
+    )
+    int reclaimFailed(
+        @Param("id") UUID id,
+        @Param("requestHash") String requestHash,
+        @Param("now") Instant now
+    );
+
     Optional<IdempotencyKeyJpaEntity> findByUserIdAndIdempotencyKey(
         UUID userId,
         String idempotencyKey

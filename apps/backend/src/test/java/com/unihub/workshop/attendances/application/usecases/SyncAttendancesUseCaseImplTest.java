@@ -32,6 +32,7 @@ import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
+import com.unihub.workshop.shared.idempotency.FailedKeyPolicy;
 import com.unihub.workshop.shared.idempotency.IdempotencyConflictException;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
 import com.unihub.workshop.workshops.api.WorkshopApi;
@@ -57,6 +58,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -129,7 +131,8 @@ class SyncAttendancesUseCaseImplTest {
                     any(),
                     any(),
                     any(),
-                    eq(AttendanceOutcome[].class)
+                    eq(AttendanceOutcome[].class),
+                    eq(FailedKeyPolicy.RECLAIM)
                 )
             )
             .thenReturn(new ClaimResult.Acquired<>(IDEMPOTENCY_KEY_ID));
@@ -225,7 +228,8 @@ class SyncAttendancesUseCaseImplTest {
                 any(),
                 any(),
                 any(),
-                eq(AttendanceOutcome[].class)
+                eq(AttendanceOutcome[].class),
+                eq(FailedKeyPolicy.RECLAIM)
             )
         ).thenReturn(result);
     }
@@ -240,7 +244,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -274,7 +280,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             ticketMap(
                 ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
                 ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED"),
@@ -326,7 +334,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -348,7 +358,10 @@ class SyncAttendancesUseCaseImplTest {
 
         verify(workshopApi).getWorkshopForRegistration(WORKSHOP_ID);
         verify(workshopApi).isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID);
-        verify(registrationApi).getTicketContexts(anyCollection());
+        verify(registrationApi).getTicketContexts(
+            eq(WORKSHOP_ID),
+            anyCollection()
+        );
         verify(attendanceRepository).findByWorkshopIdAndRegistrationIds(
             eq(WORKSHOP_ID),
             anyCollection()
@@ -374,9 +387,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
-            Map.of()
-        );
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(Map.of());
 
         useCase.execute(
             new SyncAttendancesCommand(
@@ -389,6 +402,7 @@ class SyncAttendancesUseCaseImplTest {
         );
 
         verify(registrationApi).getTicketContexts(
+            eq(WORKSHOP_ID),
             registrationIdsCaptor.capture()
         );
         assertThat(registrationIdsCaptor.getValue()).containsExactlyInAnyOrder(
@@ -495,7 +509,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -534,7 +550,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 knownRegistration,
                 ticket(knownRegistration, WORKSHOP_ID, "CONFIRMED")
@@ -582,7 +600,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CANCELED")
@@ -616,7 +636,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, OTHER_WORKSHOP_ID, "CONFIRMED")
@@ -652,7 +674,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             ticketMap(
                 ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
                 ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED")
@@ -692,7 +716,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -737,7 +763,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -827,9 +855,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
-            Map.of()
-        );
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(Map.of());
 
         List<AttendanceOutcome> outcomes = useCase.execute(
             command(entry(registrationId, syncId))
@@ -864,7 +892,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             ticketMap(
                 ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
                 ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED")
@@ -926,7 +956,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -975,7 +1007,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -1023,7 +1057,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             ticketMap(
                 ticket(retriedRegistration, WORKSHOP_ID, "CONFIRMED"),
                 ticket(newRegistration, WORKSHOP_ID, "CONFIRMED")
@@ -1087,7 +1123,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             ticketMap(
                 ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
                 ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED")
@@ -1127,7 +1165,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CANCELED")
@@ -1219,7 +1259,8 @@ class SyncAttendancesUseCaseImplTest {
                 any(),
                 any(),
                 any(),
-                eq(AttendanceOutcome[].class)
+                eq(AttendanceOutcome[].class),
+                eq(FailedKeyPolicy.RECLAIM)
             )
         ).thenThrow(conflict);
 
@@ -1265,7 +1306,8 @@ class SyncAttendancesUseCaseImplTest {
                 eq("POST"),
                 eq("/api/v1/workshops/" + WORKSHOP_ID + "/attendances/sync"),
                 requestHashCaptor.capture(),
-                eq(AttendanceOutcome[].class)
+                eq(AttendanceOutcome[].class),
+                eq(FailedKeyPolicy.RECLAIM)
             );
         inOrder.verify(workshopApi).getWorkshopForRegistration(WORKSHOP_ID);
         assertThat(requestHashCaptor.getValue()).matches("[0-9a-f]{64}");
@@ -1309,9 +1351,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenThrow(
-            failure
-        );
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenThrow(failure);
 
         assertThatThrownBy(() ->
             useCase.execute(
@@ -1393,7 +1435,8 @@ class SyncAttendancesUseCaseImplTest {
             eq("POST"),
             anyString(),
             requestHashCaptor.capture(),
-            eq(AttendanceOutcome[].class)
+            eq(AttendanceOutcome[].class),
+            eq(FailedKeyPolicy.RECLAIM)
         );
 
         List<String> hashes = requestHashCaptor.getAllValues();
@@ -1456,7 +1499,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             ticketMap(
                 ticket(firstRegistration, WORKSHOP_ID, "CONFIRMED"),
                 ticket(secondRegistration, WORKSHOP_ID, "CONFIRMED")
@@ -1493,7 +1538,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -1534,7 +1581,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -1565,9 +1614,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
-            Map.of()
-        );
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(Map.of());
 
         List<AttendanceOutcome> outcomes = useCase.execute(
             command(entry(registrationId, syncId))
@@ -1613,7 +1662,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -1697,7 +1748,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -1737,7 +1790,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -1779,6 +1834,24 @@ class SyncAttendancesUseCaseImplTest {
     }
 
     @Test
+    void execute_bulkDataAccessFailure_returnsServiceUnavailable() {
+        UUID registrationId = UUID.randomUUID();
+        UUID syncId = UUID.randomUUID();
+        stubSuccessfulReconciliation(registrationId, syncId);
+        DataIntegrityViolationException failure =
+            new DataIntegrityViolationException("write failed");
+        when(attendanceRepository.insertAll(anyCollection())).thenThrow(
+            failure
+        );
+
+        assertThatThrownBy(() ->
+            useCase.execute(command(entry(registrationId, syncId)))
+        ).isInstanceOfSatisfying(ServiceUnavailableException.class, exception ->
+            assertThat(exception.getCause()).isSameAs(failure)
+        );
+    }
+
+    @Test
     @DisplayName(
         "execute translates a primary-database failure of a reconciliation read into 503"
     )
@@ -1794,9 +1867,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenThrow(
-            failure
-        );
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenThrow(failure);
 
         assertThatThrownBy(() ->
             useCase.execute(
@@ -1863,7 +1936,9 @@ class SyncAttendancesUseCaseImplTest {
         when(
             workshopApi.isStaffAssignedToWorkshop(WORKSHOP_ID, STAFF_ID)
         ).thenReturn(true);
-        when(registrationApi.getTicketContexts(anyCollection())).thenReturn(
+        when(
+            registrationApi.getTicketContexts(eq(WORKSHOP_ID), anyCollection())
+        ).thenReturn(
             Map.of(
                 registrationId,
                 ticket(registrationId, WORKSHOP_ID, "CONFIRMED")
@@ -1908,7 +1983,8 @@ class SyncAttendancesUseCaseImplTest {
                 any(),
                 any(),
                 any(),
-                eq(AttendanceOutcome[].class)
+                eq(AttendanceOutcome[].class),
+                eq(FailedKeyPolicy.RECLAIM)
             )
         ).thenThrow(failure);
 

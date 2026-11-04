@@ -27,8 +27,8 @@ import org.springframework.stereotype.Component;
  * field-level {@code validationErrors} list.
  *
  * <p>Three passes run in order: the declarative bean constraints on the DTO,
- * duplicate detection for {@code syncId} and {@code registrationId}, and format
- * parsing of the string-typed identifiers and timestamp.
+ * format parsing of the string-typed identifiers and timestamp, and duplicate
+ * detection for the parsed {@code syncId} and {@code registrationId} values.
  */
 @Component
 @RequiredArgsConstructor
@@ -61,8 +61,8 @@ public class AttendanceSyncBatchValidator {
         requireBeanConstraints(request);
 
         List<AttendanceSyncEntryRequest> entries = request.entries();
-        requireDistinctIdentifiers(entries);
         requireParsableValues(entries);
+        requireDistinctIdentifiers(entries);
     }
 
     private void requireBeanConstraints(AttendanceSyncRequest request) {
@@ -88,8 +88,8 @@ public class AttendanceSyncBatchValidator {
     private static void requireDistinctIdentifiers(
         List<AttendanceSyncEntryRequest> entries
     ) {
-        Map<String, Integer> firstSyncIdIndexes = new HashMap<>();
-        Map<String, Integer> firstRegistrationIdIndexes = new HashMap<>();
+        Map<UUID, Integer> firstSyncIdIndexes = new HashMap<>();
+        Map<UUID, Integer> firstRegistrationIdIndexes = new HashMap<>();
         List<String> errors = new ArrayList<>();
 
         for (int index = 0; index < entries.size(); index++) {
@@ -117,13 +117,16 @@ public class AttendanceSyncBatchValidator {
         String field,
         String value,
         int index,
-        Map<String, Integer> firstIndexes,
+        Map<UUID, Integer> firstIndexes,
         List<String> errors
     ) {
         if (value == null) {
             return;
         }
-        Integer firstIndex = firstIndexes.putIfAbsent(value, index);
+        Integer firstIndex = firstIndexes.putIfAbsent(
+            UUID.fromString(value),
+            index
+        );
         if (firstIndex != null) {
             errors.add(
                 entryField(index, field) +

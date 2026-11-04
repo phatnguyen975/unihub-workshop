@@ -11,6 +11,7 @@ import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,38 @@ class AttendanceSyncBatchValidatorTest {
 
     private static final String DEVICE_ID = "device-abc-123";
     private static final String SCANNED_AT = "2026-11-15T09:30:00Z";
+
+    @Test
+    void validate_equivalentUuidSpellings_rejectsDuplicates() {
+        String id = "abcdefab-cdef-4abc-8def-abcdefabcdef";
+        ValidationException syncFailure = expectValidationFailure(
+            request(
+                entry(id, UUID.randomUUID().toString(), SCANNED_AT),
+                entry(
+                    id.toUpperCase(Locale.ROOT),
+                    UUID.randomUUID().toString(),
+                    SCANNED_AT
+                )
+            )
+        );
+        assertThat(syncFailure.getValidationErrors()).anyMatch(error ->
+            error.contains("syncId")
+        );
+
+        ValidationException registrationFailure = expectValidationFailure(
+            request(
+                entry(UUID.randomUUID().toString(), id, SCANNED_AT),
+                entry(
+                    UUID.randomUUID().toString(),
+                    id.toUpperCase(Locale.ROOT),
+                    SCANNED_AT
+                )
+            )
+        );
+        assertThat(registrationFailure.getValidationErrors()).anyMatch(error ->
+            error.contains("registrationId")
+        );
+    }
 
     private AttendanceSyncBatchValidator batchValidator;
 

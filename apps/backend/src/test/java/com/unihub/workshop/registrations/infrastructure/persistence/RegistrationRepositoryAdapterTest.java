@@ -13,6 +13,8 @@ import com.unihub.workshop.shared.exception.BadRequestException;
 import com.unihub.workshop.shared.pagination.KeysetCursor;
 import com.unihub.workshop.shared.pagination.KeysetCursorCodec;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +26,36 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationRepositoryAdapterTest {
+
+    @Test
+    void ticketLookupQueryIsScopedToWorkshop() throws Exception {
+        var method = RegistrationJpaRepository.class.getDeclaredMethod(
+            "findByWorkshopIdAndIdIn",
+            UUID.class,
+            Collection.class
+        );
+        assertThat(method.getName()).contains("WorkshopId").contains("IdIn");
+    }
+
+    @Test
+    void ticketLookupPassesWorkshopAndIdsToPersistence() {
+        UUID workshopId = UUID.randomUUID();
+        var ids = List.of(UUID.randomUUID());
+        var entities = List.of(
+            RegistrationJpaEntity.builder().id(ids.get(0)).build()
+        );
+        var registrations = List.of(
+            Registration.builder().id(ids.get(0)).build()
+        );
+        when(repository.findByWorkshopIdAndIdIn(workshopId, ids)).thenReturn(
+            entities
+        );
+        when(mapper.toDomainList(entities)).thenReturn(registrations);
+        assertThat(
+            adapter.findAllByWorkshopIdAndIds(workshopId, ids)
+        ).isEqualTo(registrations);
+        verify(repository).findByWorkshopIdAndIdIn(workshopId, ids);
+    }
 
     @Mock
     private RegistrationJpaRepository repository;

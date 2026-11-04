@@ -1,6 +1,7 @@
 package com.unihub.workshop.registrations.infrastructure.persistence;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +14,11 @@ import org.springframework.data.repository.query.Param;
 public interface RegistrationJpaRepository
     extends JpaRepository<RegistrationJpaEntity, UUID>
 {
+    List<RegistrationJpaEntity> findByWorkshopIdAndIdIn(
+        UUID workshopId,
+        Collection<UUID> ids
+    );
+
     @Query(
         """
         SELECT r FROM RegistrationJpaEntity r

@@ -56,10 +56,12 @@ public interface RegistrationApi {
      * <p>Callers use this to decide whether a scanned ticket may be admitted without
      * performing per-entry lookups. Unknown identifiers are simply absent from the result.
      *
+     * @param workshopId workshop whose registrations may be returned
      * @param registrationIds registration identifiers to resolve
      * @return registration context keyed by registration identifier; empty when no ids are supplied
      */
     Map<UUID, RegistrationTicketContextDto> getTicketContexts(
+        UUID workshopId,
         Collection<UUID> registrationIds
     );
 

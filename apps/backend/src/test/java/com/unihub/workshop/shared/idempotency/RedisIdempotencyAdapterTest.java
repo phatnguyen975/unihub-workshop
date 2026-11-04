@@ -15,6 +15,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.exception.ConflictException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,139 @@ class RedisIdempotencyAdapterTest {
     private final String requestHash = "hash123";
 
     record TestPayload(String message, int count) {}
+
+    @Test
+    void claim_defaultPolicyRejectsFailedKey() {
+        var existing = IdempotencyKeyJpaEntity.builder()
+            .id(UUID.randomUUID())
+            .requestHash(requestHash)
+            .status("FAILED")
+            .build();
+        when(
+            repository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
+        ).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() ->
+            adapter.claim(
+                userId,
+                idempotencyKey,
+                "POST",
+                "/api/v1/registrations",
+                requestHash,
+                TestPayload.class
+            )
+        )
+            .isInstanceOf(ConflictException.class)
+            .hasMessageContaining("previously failed");
+        verify(repository, never()).reclaimFailed(any(), any(), any());
+    }
+
+    @Test
+    void claim_failedRecordCanBeReclaimedAtomically() {
+        UUID id = UUID.randomUUID();
+        IdempotencyKeyJpaEntity existing = IdempotencyKeyJpaEntity.builder()
+            .id(id)
+            .requestHash(requestHash)
+            .status("FAILED")
+            .build();
+        when(
+            repository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
+        ).thenReturn(Optional.of(existing));
+        when(
+            repository.reclaimFailed(
+                eq(id),
+                eq(requestHash),
+                any(Instant.class)
+            )
+        ).thenReturn(1);
+
+        ClaimResult<TestPayload> result = adapter.claim(
+            userId,
+            idempotencyKey,
+            "POST",
+            "/api/v1/test",
+            requestHash,
+            TestPayload.class,
+            FailedKeyPolicy.RECLAIM
+        );
+
+        assertThat(result).isInstanceOf(ClaimResult.Acquired.class);
+        assertThat(
+            ((ClaimResult.Acquired<TestPayload>) result).idempotencyKeyId()
+        ).isEqualTo(id);
+    }
+
+    @Test
+    void claim_failedRecordAlreadyReclaimedReturnsConflict() {
+        UUID id = UUID.randomUUID();
+        var existing = IdempotencyKeyJpaEntity.builder()
+            .id(id)
+            .requestHash(requestHash)
+            .status("FAILED")
+            .build();
+        when(
+            repository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
+        ).thenReturn(Optional.of(existing));
+        when(
+            repository.reclaimFailed(
+                eq(id),
+                eq(requestHash),
+                any(Instant.class)
+            )
+        ).thenReturn(0);
+        assertThatThrownBy(() ->
+            adapter.claim(
+                userId,
+                idempotencyKey,
+                "POST",
+                "/api/v1/test",
+                requestHash,
+                TestPayload.class,
+                FailedKeyPolicy.RECLAIM
+            )
+        ).isInstanceOf(IdempotencyConflictException.class);
+    }
+
+    @Test
+    void claim_rollbackReleasesOnlyItsPendingCacheEntry() {
+        when(
+            repository.insertPendingIfAbsent(
+                any(),
+                eq(userId),
+                eq(idempotencyKey),
+                anyString(),
+                anyString(),
+                anyString(),
+                any()
+            )
+        ).thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            adapter.claim(
+                userId,
+                idempotencyKey,
+                "POST",
+                "/api/v1/test",
+                requestHash,
+                TestPayload.class
+            );
+            TransactionSynchronizationManager.getSynchronizations().forEach(
+                synchronization ->
+                    synchronization.afterCompletion(
+                        TransactionSynchronization.STATUS_ROLLED_BACK
+                    )
+            );
+            verify(redisTemplate).execute(
+                eq(RedisIdempotencyAdapter.DELETE_IF_MATCH),
+                eq(List.of(redisKey)),
+                anyString()
+            );
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
 
     @BeforeEach
     void setUp() {

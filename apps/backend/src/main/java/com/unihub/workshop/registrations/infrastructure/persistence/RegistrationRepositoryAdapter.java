@@ -103,6 +103,20 @@ public class RegistrationRepositoryAdapter implements RegistrationRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public List<Registration> findAllByWorkshopIdAndIds(
+        UUID workshopId,
+        Collection<UUID> ids
+    ) {
+        if (workshopId == null || ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return mapper.toDomainList(
+            repository.findByWorkshopIdAndIdIn(workshopId, ids)
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public CursorPage<Registration> findByStudentUserId(
         UUID studentUserId,
         RegistrationStatus status,

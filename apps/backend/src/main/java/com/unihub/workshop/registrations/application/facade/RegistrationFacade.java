@@ -211,13 +211,18 @@ public class RegistrationFacade implements RegistrationApi {
     @Override
     @Transactional(readOnly = true)
     public Map<UUID, RegistrationTicketContextDto> getTicketContexts(
+        UUID workshopId,
         Collection<UUID> registrationIds
     ) {
-        if (registrationIds == null || registrationIds.isEmpty()) {
+        if (
+            workshopId == null ||
+            registrationIds == null ||
+            registrationIds.isEmpty()
+        ) {
             return Map.of();
         }
         return registrationRepository
-            .findAllByIds(registrationIds)
+            .findAllByWorkshopIdAndIds(workshopId, registrationIds)
             .stream()
             .collect(
                 Collectors.toMap(Registration::id, registration ->
