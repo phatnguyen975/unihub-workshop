@@ -306,8 +306,6 @@ Not applicable. Both endpoints are `GET` requests and are inherently idempotent 
 | `payload.availableSeats` | integer ≥ 0  | `max(0, capacity − confirmedCount − pendingCount)` at the moment of the event |
 | `payload.lastUpdatedAt`  | ISO 8601 UTC | Timestamp of the registration state change that triggered this event          |
 
-**Implementation gap note:** The current implementation emits only `{ workshopId, status }`. This contract specifies the full 6-field payload. The discrepancy will be corrected as part of the `/build` tasks for this feature. Until then, SSE clients receiving this event may see a truncated payload.
-
 **Spec Traceability:** FR-15, FR-16, FR-17, Scenario 13, Scenario 14.
 
 ## 7. Cross-Endpoint Consistency Notes

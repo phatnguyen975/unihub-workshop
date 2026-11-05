@@ -281,6 +281,7 @@ flowchart LR
   Payments -- sync query --> REG_API
   REG_API -- facade --> Registrations
   Attendances -- sync query --> REG_API
+  Attendances -- sync query --> WS_API
   Notifications -- sync query --> IAM_API
   IAM_API -- facade --> IAM
   Workshops -- WorkshopPublishedEvent --> Publisher
@@ -304,6 +305,8 @@ flowchart LR
 **2. Intra-Module Architecture (Clean Architecture)**
 
 - **Inward Dependency Rule:** In Clean Architecture, intra-module dependencies point strictly inward (`Presentation` → `Application` → `Domain`), while `Infrastructure` implements outbound ports defined by `Application` (Dependency Inversion Principle) and encapsulates all external technical integrations. The Domain model remains 100% Pure Java with zero framework leakage.
+
+- **Read workflows with different consistency requirements:** Application coordinators may separate a consistency-critical context/authorization phase from eventually consistent reporting through distinct transaction boundaries. Use actual proxied calls or explicit transaction management; self-invocation of an annotated method is not a routing boundary. Avoid an enclosing transaction that pins both phases to the same datasource. Each phase still uses its module's ports and peer public facades; transaction coordination does not permit access to peer internals or direct aggregation of another module's business data. Add facade methods only for real callers, keep persistence queries in infrastructure, and place REST mapping in presentation. A composed read does not by itself require a worker or materialized projection.
 
 ```mermaid
 flowchart LR

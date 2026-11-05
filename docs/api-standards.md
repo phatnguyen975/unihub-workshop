@@ -13,7 +13,8 @@ We use URI path versioning (e.g., `/api/v1/...`) because it is explicit, cache-f
 
 ### Pagination, Search & Filtering
 
-- **Pagination:** All collection endpoints use cursor-based (keyset) pagination to guarantee stable `O(1)` performance at scale and prevent data drift under concurrent writes. Clients pass a `?cursor=` query parameter to fetch the next window and may pass `?size=` to control batch size (e.g., `?cursor=...&size=20`). The backend must enforce a default page size (usually 20) and a strict hard-cap maximum (e.g., 100) to protect database performance from oversized requests. No alias parameter names (e.g., `limit`, `page`) are allowed.
+- **Pagination:** All collection endpoints use cursor-based (keyset) pagination to avoid growing OFFSET scans and keep traversal deterministic under concurrent inserts. Efficient execution still requires indexes matching the visibility predicates and ordering; keyset pagination alone does not guarantee constant-time queries or a frozen snapshot across pages. Clients pass a `?cursor=` query parameter to fetch the next window and may pass `?size=` to control batch size (e.g., `?cursor=...&size=20`). The backend must enforce a default page size (usually 20) and a strict hard-cap maximum (e.g., 100) to protect database performance from oversized requests. No alias parameter names (e.g., `limit`, `page`) are allowed.
+  - **Aggregate resources with bounded previews:** A single-resource summary may embed a fixed-size preview without cursor metadata. Its contract must specify the preview's maximum size, fields, and deterministic ordering. A bounded preview does not imply a pageable collection or expose pagination controls unless the endpoint contract declares them. Browsing the full collection requires a cursor-paginated contract.
   - **Universal Keyset Cursor Format:** Keyset cursors are opaque Base64-encoded strings (with URL-safe decoding support) representing a universal, storage-agnostic JSON payload:
     ```json
     {
@@ -29,9 +30,11 @@ We use URI path versioning (e.g., `/api/v1/...`) because it is explicit, cache-f
     - `primaryValue` (string, nullable): Serialized string value of the primary sorted attribute (e.g., ISO-8601 UTC timestamp, numeric decimal string, or null).
     - `secondaryValue` (string, nullable): Serialized string value of the secondary tie-breaker attribute (typically `createdAt` ISO-8601 UTC timestamp, or null when sorting directly by `createdAt`).
     - `filterFingerprint` (string, nullable): Server-derived canonical string over the filter parameters that narrow the result set (never `sort`, `size`, or `cursor`). It binds a cursor to the filter set that produced it: if a client replays a cursor against a different filter set, the backend strictly rejects the request with RFC 7807 `400 Bad Request`. Cursors without a fingerprint (minted before this contract, or collections with no filters) skip the check. Clients must treat this value as opaque and must not construct or compare it.
+    - **Fingerprint implementation:** `shared/pagination/FilterFingerprint` encodes filters in a stable declaration order as `name=value` pairs joined by `&`, percent-encoding values and using `*` for absent values. A hash is not required. Collections using a dedicated filter value object must still produce a deterministic canonical fingerprint. The codec validates filter binding only when both the cursor and the caller supply a fingerprint. Base64 encoding and the fingerprint do not authenticate a cursor or replace authorization; the feature must enforce scope and validate any ordering constraints not covered by `sortField`.
   - **NULLS LAST & Multi-Column Tie-Breaking Rules:**
     - Any `NULL` value in the sorted attribute is strictly pushed to the end of the collection (`NULLS LAST`).
     - When two items have identical or null primary sort values, they are deterministically broken first by secondary timestamp (`createdAt DESC` or `startsAt DESC` so the newest record appears first), and finally by `id DESC`.
+    - **Fixed-order contracts:** An endpoint may declare a fixed ascending order and ascending identifier tie-breaker when traversal requires it. Such contracts share the universal cursor wire format while the owning adapter implements the declared seek direction. Ordering and seek predicates must use the same directions; do not substitute the default descending tie-breaker for an explicitly declared order.
   - **Storage & Engine Agnostic:** The exact same cursor payload contract is shared between relational persistence (PostgreSQL JPA Criteria) and Elasticsearch CQRS search (`search_after: [primaryValue, secondaryValue, id]`), requiring no entity-specific or storage-specific coupling.
 - **Search (Free-text / Keyword):** Endpoints that support free-text or partial keyword matching across multiple attributes (e.g., title, name, description, email) MUST standardize on `?q={keyword}` (max 100 or 200 characters as declared in the feature spec). Parameter names like `search`, `keyword`, or `query` are prohibited.
 - **Structured Filtering:** Exact or structured property filters MUST use the specific field name (e.g., `?status=`, `?role=`, `?priceType=`, `?from=`, `?to=`).
@@ -290,7 +293,7 @@ Authenticated clients establish a single, multiplexed connection to receive real
 ### Handshake & Authentication
 
 - **Primary Authentication:** The connection must be authenticated via the standard HTTP header `Authorization: Bearer <jwt>`.
-- **Client Implementation:** Web clients use `@microsoft/fetch-event-source` rather than the browser's native `EventSource`, allowing standard header-based JWT authentication and fine-grained error lifecycle management. Mobile clients (React Native) use `react-native-sse` to support live attendance monitoring (F-6.3) when connectivity is active.
+- **Client Implementation:** Web clients use `@microsoft/fetch-event-source` rather than the browser's native `EventSource`, allowing standard header-based JWT authentication and fine-grained error lifecycle management. Mobile clients (React Native) use `react-native-sse` for the same authenticated, multiplexed stream when connectivity is active.
 - **Handshake Status Codes:**
   - `200 OK`: Stream opened successfully.
   - `401 Unauthorized`: Missing, expired, or invalid JWT (standard RFC 7807 problem detail returned before stream begins).
@@ -309,11 +312,15 @@ retry: 3000
 <blank line>
 ```
 
-- `id`: Unique event ID (UUIDv4) allowing client auto-reconnection via `Last-Event-ID`.
+- `id`: Unique event ID (UUIDv4) for client deduplication and the optional `Last-Event-ID` reconnect hint. Redis Pub/Sub retains no event history, so this header does not guarantee replay or recovery of missed events.
 - `event`: Name of the domain event defining the catalog event type.
 - `data`: Serialized JSON event envelope (`{"eventId": string, "eventType": string, "timestamp": string, "payload": object}`) wrapping the domain data.
 - `retry`: Recommended reconnection interval in milliseconds (default: 3000ms).
 - `<blank line>`: Mandatory terminating empty line (`\n\n`) per the W3C SSE specification. Client parsers only commit and dispatch the event buffer upon receiving this blank line.
+
+All envelope and payload timestamps must serialize as ISO-8601 UTC strings with a trailing `Z`. This applies to Redis publishing as well as HTTP JSON serialization, including timestamps nested in untyped payloads. Each event contract must distinguish business occurrence time, persistence time, and event-production time where applicable. Event IDs and timestamps do not establish a database snapshot version or durable replay position. Events describing persisted changes must follow the owning transaction's commit, and their trigger conditions belong to the domain contract; a successful idempotent response alone does not prove that another state change occurred.
+
+**State recovery and refresh:** Clients load the owning domain's REST baseline when opening a live view and after reconnecting. When an event does not contain the full view state, clients may refetch the relevant baseline according to the feature contract. Coalesce and throttle event-driven refreshes, avoid overlapping requests for the same resource view, and honor rate-limit/retry hints. Replica-backed REST responses may lag live events; without a shared version or watermark, do not treat a later-arriving REST response as a newer snapshot. Keep live event values and baseline snapshots distinct when needed. Use periodic polling as a fallback for unavailable streaming rather than duplicating a healthy event-driven refresh path.
 
 ### Heartbeat (Keep-Alive)
 

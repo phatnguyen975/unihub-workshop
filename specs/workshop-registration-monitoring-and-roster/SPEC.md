@@ -9,7 +9,7 @@
 
 This feature gives **ORGANIZER** users a real-time, read-only dashboard capability over any workshop that belongs to their organization: (1) a **registration summary** showing current seat counts and occupancy, and (2) a **paginated attendee roster** for reviewing and filtering who has registered. It exists because organizers currently have no in-platform way to track registration progress, which forces manual headcount reconciliation before and during the event. The feature is purely read-only — no writes, no cancellations, no refunds — and it is owned by the `registrations` module of the Core Backend.
 
-In addition, this feature formally specifies the **complete real-time event payload** (`registration.updated`) that is emitted to the organizer's live dashboard whenever a registration transitions to `CONFIRMED` or `CANCELED`. The payload fix itself is an implementation detail deferred to `/build`, but the required payload shape is captured here as a binding Functional Requirement so that the spec is the authoritative source of truth.
+In addition, this feature specifies the **complete real-time event payload** (`registration.updated`) that is emitted to the organizer's live dashboard whenever a registration transitions to `CONFIRMED` or `CANCELED`. The binding six-field payload is defined below and in the API contract; implementation findings are tracked separately rather than changing the contract to match defective behavior.
 
 ## 2. Actors & Preconditions
 
@@ -49,8 +49,6 @@ In addition, this feature formally specifies the **complete real-time event payl
 - **FR-16:** Whenever a registration transitions to `CANCELED` status, the system SHALL publish a `registration.updated` event to the workshop's real-time channel with the same complete seat count snapshot as FR-15.
 - **FR-17:** The seat count values included in the `registration.updated` event payload SHALL be computed by the same formulas defined in FR-04 through FR-08, applied at the moment of the transition.
 
-> **Build note:** FR-15 through FR-17 describe the **required** payload shape. The current implementation publishes a truncated payload (`workshopId`, `status` only). Correcting the implementation to match this spec is a `/build` task.
-
 ## 4. Business Rules
 
 - **BR-01 — Multi-tenancy isolation:** An organizer may only access data for workshops that belong to their own organization. Cross-organization access is prohibited regardless of any other condition. _(Source: docs/system-design.md — RBAC; docs/adrs.md — ADR-006)_
@@ -69,14 +67,16 @@ This feature is **read-only** — it does not introduce or modify the lifecycle 
 
 | From State      | Event/Trigger                                       | To State                | Valid? | Rejection Behavior                                                        |
 | :-------------- | :-------------------------------------------------- | :---------------------- | :----: | :------------------------------------------------------------------------ |
-| `PENDING`       | Free workshop registration confirmed by system      | `CONFIRMED`             |   ✅   | N/A — triggers FR-15 event                                                |
+| _(no record)_   | Free workshop registration created by system        | `CONFIRMED`             |   ✅   | N/A — triggers FR-15 event                                                |
 | `PENDING`       | Payment webhook `payment_intent.succeeded` received | `CONFIRMED`             |   ✅   | N/A — triggers FR-15 event                                                |
 | `CONFIRMED`     | Student cancels or organizer cancels                | `CANCELED`              |   ✅   | N/A — triggers FR-16 event                                                |
-| `PENDING`       | Student cancels or registration sweeper times out   | `CANCELED`              |   ✅   | N/A — triggers FR-16 event                                                |
+| `PENDING`       | Sweeper recovers a succeeded payment                | `CONFIRMED`             |   ✅   | N/A — triggers FR-15 event                                                |
+| `PENDING`       | Sweeper resolves an expired unpaid registration     | `FAILED`                |   ✅   | Does not satisfy the confirmation/cancellation triggers in FR-15–FR-16    |
+| `PENDING`       | Student or organizer requests cancellation          | `PENDING` (unchanged)   |   ❌   | `422` — only `CONFIRMED` registrations are cancelable (F-4.3)             |
 | `CONFIRMED`     | Summary / roster read                               | `CONFIRMED` (unchanged) |   ✅   | N/A — read-only, no state change                                          |
 | Any → Any other | Any transition not listed above                     | —                       |   ❌   | Rejected by existing registration FSM; no event published by this feature |
 
-> **Note:** This feature does not implement the FSM transitions above. It publishes events when those transitions occur, and it reads the resulting state for summary/roster queries. The FSM itself is owned by the free-workshop-registration and payment-webhook-handling features.
+> **Note:** This feature does not implement the FSM transitions above. It publishes events for its declared triggers and reads the resulting state for summary/roster queries. The lifecycle is owned by free/paid registration, payment webhook handling, and registration reconciliation and cancellation (F-4.1, F-4.2, F-5.1, F-4.3). In particular, a sweeper timeout is not a `PENDING → CANCELED` transition.
 
 ## 6. Non-Functional Requirements
 

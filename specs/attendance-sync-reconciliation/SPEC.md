@@ -446,7 +446,7 @@ _Satisfies: FR-23, BR-03_
 
 ## 8. Out of Scope
 
-- **Live attendance summary and dashboard (F-6.3):** the summary read model, check-in percentage, and recent-scan listing belong to `live-attendance-monitoring`, which is blocked on this feature.
+- **Live attendance summary and dashboard (F-6.3):** the summary read model, check-in percentage, and recent-scan preview belong to `live-attendance-monitoring`, which depends on this feature and the Real-Time Event Streaming Hub. Current feature status is maintained in `docs/feature-catalog.md`.
 - **Real-time transport implementation (F-10.5):** the SSE endpoint, emitter registry, Redis subscriber, and reconnection semantics are already delivered by the Real-Time Event Streaming Hub. This feature only produces the event.
 - **QR code generation and signing:** ticket generation belongs to the registration features; this feature never signs or issues a ticket.
 - **On-device QR signature verification (F-6.1 / ADR-029):** performed by the mobile client before queueing; not repeated server-side.
