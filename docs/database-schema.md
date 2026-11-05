@@ -577,21 +577,21 @@ erDiagram
 
 **Schema Definition Table:**
 
-| Column Name           | Data Type    | Constraints                                                          | Description/UX Logic                                             |
-| :-------------------- | :----------- | :------------------------------------------------------------------- | :--------------------------------------------------------------- |
-| id                    | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid()                              | Attendance identifier.                                           |
-| workshop_id           | UUID         | FK workshops(id), NOT NULL                                           | Workshop being checked in.                                       |
-| registration_id       | UUID         | FK registrations(id), NOT NULL                                       | Registered attendee.                                             |
-| checked_in_by_user_id | UUID         | FK users(id), NOT NULL                                               | `STAFF` user performing the check-in.                            |
-| sync_id               | UUID         | NOT NULL                                                             | Mobile sync idempotency key.                                     |
-| device_id             | VARCHAR(100) | NULL                                                                 | Optional device identifier.                                      |
-| check_in_method       | VARCHAR(20)  | NOT NULL, CHECK (check_in_method IN ('OFFLINE_SYNC','REALTIME_API')) | Source of check-in.                                              |
-| status                | VARCHAR(20)  | NOT NULL, DEFAULT 'VALID', CHECK (status IN ('VALID','INVALIDATED')) | Allows admins to soft-delete accidental or fraudulent check-ins. |
-| checked_in_at         | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                              | Check-in time.                                                   |
-| created_at            | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                              | Audit timestamp.                                                 |
-| updated_at            | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                              | Audit timestamp.                                                 |
-| created_by            | UUID         | FK users(id), NOT NULL                                               | `STAFF` user or system process.                                  |
-| updated_by            | UUID         | FK users(id), NOT NULL                                               | `STAFF` user or system process.                                  |
+| Column Name           | Data Type    | Constraints                                                          | Description/UX Logic                                                                                                                                                        |
+| :-------------------- | :----------- | :------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                    | UUID         | PK, NOT NULL, DEFAULT gen_random_uuid()                              | Attendance identifier.                                                                                                                                                      |
+| workshop_id           | UUID         | FK workshops(id), NOT NULL                                           | Workshop being checked in.                                                                                                                                                  |
+| registration_id       | UUID         | FK registrations(id), NOT NULL                                       | Registered attendee.                                                                                                                                                        |
+| checked_in_by_user_id | UUID         | FK users(id), NOT NULL                                               | `STAFF` user performing the check-in.                                                                                                                                       |
+| sync_id               | UUID         | NOT NULL                                                             | Durable per-entry offline sync idempotency key, unique per workshop (`(workshop_id, sync_id)`).                                                                             |
+| device_id             | VARCHAR(100) | NULL                                                                 | Optional device identifier.                                                                                                                                                 |
+| check_in_method       | VARCHAR(20)  | NOT NULL, CHECK (check_in_method IN ('OFFLINE_SYNC','REALTIME_API')) | Source of check-in.                                                                                                                                                         |
+| status                | VARCHAR(20)  | NOT NULL, DEFAULT 'VALID', CHECK (status IN ('VALID','INVALIDATED')) | Allows admins to soft-delete accidental or fraudulent check-ins. `INVALIDATED` rows are never reactivated by sync; a re-scan classifies as `ALREADY_USED`.                  |
+| checked_in_at         | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                              | Check-in time. Offline sync stores the clamped client `scannedAt` (never before the workshop `starts_at`, never after server `now()`); `created_at` records server receipt. |
+| created_at            | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                              | Audit timestamp.                                                                                                                                                            |
+| updated_at            | TIMESTAMPTZ  | NOT NULL, DEFAULT now()                                              | Audit timestamp.                                                                                                                                                            |
+| created_by            | UUID         | FK users(id), NOT NULL                                               | `STAFF` user or system process.                                                                                                                                             |
+| updated_by            | UUID         | FK users(id), NOT NULL                                               | `STAFF` user or system process.                                                                                                                                             |
 
 **Indexing Strategy:**
 
@@ -601,7 +601,7 @@ erDiagram
 - B-Tree on `checked_in_at` for reporting.
 
 > [!IMPORTANT]
-> Offline sync must use the `(workshop_id, sync_id)` uniqueness constraint to deterministically resolve `ALREADY_USED` responses.
+> Offline sync must use the `(workshop_id, sync_id)` uniqueness constraint to deterministically resolve `ALREADY_USED` responses. `sync_id` is the **durable per-entry** idempotency key and is complementary to the mandatory request-level `Idempotency-Key` header — a retried batch with identical `sync_id` values must be a no-op returning `SUCCESS`. Rows with `status = 'INVALIDATED'` are never reactivated by sync; a re-scan of an invalidated ticket classifies as `ALREADY_USED`. `checked_in_at` holds the clamped client `scannedAt` (never before the workshop `starts_at`, never after server `now()`), while `created_at` holds the server receipt time.
 
 ### Table: `idempotency_keys`
 

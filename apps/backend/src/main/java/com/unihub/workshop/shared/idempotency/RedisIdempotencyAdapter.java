@@ -6,10 +6,12 @@ import com.unihub.workshop.shared.exception.AppException;
 import com.unihub.workshop.shared.exception.ConflictException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -25,6 +27,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class RedisIdempotencyAdapter implements IdempotencyPort {
 
     private static final String IDEMPOTENCY_KEY_PREFIX = "idempotency:";
+    static final DefaultRedisScript<Long> DELETE_IF_MATCH =
+        new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+                "return redis.call('del', KEYS[1]) else return 0 end",
+            Long.class
+        );
     private static final ObjectMapper OBJECT_MAPPER =
         new ObjectMapper().registerModule(new JavaTimeModule());
 
@@ -35,8 +43,18 @@ public class RedisIdempotencyAdapter implements IdempotencyPort {
         String status,
         String hash,
         Integer responseCode,
-        String responseBody
-    ) {}
+        String responseBody,
+        String owner
+    ) {
+        public CachedIdempotencyEntry(
+            String status,
+            String hash,
+            Integer responseCode,
+            String responseBody
+        ) {
+            this(status, hash, responseCode, responseBody, null);
+        }
+    }
 
     @Override
     @Transactional
@@ -47,6 +65,28 @@ public class RedisIdempotencyAdapter implements IdempotencyPort {
         String requestPath,
         String requestHash,
         Class<T> responseType
+    ) {
+        return claim(
+            userId,
+            idempotencyKey,
+            requestMethod,
+            requestPath,
+            requestHash,
+            responseType,
+            FailedKeyPolicy.REJECT
+        );
+    }
+
+    @Override
+    @Transactional
+    public <T> ClaimResult<T> claim(
+        UUID userId,
+        String idempotencyKey,
+        String requestMethod,
+        String requestPath,
+        String requestHash,
+        Class<T> responseType,
+        FailedKeyPolicy failedKeyPolicy
     ) {
         String redisKey = formatKey(userId, idempotencyKey);
 
@@ -153,8 +193,24 @@ public class RedisIdempotencyAdapter implements IdempotencyPort {
         }
 
         if ("FAILED".equalsIgnoreCase(existing.getStatus())) {
-            throw new ConflictException(
-                "Idempotency key previously failed; please generate a new idempotency key"
+            if (failedKeyPolicy != FailedKeyPolicy.RECLAIM) {
+                throw new ConflictException(
+                    "Idempotency key previously failed; please generate a new idempotency key"
+                );
+            }
+            if (
+                idempotencyKeyJpaRepository.reclaimFailed(
+                    existing.getId(),
+                    requestHash,
+                    Instant.now()
+                ) == 1
+            ) {
+                setTransientPendingLock(redisKey, requestHash);
+                return new ClaimResult.Acquired<>(existing.getId());
+            }
+            throw new IdempotencyConflictException(
+                "Request is currently in progress",
+                2
             );
         }
 
@@ -282,15 +338,39 @@ public class RedisIdempotencyAdapter implements IdempotencyPort {
                 "PENDING",
                 requestHash,
                 null,
-                null
+                null,
+                UUID.randomUUID().toString()
             );
+            String pendingJson = OBJECT_MAPPER.writeValueAsString(entry);
             redisTemplate
                 .opsForValue()
-                .set(
-                    redisKey,
-                    OBJECT_MAPPER.writeValueAsString(entry),
-                    Duration.ofSeconds(60)
+                .set(redisKey, pendingJson, Duration.ofSeconds(60));
+            if (
+                TransactionSynchronizationManager.isActualTransactionActive() &&
+                TransactionSynchronizationManager.isSynchronizationActive()
+            ) {
+                TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (status != STATUS_COMMITTED) {
+                                try {
+                                    redisTemplate.execute(
+                                        DELETE_IF_MATCH,
+                                        List.of(redisKey),
+                                        pendingJson
+                                    );
+                                } catch (RuntimeException ex) {
+                                    log.warn(
+                                        "Failed to release rolled-back idempotency claim",
+                                        ex
+                                    );
+                                }
+                            }
+                        }
+                    }
                 );
+            }
         } catch (Exception e) {
             log.warn(
                 "Failed to write transient PENDING lock to Redis: {}",

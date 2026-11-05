@@ -29,6 +29,7 @@ import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ValidationException;
 import com.unihub.workshop.shared.idempotency.ClaimResult;
+import com.unihub.workshop.shared.idempotency.FailedKeyPolicy;
 import com.unihub.workshop.shared.idempotency.IdempotencyPort;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
@@ -105,7 +106,8 @@ class CancelRegistrationUseCaseFreeTest {
                 any(),
                 any(),
                 any(),
-                eq(CancelledRegistrationResult.class)
+                eq(CancelledRegistrationResult.class),
+                eq(FailedKeyPolicy.RECLAIM)
             )
         ).thenReturn(acquired);
 
@@ -317,7 +319,8 @@ class CancelRegistrationUseCaseFreeTest {
                 any(),
                 any(),
                 any(),
-                eq(CancelledRegistrationResult.class)
+                eq(CancelledRegistrationResult.class),
+                eq(FailedKeyPolicy.RECLAIM)
             )
         ).thenReturn(replayed);
 

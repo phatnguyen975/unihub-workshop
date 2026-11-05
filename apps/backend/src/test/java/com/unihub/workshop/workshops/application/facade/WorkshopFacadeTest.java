@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
+import com.unihub.workshop.workshops.application.ports.out.WorkshopAssignmentRepository;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
 import com.unihub.workshop.workshops.domain.model.Workshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
@@ -24,12 +25,17 @@ import org.junit.jupiter.api.Test;
 class WorkshopFacadeTest {
 
     private WorkshopRepository workshopRepository;
+    private WorkshopAssignmentRepository workshopAssignmentRepository;
     private WorkshopFacade workshopFacade;
 
     @BeforeEach
     void setUp() {
         workshopRepository = mock(WorkshopRepository.class);
-        workshopFacade = new WorkshopFacade(workshopRepository);
+        workshopAssignmentRepository = mock(WorkshopAssignmentRepository.class);
+        workshopFacade = new WorkshopFacade(
+            workshopRepository,
+            workshopAssignmentRepository
+        );
     }
 
     @Test
@@ -167,6 +173,69 @@ class WorkshopFacadeTest {
         assertThat(result.get(id1).status()).isEqualTo("PUBLISHED");
         assertThat(result.get(id2).price()).isEqualByComparingTo(
             new BigDecimal("25.00")
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "isStaffAssignedToWorkshop: returns false when either identifier is null"
+    )
+    void isStaffAssignedToWorkshop_NullIdentifier_ReturnsFalse() {
+        UUID workshopId = UUID.randomUUID();
+        UUID staffUserId = UUID.randomUUID();
+
+        assertThat(
+            workshopFacade.isStaffAssignedToWorkshop(null, staffUserId)
+        ).isFalse();
+        assertThat(
+            workshopFacade.isStaffAssignedToWorkshop(workshopId, null)
+        ).isFalse();
+
+        verifyNoInteractions(workshopAssignmentRepository);
+    }
+
+    @Test
+    @DisplayName(
+        "isStaffAssignedToWorkshop: delegates the assignment existence check to the repository"
+    )
+    void isStaffAssignedToWorkshop_delegatesToAssignmentRepository() {
+        UUID workshopId = UUID.randomUUID();
+        UUID assignedStaffUserId = UUID.randomUUID();
+        UUID unassignedStaffUserId = UUID.randomUUID();
+
+        when(
+            workshopAssignmentRepository.existsByWorkshopIdAndStaffUserId(
+                workshopId,
+                assignedStaffUserId
+            )
+        ).thenReturn(true);
+        when(
+            workshopAssignmentRepository.existsByWorkshopIdAndStaffUserId(
+                workshopId,
+                unassignedStaffUserId
+            )
+        ).thenReturn(false);
+
+        assertThat(
+            workshopFacade.isStaffAssignedToWorkshop(
+                workshopId,
+                assignedStaffUserId
+            )
+        ).isTrue();
+        assertThat(
+            workshopFacade.isStaffAssignedToWorkshop(
+                workshopId,
+                unassignedStaffUserId
+            )
+        ).isFalse();
+
+        verify(workshopAssignmentRepository).existsByWorkshopIdAndStaffUserId(
+            workshopId,
+            assignedStaffUserId
+        );
+        verify(workshopAssignmentRepository).existsByWorkshopIdAndStaffUserId(
+            workshopId,
+            unassignedStaffUserId
         );
     }
 }

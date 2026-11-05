@@ -8,6 +8,7 @@ import java.util.UUID;
 public interface IdempotencyPort {
     /**
      * Attempts to claim the idempotency key for the authenticated user and request payload.
+     * An existing FAILED record is rejected.
      *
      * @param userId authenticated user ID
      * @param idempotencyKey client-supplied UUID string
@@ -26,6 +27,17 @@ public interface IdempotencyPort {
         String requestPath,
         String requestHash,
         Class<T> responseType
+    );
+
+    /** Claims a key using the caller's explicit policy for an existing FAILED record. */
+    <T> ClaimResult<T> claim(
+        UUID userId,
+        String idempotencyKey,
+        String requestMethod,
+        String requestPath,
+        String requestHash,
+        Class<T> responseType,
+        FailedKeyPolicy failedKeyPolicy
     );
 
     /**

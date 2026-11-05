@@ -842,7 +842,7 @@ sequenceDiagram
   else Valid Signature (Authentic Ticket)
     Mobile->>Mobile: Generate sync_id (Idempotency Key), extract registration_id & Save to SQLite
   end
-  Mobile->>GW: POST /api/v1/workshops/{workshopId}/attendances/sync (Batch Array)
+  Mobile->>GW: POST /api/v1/workshops/{workshopId}/attendances/sync (Idempotency-Key, Batch Array)
   GW->>API: Forward Sync Request
   API->>API: Validate JWT Role (STAFF) and permission for {workshopId}
   alt Unauthorized
@@ -867,7 +867,7 @@ sequenceDiagram
     API->>DB: Bulk insert pending check-ins using atomic upsert mechanism, return successfully persisted registration IDs
     DB-->>API: Returned registration_id list (successful inserts)
     API->>API: Reconcile in_memory_pending_list against returned list, any missing IDs are marked ALREADY_USED
-    API->>API: Build structured response array of { sync_id, status }
+    API->>API: Build structured response array of { syncId, status }
     opt New check-ins persisted
       API->>Redis: Publish attendance.updated to unihub:stream:workshop:{workshopId}
       Redis->>API: Distribute to active SSE connections
@@ -885,8 +885,13 @@ sequenceDiagram
 - **Workshop Boundary Enforcement:** Every read and write is constrained by `{workshopId}`, so a valid ticket from one workshop cannot be synchronized against another workshop. This closes the Cross-Workshop Ticket Spoofing gap at the data-access layer, not just at the endpoint layer.
 - **In-Memory Idempotent Filter:** The API classifies each fetched record in RAM before writing anything. Existing rows with the same `sync_id` are treated as `SUCCESS` for legitimate retries, while a different `sync_id` against the same `registration_id` is treated as `ALREADY_USED` for a real double scan.
 - **Pessimistic DB Constraints with Returned Identifiers:** The system relies on database-level unique constraints and atomic upsert mechanisms provided by the storage engine. Bulk writes return the identifiers that were successfully persisted; the API reconciles this returned list against the attempted inserts. Any attempted insert missing from the returned set lost the micro-second race and is marked `ALREADY_USED`. This approach avoids relying on exception-based control flow and keeps the reconciliation deterministic.
-- **Structured 207 Multi-Status Reconciliation:** The API returns a single `207 Multi-Status` payload with explicit `{ sync_id, status }` objects such as `SUCCESS`, `INVALID_TICKET`, and `ALREADY_USED`. The mobile client uses those exact status codes to reconcile local SQLite state without parsing free-form messages.
+- **Structured 207 Multi-Status Reconciliation:** The API returns a single `207 Multi-Status` payload with explicit `{ syncId, status }` objects such as `SUCCESS`, `INVALID_TICKET`, and `ALREADY_USED`. The mobile client uses those exact status codes to reconcile local SQLite state without parsing free-form messages.
 - **Live Attendance Broadcasting:** Following successful persistence of new check-ins, the backend broadcasts an `attendance.updated` event to the Redis Pub/Sub channel for that workshop (`unihub:stream:workshop:{workshopId}`). All organizers viewing the Live Attendance Dashboard and on-site check-in staff assigned to the workshop (F-6.3) receive real-time count updates over their multiplexed SSE stream (`GET /api/v1/stream/events`) without manual page refreshes.
+- **Two-Level Idempotency:** The sync request carries a mandatory `Idempotency-Key` header (request-level, 2-tier Redis L1 + `idempotency_keys` L2, `400` when absent) **and** a per-entry `sync_id` (entry-level, durable via the `(workshop_id, sync_id)` unique constraint). The header replays an entire batch response on client retry; `sync_id` guarantees that an individual scan is never persisted twice even if the batch is re-sent under a different header value. Both are required — neither replaces the other.
+- **Rejected-Ticket Semantics:** A registration that is absent, not `CONFIRMED` (`PENDING`, `FAILED`, `CANCELED`), or bound to a different workshop classifies as `INVALID_TICKET`. An existing attendance row already marked `INVALIDATED` is never reactivated by sync — a re-scan of that ticket classifies as `ALREADY_USED`, and reinstatement remains an explicit organizer action outside this flow.
+- **Late Sync Window:** Offline batches legitimately arrive after the session ends, so sync is accepted while the workshop is `PUBLISHED` or `COMPLETED`. `CANCELED` workshops are rejected, and no time-window restriction is applied to the sync itself.
+- **Scan Timestamp Provenance:** `attendances.checked_in_at` stores the client-supplied `scannedAt`, clamped so it never precedes the workshop `starts_at` and never exceeds server `now()`; `attendances.created_at` records the server receipt time. This preserves the true offline scan ordering for reporting without allowing a tampered clock to fabricate future attendance.
+- **Bounded Batch:** The request body `{ deviceId, entries: [{ syncId, registrationId, scannedAt }] }` must be non-empty and is capped at 500 entries. Empty, oversized, or intra-batch duplicate `syncId`/`registrationId` values are rejected with `422 Unprocessable Content` before any database work, because they signal a client bug rather than a partial business outcome. A workshop in `DRAFT` or `CANCELED` status is likewise rejected with `422 Unprocessable Content` as a state-machine violation, not a per-entry outcome.
 
 ### Async AI Summarization Flow
 

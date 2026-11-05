@@ -29,4 +29,16 @@ public interface WorkshopApi {
     Map<UUID, WorkshopRegistrationDetailsDto> getWorkshopsForRegistrations(
         Collection<UUID> workshopIds
     );
+
+    /**
+     * Checks whether a staff user is explicitly assigned to a workshop.
+     *
+     * <p>Assignment is the only authority for staff check-in; organization membership
+     * is deliberately not considered.
+     *
+     * @param workshopId target workshop ID
+     * @param staffUserId staff user ID
+     * @return true when an assignment record exists for the pair, false otherwise
+     */
+    boolean isStaffAssignedToWorkshop(UUID workshopId, UUID staffUserId);
 }

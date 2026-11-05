@@ -12,6 +12,7 @@ import com.unihub.workshop.iam.api.dto.StudentProfileDto;
 import com.unihub.workshop.registrations.api.dto.ConfirmPaidRegistrationCommand;
 import com.unihub.workshop.registrations.api.dto.RegistrationConfirmedDto;
 import com.unihub.workshop.registrations.api.dto.RegistrationPaymentContextDto;
+import com.unihub.workshop.registrations.api.dto.RegistrationTicketContextDto;
 import com.unihub.workshop.registrations.application.ports.out.CapacityPort;
 import com.unihub.workshop.registrations.application.ports.out.QrSignaturePort;
 import com.unihub.workshop.registrations.application.ports.out.RegistrationRepository;
@@ -302,5 +303,76 @@ class RegistrationFacadeTest {
     void broadcastSeatCountSnapshot_DelegatesToBroadcaster() {
         registrationFacade.broadcastSeatCountSnapshot(WORKSHOP_ID);
         verify(workshopRegistrationBroadcaster).broadcast(WORKSHOP_ID);
+    }
+
+    @Test
+    @DisplayName(
+        "getTicketContexts resolves registration status and workshop scope in one bulk read"
+    )
+    void getTicketContexts_resolvesStatusAndWorkshopScopeInOneRead() {
+        UUID confirmedId = UUID.randomUUID();
+        UUID canceledId = UUID.randomUUID();
+        List<UUID> registrationIds = List.of(confirmedId, canceledId);
+
+        Registration confirmed = Registration.builder()
+            .id(confirmedId)
+            .workshopId(WORKSHOP_ID)
+            .studentUserId(STUDENT_USER_ID)
+            .status(RegistrationStatus.CONFIRMED)
+            .build();
+        Registration canceled = Registration.builder()
+            .id(canceledId)
+            .workshopId(WORKSHOP_ID)
+            .studentUserId(STUDENT_USER_ID)
+            .status(RegistrationStatus.CANCELED)
+            .build();
+
+        when(
+            registrationRepository.findAllByWorkshopIdAndIds(
+                WORKSHOP_ID,
+                registrationIds
+            )
+        ).thenReturn(List.of(confirmed, canceled));
+
+        Map<UUID, RegistrationTicketContextDto> contexts =
+            registrationFacade.getTicketContexts(WORKSHOP_ID, registrationIds);
+
+        assertThat(contexts).containsExactlyInAnyOrderEntriesOf(
+            Map.of(
+                confirmedId,
+                new RegistrationTicketContextDto(
+                    confirmedId,
+                    WORKSHOP_ID,
+                    "CONFIRMED"
+                ),
+                canceledId,
+                new RegistrationTicketContextDto(
+                    canceledId,
+                    WORKSHOP_ID,
+                    "CANCELED"
+                )
+            )
+        );
+        verify(registrationRepository).findAllByWorkshopIdAndIds(
+            WORKSHOP_ID,
+            registrationIds
+        );
+    }
+
+    @Test
+    @DisplayName(
+        "getTicketContexts returns an empty map without querying when no ids are supplied"
+    )
+    void getTicketContexts_withNoIds_returnsEmptyMapWithoutQuerying() {
+        assertThat(
+            registrationFacade.getTicketContexts(WORKSHOP_ID, Set.of())
+        ).isEmpty();
+        assertThat(
+            registrationFacade.getTicketContexts(WORKSHOP_ID, null)
+        ).isEmpty();
+        verify(registrationRepository, never()).findAllByWorkshopIdAndIds(
+            any(),
+            any()
+        );
     }
 }
