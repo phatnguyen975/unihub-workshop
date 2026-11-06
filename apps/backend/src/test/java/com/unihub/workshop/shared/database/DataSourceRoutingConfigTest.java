@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class DataSourceRoutingConfigTest {
@@ -181,6 +182,11 @@ class DataSourceRoutingConfigTest {
             );
 
             assertThat(routing).isInstanceOf(
+                LazyConnectionDataSourceProxy.class
+            );
+            LazyConnectionDataSourceProxy proxy =
+                (LazyConnectionDataSourceProxy) routing;
+            assertThat(proxy.getTargetDataSource()).isInstanceOf(
                 TransactionAwareRoutingDataSource.class
             );
         }

@@ -12,6 +12,7 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,6 +85,14 @@ class GlobalExceptionHandlerTest {
             throw new RuntimeException("Unexpected error");
         }
 
+        @GetMapping("/test/unrelated-database-unavailable")
+        public void unrelatedDatabaseUnavailable() {
+            throw new RuntimeException(
+                "database unavailable",
+                new SQLTransientConnectionException("unavailable", "08001")
+            );
+        }
+
         @PostMapping(
             value = "/test/json-only",
             consumes = MediaType.APPLICATION_JSON_VALUE
@@ -92,6 +101,15 @@ class GlobalExceptionHandlerTest {
     }
 
     private MockMvc mockMvc;
+
+    @Test
+    void unrelatedEndpointConnectionFailureKeepsExistingInternalError()
+        throws Exception {
+        mockMvc
+            .perform(get("/test/unrelated-database-unavailable"))
+            .andExpect(status().isInternalServerError());
+    }
+
     private GlobalExceptionHandler exceptionHandler;
 
     @BeforeEach

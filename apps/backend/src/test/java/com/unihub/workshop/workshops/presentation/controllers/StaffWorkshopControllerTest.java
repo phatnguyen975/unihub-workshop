@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,9 +22,12 @@ import com.unihub.workshop.workshops.domain.model.StaffAssignedWorkshop;
 import com.unihub.workshop.workshops.domain.model.WorkshopStatus;
 import com.unihub.workshop.workshops.presentation.dto.StaffAssignedWorkshopResponse;
 import com.unihub.workshop.workshops.presentation.mapper.StaffWorkshopPresentationMapper;
+import java.sql.SQLException;
+import java.sql.SQLTransientConnectionException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.exception.JDBCConnectionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +35,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 class StaffWorkshopControllerTest {
 
@@ -90,6 +95,68 @@ class StaffWorkshopControllerTest {
             "mock-jwt",
             "ROLE_" + role
         );
+    }
+
+    @Test
+    void primaryUnavailable_returnsServiceUnavailable() throws Exception {
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenThrow(
+            new CannotCreateTransactionException(
+                "primary unavailable",
+                new SQLTransientConnectionException("pool unavailable", "08001")
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned").principal(staffAuth(STAFF_ID))
+            )
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(header().string("Retry-After", "30"))
+            .andExpect(
+                jsonPath("$.error.type").value(
+                    "urn:unihub:error:service-unavailable"
+                )
+            );
+    }
+
+    @Test
+    void nonConnectionSqlFailure_remainsInternalError() throws Exception {
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenThrow(
+            new CannotCreateTransactionException(
+                "transaction failed",
+                new SQLException("syntax error", "42601")
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned").principal(staffAuth(STAFF_ID))
+            )
+            .andExpect(status().isInternalServerError());
+    }
+
+    @Test
+    void hibernateConnectionFailure_returnsServiceUnavailable()
+        throws Exception {
+        when(
+            useCase.execute(any(ListStaffAssignedWorkshopsQuery.class))
+        ).thenThrow(
+            new JDBCConnectionException(
+                "connection failure",
+                new SQLException("connection closed", "08006")
+            )
+        );
+
+        mockMvc
+            .perform(
+                get("/api/v1/workshops/assigned").principal(staffAuth(STAFF_ID))
+            )
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(header().string("Retry-After", "30"));
     }
 
     @Test
