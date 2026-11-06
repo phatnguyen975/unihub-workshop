@@ -1,8 +1,10 @@
 package com.unihub.workshop.attendances.application.events;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -13,6 +15,7 @@ import com.unihub.workshop.shared.realtime.api.RealtimeEventPublisher;
 import com.unihub.workshop.shared.realtime.api.RealtimeEventType;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -128,6 +131,9 @@ class AttendanceSyncEventPublisherTest {
 
         Map<?, ?> payload = capturePayload();
 
+        assertThat(payload.keySet()).isEqualTo(
+            Set.of("workshopId", "checkedInCount", "capacity", "lastSyncedAt")
+        );
         assertThat(payload.get("workshopId")).isEqualTo(WORKSHOP_ID);
         assertThat(payload.get("checkedInCount")).isEqualTo(42L);
         assertThat(payload.get("capacity")).isEqualTo(CAPACITY);
@@ -194,6 +200,21 @@ class AttendanceSyncEventPublisherTest {
         publisher.publishAfterCommit(WORKSHOP_ID, CAPACITY);
 
         verifyNoInteractions(realtimeEventPublisher);
+    }
+
+    @Test
+    @DisplayName("a publisher failure never breaks the already-committed sync")
+    void publishAfterCommit_publisherFails_swallowsFailure() {
+        when(
+            attendanceRepository.countValidByWorkshopId(WORKSHOP_ID)
+        ).thenReturn(1L);
+        doThrow(new IllegalStateException("redis unavailable"))
+            .when(realtimeEventPublisher)
+            .publishToWorkshop(eq(WORKSHOP_ID), any());
+
+        assertThatCode(() ->
+            publisher.publishAfterCommit(WORKSHOP_ID, CAPACITY)
+        ).doesNotThrowAnyException();
     }
 
     private Map<?, ?> capturePayload() {

@@ -25,7 +25,7 @@ Repair and regression-check the existing streaming, assignment-provisioning, and
 
 ### Phase 1: Restore Existing API Contracts
 
-- [ ] **T1 — Existing attendance updates reach SSE consumers with UTC text timestamps and unchanged publishing semantics**
+- [x] **T1 — Existing attendance updates reach SSE consumers with UTC text timestamps and unchanged publishing semantics**
   - **Size:** S — 4 expected files.
   - **Depends on:** —
   - **Layers touched:** Existing attendance application event production; shared realtime infrastructure and wire representation.

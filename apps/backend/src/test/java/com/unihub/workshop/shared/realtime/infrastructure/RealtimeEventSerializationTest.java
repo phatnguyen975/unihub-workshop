@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.realtime.api.RealtimeEvent;
 import com.unihub.workshop.shared.realtime.api.RealtimeEventType;
@@ -23,6 +24,7 @@ class RealtimeEventSerializationTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     @Test
@@ -42,7 +44,7 @@ class RealtimeEventSerializationTest {
             "linkUrl",
             "/workshops/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
             "createdAt",
-            "2026-09-09T05:15:00Z"
+            Instant.parse("2026-09-09T05:15:00Z")
         );
 
         RealtimeEvent<Map<String, Object>> event = new RealtimeEvent<>(
@@ -87,7 +89,7 @@ class RealtimeEventSerializationTest {
             "unreadCount",
             2,
             "readAt",
-            "2026-09-09T05:15:30Z"
+            Instant.parse("2026-09-09T05:15:30Z")
         );
 
         RealtimeEvent<Map<String, Object>> event = new RealtimeEvent<>(
@@ -190,7 +192,7 @@ class RealtimeEventSerializationTest {
             "capacity",
             100,
             "lastSyncedAt",
-            "2026-09-09T05:17:00Z"
+            Instant.parse("2026-09-09T05:17:00Z")
         );
 
         RealtimeEvent<Map<String, Object>> event = new RealtimeEvent<>(
@@ -210,6 +212,12 @@ class RealtimeEventSerializationTest {
             85
         );
         assertThat(root.get("payload").get("capacity").asInt()).isEqualTo(100);
+        assertThat(
+            root.get("payload").get("lastSyncedAt").isTextual()
+        ).isTrue();
+        assertThat(root.get("payload").get("lastSyncedAt").asText()).isEqualTo(
+            "2026-09-09T05:17:00Z"
+        );
     }
 
     @Test
@@ -231,7 +239,7 @@ class RealtimeEventSerializationTest {
             "availableSeats",
             0,
             "lastUpdatedAt",
-            "2026-09-09T05:17:30Z"
+            Instant.parse("2026-09-09T05:17:30Z")
         );
 
         RealtimeEvent<Map<String, Object>> event = new RealtimeEvent<>(
@@ -270,7 +278,7 @@ class RealtimeEventSerializationTest {
             "qrPayload",
             "unihub:reg:3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f:sig:abc123xyz",
             "qrIssuedAt",
-            "2026-09-09T05:18:00Z"
+            Instant.parse("2026-09-09T05:18:00Z")
         );
 
         RealtimeEvent<Map<String, Object>> event = new RealtimeEvent<>(
