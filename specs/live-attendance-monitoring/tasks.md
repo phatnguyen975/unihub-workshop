@@ -63,7 +63,7 @@ Repair and regression-check the existing streaming, assignment-provisioning, and
     - Existing registration, payment, idempotency, sync, lifecycle, and read-only reporting unit suites remain green after the shared datasource change. Never route a mutation or its participating reads to Replica to fix an assertion. _(ADR-014/ADR-015; F-6.2 Primary requirement.)_
   - **Human API retest:** On an upcoming published workshop, assign/revoke staff through the existing administration API and immediately query their assigned-workshop feed. Retest its pagination/filter errors, an existing read-only report, a registration mutation, and sync. Pool/connection evidence comes from tests or existing observability, never a new debug response field. Use separate fixtures for assignment timing and on-site sync.
 
-- [ ] **T3 — Existing registration summary reports the workshop update time when no registrations exist**
+- [x] **T3 — Existing registration summary reports the workshop update time when no registrations exist**
   - **Size:** M — 6 expected files.
   - **Depends on:** T2 — datasource routing is verified before changing an existing Replica reporting path.
   - **Layers touched:** Workshop public facade/application read, registration application reporting, existing presentation response and regression verification.
@@ -83,10 +83,10 @@ Repair and regression-check the existing streaming, assignment-provisioning, and
 
 #### Checkpoint A — Existing APIs must be stable before F-6.3 starts
 
-- [ ] T1–T3 have failing-before/passing-after regressions, their acceptance criteria pass, the full backend unit suite passes, and `ModulithArchitectureTest` passes.
-- [ ] The human has retested the affected existing APIs and explicitly confirmed the legacy baseline is stable. Automated green results alone do not open this gate.
-- [ ] Any regression in an existing feature introduced by these changes has been reproduced and repaired in the responsible task, with a failing regression guard and repeated relevant/full unit verification. If reported after a checkbox was completed, reopen that task; do not proceed to T4 while the failure remains.
-- [ ] No attendance-summary endpoint, F-6.3 confirmed-count facade extension, reporting index, or other F-6.3 production change has begun before this gate clears. T3's timestamp query belongs to the existing registration-summary repair.
+- [x] T1–T3 have failing-before/passing-after regressions, their acceptance criteria pass, the full backend unit suite passes, and `ModulithArchitectureTest` passes.
+- [x] The human has retested the affected existing APIs and explicitly confirmed the legacy baseline is stable. Automated green results alone do not open this gate.
+- [x] Any regression in an existing feature introduced by these changes has been reproduced and repaired in the responsible task, with a failing regression guard and repeated relevant/full unit verification. If reported after a checkbox was completed, reopen that task; do not proceed to T4 while the failure remains.
+- [x] No attendance-summary endpoint, F-6.3 confirmed-count facade extension, reporting index, or other F-6.3 production change has begun before this gate clears. T3's timestamp query belongs to the existing registration-summary repair.
 
 This checkpoint is a gate, not an extra implementation task. Passing it does not invoke the next task; the human separately invokes `/build live-attendance-monitoring T4`.
 

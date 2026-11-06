@@ -1,6 +1,7 @@
 package com.unihub.workshop.workshops.api;
 
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -10,6 +11,9 @@ import java.util.UUID;
  * Public synchronous facade interface for Workshop queries required by peer modules.
  */
 public interface WorkshopApi {
+    /** Returns the workshop's update time, or empty when the workshop is absent. */
+    Optional<Instant> getWorkshopUpdatedAt(UUID workshopId);
+
     /**
      * Retrieves registration details for a single workshop by ID.
      *

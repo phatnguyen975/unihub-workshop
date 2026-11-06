@@ -2,6 +2,7 @@ package com.unihub.workshop.registrations.application.usecases;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -113,6 +114,7 @@ class GetWorkshopRegistrationSummaryUseCaseTest {
         assertThat(result.lastUpdatedAt()).isEqualTo(latestRegistrationTime);
 
         verify(workshopApi).getWorkshopForRegistration(workshopId);
+        verify(workshopApi, never()).getWorkshopUpdatedAt(workshopId);
         verify(registrationRepository).getRegistrationRawCounts(workshopId);
     }
 
@@ -174,6 +176,9 @@ class GetWorkshopRegistrationSummaryUseCaseTest {
         ).thenReturn(
             new WorkshopRegistrationRawCounts(0L, 0L, Optional.empty())
         );
+        when(workshopApi.getWorkshopUpdatedAt(workshopId)).thenReturn(
+            Optional.of(now.minusSeconds(3600))
+        );
 
         // Act
         WorkshopRegistrationSeatCounts result = useCase.getSummary(query);
@@ -185,7 +190,64 @@ class GetWorkshopRegistrationSummaryUseCaseTest {
         assertThat(result.occupancyPercentage()).isEqualTo(
             new BigDecimal("0.00")
         );
-        assertThat(result.lastUpdatedAt()).isEqualTo(now);
+        assertThat(result.lastUpdatedAt()).isEqualTo(now.minusSeconds(3600));
+    }
+
+    @Test
+    void emptyUnscheduledDraftUsesWorkshopUpdatedAt() {
+        Instant updatedAt = now.minusSeconds(3600);
+        WorkshopRegistrationDetailsDto draft =
+            new WorkshopRegistrationDetailsDto(
+                workshopId,
+                orgId,
+                "Draft",
+                "draft",
+                "DRAFT",
+                null,
+                null,
+                BigDecimal.ZERO,
+                null,
+                null
+            );
+        when(workshopApi.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(draft)
+        );
+        when(
+            registrationRepository.getRegistrationRawCounts(workshopId)
+        ).thenReturn(
+            new WorkshopRegistrationRawCounts(0L, 0L, Optional.empty())
+        );
+        when(workshopApi.getWorkshopUpdatedAt(workshopId)).thenReturn(
+            Optional.of(updatedAt)
+        );
+
+        WorkshopRegistrationSeatCounts result = useCase.getSummary(
+            new GetWorkshopRegistrationSummaryQuery(workshopId, orgId)
+        );
+
+        assertThat(result.lastUpdatedAt()).isEqualTo(updatedAt);
+        assertThat(result.capacity()).isZero();
+    }
+
+    @Test
+    void emptySummaryWithMissingWorkshopTimestampReturnsNotFound() {
+        when(workshopApi.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(createWorkshopDto(workshopId, orgId, 50, now))
+        );
+        when(
+            registrationRepository.getRegistrationRawCounts(workshopId)
+        ).thenReturn(
+            new WorkshopRegistrationRawCounts(0L, 0L, Optional.empty())
+        );
+        when(workshopApi.getWorkshopUpdatedAt(workshopId)).thenReturn(
+            Optional.empty()
+        );
+
+        assertThatThrownBy(() ->
+            useCase.getSummary(
+                new GetWorkshopRegistrationSummaryQuery(workshopId, orgId)
+            )
+        ).isInstanceOf(NotFoundException.class);
     }
 
     @Test
