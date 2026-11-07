@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.unihub.workshop.shared.realtime.api.RealtimeEvent;
@@ -108,6 +109,53 @@ class RedisRealtimePubSubTest {
         );
         assertThat(messageCaptor.getValue()).contains("attendance.updated");
         assertThat(messageCaptor.getValue()).contains("42");
+    }
+
+    @Test
+    @DisplayName("attendance updates publish nested Instant as a UTC string")
+    void publishToWorkshop_attendanceTimestampIsUtcText() throws Exception {
+        UUID workshopId = UUID.randomUUID();
+        Instant timestamp = Instant.parse("2026-09-09T05:17:00Z");
+        RealtimeEvent<Map<String, Object>> event = new RealtimeEvent<>(
+            UUID.randomUUID(),
+            RealtimeEventType.ATTENDANCE_UPDATED.getValue(),
+            timestamp,
+            Map.of(
+                "workshopId",
+                workshopId,
+                "checkedInCount",
+                42L,
+                "capacity",
+                100,
+                "lastSyncedAt",
+                timestamp
+            )
+        );
+
+        publisherAdapter.publishToWorkshop(workshopId, event);
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(redisTemplate).convertAndSend(
+            eq("unihub:stream:workshop:" + workshopId),
+            message.capture()
+        );
+        JsonNode root = objectMapper.readTree(message.getValue());
+        assertThat(root.path("timestamp").isTextual()).isTrue();
+        assertThat(root.path("timestamp").asText()).isEqualTo(
+            timestamp.toString()
+        );
+        JsonNode payload = root.path("payload");
+        assertThat(payload.size()).isEqualTo(4);
+        assertThat(payload.path("workshopId").asText()).isEqualTo(
+            workshopId.toString()
+        );
+        assertThat(payload.path("checkedInCount").isIntegralNumber()).isTrue();
+        assertThat(payload.path("checkedInCount").asLong()).isEqualTo(42L);
+        assertThat(payload.path("capacity").asInt()).isEqualTo(100);
+        assertThat(payload.path("lastSyncedAt").isTextual()).isTrue();
+        assertThat(payload.path("lastSyncedAt").asText()).isEqualTo(
+            timestamp.toString()
+        );
     }
 
     @Test

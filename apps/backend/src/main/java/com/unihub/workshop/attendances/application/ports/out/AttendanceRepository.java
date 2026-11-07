@@ -2,6 +2,7 @@ package com.unihub.workshop.attendances.application.ports.out;
 
 import com.unihub.workshop.attendances.domain.model.Attendance;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -10,6 +11,8 @@ import java.util.UUID;
  * Outbound port for attendance persistence.
  */
 public interface AttendanceRepository {
+    List<Attendance> findRecentValidByWorkshopId(UUID workshopId);
+
     /**
      * Persists every supplied attendance record with a single bulk write.
      *

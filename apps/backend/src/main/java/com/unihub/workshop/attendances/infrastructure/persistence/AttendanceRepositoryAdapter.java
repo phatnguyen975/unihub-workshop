@@ -24,6 +24,26 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AttendanceRepositoryAdapter implements AttendanceRepository {
 
+    @Override
+    public List<Attendance> findRecentValidByWorkshopId(UUID workshopId) {
+        if (workshopId == null) {
+            return List.of();
+        }
+        MapSqlParameterSource parameters = new MapSqlParameterSource().addValue(
+            "workshopId",
+            workshopId
+        );
+        return namedJdbcTemplate.query(
+            SELECT_PREFIX +
+                "WHERE workshop_id = :workshopId" +
+                VALID_STATUS_PREDICATE +
+                " " +
+                "ORDER BY checked_in_at DESC, id DESC LIMIT 10",
+            parameters,
+            (resultSet, rowNumber) -> mapRow(resultSet)
+        );
+    }
+
     private static final String[] COLUMN_NAMES = {
         "id",
         "workshop_id",
@@ -71,10 +91,13 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
         "WHERE workshop_id = :workshopId" +
         " AND registration_id IN (:registrationIds)";
 
+    private static final String VALID_STATUS_PREDICATE =
+        " AND status = 'VALID'";
+
     private static final String COUNT_VALID_BY_WORKSHOP_STATEMENT =
         "SELECT COUNT(*) FROM attendances" +
         " WHERE workshop_id = :workshopId" +
-        " AND status = :status";
+        VALID_STATUS_PREDICATE;
 
     private static final String SYNC_ID_COLUMN = "sync_id";
 
@@ -146,9 +169,10 @@ public class AttendanceRepositoryAdapter implements AttendanceRepository {
             return 0L;
         }
 
-        MapSqlParameterSource parameters = new MapSqlParameterSource()
-            .addValue("workshopId", workshopId)
-            .addValue("status", AttendanceStatus.VALID.name());
+        MapSqlParameterSource parameters = new MapSqlParameterSource().addValue(
+            "workshopId",
+            workshopId
+        );
 
         Long count = namedJdbcTemplate.queryForObject(
             COUNT_VALID_BY_WORKSHOP_STATEMENT,

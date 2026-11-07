@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-This feature implements the backend data provisioning endpoint that enables Check-in Staff to perform offline QR-code-based attendance recording during Skills and Career Week. Before going on-site, a staff member authenticates and calls a single authenticated endpoint to download the complete list of workshops they are assigned to, along with their enrollment data, caching it locally on the mobile device. This endpoint — scoped strictly to the `workshops` module — returns a keyset-paginated, filterable list of workshop records for the authenticated staff member, drawing exclusively from the primary database to guarantee that newly-assigned workshops are always visible regardless of replication lag. It is the first of two phases in the offline check-in workflow; the second phase (attendance sync reconciliation) is a separate, currently-blocked feature.
+This feature implements the backend data provisioning endpoint that enables Check-in Staff to perform offline QR-code-based attendance recording during Skills and Career Week. Before going on-site, a staff member authenticates and calls a single authenticated endpoint to download the complete list of workshops they are assigned to, caching workshop metadata locally on the mobile device. This endpoint — scoped strictly to the `workshops` module — returns a keyset-paginated, filterable list of workshop records for the authenticated staff member, drawing exclusively from the primary database to guarantee that newly-assigned workshops are always visible regardless of replication lag. It is the first of two phases in the offline check-in workflow; the second phase is owned by the separate `attendance-sync-reconciliation` feature (F-6.2). Feature readiness and completion are tracked in `docs/feature-catalog.md`.
 
 ## 2. Actors & Preconditions
 
@@ -259,7 +259,7 @@ _Satisfies: FR-03, BR-01_
 ## 8. Out of Scope
 
 - **Mobile application (apps/mobile/):** This spec covers only the backend REST endpoint. The React Native client, SQLite local cache, and offline UI are out of scope.
-- **Attendance recording and sync (F-6.2):** The `POST /api/v1/workshops/{workshopId}/attendances/sync` endpoint that reconciles offline attendance records is a separate, currently-blocked feature (`attendance-sync-reconciliation`). No attendance data is read or written by this endpoint.
+- **Attendance recording and sync (F-6.2):** The `POST /api/v1/workshops/{workshopId}/attendances/sync` endpoint that reconciles offline attendance records belongs to the separate `attendance-sync-reconciliation` feature. No attendance data is read or written by this provisioning endpoint. See `docs/feature-catalog.md` for the current status of F-6.2.
 - **QR code generation or scanning:** QR code logic is out of scope. This endpoint provides workshop metadata, not QR codes.
 - **Public-key distribution (F-1.3):** The `GET /api/v1/auth/public-key` endpoint is a separate, already-completed feature.
 - **Enrollment/registration data:** This endpoint does not return the list of registered students per workshop. That data is required for QR-scan validation and belongs to a later phase.

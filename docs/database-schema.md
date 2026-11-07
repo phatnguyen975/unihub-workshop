@@ -599,6 +599,9 @@ erDiagram
 - Unique B-Tree on `(workshop_id, sync_id)` to guarantee offline idempotency.
 - B-Tree on `status` to filter out invalidated records during attendance reporting.
 - B-Tree on `checked_in_at` for reporting.
+- Partial composite B-Tree `idx_attendances_workshop_valid_checked_in_at_id` on `(workshop_id, checked_in_at DESC, id DESC) WHERE status = 'VALID'` for workshop-scoped valid-attendance counts and newest-first reads. Single-column indexes do not provide the same workshop-scoped ordering. This index is not present in the current migrations and requires an additive Flyway migration before relying on that access path.
+
+**Reporting semantics:** Attendance reporting counts persisted rows with the required status and workshop scope, not synchronization outcomes; a successful retry can leave the row set unchanged. `INVALIDATED` rows do not represent current valid attendance. `checked_in_at` preserves scan time, while `created_at` records server receipt, so late synchronization can make scan order differ from insertion order. Use a unique identifier as the final ordering tie-breaker. Attendance validity and a registration's current status are distinct facts owned by their respective modules; do not assume the two row sets remain identical or resolve cross-module business values by bypassing the owning module's public API. Response fields, preview limits, and derived metric formulas belong to the feature contract.
 
 > [!IMPORTANT]
 > Offline sync must use the `(workshop_id, sync_id)` uniqueness constraint to deterministically resolve `ALREADY_USED` responses. `sync_id` is the **durable per-entry** idempotency key and is complementary to the mandatory request-level `Idempotency-Key` header — a retried batch with identical `sync_id` values must be a no-op returning `SUCCESS`. Rows with `status = 'INVALIDATED'` are never reactivated by sync; a re-scan of an invalidated ticket classifies as `ALREADY_USED`. `checked_in_at` holds the clamped client `scannedAt` (never before the workshop `starts_at`, never after server `now()`), while `created_at` holds the server receipt time.
@@ -792,12 +795,15 @@ Neon PostgreSQL uses a primary-replica topology. Replication lag is expected and
 - All OTP verification, password changes, and refresh token rotations must be routed to the primary.
 - Admin mutation flows that rely on `version` must read from the primary to avoid stale versions.
 - Offline sync reconciliation must read and write against the primary to avoid double check-ins.
+- Reads requiring immediate visibility after a write must use Primary even when they make no business mutation; a newly granted assignment must not disappear behind replication lag in a provisioning response.
+- Authorization that requires current ownership or assignment state must use Primary. A read workflow may retain authorized resource context and then obtain eventually consistent reporting values separately. State the authorization freshness requirement explicitly; checking permission establishes access at that time and does not lock it for the lifetime of the response.
 - The Spring Modulith event publication registry (`event_publication`) must be strictly routed to the Primary DB to prevent missed events or duplicate broker publishing caused by replica read delays.
 
 **Replica Routing Requirements:**
 
 - Heavy background read operations, such as synchronizing workshop data to Elasticsearch or batch reading for reporting, should be explicitly routed to Read Replicas to protect the Primary DB's transaction throughput during high-concurrency spikes.
 - Non-mutating history and reporting queries may use a Read Replica when their callers explicitly tolerate short-lived stale data. They must never participate in a check-then-act decision, idempotency workflow, authorization decision that changes state, or immediate read-after-write UX.
+- When consistency-critical context and reporting values use different datasources, finish the Primary phase before the Replica reporting transaction. Neither an enclosing transaction nor peer-facade propagation may silently change the intended routing. Values read across datasources are not one atomic snapshot; a read-only transaction alone also does not guarantee that several statements share one snapshot beyond the configured isolation level. Document failure and fallback policies explicitly rather than silently redirecting reporting load to Primary.
 
 > [!CAUTION]
 > Replica reads on the tables above can produce stale states and break exactly-once guarantees. Restrict replicas to non-critical browsing, history, and reporting queries where eventual consistency is acceptable.

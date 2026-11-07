@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import jakarta.servlet.FilterChain;
 import java.time.Instant;
 import java.util.UUID;
@@ -18,6 +19,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +54,9 @@ class JwtAuthenticationFilterTest {
     @Test
     void shouldRejectBlacklistedJti() throws Exception {
         // Arrange
+        request.setRequestURI(
+            "/api/v1/workshops/00000000-0000-4000-8000-000000000001/attendances/summary"
+        );
         String token = "some.jwt.token";
         request.addHeader("Authorization", "Bearer " + token);
 
@@ -83,6 +88,57 @@ class JwtAuthenticationFilterTest {
             eq(response),
             eq(null),
             any(AuthenticationCredentialsNotFoundException.class)
+        );
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void summaryRejectsInvalidJwtBeforeChain() throws Exception {
+        request.setRequestURI(
+            "/api/v1/workshops/00000000-0000-4000-8000-000000000001/attendances/summary"
+        );
+        request.addHeader("Authorization", "Bearer invalid");
+        when(jwtDecoder.decode("invalid")).thenThrow(
+            new JwtException("invalid token")
+        );
+        filter.doFilterInternal(request, response, filterChain);
+        verify(exceptionResolver).resolveException(
+            eq(request),
+            eq(response),
+            eq(null),
+            any(AuthenticationCredentialsNotFoundException.class)
+        );
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void summaryRevocationOutageFailsClosedBeforeChain() throws Exception {
+        request.setRequestURI(
+            "/api/v1/workshops/00000000-0000-4000-8000-000000000001/attendances/summary"
+        );
+        request.addHeader("Authorization", "Bearer token");
+        Jwt jwt = mock(Jwt.class);
+        Instant now = Instant.now();
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+            UUID.randomUUID().toString(),
+            UUID.randomUUID().toString(),
+            "jti",
+            "STAFF",
+            UUID.randomUUID().toString(),
+            now,
+            now.plusSeconds(60)
+        );
+        when(jwtDecoder.decode("token")).thenReturn(jwt);
+        when(claimsExtractor.extract(jwt)).thenReturn(principal);
+        when(jtiValidator.isTokenValid("jti")).thenThrow(
+            new ServiceUnavailableException("unavailable")
+        );
+        filter.doFilterInternal(request, response, filterChain);
+        verify(exceptionResolver).resolveException(
+            eq(request),
+            eq(response),
+            eq(null),
+            any(ServiceUnavailableException.class)
         );
         verify(filterChain, never()).doFilter(request, response);
     }

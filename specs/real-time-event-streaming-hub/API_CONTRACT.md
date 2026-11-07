@@ -48,6 +48,8 @@ This contract defines the network interface for the **Real-Time Event Streaming 
 
 **Request Body:** None.
 
+**Reconnection semantics:** `Last-Event-ID` is an optional hint, not a replay guarantee. The Redis Pub/Sub hub does not persist event history or replay events lost during disconnection. Clients must reload the domain REST baseline on reconnect; attendance monitoring uses `GET /api/v1/workshops/{workshopId}/attendances/summary`. Event IDs support deduplication but are not ordered workshop versions. Envelope and payload timestamps, including `attendance.updated.payload.lastSyncedAt`, are ISO-8601 UTC JSON strings, never epoch numbers.
+
 #### Response
 
 **Success — `200 OK` (Stream Established):**

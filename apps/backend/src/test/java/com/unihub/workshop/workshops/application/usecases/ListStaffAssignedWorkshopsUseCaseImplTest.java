@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class ListStaffAssignedWorkshopsUseCaseImplTest {
@@ -90,6 +91,17 @@ class ListStaffAssignedWorkshopsUseCaseImplTest {
             eq(20),
             any(StaffWorkshopFilter.class)
         );
+    }
+
+    @Test
+    void execute_usesPrimaryTransactionForCurrentAssignments()
+        throws Exception {
+        Transactional transaction = ListStaffAssignedWorkshopsUseCaseImpl.class
+            .getMethod("execute", ListStaffAssignedWorkshopsQuery.class)
+            .getAnnotation(Transactional.class);
+
+        assertThat(transaction).isNotNull();
+        assertThat(transaction.readOnly()).isFalse();
     }
 
     @Test

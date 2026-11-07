@@ -91,6 +91,38 @@ class AttendanceRepositoryAdapterTest {
     }
 
     @Test
+    void recentValidQueryIsWorkshopScopedBoundedAndOrdered() {
+        UUID workshopId = UUID.randomUUID();
+        Attendance row = attendance(UUID.randomUUID(), UUID.randomUUID());
+        when(
+            namedJdbcTemplate.query(
+                anyString(),
+                any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<Attendance>>any()
+            )
+        ).thenReturn(List.of(row));
+
+        assertThat(
+            adapter.findRecentValidByWorkshopId(workshopId)
+        ).containsExactly(row);
+        verify(namedJdbcTemplate).query(
+            sqlCaptor.capture(),
+            parameterCaptor.capture(),
+            attendanceRowMapperCaptor.capture()
+        );
+        assertThat(sqlCaptor.getValue()).contains(
+            "workshop_id = :workshopId",
+            "status = 'VALID'",
+            "ORDER BY checked_in_at DESC, id DESC",
+            "LIMIT 10"
+        );
+        assertThat(parameterCaptor.getValue().getValue("workshopId")).isEqualTo(
+            workshopId
+        );
+        assertThat(parameterCaptor.getValue().hasValue("status")).isFalse();
+    }
+
+    @Test
     @DisplayName(
         "insertAll issues exactly one multi-row statement with an ON CONFLICT DO NOTHING RETURNING clause"
     )
@@ -491,13 +523,11 @@ class AttendanceRepositoryAdapterTest {
         assertThat(sql).startsWith("SELECT COUNT(*)");
         assertThat(sql).contains("FROM attendances");
         assertThat(sql).contains("workshop_id = :workshopId");
-        assertThat(sql).contains("status = :status");
+        assertThat(sql).contains("status = 'VALID'");
         assertThat(parameterCaptor.getValue().getValue("workshopId")).isEqualTo(
             workshopId
         );
-        assertThat(parameterCaptor.getValue().getValue("status")).isEqualTo(
-            AttendanceStatus.VALID.name()
-        );
+        assertThat(parameterCaptor.getValue().hasValue("status")).isFalse();
     }
 
     @Test

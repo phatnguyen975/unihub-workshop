@@ -5,6 +5,7 @@ import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopAssignmentRepository;
 import com.unihub.workshop.workshops.application.ports.out.WorkshopRepository;
 import com.unihub.workshop.workshops.domain.model.Workshop;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -26,6 +27,15 @@ public class WorkshopFacade implements WorkshopApi {
 
     private final WorkshopRepository workshopRepository;
     private final WorkshopAssignmentRepository workshopAssignmentRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Instant> getWorkshopUpdatedAt(UUID workshopId) {
+        if (workshopId == null) {
+            return Optional.empty();
+        }
+        return workshopRepository.findById(workshopId).map(Workshop::updatedAt);
+    }
 
     @Override
     @Transactional(readOnly = true)

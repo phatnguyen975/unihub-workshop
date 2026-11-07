@@ -7,6 +7,10 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
+import java.sql.SQLException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,6 +35,10 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private static final String STAFF_ASSIGNED_WORKSHOPS_PATH =
+        "/api/v1/workshops/assigned";
+    private static final String SQL_CONNECTION_ERROR_CLASS = "08";
 
     @Value("${app.http.retry-after-seconds:30}")
     private int defaultRetryAfterSeconds = 30;
@@ -450,6 +458,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         Exception ex,
         HttpServletRequest request
     ) {
+        if (
+            request
+                .getRequestURI()
+                .equals(
+                    request.getContextPath() + STAFF_ASSIGNED_WORKSHOPS_PATH
+                ) &&
+            isConnectionFailure(ex)
+        ) {
+            return handleAppException(
+                new ServiceUnavailableException(
+                    "The workshop assignment service is temporarily unavailable."
+                ),
+                request
+            );
+        }
         log.error("Unhandled system error", ex);
         ProblemDetail problem = createProblemDetail(
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -461,6 +484,29 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
             problem
         );
+    }
+
+    private boolean isConnectionFailure(Throwable exception) {
+        for (
+            Throwable cause = exception;
+            cause != null;
+            cause = cause.getCause()
+        ) {
+            if (cause instanceof SQLException sqlException) {
+                String sqlState = sqlException.getSQLState();
+                if (
+                    sqlException instanceof SQLTransientConnectionException ||
+                    sqlException instanceof
+                        SQLNonTransientConnectionException ||
+                    sqlException instanceof SQLRecoverableException ||
+                    (sqlState != null &&
+                        sqlState.startsWith(SQL_CONNECTION_ERROR_CLASS))
+                ) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private ProblemDetail createProblemDetail(

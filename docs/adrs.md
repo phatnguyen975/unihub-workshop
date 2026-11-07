@@ -135,6 +135,7 @@
 - **Rationale:** Critical flows require strict "Read-Your-Writes" consistency to prevent replay anomalies, concurrency conflicts, or lost updates. Forcing primary routing for these specific operations eliminates replication lag risks while still preserving read replica scalability for the vast majority of public traffic.
 - **Alternatives Considered:** Replica reads for idempotency and admin mutations were rejected because replication lag can cause false negatives, replay anomalies, and lost-update races. A single-node primary-only model was rejected because it would unnecessarily sacrifice read scalability for non-critical browsing paths.
 - **Consequences:** Requires explicit routing logic at the application layer (e.g., relying on `@Transactional` routing mechanisms) and strict code reviews to ensure critical reads never hit replicas.
+  - **Mixed-consistency read workflows:** When a read workflow requires current authorization or immediate visibility of a recent change but tolerates stale reporting values, resolve its consistency-critical context on Primary before reading those reporting values in a separate Replica transaction. Define the required freshness of each phase in the feature contract. Do not wrap both phases in a single transaction that defeats the split, promise an atomic snapshot across datasources, or use reporting values to drive a mutation.
 
 ### ADR 016: Stale-While-Revalidate (SWR) Cache-Aside
 
@@ -283,7 +284,7 @@
   - **HTTP/2 and Standard Infrastructure Compatibility:** SSE operates over standard HTTP/1.1 and HTTP/2, traversing corporate firewalls, proxies, and load balancers without requiring WebSocket upgrade handshakes. Nginx acts as a forwarding reverse proxy with `proxy_buffering off;`.
   - **Horizontal Scalability via Redis Pub/Sub:** Backend nodes run statelessly behind Nginx. When an event occurs on Node A or in a background Worker, publishing to Redis Pub/Sub ensures Node B (holding the user's active `SseEmitter`) receives and streams the event to the client.
   - **Multiplexed Single-Connection:** A single client maintains only one SSE stream for all event types (`notification.new`, `ai.summary.completed`, `attendance.updated`, `registration.updated`, `payment.confirmed`), preventing socket exhaustion on client devices and reverse proxies.
-  - **Native Reconnection:** SSE clients natively handle reconnects with backoff and `Last-Event-ID`.
+  - **Native Reconnection:** SSE clients handle reconnects with backoff and may send `Last-Event-ID` as a hint. Redis Pub/Sub is transient and the hub has no historical event store; reconnecting does not replay missed events. Clients recover business state through the owning domain's REST baseline.
 - **Alternatives Considered:**
   - _WebSockets:_ Rejected because UniHub does not require bidirectional streaming (client-to-server messaging). WebSockets introduce stateful connection management, custom ping-pong frames, firewall traversal issues, and higher operational complexity.
   - _Short Polling:_ Rejected as primary strategy because it creates wasteful HTTP traffic, increases Neon DB and Redis load, and delays user feedback by the polling interval (3-5 seconds). Retained strictly as fallback for environments where streaming is disrupted.

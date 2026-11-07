@@ -51,6 +51,27 @@ class WorkshopFacadeTest {
     }
 
     @Test
+    void getWorkshopUpdatedAt_returnsPersistedTimestamp() {
+        UUID id = UUID.randomUUID();
+        Instant updatedAt = Instant.parse("2026-10-28T13:00:00Z");
+        when(workshopRepository.findById(id)).thenReturn(
+            Optional.of(Workshop.builder().id(id).updatedAt(updatedAt).build())
+        );
+
+        assertThat(workshopFacade.getWorkshopUpdatedAt(id)).contains(updatedAt);
+    }
+
+    @Test
+    void getWorkshopUpdatedAt_returnsEmptyForMissingOrNullId() {
+        UUID id = UUID.randomUUID();
+        when(workshopRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThat(workshopFacade.getWorkshopUpdatedAt(id)).isEmpty();
+        assertThat(workshopFacade.getWorkshopUpdatedAt(null)).isEmpty();
+        verify(workshopRepository).findById(id);
+    }
+
+    @Test
     @DisplayName(
         "getWorkshopForRegistration: returns empty when workshop is not found"
     )

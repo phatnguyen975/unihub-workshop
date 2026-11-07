@@ -13,6 +13,8 @@ import java.util.UUID;
  * Public synchronous facade interface for Registrations management required by peer modules (e.g. payments).
  */
 public interface RegistrationApi {
+    long countConfirmedByWorkshopId(UUID workshopId);
+
     /**
      * Confirms a PENDING paid registration:
      * - Transitions registration from PENDING to CONFIRMED

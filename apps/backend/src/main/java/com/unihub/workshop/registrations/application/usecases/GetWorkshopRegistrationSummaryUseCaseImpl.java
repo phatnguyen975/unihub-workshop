@@ -66,10 +66,14 @@ public class GetWorkshopRegistrationSummaryUseCaseImpl
         int capacity = workshop.capacity() != null ? workshop.capacity() : 0;
         Instant lastUpdatedAt = rawCounts
             .latestUpdatedAt()
-            .orElse(
-                workshop.startsAt() != null
-                    ? workshop.startsAt()
-                    : Instant.now()
+            .orElseGet(() ->
+                workshopApi
+                    .getWorkshopUpdatedAt(query.workshopId())
+                    .orElseThrow(() ->
+                        new NotFoundException(
+                            "Workshop not found with ID: " + query.workshopId()
+                        )
+                    )
             );
 
         // 5. Build and return calculated seat counts snapshot

@@ -148,6 +148,17 @@ class ModulithArchitectureTest {
     }
 
     @Test
+    void applicationMustNotDependOnHibernate() {
+        noClasses()
+            .that()
+            .resideInAPackage("..application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("org.hibernate..")
+            .check(importedClasses);
+    }
+
+    @Test
     @DisplayName("Outbound application ports must be interfaces")
     void outboundPortsMustBeInterfaces() {
         classes()

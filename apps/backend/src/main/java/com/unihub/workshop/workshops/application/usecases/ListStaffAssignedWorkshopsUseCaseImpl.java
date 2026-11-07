@@ -24,7 +24,7 @@ public class ListStaffAssignedWorkshopsUseCaseImpl
     private final WorkshopAssignmentRepository assignmentRepository;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CursorPage<StaffAssignedWorkshop> execute(
         ListStaffAssignedWorkshopsQuery query
     ) {
