@@ -112,16 +112,14 @@ class AttendanceRepositoryAdapterTest {
         );
         assertThat(sqlCaptor.getValue()).contains(
             "workshop_id = :workshopId",
-            "status = :status",
+            "status = 'VALID'",
             "ORDER BY checked_in_at DESC, id DESC",
             "LIMIT 10"
         );
         assertThat(parameterCaptor.getValue().getValue("workshopId")).isEqualTo(
             workshopId
         );
-        assertThat(parameterCaptor.getValue().getValue("status")).isEqualTo(
-            "VALID"
-        );
+        assertThat(parameterCaptor.getValue().hasValue("status")).isFalse();
     }
 
     @Test
@@ -525,13 +523,11 @@ class AttendanceRepositoryAdapterTest {
         assertThat(sql).startsWith("SELECT COUNT(*)");
         assertThat(sql).contains("FROM attendances");
         assertThat(sql).contains("workshop_id = :workshopId");
-        assertThat(sql).contains("status = :status");
+        assertThat(sql).contains("status = 'VALID'");
         assertThat(parameterCaptor.getValue().getValue("workshopId")).isEqualTo(
             workshopId
         );
-        assertThat(parameterCaptor.getValue().getValue("status")).isEqualTo(
-            AttendanceStatus.VALID.name()
-        );
+        assertThat(parameterCaptor.getValue().hasValue("status")).isFalse();
     }
 
     @Test

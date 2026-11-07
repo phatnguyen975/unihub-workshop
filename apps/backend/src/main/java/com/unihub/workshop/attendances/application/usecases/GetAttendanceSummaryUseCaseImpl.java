@@ -3,6 +3,7 @@ package com.unihub.workshop.attendances.application.usecases;
 import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryQuery;
 import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryUseCase;
 import com.unihub.workshop.attendances.application.ports.out.AttendanceRepository;
+import com.unihub.workshop.attendances.application.ports.out.DatabaseFailureClassifier;
 import com.unihub.workshop.attendances.domain.model.AttendanceSummary;
 import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.shared.exception.ForbiddenException;
@@ -10,12 +11,6 @@ import com.unihub.workshop.shared.exception.NotFoundException;
 import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
-import java.sql.SQLException;
-import java.sql.SQLNonTransientConnectionException;
-import java.sql.SQLRecoverableException;
-import java.sql.SQLTransientConnectionException;
-import org.hibernate.exception.JDBCConnectionException;
-import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -29,6 +24,7 @@ public class GetAttendanceSummaryUseCaseImpl
     private final WorkshopApi workshopApi;
     private final RegistrationApi registrationApi;
     private final AttendanceRepository attendanceRepository;
+    private final DatabaseFailureClassifier databaseFailureClassifier;
     private final TransactionTemplate primary;
     private final TransactionTemplate replica;
 
@@ -36,11 +32,13 @@ public class GetAttendanceSummaryUseCaseImpl
         WorkshopApi workshopApi,
         RegistrationApi registrationApi,
         AttendanceRepository attendanceRepository,
+        DatabaseFailureClassifier databaseFailureClassifier,
         PlatformTransactionManager transactionManager
     ) {
         this.workshopApi = workshopApi;
         this.registrationApi = registrationApi;
         this.attendanceRepository = attendanceRepository;
+        this.databaseFailureClassifier = databaseFailureClassifier;
         primary = new TransactionTemplate(transactionManager);
         primary.setPropagationBehavior(
             TransactionDefinition.PROPAGATION_REQUIRES_NEW
@@ -57,7 +55,7 @@ public class GetAttendanceSummaryUseCaseImpl
         try {
             return readSummary(query);
         } catch (RuntimeException failure) {
-            if (isConnectionFailure(failure)) {
+            if (databaseFailureClassifier.isUnavailable(failure)) {
                 throw new ServiceUnavailableException(
                     "Attendance summary is temporarily unavailable. Please retry.",
                     failure
@@ -100,33 +98,5 @@ public class GetAttendanceSummaryUseCaseImpl
                 )
             )
         );
-    }
-
-    private static boolean isConnectionFailure(Throwable failure) {
-        for (
-            Throwable cause = failure;
-            cause != null;
-            cause = cause.getCause()
-        ) {
-            if (
-                cause instanceof DataAccessResourceFailureException ||
-                cause instanceof JDBCConnectionException
-            ) {
-                return true;
-            }
-            if (cause instanceof SQLException sqlException) {
-                String state = sqlException.getSQLState();
-                if (
-                    sqlException instanceof SQLTransientConnectionException ||
-                    sqlException instanceof
-                        SQLNonTransientConnectionException ||
-                    sqlException instanceof SQLRecoverableException ||
-                    (state != null && state.startsWith("08"))
-                ) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }

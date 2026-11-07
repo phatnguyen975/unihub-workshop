@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryQuery;
 import com.unihub.workshop.attendances.application.ports.out.AttendanceRepository;
+import com.unihub.workshop.attendances.application.ports.out.DatabaseFailureClassifier;
 import com.unihub.workshop.attendances.domain.model.AttendanceSummary;
 import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.shared.exception.ForbiddenException;
@@ -46,6 +47,9 @@ class GetAttendanceSummaryUseCaseImplTest {
     private final PlatformTransactionManager manager = mock(
         PlatformTransactionManager.class
     );
+    private final DatabaseFailureClassifier classifier = mock(
+        DatabaseFailureClassifier.class
+    );
     private final TransactionStatus primary = mock(TransactionStatus.class);
     private final TransactionStatus replica = mock(TransactionStatus.class);
     private final UUID workshopId = UUID.randomUUID();
@@ -55,10 +59,18 @@ class GetAttendanceSummaryUseCaseImplTest {
     @BeforeEach
     void setup() {
         when(manager.getTransaction(any())).thenReturn(primary, replica);
+        when(classifier.isUnavailable(any())).thenAnswer(invocation -> {
+            Throwable failure = invocation.getArgument(0);
+            return (
+                failure instanceof DataAccessResourceFailureException ||
+                failure.getCause() instanceof SQLTransientConnectionException
+            );
+        });
         useCase = new GetAttendanceSummaryUseCaseImpl(
             workshops,
             registrations,
             attendances,
+            classifier,
             manager
         );
     }

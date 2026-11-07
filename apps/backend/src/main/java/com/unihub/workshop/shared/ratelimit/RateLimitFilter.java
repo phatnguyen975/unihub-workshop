@@ -144,22 +144,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "X-RateLimit-Remaining",
             String.valueOf(probe.getRemainingTokens())
         );
+        long waitNanos = probe.getNanosToWaitForRefill();
+        long retrySeconds = TimeUnit.NANOSECONDS.toSeconds(waitNanos);
+        if (waitNanos > TimeUnit.SECONDS.toNanos(retrySeconds)) {
+            retrySeconds++;
+        }
         response.setHeader(
             "X-RateLimit-Retry-After",
-            String.valueOf(
-                TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill())
-            )
+            String.valueOf(retrySeconds)
         );
 
         if (probe.isConsumed()) {
             filterChain.doFilter(request, response);
         } else {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            long waitNanos = probe.getNanosToWaitForRefill();
-            long retrySeconds = TimeUnit.NANOSECONDS.toSeconds(waitNanos);
-            if (waitNanos > TimeUnit.SECONDS.toNanos(retrySeconds)) {
-                retrySeconds++;
-            }
             response.setHeader("Retry-After", Long.toString(retrySeconds));
             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
 
@@ -168,7 +166,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
             String detail = String.format(
                 "Rate limit exceeded. Try again in %d seconds.",
-                TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill())
+                retrySeconds
             );
 
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(

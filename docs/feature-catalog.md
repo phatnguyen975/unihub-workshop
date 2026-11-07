@@ -437,7 +437,7 @@
 
 ### 6.3 `live-attendance-monitoring`
 
-> **Status:** READY
+> **Status:** DONE
 
 **Description:** Provides `ORGANIZER` and assigned `STAFF` users with operational visibility into server-reconciled workshop attendance. The backend-owned `GET /api/v1/workshops/{workshopId}/attendances/summary` returns `workshopId`, `capacity`, `confirmedCount`, `checkedInCount`, `checkInPercentage`, and a bounded `recentScans` preview. Confirmed registrations are resolved through `registrations::api`; checked-in count and recent scans come only from persisted `VALID` attendance rows. F-6.2 owns after-commit `attendance.updated` publication when at least one new row was inserted; F-10.5 owns Redis Pub/Sub distribution and the existing multiplexed SSE endpoint. F-6.3 introduces neither a worker nor a materialized projection table. Web and Mobile consume these contracts; UI implementation is outside this backend feature.
 

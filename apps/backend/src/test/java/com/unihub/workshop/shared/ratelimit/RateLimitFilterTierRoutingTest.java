@@ -170,7 +170,7 @@ class RateLimitFilterTierRoutingTest {
         when(probe.isConsumed()).thenReturn(false);
         when(probe.getRemainingTokens()).thenReturn(0L);
         when(probe.getNanosToWaitForRefill()).thenReturn(
-            Duration.ofSeconds(4).toNanos()
+            Duration.ofMillis(4500).toNanos()
         );
         MockHttpServletRequest request = new MockHttpServletRequest(
             "GET",
@@ -185,9 +185,12 @@ class RateLimitFilterTierRoutingTest {
         assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("100");
         assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
         assertThat(response.getHeader("X-RateLimit-Retry-After")).isEqualTo(
-            "4"
+            "5"
         );
-        assertThat(response.getHeader("Retry-After")).isEqualTo("4");
+        assertThat(response.getHeader("Retry-After")).isEqualTo("5");
+        assertThat(response.getContentAsString()).contains(
+            "Try again in 5 seconds"
+        );
         verify(filterChain, never()).doFilter(request, response);
     }
 }
