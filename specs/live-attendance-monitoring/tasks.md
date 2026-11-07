@@ -135,13 +135,15 @@ This checkpoint is a gate, not an extra implementation task. Passing it does not
 
 ### Phase 3: Assigned Staff and Failure Semantics
 
-- [ ] **T5 — Assigned Staff can read the same summary while unassigned or revoked Staff cannot**
-  - **Size:** S — 4 expected files.
+- [x] **T5 — Assigned Staff can read the same summary while unassigned or revoked Staff cannot**
+  - **Size:** S — 6 expected files. Gate 1 approved the query/mapper scope correction in `improvement-proposal.md`.
   - **Depends on:** T4 and Checkpoint B.
   - **Layers touched:** Existing summary application authorization and REST admission; existing workshop public facade is reused.
   - **Files:**
+    - `apps/backend/src/main/java/com/unihub/workshop/attendances/application/ports/in/GetAttendanceSummaryQuery.java` — carry the authenticated caller role and user ID alongside the workshop and optional organizer organization context.
+    - `apps/backend/src/main/java/com/unihub/workshop/attendances/presentation/mapper/AttendancePresentationMapper.java` — map authenticated identity and role into the query through MapStruct.
     - `apps/backend/src/main/java/com/unihub/workshop/attendances/application/usecases/GetAttendanceSummaryUseCaseImpl.java` — enable the Staff branch of the Primary authorization phase.
-    - `apps/backend/src/main/java/com/unihub/workshop/attendances/presentation/controllers/AttendanceSummaryController.java` — allow both approved roles, extracting organization context only for Organizer.
+    - `apps/backend/src/main/java/com/unihub/workshop/attendances/presentation/controllers/AttendanceSummaryController.java` — allow both approved roles, derive user ID and role from authentication, and extract organization context only for Organizer.
     - `apps/backend/src/test/java/com/unihub/workshop/attendances/application/usecases/GetAttendanceSummaryUseCaseImplTest.java` — assigned/unassigned/revoked and phase ordering.
     - `apps/backend/src/test/java/com/unihub/workshop/attendances/presentation/controllers/AttendanceSummaryControllerTest.java` — identical response schema and role behavior with use case mocked.
   - **Acceptance Criteria:**

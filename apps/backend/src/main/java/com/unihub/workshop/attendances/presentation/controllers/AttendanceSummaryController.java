@@ -3,8 +3,10 @@ package com.unihub.workshop.attendances.presentation.controllers;
 import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryUseCase;
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSummaryResponse;
 import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapper;
+import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,19 +23,30 @@ public class AttendanceSummaryController {
     private final AttendancePresentationMapper mapper;
 
     @GetMapping("/api/v1/workshops/{workshopId}/attendances/summary")
-    @PreAuthorize("hasRole('ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'STAFF')")
     public ApiResponse<AttendanceSummaryResponse> getSummary(
         @PathVariable UUID workshopId,
         Authentication authentication
     ) {
-        SecurityContextUtils.verifyRole(authentication, "ORGANIZER");
-        UUID organizationId = SecurityContextUtils.extractOrganizationId(
+        String role = SecurityContextUtils.extractRole(
             authentication
-        );
+        ).toUpperCase(Locale.ROOT);
+        if (!"ORGANIZER".equals(role) && !"STAFF".equals(role)) {
+            throw new ForbiddenException("Access denied");
+        }
+        UUID userId = SecurityContextUtils.extractUserId(authentication);
+        UUID organizationId = "ORGANIZER".equals(role)
+            ? SecurityContextUtils.extractOrganizationId(authentication)
+            : null;
         return ApiResponse.success(
             mapper.toSummaryResponse(
                 useCase.execute(
-                    mapper.toSummaryQuery(workshopId, organizationId)
+                    mapper.toSummaryQuery(
+                        workshopId,
+                        organizationId,
+                        userId,
+                        role
+                    )
                 )
             ),
             "Attendance summary retrieved"

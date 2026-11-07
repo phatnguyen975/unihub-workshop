@@ -2,12 +2,14 @@ package com.unihub.workshop.attendances.presentation.controllers;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryQuery;
 import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryUseCase;
 import com.unihub.workshop.attendances.domain.model.Attendance;
 import com.unihub.workshop.attendances.domain.model.AttendanceSummary;
@@ -133,5 +135,45 @@ class AttendanceSummaryControllerTest {
             )
         ).andExpect(status().isBadRequest());
         verifyNoInteractions(useCase);
+    }
+
+    @Test
+    void staffWithoutOrganizationReceivesSummaryUsingJwtSubject()
+        throws Exception {
+        UUID staffId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-11-07T00:00:00Z");
+        JwtAuthenticatedPrincipal principal = new JwtAuthenticatedPrincipal(
+            staffId.toString(),
+            null,
+            "jti",
+            "STAFF",
+            UUID.randomUUID().toString(),
+            now,
+            now.plusSeconds(3600)
+        );
+        when(useCase.execute(any())).thenReturn(
+            AttendanceSummary.of(workshopId, 100, 80, 50, List.of())
+        );
+        mvc.perform(
+            get(
+                "/api/v1/workshops/{workshopId}/attendances/summary",
+                workshopId
+            )
+                .queryParam("userId", UUID.randomUUID().toString())
+                .principal(
+                    new TestingAuthenticationToken(
+                        principal,
+                        null,
+                        "ROLE_STAFF"
+                    )
+                )
+        )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(6))
+            .andExpect(jsonPath("$.data.checkedInCount").value(50))
+            .andExpect(jsonPath("$.data.recentScans").isEmpty());
+        verify(useCase).execute(
+            new GetAttendanceSummaryQuery(workshopId, null, staffId, "STAFF")
+        );
     }
 }

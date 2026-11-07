@@ -20,7 +20,9 @@ import org.mapstruct.Mapping;
 public interface AttendancePresentationMapper {
     GetAttendanceSummaryQuery toSummaryQuery(
         UUID workshopId,
-        UUID organizationId
+        UUID organizationId,
+        UUID userId,
+        String role
     );
 
     AttendanceSummaryResponse toSummaryResponse(AttendanceSummary summary);

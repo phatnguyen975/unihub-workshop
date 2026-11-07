@@ -51,10 +51,19 @@ public class GetAttendanceSummaryUseCaseImpl
             WorkshopRegistrationDetailsDto found = workshopApi
                 .getWorkshopForRegistration(query.workshopId())
                 .orElseThrow(() -> new NotFoundException("Workshop not found"));
-            if (
-                query.organizationId() == null ||
-                !query.organizationId().equals(found.organizationId())
+            boolean authorized = switch (
+                query.role() != null ? query.role() : ""
             ) {
+                case "ORGANIZER" -> query.organizationId() != null &&
+                    query.organizationId().equals(found.organizationId());
+                case "STAFF" -> query.userId() != null &&
+                    workshopApi.isStaffAssignedToWorkshop(
+                        query.workshopId(),
+                        query.userId()
+                    );
+                default -> false;
+            };
+            if (!authorized) {
                 throw new ForbiddenException("Access denied");
             }
             return found;

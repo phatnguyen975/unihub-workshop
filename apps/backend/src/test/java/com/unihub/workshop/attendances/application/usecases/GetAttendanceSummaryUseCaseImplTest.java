@@ -91,7 +91,12 @@ class GetAttendanceSummaryUseCaseImplTest {
         );
 
         AttendanceSummary summary = useCase.execute(
-            new GetAttendanceSummaryQuery(workshopId, orgId)
+            new GetAttendanceSummaryQuery(
+                workshopId,
+                orgId,
+                UUID.randomUUID(),
+                "ORGANIZER"
+            )
         );
 
         assertThat(summary.checkInPercentage()).isEqualTo(
@@ -124,7 +129,14 @@ class GetAttendanceSummaryUseCaseImplTest {
             Optional.of(workshop(UUID.randomUUID(), 10))
         );
         assertThatThrownBy(() ->
-            useCase.execute(new GetAttendanceSummaryQuery(workshopId, orgId))
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
         ).isInstanceOf(ForbiddenException.class);
         verify(registrations, never()).countConfirmedByWorkshopId(any());
         verify(attendances, never()).countValidByWorkshopId(any());
@@ -136,7 +148,14 @@ class GetAttendanceSummaryUseCaseImplTest {
             Optional.empty()
         );
         assertThatThrownBy(() ->
-            useCase.execute(new GetAttendanceSummaryQuery(workshopId, orgId))
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
         ).isInstanceOf(NotFoundException.class);
         verify(registrations, never()).countConfirmedByWorkshopId(any());
     }
@@ -150,7 +169,12 @@ class GetAttendanceSummaryUseCaseImplTest {
             List.of()
         );
         AttendanceSummary result = useCase.execute(
-            new GetAttendanceSummaryQuery(workshopId, orgId)
+            new GetAttendanceSummaryQuery(
+                workshopId,
+                orgId,
+                UUID.randomUUID(),
+                "ORGANIZER"
+            )
         );
         assertThat(result.capacity()).isZero();
         assertThat(result.confirmedCount()).isZero();
@@ -185,8 +209,162 @@ class GetAttendanceSummaryUseCaseImplTest {
         );
         assertThat(
             useCase
-                .execute(new GetAttendanceSummaryQuery(workshopId, orgId))
+                .execute(
+                    new GetAttendanceSummaryQuery(
+                        workshopId,
+                        orgId,
+                        UUID.randomUUID(),
+                        "ORGANIZER"
+                    )
+                )
                 .workshopId()
         ).isEqualTo(workshopId);
+    }
+
+    @Test
+    void assignedStaffReadsAfterPrimaryAssignmentCheck() {
+        UUID staffId = UUID.randomUUID();
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(
+            workshops.isStaffAssignedToWorkshop(workshopId, staffId)
+        ).thenReturn(true);
+        when(registrations.countConfirmedByWorkshopId(workshopId)).thenReturn(
+            80L
+        );
+        when(attendances.countValidByWorkshopId(workshopId)).thenReturn(50L);
+        when(attendances.findRecentValidByWorkshopId(workshopId)).thenReturn(
+            List.of()
+        );
+
+        AttendanceSummary result = useCase.execute(
+            new GetAttendanceSummaryQuery(workshopId, null, staffId, "STAFF")
+        );
+
+        assertThat(result.checkInPercentage()).isEqualTo(
+            new BigDecimal("62.50")
+        );
+        InOrder order = inOrder(manager, workshops, registrations);
+        order.verify(manager).getTransaction(any(TransactionDefinition.class));
+        order.verify(workshops).getWorkshopForRegistration(workshopId);
+        order.verify(workshops).isStaffAssignedToWorkshop(workshopId, staffId);
+        order.verify(manager).commit(primary);
+        order.verify(manager).getTransaction(any(TransactionDefinition.class));
+        order.verify(registrations).countConfirmedByWorkshopId(workshopId);
+    }
+
+    @Test
+    void unassignedStaffInSameOrganizationIsForbiddenBeforeReporting() {
+        UUID staffId = UUID.randomUUID();
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(
+            workshops.isStaffAssignedToWorkshop(workshopId, staffId)
+        ).thenReturn(false);
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    staffId,
+                    "STAFF"
+                )
+            )
+        ).isInstanceOf(ForbiddenException.class);
+        verify(workshops).isStaffAssignedToWorkshop(workshopId, staffId);
+        verify(registrations, never()).countConfirmedByWorkshopId(any());
+        verify(attendances, never()).countValidByWorkshopId(any());
+    }
+
+    @Test
+    void revokedStaffCannotUsePreviousAuthorization() {
+        UUID staffId = UUID.randomUUID();
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(
+            workshops.isStaffAssignedToWorkshop(workshopId, staffId)
+        ).thenReturn(true, false);
+        when(attendances.findRecentValidByWorkshopId(workshopId)).thenReturn(
+            List.of()
+        );
+        GetAttendanceSummaryQuery query = new GetAttendanceSummaryQuery(
+            workshopId,
+            UUID.randomUUID(),
+            staffId,
+            "STAFF"
+        );
+
+        useCase.execute(query);
+        assertThatThrownBy(() -> useCase.execute(query)).isInstanceOf(
+            ForbiddenException.class
+        );
+        verify(workshops, times(2)).isStaffAssignedToWorkshop(
+            workshopId,
+            staffId
+        );
+        verify(registrations, times(1)).countConfirmedByWorkshopId(workshopId);
+        verify(attendances, times(1)).countValidByWorkshopId(workshopId);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "DRAFT", "PUBLISHED", "COMPLETED", "CANCELED" })
+    void assignedStaffCanReadEveryWorkshopState(String state) {
+        UUID staffId = UUID.randomUUID();
+        WorkshopRegistrationDetailsDto existing =
+            new WorkshopRegistrationDetailsDto(
+                workshopId,
+                orgId,
+                "Title",
+                "slug",
+                state,
+                null,
+                null,
+                BigDecimal.ZERO,
+                10,
+                null
+            );
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(existing)
+        );
+        when(
+            workshops.isStaffAssignedToWorkshop(workshopId, staffId)
+        ).thenReturn(true);
+        when(attendances.findRecentValidByWorkshopId(workshopId)).thenReturn(
+            List.of()
+        );
+        assertThat(
+            useCase
+                .execute(
+                    new GetAttendanceSummaryQuery(
+                        workshopId,
+                        null,
+                        staffId,
+                        "STAFF"
+                    )
+                )
+                .workshopId()
+        ).isEqualTo(workshopId);
+    }
+
+    @Test
+    void missingWorkshopIsNotFoundBeforeStaffAssignmentCheck() {
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.empty()
+        );
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    null,
+                    UUID.randomUUID(),
+                    "STAFF"
+                )
+            )
+        ).isInstanceOf(NotFoundException.class);
+        verify(workshops, never()).isStaffAssignedToWorkshop(any(), any());
+        verify(registrations, never()).countConfirmedByWorkshopId(any());
     }
 }
