@@ -50,6 +50,14 @@ public class RegistrationFacade implements RegistrationApi {
     private final WorkshopRegistrationBroadcaster workshopRegistrationBroadcaster;
 
     @Override
+    @Transactional(readOnly = true)
+    public long countConfirmedByWorkshopId(UUID workshopId) {
+        return registrationRepository
+            .getRegistrationRawCounts(workshopId)
+            .confirmedCount();
+    }
+
+    @Override
     @Transactional
     public RegistrationConfirmedDto confirmPaidRegistration(
         ConfirmPaidRegistrationCommand command

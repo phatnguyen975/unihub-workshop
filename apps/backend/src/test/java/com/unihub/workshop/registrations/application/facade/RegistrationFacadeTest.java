@@ -20,6 +20,7 @@ import com.unihub.workshop.registrations.application.ports.out.WorkshopRegistrat
 import com.unihub.workshop.registrations.domain.model.QrTicket;
 import com.unihub.workshop.registrations.domain.model.Registration;
 import com.unihub.workshop.registrations.domain.model.RegistrationStatus;
+import com.unihub.workshop.registrations.domain.model.WorkshopRegistrationRawCounts;
 import com.unihub.workshop.shared.events.WorkshopRegisteredEvent;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
@@ -183,6 +184,19 @@ class RegistrationFacadeTest {
             "Advanced Java 25"
         );
         assertThat(publishedEvent.qrSignature()).isEqualTo("sig_abc_123");
+    }
+
+    @Test
+    void countConfirmedByWorkshopIdUsesConfirmedCountOnly() {
+        when(
+            registrationRepository.getRegistrationRawCounts(WORKSHOP_ID)
+        ).thenReturn(
+            new WorkshopRegistrationRawCounts(80, 7, Optional.empty())
+        );
+        assertThat(
+            registrationFacade.countConfirmedByWorkshopId(WORKSHOP_ID)
+        ).isEqualTo(80);
+        verify(registrationRepository).getRegistrationRawCounts(WORKSHOP_ID);
     }
 
     @Test

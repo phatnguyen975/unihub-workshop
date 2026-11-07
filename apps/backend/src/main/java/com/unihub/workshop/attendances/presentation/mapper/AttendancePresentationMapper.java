@@ -1,8 +1,12 @@
 package com.unihub.workshop.attendances.presentation.mapper;
 
+import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryQuery;
 import com.unihub.workshop.attendances.application.ports.in.SyncAttendancesCommand;
+import com.unihub.workshop.attendances.domain.model.Attendance;
 import com.unihub.workshop.attendances.domain.model.AttendanceOutcome;
+import com.unihub.workshop.attendances.domain.model.AttendanceSummary;
 import com.unihub.workshop.attendances.domain.model.SyncEntry;
+import com.unihub.workshop.attendances.presentation.dto.AttendanceSummaryResponse;
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncEntryRequest;
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncOutcomeResponse;
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSyncRequest;
@@ -14,6 +18,15 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface AttendancePresentationMapper {
+    GetAttendanceSummaryQuery toSummaryQuery(
+        UUID workshopId,
+        UUID organizationId
+    );
+
+    AttendanceSummaryResponse toSummaryResponse(AttendanceSummary summary);
+
+    AttendanceSummaryResponse.RecentScan toRecentScan(Attendance attendance);
+
     @Mapping(target = "workshopId", source = "workshopId")
     @Mapping(target = "staffUserId", source = "staffUserId")
     @Mapping(target = "idempotencyKey", source = "idempotencyKey")

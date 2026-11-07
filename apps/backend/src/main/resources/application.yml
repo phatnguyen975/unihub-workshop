@@ -16,6 +16,8 @@ spring:
       enabled: true
   flyway:
     enabled: true
+    postgresql:
+      transactional-lock: false
     locations: classpath:db/migration
     out-of-order: false
     validate-on-migrate: true

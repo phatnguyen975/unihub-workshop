@@ -92,7 +92,7 @@ This checkpoint is a gate, not an extra implementation task. Passing it does not
 
 ### Phase 2: Complete Organizer Monitoring Baseline
 
-- [ ] **T4 — An authorized Organizer can retrieve the complete attendance summary with real metrics and the newest-ten preview**
+- [x] **T4 — An authorized Organizer can retrieve the complete attendance summary with real metrics and the newest-ten preview**
   - **Size:** M, explicitly accepted scope exception — 18 expected files across the complete vertical slice.
   - **Depends on:** T1, T2, T3, **and human confirmation of Checkpoint A**.
   - **Layers touched:** Pure domain read model/calculation, application inbound port/orchestration, public registration facade, attendance persistence, additive schema/configuration, presentation DTO/controller/MapStruct mapping.
@@ -128,10 +128,10 @@ This checkpoint is a gate, not an extra implementation task. Passing it does not
 
 #### Checkpoint B — Organizer slice is real and reviewable
 
-- [ ] T4 serves real data through the complete REST path; no placeholder fields, fake empty preview, alternate endpoint, or unbounded read remains.
-- [ ] T1–T3 still pass, full backend unit tests and static architecture checks pass, and the human's Organizer/API regression checks are green.
-- [ ] The new index is verified valid in the controlled manual environment before relying on its access path. A failed/incomplete concurrent index is not hidden with `IF NOT EXISTS` or treated as a completed migration.
-- [ ] T4's accepted size exception has not silently expanded beyond its declared scope; material new files/architecture changes are surfaced for plan review.
+- [x] T4 serves real data through the complete REST path; no placeholder fields, fake empty preview, alternate endpoint, or unbounded read remains.
+- [x] T1–T3 still pass, full backend unit tests and static architecture checks pass, and the human's Organizer/API regression checks are green.
+- [x] The new index is verified valid in the controlled manual environment before relying on its access path. A failed/incomplete concurrent index is not hidden with `IF NOT EXISTS` or treated as a completed migration.
+- [x] T4's accepted size exception has not silently expanded beyond its declared scope; material new files/architecture changes are surfaced for plan review.
 
 ### Phase 3: Assigned Staff and Failure Semantics
 

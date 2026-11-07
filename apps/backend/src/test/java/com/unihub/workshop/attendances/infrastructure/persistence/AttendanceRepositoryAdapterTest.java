@@ -91,6 +91,40 @@ class AttendanceRepositoryAdapterTest {
     }
 
     @Test
+    void recentValidQueryIsWorkshopScopedBoundedAndOrdered() {
+        UUID workshopId = UUID.randomUUID();
+        Attendance row = attendance(UUID.randomUUID(), UUID.randomUUID());
+        when(
+            namedJdbcTemplate.query(
+                anyString(),
+                any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<Attendance>>any()
+            )
+        ).thenReturn(List.of(row));
+
+        assertThat(
+            adapter.findRecentValidByWorkshopId(workshopId)
+        ).containsExactly(row);
+        verify(namedJdbcTemplate).query(
+            sqlCaptor.capture(),
+            parameterCaptor.capture(),
+            attendanceRowMapperCaptor.capture()
+        );
+        assertThat(sqlCaptor.getValue()).contains(
+            "workshop_id = :workshopId",
+            "status = :status",
+            "ORDER BY checked_in_at DESC, id DESC",
+            "LIMIT 10"
+        );
+        assertThat(parameterCaptor.getValue().getValue("workshopId")).isEqualTo(
+            workshopId
+        );
+        assertThat(parameterCaptor.getValue().getValue("status")).isEqualTo(
+            "VALID"
+        );
+    }
+
+    @Test
     @DisplayName(
         "insertAll issues exactly one multi-row statement with an ON CONFLICT DO NOTHING RETURNING clause"
     )

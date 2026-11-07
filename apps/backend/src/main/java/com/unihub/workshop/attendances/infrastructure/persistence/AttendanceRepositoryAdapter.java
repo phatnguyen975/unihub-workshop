@@ -24,6 +24,23 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AttendanceRepositoryAdapter implements AttendanceRepository {
 
+    @Override
+    public List<Attendance> findRecentValidByWorkshopId(UUID workshopId) {
+        if (workshopId == null) {
+            return List.of();
+        }
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+            .addValue("workshopId", workshopId)
+            .addValue("status", AttendanceStatus.VALID.name());
+        return namedJdbcTemplate.query(
+            SELECT_PREFIX +
+                "WHERE workshop_id = :workshopId AND status = :status " +
+                "ORDER BY checked_in_at DESC, id DESC LIMIT 10",
+            parameters,
+            (resultSet, rowNumber) -> mapRow(resultSet)
+        );
+    }
+
     private static final String[] COLUMN_NAMES = {
         "id",
         "workshop_id",
