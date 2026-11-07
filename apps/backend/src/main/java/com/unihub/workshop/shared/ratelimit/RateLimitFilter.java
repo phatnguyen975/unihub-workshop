@@ -115,6 +115,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String bucketKey = extractKey(request);
         ResolvedTier resolved = resolveTier(request.getRequestURI());
 
+        ConsumptionProbe probe;
         try {
             var bucket = proxyManager
                 .builder()
@@ -122,61 +123,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     bucketKey.getBytes(StandardCharsets.UTF_8),
                     resolved::config
                 );
-            ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-
-            response.setHeader(
-                "X-RateLimit-Limit",
-                String.valueOf(resolved.tier().capacity())
-            );
-            response.setHeader(
-                "X-RateLimit-Remaining",
-                String.valueOf(probe.getRemainingTokens())
-            );
-            response.setHeader(
-                "X-RateLimit-Retry-After",
-                String.valueOf(
-                    TimeUnit.NANOSECONDS.toSeconds(
-                        probe.getNanosToWaitForRefill()
-                    )
-                )
-            );
-
-            if (probe.isConsumed()) {
-                filterChain.doFilter(request, response);
-            } else {
-                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                response.setContentType(
-                    MediaType.APPLICATION_PROBLEM_JSON_VALUE
-                );
-
-                String traceId = RequestLoggingFilter.getCurrentTraceId();
-                String processedBy =
-                    RequestLoggingFilter.getCurrentProcessedBy();
-
-                String detail = String.format(
-                    "Rate limit exceeded. Try again in %d seconds.",
-                    TimeUnit.NANOSECONDS.toSeconds(
-                        probe.getNanosToWaitForRefill()
-                    )
-                );
-
-                ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                    HttpStatus.TOO_MANY_REQUESTS,
-                    detail
-                );
-                problem.setType(URI.create("urn:unihub:error:rate-limited"));
-                problem.setTitle("Too Many Requests");
-                problem.setInstance(URI.create(request.getRequestURI()));
-
-                ApiResponse<Void> apiResponse = ApiResponse.error(problem);
-                apiResponse.setMetadata(
-                    new ApiResponse.Metadata(traceId, processedBy)
-                );
-
-                response
-                    .getWriter()
-                    .write(objectMapper.writeValueAsString(apiResponse));
-            }
+            probe = bucket.tryConsumeAndReturnRemaining(1);
         } catch (Exception ex) {
             log.warn(
                 "Redis unavailable for rate limiting. Failing open. Key: {}, Path: {}, Error: {}",
@@ -186,6 +133,60 @@ public class RateLimitFilter extends OncePerRequestFilter {
             );
             metrics.incrementRedisUnavailable(resolved.tag());
             filterChain.doFilter(request, response);
+            return;
+        }
+
+        response.setHeader(
+            "X-RateLimit-Limit",
+            String.valueOf(resolved.tier().capacity())
+        );
+        response.setHeader(
+            "X-RateLimit-Remaining",
+            String.valueOf(probe.getRemainingTokens())
+        );
+        response.setHeader(
+            "X-RateLimit-Retry-After",
+            String.valueOf(
+                TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill())
+            )
+        );
+
+        if (probe.isConsumed()) {
+            filterChain.doFilter(request, response);
+        } else {
+            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            long waitNanos = probe.getNanosToWaitForRefill();
+            long retrySeconds = TimeUnit.NANOSECONDS.toSeconds(waitNanos);
+            if (waitNanos > TimeUnit.SECONDS.toNanos(retrySeconds)) {
+                retrySeconds++;
+            }
+            response.setHeader("Retry-After", Long.toString(retrySeconds));
+            response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+
+            String traceId = RequestLoggingFilter.getCurrentTraceId();
+            String processedBy = RequestLoggingFilter.getCurrentProcessedBy();
+
+            String detail = String.format(
+                "Rate limit exceeded. Try again in %d seconds.",
+                TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill())
+            );
+
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.TOO_MANY_REQUESTS,
+                detail
+            );
+            problem.setType(URI.create("urn:unihub:error:rate-limited"));
+            problem.setTitle("Too Many Requests");
+            problem.setInstance(URI.create(request.getRequestURI()));
+
+            ApiResponse<Void> apiResponse = ApiResponse.error(problem);
+            apiResponse.setMetadata(
+                new ApiResponse.Metadata(traceId, processedBy)
+            );
+
+            response
+                .getWriter()
+                .write(objectMapper.writeValueAsString(apiResponse));
         }
     }
 

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.unihub.workshop.shared.exception.AppException;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +65,7 @@ class RedisJtiValidatorTest {
         AppException exception = assertThrows(AppException.class, () ->
             validator.isTokenValid("jti-123")
         );
+        assertInstanceOf(ServiceUnavailableException.class, exception);
         assertEquals(
             "Failed to check token revocation status. Failing closed.",
             exception.getMessage()

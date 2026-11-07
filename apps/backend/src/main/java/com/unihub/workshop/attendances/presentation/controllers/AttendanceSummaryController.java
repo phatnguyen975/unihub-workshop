@@ -4,11 +4,13 @@ import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummary
 import com.unihub.workshop.attendances.presentation.dto.AttendanceSummaryResponse;
 import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapper;
 import com.unihub.workshop.shared.exception.ForbiddenException;
+import com.unihub.workshop.shared.exception.InternalServerException;
 import com.unihub.workshop.shared.security.SecurityContextUtils;
 import com.unihub.workshop.shared.web.ApiResponse;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 public class AttendanceSummaryController {
 
     private final GetAttendanceSummaryUseCase useCase;
@@ -26,6 +29,21 @@ public class AttendanceSummaryController {
     @PreAuthorize("hasAnyRole('ORGANIZER', 'STAFF')")
     public ApiResponse<AttendanceSummaryResponse> getSummary(
         @PathVariable UUID workshopId,
+        Authentication authentication
+    ) {
+        try {
+            return retrieveSummary(workshopId, authentication);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            log.error("Unexpected failure retrieving attendance summary", ex);
+            throw new InternalServerException(
+                "An unexpected system error occurred.",
+                ex
+            );
+        }
+    }
+
+    private ApiResponse<AttendanceSummaryResponse> retrieveSummary(
+        UUID workshopId,
         Authentication authentication
     ) {
         String role = SecurityContextUtils.extractRole(

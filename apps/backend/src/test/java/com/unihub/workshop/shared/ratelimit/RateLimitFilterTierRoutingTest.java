@@ -1,6 +1,7 @@
 package com.unihub.workshop.shared.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -11,11 +12,13 @@ import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.distributed.proxy.RemoteBucketBuilder;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -38,6 +41,8 @@ class RateLimitFilterTierRoutingTest {
     private FilterChain filterChain;
 
     private RateLimitFilter filter;
+    private ConsumptionProbe probe;
+    private RateLimitMetrics metrics;
 
     @BeforeEach
     void setUp() {
@@ -73,14 +78,11 @@ class RateLimitFilterTierRoutingTest {
             )
             .build();
 
-        filter = new RateLimitFilter(
-            proxyManager,
-            properties,
-            mock(RateLimitMetrics.class)
-        );
+        metrics = mock(RateLimitMetrics.class);
+        filter = new RateLimitFilter(proxyManager, properties, metrics);
 
         BucketProxy bucket = mock(BucketProxy.class);
-        ConsumptionProbe probe = mock(ConsumptionProbe.class);
+        probe = mock(ConsumptionProbe.class);
 
         when(probe.isConsumed()).thenReturn(true);
         when(probe.getRemainingTokens()).thenReturn(1L);
@@ -116,6 +118,7 @@ class RateLimitFilterTierRoutingTest {
         "/api/v1/admin/organizations/users, 100",
         "/api/v1/admin/organizations/users/u-123, 100",
         "/api/v1/workshops, 100",
+        "/api/v1/workshops/w/attendances/sync, 100",
         "/api/v1/admin/ingestion-jobs, 100",
         "/api/v1/admin/ingestion-jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/reject-artifact, 100",
         "/api/v1/unknown, 100",
@@ -141,5 +144,50 @@ class RateLimitFilterTierRoutingTest {
             ArgumentMatchers.<Supplier<BucketConfiguration>>any()
         );
         verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void downstreamFailureIsNotRetriedAsRateLimiterOutage() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET",
+            "/api/v1/workshops/00000000-0000-4000-8000-000000000001/attendances/summary"
+        );
+        request.setRemoteAddr("10.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        doThrow(new ServletException("downstream failure"))
+            .when(filterChain)
+            .doFilter(request, response);
+
+        assertThatThrownBy(() ->
+            filter.doFilterInternal(request, response, filterChain)
+        ).isInstanceOf(ServletException.class);
+        verify(filterChain, times(1)).doFilter(request, response);
+        verify(metrics, never()).incrementRedisUnavailable(anyString());
+    }
+
+    @Test
+    void summaryGetUsesDefaultTierAndRejectsExhaustedQuota() throws Exception {
+        when(probe.isConsumed()).thenReturn(false);
+        when(probe.getRemainingTokens()).thenReturn(0L);
+        when(probe.getNanosToWaitForRefill()).thenReturn(
+            Duration.ofSeconds(4).toNanos()
+        );
+        MockHttpServletRequest request = new MockHttpServletRequest(
+            "GET",
+            "/api/v1/workshops/00000000-0000-4000-8000-000000000001/attendances/summary"
+        );
+        request.setRemoteAddr("10.0.0.1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("100");
+        assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
+        assertThat(response.getHeader("X-RateLimit-Retry-After")).isEqualTo(
+            "4"
+        );
+        assertThat(response.getHeader("Retry-After")).isEqualTo("4");
+        verify(filterChain, never()).doFilter(request, response);
     }
 }

@@ -153,12 +153,14 @@ This checkpoint is a gate, not an extra implementation task. Passing it does not
     - Organizer behavior, `STUDENT` denial, field minimization, replica sourcing, and existing sync/assignment authorization remain unchanged. No IAM dependency or new assignment-state field is added. _(FR-01–FR-24, BR-01.)_
   - **Human API retest:** Use assigned, unassigned, same-organization-unassigned, and revoked Staff identities against the summary; include a canceled historical workshop. Retest Organizer access, the Staff assigned-workshop feed, and sync eligibility with the same role boundaries.
 
-- [ ] **T6 — Summary failures preserve retry hints, security, admission quotas, and a recoverable baseline without breaking existing APIs**
-  - **Size:** M — 8 expected files.
+- [x] **T6 — Summary failures preserve retry hints, security, admission quotas, and a recoverable baseline without breaking existing APIs**
+  - **Size:** M — up to 10 expected files, including the scoped unexpected-error handling and rate-limit fail-open repair approved in `improvement-proposal.md`.
   - **Depends on:** T5.
   - **Layers touched:** Summary application/transaction failure boundary, presentation error serialization, shared security/admission behavior through unit verification.
   - **Files:**
     - `apps/backend/src/main/java/com/unihub/workshop/attendances/application/usecases/GetAttendanceSummaryUseCaseImpl.java` — translate unavailable required reads/transaction acquisition into the existing service-unavailable failure; retain unexpected failures as internal errors.
+    - `apps/backend/src/main/java/com/unihub/workshop/attendances/presentation/controllers/AttendanceSummaryController.java` or `apps/backend/src/main/java/com/unihub/workshop/shared/web/GlobalExceptionHandler.java` — translate unexpected state/argument exceptions to a sanitized `500` at the summary endpoint only; select the narrowest boundary verified by exception-resolution tests.
+    - `apps/backend/src/main/java/com/unihub/workshop/shared/ratelimit/RateLimitFilter.java` — restrict fail-open handling to quota-backend evaluation; invoke downstream filters once and propagate their failures without falsely recording a Redis outage.
     - `apps/backend/src/test/java/com/unihub/workshop/attendances/application/usecases/GetAttendanceSummaryUseCaseImplTest.java` — Primary/Replica failures, completion/cleanup, no fallback, no partial summary.
     - `apps/backend/src/test/java/com/unihub/workshop/attendances/presentation/controllers/AttendanceSummaryControllerTest.java` — exact status/envelope/content type, retry header, metadata, repeated reads and UTC representation.
     - `apps/backend/src/test/java/com/unihub/workshop/shared/security/JwtAuthenticationFilterTest.java` — new endpoint authentication failure paths with decoder/validator/resolver mocked.
@@ -169,20 +171,20 @@ This checkpoint is a gate, not an extra implementation task. Passing it does not
   - **Acceptance Criteria:**
     - Unavailable Primary workshop/permission reads or Replica registration/count/preview reads yield `503`, `urn:unihub:error:service-unavailable`, and a positive `Retry-After` through the real error representation. Include failure while acquiring the transaction/connection, not only a repository callback failure. No successful partial/zero substitute or Primary reporting fallback is returned. _(FR-25, BR-08; Scenario 14; API contract error table.)_
     - Unverifiable JTI revocation yields the existing fail-closed `503` with its shared retry hint; missing/invalid/expired/revoked authentication stays `401`. An admission-backend outage cannot bypass these checks. Reuse working shared production behavior rather than weakening it to make a new endpoint test pass. _(FR-01, FR-26, FR-28; Scenarios 3, 14–15.)_
-    - Exhausting the user's shared default quota of 100 requests/60 seconds yields `429` with retry/rate headers. Quota evaluation alone failing permits an otherwise authenticated/authorized read. Stream handshakes still use 10/60 seconds. _(FR-27–FR-28; Scenario 15; API contract §4.)_
-    - Documented `400/401/403/404/405/429/500/503` outcomes retain standard envelopes/content types and no leaked internals. An unexpected mapping/programming failure is `500`, not disguised as a retryable datasource outage. No new state-validation, idempotency-conflict, or `207` response is added to GET. _(API contract §3.)_
+    - Exhausting the user's shared default quota of 100 requests/60 seconds yields `429` with retry/rate headers. Quota evaluation alone failing permits an otherwise authenticated/authorized read. A downstream filter or handler exception propagates without re-invoking the chain or emitting a false Redis-outage metric; fail-open does not bypass authentication. Stream handshakes still use 10/60 seconds. _(FR-27–FR-28; Scenario 15; API contract §4.)_
+    - Documented `400/401/403/404/405/429/500/503` outcomes retain standard envelopes/content types and no leaked internals. Unexpected mapping/programming failures, including `IllegalStateException` and `IllegalArgumentException` in the summary handler, yield sanitized `500`, not `422` or a retryable datasource outage. Verify framework binding `400`, explicit domain errors and unrelated endpoints' existing error behavior remain unchanged. No new state-validation, idempotency-conflict, or `207` response is added to GET. _(API contract §3.)_
     - A fresh read after reconnect can recover replica-visible state without `Last-Event-ID` replay or an idempotency key. A returned count older than the latest SSE count is permitted; it is not labeled an atomic/newer snapshot or equipped with a fabricated timestamp/version. Repeated reads emit no event. _(FR-29–FR-34, BR-10–BR-12; Scenarios 13, 16–17.)_
     - All existing API regressions from Phase 1 remain green after the final failure-path changes. If a manual regression is found, reopen the responsible task and repair it before claiming feature readiness. _(Human instruction; project Definition of Done.)_
   - **Human API retest:** Verify the status/error matrix and retry hints in a controlled environment, then restore dependencies and verify recovery. Reconnect the existing stream and read the summary after a committed sync; repeat a sync retry to confirm no extra event/count. The plan does not require implementing a client refresh scheduler or automatically performing outage experiments against shared infrastructure.
 
 #### Checkpoint C — Implementation ready for human-invoked review
 
-- [ ] T1–T6 are complete and every task acceptance criterion, not only each checkbox, has been verified.
-- [ ] All 34 FRs, 12 BRs, and 17 spec scenarios are covered by the task mapping below; client refresh/rendering obligations remain contract-only.
-- [ ] Full backend unit suite and `ModulithArchitectureTest` pass; no integration test, app-context test, Testcontainers, or real service was introduced in automated verification.
-- [ ] The human's existing-API regression checks and new Organizer/Staff summary API checks pass. No unresolved regression is carried forward.
-- [ ] The migration is additive and compatible with previous backend code; data and existing uniqueness constraints are preserved.
-- [ ] Ready for the human to invoke `/review live-attendance-monitoring`. Do not run `/review`, `/fix`, or another `/build` automatically.
+- [x] T1–T6 are complete and every task acceptance criterion, not only each checkbox, has been verified.
+- [x] All 34 FRs, 12 BRs, and 17 spec scenarios are covered by the task mapping below; client refresh/rendering obligations remain contract-only.
+- [x] Full backend unit suite and `ModulithArchitectureTest` pass; no integration test, app-context test, Testcontainers, or real service was introduced in automated verification.
+- [x] The human's existing-API regression checks and new Organizer/Staff summary API checks pass. No unresolved regression is carried forward.
+- [x] The migration is additive and compatible with previous backend code; data and existing uniqueness constraints are preserved.
+- [x] Ready for the human to invoke `/review live-attendance-monitoring`. Do not run `/review`, `/fix`, or another `/build` automatically.
 
 ## 4. Definition of Done and Regression Discipline
 

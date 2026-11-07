@@ -16,9 +16,11 @@ import com.unihub.workshop.attendances.domain.model.AttendanceSummary;
 import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
 import java.math.BigDecimal;
+import java.sql.SQLTransientConnectionException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +30,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -121,6 +125,205 @@ class GetAttendanceSummaryUseCaseImplTest {
                 TransactionDefinition.PROPAGATION_REQUIRES_NEW
             )
         );
+    }
+
+    @Test
+    void primaryTransactionConnectionFailureReturnsServiceUnavailable() {
+        when(manager.getTransaction(any())).thenThrow(
+            new CannotCreateTransactionException(
+                "connection",
+                new SQLTransientConnectionException("offline", "08001")
+            )
+        );
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
+        ).isInstanceOf(ServiceUnavailableException.class);
+        verify(registrations, never()).countConfirmedByWorkshopId(any());
+        verify(attendances, never()).countValidByWorkshopId(any());
+    }
+
+    @Test
+    void replicaReadFailureReturnsServiceUnavailableWithoutPartialResult() {
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(registrations.countConfirmedByWorkshopId(workshopId)).thenThrow(
+            new DataAccessResourceFailureException("replica unavailable")
+        );
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
+        ).isInstanceOf(ServiceUnavailableException.class);
+        verify(manager).commit(primary);
+        verify(manager).rollback(replica);
+        verify(attendances, never()).countValidByWorkshopId(any());
+    }
+
+    @Test
+    void unrelatedProgrammingFailureRemainsUnchanged() {
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(registrations.countConfirmedByWorkshopId(workshopId)).thenThrow(
+            new IllegalStateException("bug")
+        );
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("bug");
+    }
+
+    @Test
+    void staffPermissionDatabaseFailureStopsBeforeReplica() {
+        UUID staffId = UUID.randomUUID();
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(
+            workshops.isStaffAssignedToWorkshop(workshopId, staffId)
+        ).thenThrow(
+            new DataAccessResourceFailureException("primary unavailable")
+        );
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    null,
+                    staffId,
+                    "STAFF"
+                )
+            )
+        ).isInstanceOf(ServiceUnavailableException.class);
+        verify(manager).rollback(primary);
+        verify(manager, times(1)).getTransaction(any());
+        verify(registrations, never()).countConfirmedByWorkshopId(any());
+    }
+
+    @Test
+    void primaryWorkshopReadFailureStopsBeforeReplica() {
+        when(workshops.getWorkshopForRegistration(workshopId)).thenThrow(
+            new DataAccessResourceFailureException("primary unavailable")
+        );
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
+        ).isInstanceOf(ServiceUnavailableException.class);
+        verify(manager).rollback(primary);
+        verify(manager, times(1)).getTransaction(any());
+        verify(registrations, never()).countConfirmedByWorkshopId(any());
+    }
+
+    @Test
+    void replicaTransactionAcquisitionFailureDoesNotFallbackToPrimary() {
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(manager.getTransaction(any()))
+            .thenReturn(primary)
+            .thenThrow(
+                new CannotCreateTransactionException(
+                    "connection",
+                    new SQLTransientConnectionException(
+                        "replica offline",
+                        "08001"
+                    )
+                )
+            );
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
+        ).isInstanceOf(ServiceUnavailableException.class);
+        verify(manager).commit(primary);
+        verify(manager, times(2)).getTransaction(any());
+        verify(registrations, never()).countConfirmedByWorkshopId(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "count", "preview" })
+    void replicaAttendanceFailureDoesNotReturnPartialSummary(String phase) {
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        if ("count".equals(phase)) {
+            when(attendances.countValidByWorkshopId(workshopId)).thenThrow(
+                new DataAccessResourceFailureException("replica unavailable")
+            );
+        } else {
+            when(attendances.findRecentValidByWorkshopId(workshopId)).thenThrow(
+                new DataAccessResourceFailureException("replica unavailable")
+            );
+        }
+        assertThatThrownBy(() ->
+            useCase.execute(
+                new GetAttendanceSummaryQuery(
+                    workshopId,
+                    orgId,
+                    UUID.randomUUID(),
+                    "ORGANIZER"
+                )
+            )
+        ).isInstanceOf(ServiceUnavailableException.class);
+        verify(manager).rollback(replica);
+        verify(manager, times(2)).getTransaction(any());
+    }
+
+    @Test
+    void repeatedReadCanObserveNewReplicaStateWithoutWriting() {
+        when(workshops.getWorkshopForRegistration(workshopId)).thenReturn(
+            Optional.of(workshop(orgId, 100))
+        );
+        when(registrations.countConfirmedByWorkshopId(workshopId)).thenReturn(
+            80L
+        );
+        when(attendances.countValidByWorkshopId(workshopId)).thenReturn(
+            50L,
+            51L
+        );
+        when(attendances.findRecentValidByWorkshopId(workshopId)).thenReturn(
+            List.of()
+        );
+        GetAttendanceSummaryQuery query = new GetAttendanceSummaryQuery(
+            workshopId,
+            orgId,
+            UUID.randomUUID(),
+            "ORGANIZER"
+        );
+        assertThat(useCase.execute(query).checkedInCount()).isEqualTo(50L);
+        assertThat(useCase.execute(query).checkedInCount()).isEqualTo(51L);
+        verify(attendances, never()).insertAll(any());
     }
 
     @Test

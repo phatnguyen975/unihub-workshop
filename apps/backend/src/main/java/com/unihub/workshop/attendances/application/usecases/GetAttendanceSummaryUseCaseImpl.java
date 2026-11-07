@@ -7,8 +7,15 @@ import com.unihub.workshop.attendances.domain.model.AttendanceSummary;
 import com.unihub.workshop.registrations.api.RegistrationApi;
 import com.unihub.workshop.shared.exception.ForbiddenException;
 import com.unihub.workshop.shared.exception.NotFoundException;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.workshops.api.WorkshopApi;
 import com.unihub.workshop.workshops.api.dto.WorkshopRegistrationDetailsDto;
+import java.sql.SQLException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLTransientConnectionException;
+import org.hibernate.exception.JDBCConnectionException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -47,6 +54,20 @@ public class GetAttendanceSummaryUseCaseImpl
 
     @Override
     public AttendanceSummary execute(GetAttendanceSummaryQuery query) {
+        try {
+            return readSummary(query);
+        } catch (RuntimeException failure) {
+            if (isConnectionFailure(failure)) {
+                throw new ServiceUnavailableException(
+                    "Attendance summary is temporarily unavailable. Please retry.",
+                    failure
+                );
+            }
+            throw failure;
+        }
+    }
+
+    private AttendanceSummary readSummary(GetAttendanceSummaryQuery query) {
         WorkshopRegistrationDetailsDto workshop = primary.execute(status -> {
             WorkshopRegistrationDetailsDto found = workshopApi
                 .getWorkshopForRegistration(query.workshopId())
@@ -79,5 +100,33 @@ public class GetAttendanceSummaryUseCaseImpl
                 )
             )
         );
+    }
+
+    private static boolean isConnectionFailure(Throwable failure) {
+        for (
+            Throwable cause = failure;
+            cause != null;
+            cause = cause.getCause()
+        ) {
+            if (
+                cause instanceof DataAccessResourceFailureException ||
+                cause instanceof JDBCConnectionException
+            ) {
+                return true;
+            }
+            if (cause instanceof SQLException sqlException) {
+                String state = sqlException.getSQLState();
+                if (
+                    sqlException instanceof SQLTransientConnectionException ||
+                    sqlException instanceof
+                        SQLNonTransientConnectionException ||
+                    sqlException instanceof SQLRecoverableException ||
+                    (state != null && state.startsWith("08"))
+                ) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

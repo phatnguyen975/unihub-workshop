@@ -6,6 +6,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,7 +15,9 @@ import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummary
 import com.unihub.workshop.attendances.application.ports.in.GetAttendanceSummaryUseCase;
 import com.unihub.workshop.attendances.domain.model.Attendance;
 import com.unihub.workshop.attendances.domain.model.AttendanceSummary;
+import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapper;
 import com.unihub.workshop.attendances.presentation.mapper.AttendancePresentationMapperImpl;
+import com.unihub.workshop.shared.exception.ServiceUnavailableException;
 import com.unihub.workshop.shared.security.JwtAuthenticatedPrincipal;
 import com.unihub.workshop.shared.web.GlobalExceptionHandler;
 import com.unihub.workshop.shared.web.GlobalResponseBodyAdvice;
@@ -175,5 +179,97 @@ class AttendanceSummaryControllerTest {
         verify(useCase).execute(
             new GetAttendanceSummaryQuery(workshopId, null, staffId, "STAFF")
         );
+    }
+
+    @Test
+    void unexpectedProgrammingFailureReturnsInternalServerError()
+        throws Exception {
+        when(useCase.execute(any())).thenThrow(
+            new IllegalStateException("unexpected mapping bug")
+        );
+        mvc.perform(
+            get(
+                "/api/v1/workshops/{workshopId}/attendances/summary",
+                workshopId
+            ).principal(auth("ORGANIZER"))
+        )
+            .andExpect(status().isInternalServerError())
+            .andExpect(
+                jsonPath("$.error.type").value("urn:unihub:error:internal")
+            )
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "An unexpected system error occurred."
+                )
+            );
+    }
+
+    @Test
+    void mappingFailureIsSanitizedInternalServerError() throws Exception {
+        AttendancePresentationMapper failingMapper = mock(
+            AttendancePresentationMapper.class
+        );
+        when(failingMapper.toSummaryResponse(any())).thenThrow(
+            new IllegalArgumentException("internal mapping details")
+        );
+        when(useCase.execute(any())).thenReturn(
+            AttendanceSummary.of(workshopId, 0, 0, 0, List.of())
+        );
+        MockMvc failingMvc = MockMvcBuilders.standaloneSetup(
+            new AttendanceSummaryController(useCase, failingMapper)
+        )
+            .setControllerAdvice(
+                new GlobalExceptionHandler(),
+                new GlobalResponseBodyAdvice()
+            )
+            .build();
+        failingMvc
+            .perform(
+                get(
+                    "/api/v1/workshops/{workshopId}/attendances/summary",
+                    workshopId
+                ).principal(auth("ORGANIZER"))
+            )
+            .andExpect(status().isInternalServerError())
+            .andExpect(
+                jsonPath("$.error.detail").value(
+                    "An unexpected system error occurred."
+                )
+            );
+    }
+
+    @Test
+    void unavailableReturnsRetryHintAndStandardProblem() throws Exception {
+        when(useCase.execute(any())).thenThrow(
+            new ServiceUnavailableException("temporarily unavailable")
+        );
+        mvc.perform(
+            get(
+                "/api/v1/workshops/{workshopId}/attendances/summary",
+                workshopId
+            ).principal(auth("ORGANIZER"))
+        )
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(header().string("Retry-After", "30"))
+            .andExpect(
+                content().contentTypeCompatibleWith("application/problem+json")
+            )
+            .andExpect(
+                jsonPath("$.error.type").value(
+                    "urn:unihub:error:service-unavailable"
+                )
+            )
+            .andExpect(jsonPath("$.metadata.traceId").exists());
+    }
+
+    @Test
+    void missingAuthenticationIsUnauthorized() throws Exception {
+        mvc.perform(
+            get(
+                "/api/v1/workshops/{workshopId}/attendances/summary",
+                workshopId
+            )
+        ).andExpect(status().isUnauthorized());
+        verifyNoInteractions(useCase);
     }
 }
