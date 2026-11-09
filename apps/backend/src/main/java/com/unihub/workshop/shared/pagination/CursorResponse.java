@@ -5,7 +5,7 @@ import lombok.Builder;
 
 /**
  * Standard cursor pagination metadata container for REST API responses,
- * strictly conformant to {@code docs/api-standards.md}.
+ * strictly conformant to {@code contracts/http/standards.md}.
  *
  * <p>Produces JSON:
  * <pre>{@code
