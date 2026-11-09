@@ -2,7 +2,7 @@
 
 This guide simulates the legacy Student Management System dropping a nightly CSV export into the local MinIO instance. It is a development-only manual operation; the UniHub web application does not provide a CSV upload interface.
 
-## 1. Start MinIO and create the required bucket
+## 1. Start MinIO and Create the Required Bucket
 
 ```bash
 cd infra
@@ -13,7 +13,7 @@ cd ..
 
 Wait until `minio` is running and `minio-init` has completed successfully. The initialization container creates the `unihub-csv-drops` bucket.
 
-## 2. Choose the object key and file name
+## 2. Choose the Object Key and File Name
 
 The current architecture does not mandate a file-name format; object creation time determines processing order. Use the following development convention so that a file's intended export time is clear to operators. The faculty is deliberately not repeated in the file name because the organization-scoped prefix determines it.
 

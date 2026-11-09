@@ -1,0 +1,9 @@
+# ADR-010: Idempotency Mechanism
+
+> **Scope:** server
+
+- **Context:** Payment retries and network drops can cause duplicate charges without strict idempotency control.
+- **Decision:** Implement a 2-Tier Cache-Aside Idempotency Strategy combining Redis (L1 distributed in-memory cache) for sub-millisecond deduplication and cached response replay with Primary PostgreSQL (`idempotency_keys` table, L2 durable source-of-truth) for atomic insert-on-conflict claims, cache-aside backfill, and cache invalidation on failure.
+- **Rationale:** An atomic database insert (`ON CONFLICT DO NOTHING`) eliminates check-then-act race conditions across horizontally-scaled backend nodes. L1 Redis provides instant deduplication and cached replay for the 12,000-user surge. On an L1 cache miss, the system queries the primary database (L2 Hit) and backfills the L1 cache while replaying the stored response. On transient transaction failures or rollbacks, the application explicitly invalidates the L1 Redis key (`DEL`) and clears the pending database claim, ensuring clients are not locked out for subsequent retries. A Background Sweeper reconciles orphaned `PENDING` states (Delayed Webhook Recovery) for asynchronous payment flows.
+- **Alternatives Considered:** Redis-only idempotency was rejected because cache loss, node restart, or memory eviction would permanently destroy exact replay semantics for financial transactions. Database-only idempotency without Redis was rejected because it would place unnecessary read/write contention on PostgreSQL during high-volume registration surges. Application-memory deduplication was rejected because it cannot survive multi-node concurrency behind Nginx.
+- **Consequences:** Requires maintaining consistent response serialization and explicit cache invalidation logic across layers, but guarantees resilient, exactly-once mutation semantics without duplicate charges or duplicate registrations.
