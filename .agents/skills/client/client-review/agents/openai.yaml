@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-review"
+  short_description: "Client review workflow for web and mobile"
+  default_prompt: "Use $client-review for the requested client platform and capability."

@@ -4,12 +4,14 @@ title = "UniHub Gitleaks Config"
 useDefault = true
 
 [allowlist]
-description = "Ignore dummy secrets in test fixtures, test classes, and documentation specs"
+description = "Ignore dummy secrets in test fixtures, test classes, documentation, and contract examples"
 paths = [
     '''apps/backend/src/test/.*''',
     '''apps/workers/src/test/.*''',
     '''specs/.*''',
-    '''docs/.*'''
+    '''docs/.*''',
+    '''^contracts/http/features/[^/]+\.md$''',
+    '''^contracts/http/standards\.md$'''
 ]
 regexes = [
     '''columnDefinition''',

@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-foundation"
+  short_description: "Client foundation workflow for web and mobile"
+  default_prompt: "Use $client-foundation for the requested client platform and capability."

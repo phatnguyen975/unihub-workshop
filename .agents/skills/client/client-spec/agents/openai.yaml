@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-spec"
+  short_description: "Client spec workflow for web and mobile"
+  default_prompt: "Use $client-spec for the requested client platform and capability."

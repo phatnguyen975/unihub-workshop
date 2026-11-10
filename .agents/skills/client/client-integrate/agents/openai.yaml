@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-integrate"
+  short_description: "Client integrate workflow for web and mobile"
+  default_prompt: "Use $client-integrate for the requested client platform and capability."

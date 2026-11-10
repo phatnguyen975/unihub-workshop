@@ -37,7 +37,18 @@ UniHub Workshop is a university workshop management platform connecting students
 - **Background processing:** email and in-app notifications, search synchronization, student CSV ingestion, AI brochure summaries and scheduled maintenance.
 - **Security and resilience:** RS256 JWTs, role and resource authorization, idempotency, rate limiting and observability.
 
-See the [feature catalog](docs/feature-catalog.md) for feature scope and status.
+[Product Features](docs/product-features.md) defines shared feature IDs and purpose. Delivery and acceptance are tracked independently in [Server Delivery](docs/server/feature-delivery.md), [Web Delivery](docs/client/web/feature-delivery.md) and [Mobile Delivery](docs/client/mobile/feature-delivery.md).
+
+## Applications and Boundaries
+
+| Application     | Responsibility                                                        | Source Guide                                                      |
+| --------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `apps/backend/` | Public HTTP/SSE interfaces, authorization and transactional workflows | [Server Source Structure](docs/server/source-structure.md)        |
+| `apps/workers/` | Asynchronous pipelines, notifications and scheduled processing        | [Server Source Structure](docs/server/source-structure.md)        |
+| `apps/web/`     | Student and organizer browser experiences                             | [Web Source Structure](docs/client/web/source-structure.md)       |
+| `apps/mobile/`  | Staff check-in and offline attendance capture                         | [Mobile Source Structure](docs/client/mobile/source-structure.md) |
+
+Providers and consumers communicate through approved [Public Contracts](contracts/README.md). Client-owned models and service interfaces isolate UI behavior from wire formats and server internals. Mock scenarios support independent client implementation; API integration follows contract approval. Architecture targets and design artifacts do not by themselves indicate application readiness.
 
 ## Architecture
 
@@ -45,14 +56,14 @@ See the [feature catalog](docs/feature-catalog.md) for feature scope and status.
 
 Neon hosts PostgreSQL outside the local machine; it is not part of Compose. The backend and workers use the same Neon database with separate primary and read-replica endpoints. Primary handles writes and consistency-sensitive reads; replica handles eligible reporting and other eventually consistent reads.
 
-The backend is a Spring Modulith modular monolith. Workers are a separately runnable application with hexagonal boundaries. Domain events and RabbitMQ connect asynchronous processing; Redis also supports rate limiting, caching and transient realtime distribution. See [system design](docs/system-design.md) and [project structure](docs/project-structure.md).
+The backend is a Spring Modulith modular monolith. Workers are a separately runnable application with hexagonal boundaries. Domain events and RabbitMQ connect asynchronous processing; Redis also supports rate limiting, caching and transient realtime distribution. See [System Design](docs/server/system-design.md) and [repository structure](docs/repository-structure.md).
 
 ### Technology Stack
 
 | Area                   | Technology and Role                                                               |
 | ---------------------- | --------------------------------------------------------------------------------- |
-| Web                    | React 19.3.1, TypeScript — student and organizer portal                           |
-| Mobile                 | React Native 0.88.1, TypeScript, SQLite — offline-first staff check-in            |
+| Web                    | React, TypeScript — student and organizer portal                                  |
+| Mobile                 | React Native, TypeScript, SQLite — offline-first staff check-in                   |
 | Runtime                | Java 25, Spring Boot 4.0.6, Gradle Wrapper 9.5.1                                  |
 | Backend                | Spring Modulith 2.0.6, Spring Security, Spring Data JPA/JDBC, Flyway              |
 | Workers                | Spring Boot, Spring Batch, RabbitMQ consumers, PDFBox                             |
@@ -63,19 +74,19 @@ The backend is a Spring Modulith modular monolith. Workers are a separately runn
 
 ## Prerequisites
 
-- [Git](https://git-scm.com/), [JDK 25](https://adoptium.net/temurin/releases/) and [Docker with Compose](https://docs.docker.com/compose/install/). Both applications include their own Gradle Wrapper; a separate Gradle installation is unnecessary.
-- OpenSSL available in the terminal to generate theRSA key pair. On Windows, Git Bash or a separate OpenSSL installation can provide it.
+- [Git](https://git-scm.com/), [JDK 25](https://adoptium.net/temurin/releases/) and [Docker with Compose](https://docs.docker.com/compose/install/). Backend and workers include their own Gradle Wrapper; a separate Gradle installation is unnecessary.
+- OpenSSL available in the terminal to generate the RSA key pair. On Windows, Git Bash or a separate OpenSSL installation can provide it.
 - A [Neon](https://neon.com/docs/connect/connect-from-any-app) account and development project, with primary and read-replica connection details and a database role permitted to run migrations. The applications run locally but require network access to Neon.
 - For paid-registration testing, use [Stripe Sandbox](https://docs.stripe.com/sandboxes), its test secret key and the [Stripe CLI](https://docs.stripe.com/stripe-cli). Payments do not work with the dummy key.
 - For email testing, use Mailpit to capture messages locally without an email account, or use a real SMTP account. For Gmail, enable [2-Step Verification](https://support.google.com/accounts/answer/185839) and create an [App Password](https://myaccount.google.com/apppasswords). See [Google's Guide](https://support.google.com/accounts/answer/185833) if the option is unavailable.
 - For real Gemini summaries, create an API key in [Google AI Studio](https://aistudio.google.com/apikey). The mock provider needs no external AI key. See the [Gemini API Key Guide](https://ai.google.dev/gemini-api/docs/api-key) for access requirements.
 - Ensure Docker has enough memory for Elasticsearch and the other containers, and that the ports in the [port table](#ports-and-addresses) are available. On Linux, Elasticsearch may require host configuration such as `vm.max_map_count`; consult the [Elasticsearch Docker Documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html) if its container fails to start.
 
-## Local Development Setup
+## Server Development
 
 Commands start at the repository root unless stated otherwise. Do not commit `.env` files, private keys, passwords, Stripe secrets or tokens.
 
-### Shared Setup
+### Environment and Infrastructure
 
 #### Clone and Create Environment Files
 
@@ -201,7 +212,7 @@ For a sandbox paid-registration test, obtain the PaymentIntent ID from the curre
 stripe payment_intents confirm <payment_intent_id> --payment-method=pm_card_visa --return-url="http://localhost"
 ```
 
-The PaymentIntent ID is the `pi_...` portion **before** `_secret_`; never share the client secret. A Stripe `succeeded` status confirms the provider-side payment, while successful webhook delivery and registration processing must also be checked. Refer to the [paid registration contract](specs/paid-workshop-registration/API_CONTRACT.md).
+The PaymentIntent ID is the `pi_...` portion **before** `_secret_`; never share the client secret. A Stripe `succeeded` status confirms the provider-side payment, while successful webhook delivery and registration processing must also be checked. Refer to the [paid registration contract](contracts/http/features/paid-workshop-registration.md).
 
 #### Start the Backend Instances
 
@@ -223,7 +234,7 @@ $env:SERVER_PORT="8082"; $env:HOSTNAME="unihub-backend-2"; .\gradlew.bat bootRun
 
 ### Workers Setup
 
-The student CSV ingestion job is scheduled, not automatically populated with demo students. To exercise student registration against real fixtures, follow the [ingestion specification](specs/nightly-student-csv-ingestion/SPEC.md) and set `INGESTION_EXPECTED_FACULTIES` to the intended seeded organization names.
+The student CSV ingestion job is scheduled, not automatically populated with demo students. To exercise student registration against real fixtures, follow the [ingestion specification](specs/server/nightly-student-csv-ingestion/SPEC.md) and set `INGESTION_EXPECTED_FACULTIES` to the intended seeded organization names.
 
 #### Start the Workers
 
@@ -245,19 +256,11 @@ $env:SERVER_PORT="8083"; $env:HOSTNAME="unihub-workers"; .\gradlew.bat bootRun
 
 The `HOSTNAME` values label application metrics; Compose maps Prometheus target names to the host gateway. On Linux/macOS, run `chmod +x gradlew` if needed.
 
-### Web Setup
-
-Web setup instructions will be added when the application is implemented.
-
-### Mobile Setup
-
-Mobile setup instructions will be added when the application is implemented.
-
 ### Verify the Setup
 
 1. Visit the individual health endpoints: [backend 1](http://localhost:8081/actuator/health), [backend 2](http://localhost:8082/actuator/health), and [workers](http://localhost:8083/actuator/health). `UP` is the expected healthy response. Nginx intentionally blocks `/actuator`; check these directly.
 2. Open [gateway health](http://localhost/healthz), [Swagger UI](http://localhost:8081/swagger-ui.html), [Mailpit](http://localhost:8025), [RabbitMQ](http://localhost:15672), [Prometheus targets](http://localhost:9090/targets), and [Grafana](http://localhost:3000). Sign in using your configured local credentials where required.
-3. Change the seeded organizer's temporary password as described above, then use the returned token or log in via `POST http://localhost/api/v1/auth/login`. Explore endpoints in Swagger or Postman; detailed request contracts are available in [`specs/`](specs/).
+3. Change the seeded organizer's temporary password as described above, then use the returned token or log in via `POST http://localhost/api/v1/auth/login`. Explore endpoints in Swagger or Postman; approved interface definitions are listed in the [HTTP Contract Registry](contracts/http/README.md). Swagger reflects the running provider and does not replace the approved contract.
 4. For paid registration, confirm that Stripe CLI forwards webhook events successfully and that the application's registration status updates; a provider-side payment result alone is not the end-to-end outcome.
 
 ### Stop or Reset
@@ -287,11 +290,27 @@ To deliberately delete this Compose stack's local named volumes as well, use `do
 
 `infra/.env` defaults the gateway upstreams to `host.docker.internal:8081` and `:8082`. Compose supplies host-gateway mappings for Linux. `WORKERS_HOST` appears in the example environment file but is not consumed by the current Compose services; Prometheus workers routing is defined in its own YAML. Changing application ports therefore requires updating the matching Nginx upstream values and/or Prometheus targets as well.
 
-For future containerized applications, `localhost` inside an application container refers to that container. Service URLs would need to use Compose service names, and gateway/Prometheus targets would need to match the future Compose topology. The commented Docker-mode examples in `infra/.env.example` are illustrative; the current Compose file does not define those application services.
+For a containerized application topology, `localhost` addresses the application container. Service URLs use the topology's service names, and gateway/Prometheus targets match its network and ports. The Docker-mode values in `infra/.env.example` are configuration examples; application container services require their own deployment definitions.
+
+## Client Development
+
+Web and mobile use independent experience maps, UI baselines, capability bundles and delivery records. Work may proceed on either platform without requiring the other platform to be implemented. The [Client Workflow](.agents/workflows/client.md) separates scope approval, platform design approval, incremental capability design/build with mock services, human acceptance and separately authorized API integration.
+
+### Web Setup
+
+Use [Web Source Structure](docs/client/web/source-structure.md), [Web Feature Delivery](docs/client/web/feature-delivery.md) and the [Client Workflow](.agents/workflows/client.md) to establish setup scope and implementation dependencies. Configure the app's compatible tooling and verification commands through an approved setup plan; application package scripts own build/dev/test commands.
+
+### Mobile Setup
+
+Use [Mobile Source Structure](docs/client/mobile/source-structure.md), [Mobile Feature Delivery](docs/client/mobile/feature-delivery.md) and the [Mobile Rules](.agents/rules/mobile.md). The approved app setup selects compatible SDK/native dependencies and package commands, proves physical-device access and defines any required human native review.
+
+Mobile uses physical devices. Fast Refresh updates a connected compatible Expo client; agent device control is a separate capability that must be proven. When native access is unavailable, code checks continue and native UI evidence remains pending human review under the [Mobile Rules](.agents/rules/mobile.md). Browser prototypes do not certify native rendering.
 
 ## Tests
 
-Each application has its own test suite and wrapper. From the relevant directory, run `./gradlew test` on Linux/macOS or `.\gradlew.bat test` in PowerShell. Tests follow the repository's unit-test and static architecture-check policy; see [AGENTS.md](AGENTS.md).
+Backend and workers use their app-local Gradle wrapper: run `./gradlew test` on Linux/macOS or `.\gradlew.bat test` in PowerShell from the relevant app directory. Follow [Server Rules](.agents/rules/server.md) for unit-only and static architecture checks.
+
+Web and mobile use the commands configured in their app tooling under [Client Rules](.agents/rules/client.md), with unit/component and applicable journey/visual/native verification. Runner and command selection belongs to the approved app setup. [AGENTS.md](AGENTS.md) routes each task to its testing policy.
 
 ## Troubleshooting
 
@@ -306,27 +325,23 @@ Each application has its own test suite and wrapper. From the relevant directory
 | Stripe webhook `400` / signature failure      | Check the listener's current `whsec_...` against `STRIPE_WEBHOOK_SECRET` in both backend processes; restart them after changes. Confirm the forwarded URL and sandbox.                       |
 | A port is already in use                      | Stop the conflicting process or change the relevant Compose port, app configuration and gateway/Prometheus targets consistently.                                                             |
 
-## Full Docker Compose Setup
-
-The current Compose file provisions infrastructure only; application services, client images, service-to-service addresses and their Compose startup order will be added at a later stage.
-
 ## Repository Structure
 
-```text
-UniHub/
-├── AGENTS.md           # Agent rules + Documentation Map (always loaded)
-├── .agents/            # Agent skills infrastructure
-│   ├── skills/         # Reusable, language-agnostic skill definitions
-│   └── commands/       # Slash commands (/spec, /plan, /build, /review, /fix)
-├── apps/               # Product applications in the monorepo
-│   ├── backend/        # Spring Boot Modulith core backend API
-│   ├── workers/        # Background workers (batch, notifications, AI)
-│   ├── web/            # React web portal for students and organizers
-│   └── mobile/         # React Native offline-first check-in app
-├── docs/               # Architecture, design, database, and API documentation
-├── infra/              # Local Docker, data services, observability configs
-├── scripts/            # Executable scripts (Docker deploy, DB seeding, test scenarios)
-└── specs/              # Per-feature spec artifacts produced by the SDD workflow
-```
+| Location     | Responsibility                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `apps/`      | Independently owned backend, worker, web and mobile applications                            |
+| `docs/`      | Product requirements, scoped architecture/decisions, design baselines and delivery catalogs |
+| `specs/`     | Server feature and client capability requirements, task plans and verification records      |
+| `contracts/` | Approved public interfaces, HTTP standards and contract registry                            |
+| `infra/`     | Local service topology, component configuration and operational guide                       |
+| `.agents/`   | Shared/server/client rules, workflows, skills and artifact templates                        |
 
-Start with the [system design](docs/system-design.md), [API standards](docs/api-standards.md), [database schema](docs/database-schema.md) and [feature catalog](docs/feature-catalog.md) for deeper details.
+The [Repository Structure](docs/repository-structure.md) maps ownership and the [Documentation Map](docs/README.md) identifies canonical sources. Concrete framework entrypoints and app-local commands belong to each application's configuration; directory diagrams also describe artifacts authored through the owning workflow.
+
+## Agent-Assisted Development
+
+Start with [AGENTS.md](AGENTS.md), then the matching app entrypoint and scoped rules. The [Skill Catalog](.agents/skill-catalog.md) lists workflow entrypoints and available techniques; a skill does not install a browser, device runtime or test runner. Server and client workflows have their own approval and verification policies. Record actual check results and human decisions separately; passing tests or committing code does not approve product/design changes.
+
+## License
+
+The repository is distributed under the [MIT License](LICENSE). Imported skills retain their applicable licenses in their own skill directories.

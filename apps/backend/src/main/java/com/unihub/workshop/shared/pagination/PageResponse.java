@@ -6,7 +6,7 @@ import java.util.function.Function;
 import lombok.Builder;
 
 /**
- * Standard pagination response envelope conforming to {@code docs/api-standards.md}.
+ * Standard pagination response envelope conforming to {@code contracts/http/standards.md}.
  *
  * <p>Produces JSON:
  * <pre>{@code

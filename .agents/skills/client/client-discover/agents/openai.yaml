@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-discover"
+  short_description: "Client discover workflow for web and mobile"
+  default_prompt: "Use $client-discover for the requested client platform and capability."

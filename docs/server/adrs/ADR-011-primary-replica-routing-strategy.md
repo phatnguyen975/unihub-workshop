@@ -1,0 +1,10 @@
+# ADR-011: Primary-Replica Routing Strategy
+
+> **Scope:** server
+
+- **Context:** Replication lag in a primary-replica topology can cause stale reads during critical transactional operations (e.g., idempotency checks, admin data mutations, or immediate read-after-write scenarios).
+- **Decision:** Route all writes and highly consistent read operations (such as idempotency verification, pre-transaction validations, and admin mutation flows) strictly to the primary database. Route eventually consistent, non-critical reads (such as public browsing and authenticated history or reporting views) to replicas when the client can tolerate short-lived stale data.
+- **Rationale:** Critical flows require strict "Read-Your-Writes" consistency to prevent replay anomalies, concurrency conflicts, or lost updates. Forcing primary routing for these specific operations eliminates replication lag risks while still preserving read replica scalability for the vast majority of public traffic.
+- **Alternatives Considered:** Replica reads for idempotency and admin mutations were rejected because replication lag can cause false negatives, replay anomalies, and lost-update races. A single-node primary-only model was rejected because it would unnecessarily sacrifice read scalability for non-critical browsing paths.
+- **Consequences:** Requires explicit routing logic at the application layer (e.g., relying on `@Transactional` routing mechanisms) and strict code reviews to ensure critical reads never hit replicas.
+  - **Mixed-consistency read workflows:** When a read workflow requires current authorization or immediate visibility of a recent change but tolerates stale reporting values, resolve its consistency-critical context on Primary before reading those reporting values in a separate Replica transaction. Define the required freshness of each phase in the feature contract. Do not wrap both phases in a single transaction that defeats the split, promise an atomic snapshot across datasources, or use reporting values to drive a mutation.

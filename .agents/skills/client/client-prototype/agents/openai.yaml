@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-prototype"
+  short_description: "Client prototype workflow for web and mobile"
+  default_prompt: "Use $client-prototype for the requested client platform and capability."

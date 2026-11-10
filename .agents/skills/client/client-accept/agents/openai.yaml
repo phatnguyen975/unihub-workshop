@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-accept"
+  short_description: "Client accept workflow for web and mobile"
+  default_prompt: "Use $client-accept for the requested client platform and capability."

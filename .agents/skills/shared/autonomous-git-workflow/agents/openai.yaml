@@ -1,0 +1,4 @@
+interface:
+  display_name: "Autonomous Git Workflow"
+  short_description: "Carry out Git tasks within the authorized scope"
+  default_prompt: "Use $autonomous-git-workflow to handle the requested Git task while preserving existing work."

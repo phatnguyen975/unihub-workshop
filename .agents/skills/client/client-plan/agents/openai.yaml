@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-plan"
+  short_description: "Client plan workflow for web and mobile"
+  default_prompt: "Use $client-plan for the requested client platform and capability."

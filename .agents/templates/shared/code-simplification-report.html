@@ -1,0 +1,1315 @@
+<!doctype html>
+<!--
+  CODE SIMPLIFICATION — COMPLETION REPORT TEMPLATE
+
+  This file is a TEMPLATE, not a finished report. Two fully-filled, ready-to-read examples sit next to this file — read them alongside
+  these comments, not instead of them:
+    - example-completed.html  (a successful COMPLETED run)
+    - example-blocked.html    (a BLOCKED run, no test coverage)
+  Both examples share this exact structure and style; only their content differs. Match that: every report this skill produces must
+  look like these two, regardless of status — the layout, colors, and components never change between a COMPLETED, BLOCKED, or PARTIAL
+  report, only which sections have real content vs. an empty-state note.
+
+  When Workflow Step 8 is reached, copy this file and replace every placeholder before saving it as the run's output. Do not redesign
+  the layout.
+
+  PLACEHOLDERS
+  - A token written as two curly braces around a name, e.g. the overall score token, means: replace with a single value (plain text,
+    already HTML-escaped before inserting). Numbers only, no extra characters, unless the comment beside it says otherwise.
+  - A repeating section is wrapped by a pair of one-line HTML comments that both read "REPEAT: NAME", one ending in START and the other
+    in END. Duplicate everything between that pair once per item, fill each copy's placeholders, then delete the two marker comments
+    themselves from the final output.
+  - EVERY repeating section has an explicit empty-state instruction directly below it in this file. If a section has zero items, you
+    MUST use that instruction's exact wording/markup — never leave a section blank, and never invent new empty-state wording per report
+    so completed and blocked runs read consistently.
+
+  RUN STATUS
+  Set data-status on the body tag, and the status badge text, to one of: COMPLETED, BLOCKED, or PARTIAL.
+  - COMPLETED: ran through Workflow Step 7 with the Verification checklist fully passing. Omit the Status Note section entirely
+    (delete it, including its instructional comment).
+  - BLOCKED: stopped at Step 2 (no test coverage for code in scope). Include the Status Note section explaining why and what to do next.
+  - PARTIAL: stopped partway through Step 6. Include the Status Note.
+  Each checklist row's status token is PASS or FAIL, set as the data-check attribute on its list item.
+
+  SCORE CALCULATION
+  OVERALL_SCORE is never chosen independently — it is always the average of the three breakdown scores, so the ring and the three
+  bars beside it can never visually disagree:
+    OVERALL_SCORE = (SCORE_BEHAVIOR + SCORE_SCOPE + SCORE_VERIFICATION) / 3
+  Round every score (the overall average and each of the three breakdown scores) to 2 decimal places. If the rounded value is a
+  whole number, display it without decimals (100, not 100.00); if it isn't, display exactly 2 decimals (33.33, not 33.3 or 33.333).
+
+  SCORE COLOR TIERS
+  OVERALL_SCORE and each of the three breakdown scores must be colored by their own value, not a fixed color — this is what makes a 100
+  look visibly different from a 45:
+    90-100 -> var(--green)   70-89 -> var(--accent)
+    40-69  -> var(--amber)    0-39 -> var(--red)
+  For the ring: set style="--score: N; --tier: <color-var>;" on the .score-ring element, using the matching var() from the table above
+  and OVERALL_SCORE's own tier. For each breakdown bar: set the .bar-fill's style attribute directly to "width: N%; background:
+  <color-var>;" using that bar's OWN score's tier (the three bars can each land in a different tier from each other and from the ring).
+
+  DIFF LAYOUT: SIDE-BY-SIDE VS. STACKED
+  Each file-change's Before/After pair starts as a 2-column (side-by-side) diff-grid. Before filling one in, check the longer of
+  the two snippets: if its longest single line is longer than ~55 characters, OR it has more than ~10 lines, add the class "stacked"
+  to that change's diff-grid div (e.g. class="diff-grid stacked"). Stacked gives each block the full card width instead of squeezing
+  both into half-width columns, so long or deeply-nested code gets enough room on the right and isn't truncated or forced into a tiny
+  horizontal-scroll box. When unsure, prefer stacked — it never looks wrong, while 2-column with long lines does.
+
+  PLAN STEPS AND RISK
+  Each proposed simplification is one PLAN_STEP: a short title, a one-line description, and a risk chip. RISK_LEVEL is "Low",
+  "Medium", or "High"; the risk-chip's class must be risk-low, risk-medium, or risk-high to match (lowercase, hyphenated).
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Code Simplification Report</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700;800&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #0a0e16;
+                --bg-elevated: #121826;
+                --bg-card: #151c2c;
+                --border: #28334a;
+                --text: #e8ecf5;
+                --text-dim: #8b97af;
+                --accent: #5eead4;
+                --accent-dim: #2dd4bf;
+                --accent-2: #a78bfa;
+                --green: #34d399;
+                --amber: #fbbf24;
+                --red: #f87171;
+                --radius: 14px;
+                --mono:
+                    ui-monospace, "SF Mono", "Cascadia Code", "Fira Code",
+                    Consolas, monospace;
+                --sans:
+                    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    Roboto, Helvetica, Arial, sans-serif;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+            html {
+                -webkit-text-size-adjust: 100%;
+            }
+            body {
+                margin: 0;
+                font-family: var(--sans);
+                background: var(--bg);
+                color: var(--text);
+                line-height: 1.55;
+                padding: 0 0 64px;
+                overflow-x: hidden;
+                position: relative;
+                animation: fadeIn 0.5s ease;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            /* Ambient background — slow drifting gradient blobs, fixed behind
+               content. Always animating by design (this is a decorative report
+               cover page, not interactive UI, so motion stays on unconditionally). */
+            .bg-blob {
+                position: fixed;
+                border-radius: 50%;
+                filter: blur(90px);
+                z-index: -1;
+                pointer-events: none;
+                will-change: transform;
+            }
+            .bg-blob--a {
+                width: 560px;
+                height: 560px;
+                top: -220px;
+                left: -160px;
+                background: radial-gradient(
+                    circle,
+                    rgba(94, 234, 212, 0.18),
+                    transparent 70%
+                );
+                animation: drift1 18s ease-in-out infinite;
+            }
+            .bg-blob--b {
+                width: 620px;
+                height: 620px;
+                bottom: -260px;
+                right: -200px;
+                background: radial-gradient(
+                    circle,
+                    rgba(167, 139, 250, 0.16),
+                    transparent 70%
+                );
+                animation: drift2 22s ease-in-out infinite;
+            }
+            .bg-blob--c {
+                width: 420px;
+                height: 420px;
+                top: 38%;
+                left: 50%;
+                background: radial-gradient(
+                    circle,
+                    rgba(94, 234, 212, 0.08),
+                    transparent 70%
+                );
+                animation: drift3 26s ease-in-out infinite;
+            }
+            @keyframes drift1 {
+                0%,
+                100% {
+                    transform: translate(0, 0) scale(1);
+                }
+                50% {
+                    transform: translate(70px, 55px) scale(1.15);
+                }
+            }
+            @keyframes drift2 {
+                0%,
+                100% {
+                    transform: translate(0, 0) scale(1);
+                }
+                50% {
+                    transform: translate(-55px, -45px) scale(1.1);
+                }
+            }
+            @keyframes drift3 {
+                0%,
+                100% {
+                    transform: translate(-50%, 0) scale(1);
+                    opacity: 0.55;
+                }
+                50% {
+                    transform: translate(-50%, -35px) scale(1.2);
+                    opacity: 1;
+                }
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(6px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .wrap {
+                max-width: 980px;
+                margin: 0 auto;
+                padding: 0 24px;
+                position: relative;
+            }
+
+            /* Header */
+            header.report-header {
+                padding: 48px 0 26px;
+                border-bottom: 1px solid var(--border);
+                margin-bottom: 28px;
+            }
+            .eyebrow {
+                font-size: 12px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                margin-bottom: 10px;
+                font-weight: 600;
+            }
+            h1 {
+                font-size: 28px;
+                margin: 0 0 16px;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+                word-break: break-word;
+            }
+            .header-meta {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 8px;
+            }
+            .meta-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 5px 12px;
+                border-radius: 999px;
+                font-size: 12.5px;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+            .meta-pill.neutral {
+                background: var(--bg-elevated);
+                border: 1px solid var(--border);
+                color: var(--text-dim);
+            }
+            .meta-pill svg {
+                width: 13px;
+                height: 13px;
+                flex-shrink: 0;
+                opacity: 0.85;
+            }
+            .meta-pill code {
+                font-family: var(--mono);
+                font-weight: 500;
+                color: var(--text);
+                font-size: 12px;
+            }
+            .meta-pill .dot {
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: currentColor;
+                flex-shrink: 0;
+            }
+            body[data-status="COMPLETED"] .status-pill {
+                background: rgba(52, 211, 153, 0.14);
+                color: var(--green);
+                border: 1px solid rgba(52, 211, 153, 0.32);
+            }
+            body[data-status="BLOCKED"] .status-pill {
+                background: rgba(248, 113, 113, 0.14);
+                color: var(--red);
+                border: 1px solid rgba(248, 113, 113, 0.32);
+            }
+            body[data-status="PARTIAL"] .status-pill {
+                background: rgba(251, 191, 36, 0.14);
+                color: var(--amber);
+                border: 1px solid rgba(251, 191, 36, 0.32);
+            }
+
+            /* Status note (BLOCKED / PARTIAL only) */
+            .status-note {
+                display: flex;
+                gap: 12px;
+                padding: 16px 18px;
+                border-radius: var(--radius);
+                margin-bottom: 20px;
+                font-size: 13.5px;
+            }
+            body[data-status="BLOCKED"] .status-note {
+                background: rgba(248, 113, 113, 0.08);
+                border: 1px solid rgba(248, 113, 113, 0.28);
+            }
+            body[data-status="PARTIAL"] .status-note {
+                background: rgba(251, 191, 36, 0.08);
+                border: 1px solid rgba(251, 191, 36, 0.28);
+            }
+            .status-note .icon {
+                flex-shrink: 0;
+                width: 20px;
+                height: 20px;
+                margin-top: 1px;
+            }
+            body[data-status="BLOCKED"] .status-note .icon {
+                color: var(--red);
+            }
+            body[data-status="PARTIAL"] .status-note .icon {
+                color: var(--amber);
+            }
+            .status-note .status-note-title {
+                font-weight: 650;
+                color: var(--text);
+                margin-bottom: 4px;
+            }
+            .status-note .status-note-body {
+                color: var(--text-dim);
+            }
+
+            /* Stat strip */
+            .stats-row {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 12px;
+                margin-bottom: 20px;
+            }
+            .stat-card {
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 14px 16px;
+                transition:
+                    transform 0.15s ease,
+                    border-color 0.15s ease;
+                min-width: 0;
+            }
+            .stat-card:hover {
+                transform: translateY(-2px);
+                border-color: var(--accent-dim);
+            }
+            .stat-card .stat-value {
+                font-family: var(--mono);
+                font-size: 22px;
+                font-weight: 700;
+                color: var(--accent);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .stat-card .stat-label {
+                font-size: 11px;
+                color: var(--text-dim);
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                margin-top: 4px;
+            }
+
+            /* Score */
+            .score-section {
+                display: grid;
+                grid-template-columns: auto 1fr;
+                gap: 32px;
+                align-items: center;
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 28px;
+                margin-bottom: 20px;
+            }
+            .score-ring {
+                width: 120px;
+                height: 120px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                background: conic-gradient(
+                    var(--tier, var(--accent)) calc(var(--score, 0) * 1%),
+                    var(--border) 0
+                );
+                box-shadow: 0 0 26px -6px var(--tier, var(--accent));
+                flex-shrink: 0;
+                margin: 0 auto;
+                overflow: hidden;
+                transition: box-shadow 0.4s ease;
+            }
+            .score-ring::before {
+                content: "";
+                position: absolute;
+                inset: 14px;
+                border-radius: 50%;
+                background: var(--bg-card);
+            }
+            .score-ring-inner {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 1px;
+                width: 100%;
+            }
+            .score-ring .score-value {
+                font-size: 22px;
+                font-weight: 700;
+                font-family: var(--mono);
+                line-height: 1.1;
+                max-width: 78px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-align: center;
+                color: var(--tier, var(--accent));
+            }
+            .score-ring .score-max {
+                font-size: 10.5px;
+                color: var(--text-dim);
+                font-weight: 600;
+                letter-spacing: 0.02em;
+            }
+            .score-breakdown {
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                min-width: 0;
+            }
+            .score-row {
+                display: grid;
+                grid-template-columns: 160px 1fr 36px;
+                gap: 12px;
+                align-items: center;
+                font-size: 13px;
+            }
+            .score-row .bar-track {
+                height: 7px;
+                border-radius: 99px;
+                background: var(--border);
+                overflow: hidden;
+            }
+            .score-row .bar-fill {
+                display: block;
+                height: 100%;
+                border-radius: 99px;
+                background: var(--accent);
+                width: 0%;
+                transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+            }
+            .score-row .score-num {
+                font-family: var(--mono);
+                color: var(--text-dim);
+                text-align: right;
+                white-space: nowrap;
+            }
+
+            /* Generic card */
+            section.card {
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 22px 26px;
+                margin-bottom: 20px;
+            }
+            section.card h2 {
+                font-size: 13px;
+                text-transform: uppercase;
+                letter-spacing: 0.07em;
+                color: var(--text-dim);
+                margin: 0 0 18px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-weight: 700;
+            }
+            section.card h2::before {
+                content: "";
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--accent);
+                display: inline-block;
+                flex-shrink: 0;
+                box-shadow: 0 0 8px var(--accent);
+            }
+
+            /* Scope */
+            .scope-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .scope-item {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                padding: 10px 12px;
+                background: var(--bg-elevated);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                transition:
+                    border-color 0.2s ease,
+                    transform 0.15s ease;
+            }
+            .scope-item:hover {
+                border-color: var(--accent-dim);
+                transform: translateX(2px);
+            }
+            .scope-item .chip {
+                align-self: flex-start;
+            }
+            .chip {
+                font-family: var(--mono);
+                font-size: 12.5px;
+                background: var(--bg);
+                border: 1px solid var(--border);
+                color: var(--accent);
+                padding: 6px 10px;
+                border-radius: 8px;
+                word-break: break-all;
+            }
+            .scope-desc {
+                font-size: 12.5px;
+                color: var(--text-dim);
+                padding-left: 2px;
+            }
+
+            /* Plan & confirmation */
+            .plan-steps {
+                display: flex;
+                flex-direction: column;
+                gap: 9px;
+                margin-bottom: 16px;
+            }
+            .plan-step {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 13px 15px;
+                background: var(--bg-elevated);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+            }
+            .plan-step-num {
+                flex-shrink: 0;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                background: rgba(94, 234, 212, 0.14);
+                color: var(--accent);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: var(--mono);
+                font-size: 12px;
+                font-weight: 700;
+            }
+            .plan-step-body {
+                flex: 1;
+                min-width: 0;
+            }
+            .plan-step-title {
+                font-weight: 600;
+                font-size: 13.5px;
+                color: var(--text);
+                margin-bottom: 3px;
+            }
+            .plan-step-desc {
+                font-size: 13px;
+                color: var(--text-dim);
+            }
+            .risk-chip {
+                flex-shrink: 0;
+                font-size: 10.5px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                padding: 3px 9px;
+                border-radius: 999px;
+                white-space: nowrap;
+                margin-top: 2px;
+            }
+            .risk-chip.risk-low {
+                background: rgba(52, 211, 153, 0.14);
+                color: var(--green);
+                border: 1px solid rgba(52, 211, 153, 0.3);
+            }
+            .risk-chip.risk-medium {
+                background: rgba(251, 191, 36, 0.14);
+                color: var(--amber);
+                border: 1px solid rgba(251, 191, 36, 0.3);
+            }
+            .risk-chip.risk-high {
+                background: rgba(248, 113, 113, 0.14);
+                color: var(--red);
+                border: 1px solid rgba(248, 113, 113, 0.3);
+            }
+            blockquote.feedback {
+                margin: 0;
+                padding: 15px 17px;
+                border-left: 3px solid var(--accent-2);
+                background: var(--bg-elevated);
+                border-radius: 10px;
+                font-size: 14px;
+                color: var(--text-dim);
+            }
+            blockquote.feedback cite {
+                display: block;
+                margin-top: 8px;
+                font-size: 12px;
+                color: var(--text-dim);
+                font-style: normal;
+            }
+
+            /* File change cards */
+            .file-change {
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                border-radius: 10px;
+                margin-bottom: 14px;
+                overflow: hidden;
+                transition:
+                    border-color 0.2s ease,
+                    box-shadow 0.25s ease;
+            }
+            .file-change:last-child {
+                margin-bottom: 0;
+            }
+            .file-change:hover {
+                border-color: var(--accent-dim);
+                box-shadow: 0 6px 20px -8px rgba(45, 212, 191, 0.35);
+            }
+            .file-change-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 10px 12px;
+                padding: 14px 18px;
+                background: var(--bg-elevated);
+                cursor: pointer;
+                user-select: none;
+            }
+            .file-change-head .path {
+                font-family: var(--mono);
+                font-size: 13px;
+                color: var(--text);
+                word-break: break-all;
+                margin-right: auto;
+            }
+            .file-change-head .tag {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                font-weight: 700;
+                color: var(--text-dim);
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                padding: 4px 10px;
+                border-radius: 999px;
+                white-space: nowrap;
+                transition:
+                    color 0.2s ease,
+                    border-color 0.2s ease,
+                    background 0.2s ease;
+            }
+            .chevron-icon {
+                color: var(--text-dim);
+                transition:
+                    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+                    color 0.2s ease;
+                flex-shrink: 0;
+            }
+            .file-change.open .chevron-icon {
+                transform: rotate(90deg);
+                color: var(--accent);
+            }
+            .file-change.open .file-change-head .tag {
+                color: var(--accent);
+                border-color: var(--accent-dim);
+                background: rgba(94, 234, 212, 0.12);
+            }
+            .file-change-body {
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+            }
+            .file-change.open .file-change-body {
+                max-height: 6000px;
+            }
+            .file-change-inner {
+                padding: 16px 18px;
+            }
+            .rationale {
+                font-size: 13.5px;
+                color: var(--text-dim);
+                margin: 0 0 14px;
+            }
+            .diff-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            .diff-grid.stacked {
+                grid-template-columns: 1fr;
+            }
+            .diff-col h4 {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin: 0 0 6px;
+                color: var(--text-dim);
+            }
+            .diff-col.before h4 {
+                color: var(--red);
+            }
+            .diff-col.after h4 {
+                color: var(--green);
+            }
+            pre.code-block {
+                font-family: var(--mono);
+                font-size: 12.5px;
+                background: var(--bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 12px 14px;
+                overflow-x: auto;
+                margin: 0;
+                line-height: 1.5;
+                white-space: pre;
+            }
+            .diff-col.before pre.code-block {
+                border-left: 3px solid var(--red);
+            }
+            .diff-col.after pre.code-block {
+                border-left: 3px solid var(--green);
+            }
+
+            /* Verification checklist */
+            ul.checklist {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 9px;
+            }
+            ul.checklist li {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 13.5px;
+                font-weight: 500;
+                padding: 12px 15px;
+                border-radius: 9px;
+                border: 1px solid transparent;
+                transition:
+                    transform 0.15s ease,
+                    border-color 0.15s ease;
+            }
+            ul.checklist li:hover {
+                transform: translateX(3px);
+            }
+            ul.checklist li .icon-badge {
+                flex-shrink: 0;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            ul.checklist li .icon-badge svg {
+                width: 14px;
+                height: 14px;
+            }
+            ul.checklist li span.check-label {
+                flex: 1;
+            }
+            ul.checklist li .status-chip {
+                font-size: 10.5px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                padding: 3px 9px;
+                border-radius: 999px;
+                flex-shrink: 0;
+            }
+            ul.checklist li[data-check="PASS"] {
+                background: rgba(52, 211, 153, 0.08);
+                border-color: rgba(52, 211, 153, 0.22);
+            }
+            ul.checklist li[data-check="PASS"]:hover {
+                border-color: rgba(52, 211, 153, 0.45);
+            }
+            ul.checklist li[data-check="PASS"] .icon-badge {
+                background: rgba(52, 211, 153, 0.2);
+                color: var(--green);
+            }
+            ul.checklist li[data-check="PASS"] .status-chip {
+                background: rgba(52, 211, 153, 0.2);
+                color: var(--green);
+            }
+            ul.checklist li[data-check="FAIL"] {
+                background: rgba(248, 113, 113, 0.08);
+                border-color: rgba(248, 113, 113, 0.26);
+            }
+            ul.checklist li[data-check="FAIL"]:hover {
+                border-color: rgba(248, 113, 113, 0.5);
+            }
+            ul.checklist li[data-check="FAIL"] .icon-badge {
+                background: rgba(248, 113, 113, 0.2);
+                color: var(--red);
+            }
+            ul.checklist li[data-check="FAIL"] .status-chip {
+                background: rgba(248, 113, 113, 0.2);
+                color: var(--red);
+            }
+            ul.checklist li[data-check="FAIL"] span.check-label {
+                color: var(--text);
+                font-weight: 600;
+            }
+
+            /* Flagged items */
+            ul.flags {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 9px;
+            }
+            ul.flags li {
+                padding: 13px 15px;
+                border-radius: 8px;
+                background: var(--bg-elevated);
+                border-left: 3px solid var(--amber);
+                font-size: 13.5px;
+            }
+            ul.flags li .flag-title {
+                font-weight: 650;
+                color: var(--text);
+                margin-bottom: 3px;
+            }
+            ul.flags li .flag-reason {
+                color: var(--text-dim);
+            }
+
+            .empty-note {
+                color: var(--text-dim);
+                font-size: 13.5px;
+                font-style: italic;
+                margin: 0;
+            }
+            .empty-note + .empty-note {
+                margin-top: 10px;
+            }
+
+            footer {
+                text-align: center;
+                color: var(--text-dim);
+                font-size: 12px;
+                margin-top: 36px;
+                padding: 0 24px;
+            }
+
+            /* Responsive */
+            @media (max-width: 760px) {
+                .diff-grid,
+                .diff-grid.stacked {
+                    grid-template-columns: 1fr;
+                }
+            }
+            @media (max-width: 680px) {
+                .wrap {
+                    padding: 0 16px;
+                }
+                header.report-header {
+                    padding: 32px 0 22px;
+                }
+                h1 {
+                    font-size: 22px;
+                }
+                .meta-pill {
+                    font-size: 12px;
+                    padding: 4px 10px;
+                }
+                .status-note {
+                    padding: 14px 16px;
+                }
+                .stats-row {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+                .score-section {
+                    grid-template-columns: 1fr;
+                    text-align: center;
+                    padding: 22px;
+                    gap: 20px;
+                }
+                .score-ring {
+                    width: 104px;
+                    height: 104px;
+                    margin: 0 auto;
+                }
+                .score-ring::before {
+                    inset: 12px;
+                }
+                .score-ring .score-value {
+                    font-size: 18px;
+                    max-width: 64px;
+                }
+                .score-ring .score-max {
+                    font-size: 9.5px;
+                }
+                .score-breakdown {
+                    width: 100%;
+                }
+                .score-row {
+                    grid-template-columns: 1fr;
+                    gap: 4px;
+                    text-align: left;
+                }
+                .score-row .score-num {
+                    text-align: left;
+                }
+                section.card {
+                    padding: 18px 16px;
+                }
+                .file-change-head {
+                    padding: 13px 14px;
+                }
+                .file-change-inner {
+                    padding: 14px;
+                }
+                .file-change-head .path {
+                    font-size: 12px;
+                }
+                ul.checklist li {
+                    flex-wrap: wrap;
+                    padding: 11px 13px;
+                }
+                .plan-step {
+                    flex-wrap: wrap;
+                }
+                .risk-chip {
+                    margin-left: 36px;
+                }
+            }
+            @media (max-width: 420px) {
+                .stats-row {
+                    grid-template-columns: 1fr 1fr;
+                }
+                .stat-card .stat-value {
+                    font-size: 18px;
+                }
+                .header-meta {
+                    gap: 6px;
+                }
+            }
+        </style>
+    </head>
+    <body data-status="{{RUN_STATUS}}">
+        <div class="bg-blob bg-blob--a"></div>
+        <div class="bg-blob bg-blob--b"></div>
+        <div class="bg-blob bg-blob--c"></div>
+        <div class="wrap">
+            <header class="report-header">
+                <div class="eyebrow">
+                    Code Simplification &middot; Completion Report
+                </div>
+                <h1>{{PROJECT_NAME}}</h1>
+                <div class="header-meta">
+                    <span class="meta-pill status-pill"
+                        ><span class="dot"></span>{{RUN_STATUS}}</span
+                    >
+                    <span class="meta-pill neutral">
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <circle
+                                cx="10"
+                                cy="10"
+                                r="7.5"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            />
+                            <path
+                                d="M10 6v4l3 2"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                        {{RUN_TIMESTAMP}}
+                    </span>
+                    <span class="meta-pill neutral">
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M7 5L3 10l4 5M13 5l4 5-4 5"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                        {{LANGUAGE}}
+                    </span>
+                    <span class="meta-pill neutral">
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <rect
+                                x="2.5"
+                                y="4"
+                                width="15"
+                                height="12"
+                                rx="1.5"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                            />
+                            <path
+                                d="M5.5 8l2.5 2-2.5 2M10 12h4"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                        <code>{{TEST_COMMAND}}</code>
+                    </span>
+                </div>
+            </header>
+
+            <!--
+              STATUS NOTE — include this block only when data-status is BLOCKED
+              or PARTIAL; delete it entirely (comment and div) for a COMPLETED run.
+            -->
+            <div class="status-note">
+                <svg
+                    class="icon"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <circle
+                        cx="10"
+                        cy="10"
+                        r="9"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                    />
+                    <path
+                        d="M10 6v5"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                    />
+                    <circle cx="10" cy="13.5" r="0.9" fill="currentColor" />
+                </svg>
+                <div>
+                    <div class="status-note-title">{{STATUS_NOTE_TITLE}}</div>
+                    <div class="status-note-body">{{STATUS_NOTE_BODY}}</div>
+                </div>
+            </div>
+
+            <!-- ===== SUMMARY STATS ===== -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-value">{{FILES_CHANGED_COUNT}}</div>
+                    <div class="stat-label">Files changed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{SIMPLIFICATIONS_COUNT}}</div>
+                    <div class="stat-label">Simplifications</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{LINES_DELTA}}</div>
+                    <div class="stat-label">Net lines</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{FLAGGED_COUNT}}</div>
+                    <div class="stat-label">Flagged items</div>
+                </div>
+            </div>
+
+            <!-- ===== SCORE ===== -->
+            <section class="score-section">
+                <div
+                    class="score-ring"
+                    style="--score: {{OVERALL_SCORE}}; --tier: {{OVERALL_SCORE_TIER_COLOR}};"
+                >
+                    <div class="score-ring-inner">
+                        <div class="score-value">{{OVERALL_SCORE}}</div>
+                        <div class="score-max">/ 100</div>
+                    </div>
+                </div>
+                <div class="score-breakdown">
+                    <div class="score-row">
+                        <span>Behavior preservation</span>
+                        <span class="bar-track"
+                            ><span
+                                class="bar-fill"
+                                style="width: {{SCORE_BEHAVIOR}}%; background: {{SCORE_BEHAVIOR_TIER_COLOR}};"
+                            ></span
+                        ></span>
+                        <span class="score-num">{{SCORE_BEHAVIOR}}</span>
+                    </div>
+                    <div class="score-row">
+                        <span>Scope adherence</span>
+                        <span class="bar-track"
+                            ><span
+                                class="bar-fill"
+                                style="width: {{SCORE_SCOPE}}%; background: {{SCORE_SCOPE_TIER_COLOR}};"
+                            ></span
+                        ></span>
+                        <span class="score-num">{{SCORE_SCOPE}}</span>
+                    </div>
+                    <div class="score-row">
+                        <span>Verification coverage</span>
+                        <span class="bar-track"
+                            ><span
+                                class="bar-fill"
+                                style="width: {{SCORE_VERIFICATION}}%; background: {{SCORE_VERIFICATION_TIER_COLOR}};"
+                            ></span
+                        ></span>
+                        <span class="score-num">{{SCORE_VERIFICATION}}</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== SCOPE ===== -->
+            <section class="card">
+                <h2>Scope</h2>
+                <div class="scope-list">
+                    <!-- REPEAT: SCOPE_FILE START -->
+                    <div class="scope-item">
+                        <span class="chip">{{SCOPE_FILE_PATH}}</span>
+                        <span class="scope-desc"
+                            >{{SCOPE_FILE_DESCRIPTION}}</span
+                        >
+                    </div>
+                    <!-- REPEAT: SCOPE_FILE END -->
+                </div>
+                <!-- Scope should never be empty in practice (Workflow Step 1
+                     always names at least one file) — if it somehow is, show:
+                     <p class="empty-note">No files were declared in scope.</p> -->
+            </section>
+
+            <!-- ===== PLAN AND FEEDBACK ===== -->
+            <section class="card">
+                <h2>Plan &amp; Confirmation</h2>
+                <div class="plan-steps">
+                    <!-- REPEAT: PLAN_STEP START -->
+                    <div class="plan-step">
+                        <span class="plan-step-num">{{STEP_NUMBER}}</span>
+                        <div class="plan-step-body">
+                            <div class="plan-step-title">{{STEP_TITLE}}</div>
+                            <div class="plan-step-desc">
+                                {{STEP_DESCRIPTION}}
+                            </div>
+                        </div>
+                        <span class="risk-chip risk-{{RISK_LEVEL_CLASS}}"
+                            >{{RISK_LEVEL}}</span
+                        >
+                    </div>
+                    <!-- REPEAT: PLAN_STEP END -->
+                </div>
+                <!-- No plan was produced (e.g. a BLOCKED run stopped before any
+                     change could be proposed): remove every PLAN_STEP block and
+                     replace the whole .plan-steps div with: <p class="empty-note">
+                     No plan was produced — the run stopped before any changes
+                     were proposed.</p> Describe the actual reason in plain terms
+                     a human will understand (also said in the Status Note above),
+                     never by naming an internal workflow step number. -->
+
+                <!-- No feedback was given on an approved-as-is plan: delete the
+                     blockquote below and use instead:
+                     <p class="empty-note">No feedback — plan approved as-is.</p>
+                     No feedback because no plan was ever presented (BLOCKED run):
+                     <p class="empty-note">No feedback — the run stopped before a
+                     plan was presented.</p> -->
+                <blockquote class="feedback">
+                    {{HUMAN_FEEDBACK}}
+                    <cite>Feedback received before execution</cite>
+                </blockquote>
+            </section>
+
+            <!-- ===== CHANGES ===== -->
+            <section class="card">
+                <h2>Changes Applied</h2>
+
+                <!-- REPEAT: FILE_CHANGE START
+                     Duplicate this whole file-change block once per change. The
+                     onclick toggle needs no server or build step — keep it as is.
+                     See "DIFF LAYOUT" in the top comment for the stacked-vs-2-column
+                     decision on the diff-grid div below. -->
+                <div
+                    class="file-change"
+                    onclick="this.classList.toggle('open')"
+                >
+                    <div class="file-change-head">
+                        <span class="path">{{FILE_PATH}}</span>
+                        <span class="tag">{{SMELL_CATEGORY}}</span>
+                        <svg
+                            class="chevron-icon"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M7 5l6 5-6 5"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                    </div>
+                    <div class="file-change-body">
+                        <div class="file-change-inner">
+                            <p class="rationale">{{CHANGE_RATIONALE}}</p>
+                            <div class="diff-grid">
+                                <div class="diff-col before">
+                                    <h4>Before</h4>
+                                    <pre class="code-block">{{CODE_BEFORE}}</pre>
+                                </div>
+                                <div class="diff-col after">
+                                    <h4>After</h4>
+                                    <pre class="code-block">{{CODE_AFTER}}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- REPEAT: FILE_CHANGE END -->
+
+                <!-- Zero changes applied (e.g. a BLOCKED run): remove every
+                     FILE_CHANGE block and replace this whole section's content
+                     below the <h2> with:
+                     <p class="empty-note">No changes were applied.</p> -->
+            </section>
+
+            <!-- ===== VERIFICATION ===== -->
+            <section class="card">
+                <h2>Verification</h2>
+                <ul class="checklist">
+                    <!-- REPEAT: CHECK_ITEM START
+                         data-check is PASS or FAIL; the icon-badge svg is shared
+                         markup with one exception — on a FAIL row, replace the
+                         <path> below with exactly:
+                           <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round"/>
+                         (an X mark, same stroke-width as the check mark, so every
+                         report renders FAIL identically). This list always has rows
+                         (the Verification Checklist in SKILL.md), even on a BLOCKED
+                         run — items not evaluable yet are still listed, as FAIL with
+                         a label noting why (see example-blocked.html). -->
+                    <li data-check="{{CHECK_STATUS}}">
+                        <span class="icon-badge">
+                            <svg
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    d="M5 10l3.2 3.2L15 6.5"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </span>
+                        <span class="check-label">{{CHECK_LABEL}}</span>
+                        <span class="status-chip">{{CHECK_STATUS}}</span>
+                    </li>
+                    <!-- REPEAT: CHECK_ITEM END -->
+                </ul>
+            </section>
+
+            <!-- ===== FLAGGED ITEMS ===== -->
+            <section class="card">
+                <h2>Flagged for Review</h2>
+                <ul class="flags">
+                    <!-- REPEAT: FLAG_ITEM START -->
+                    <li>
+                        <div class="flag-title">{{FLAG_DESCRIPTION}}</div>
+                        <div class="flag-reason">{{FLAG_REASON}}</div>
+                    </li>
+                    <!-- REPEAT: FLAG_ITEM END -->
+                </ul>
+                <!-- Nothing flagged: remove the ul above and replace this
+                     section's content below the <h2> with:
+                     <p class="empty-note">Nothing flagged — no out-of-scope
+                     issues noticed.</p> -->
+            </section>
+
+            <footer>
+                Generated by the <strong>code-simplification</strong> skill
+                &middot; behavior preserved, not just structure
+            </footer>
+        </div>
+    </body>
+</html>
