@@ -9,9 +9,9 @@ Local and dev environments use a fixed-width, terminal-friendly format optimized
 **Format:** `[LEVEL] traceId METHOD URI -> STATUS (DURATIONms) -> PROCESSED_BY`
 
 ```text
-[INFO] 7f6f7c9b2d0b4d8c GET /api/v1/workshops -> 200 (12ms) -> unihub-app-1
-[INFO] 7f6f7c9b2d0b4d8c POST /api/v1/registrations -> 201 (28ms) -> unihub-app-1
-[WARN] 7f6f7c9b2d0b4d8c PATCH /api/v1/workshops/8e4b9b3b -> 404 (7ms) -> unihub-app-2
+[INFO] 7f6f7c9b2d0b4d8c GET /api/v1/workshops -> 200 (12ms) -> unihub-backend-1
+[INFO] 7f6f7c9b2d0b4d8c POST /api/v1/registrations -> 201 (28ms) -> unihub-backend-1
+[WARN] 7f6f7c9b2d0b4d8c PATCH /api/v1/workshops/8e4b9b3b -> 404 (7ms) -> unihub-backend-2
 ```
 
 ## Production Profile (Structured JSON)
@@ -34,7 +34,7 @@ Production uses structured JSON logging compatible with `logstash-logback-encode
 | `http.uri`      | Request path.                                          | `/api/v1/auth/register` |
 | `http.status`   | HTTP status code.                                      | `201`                   |
 | `duration_ms`   | Request duration in milliseconds.                      | `18`                    |
-| `processedBy`   | Instance ID/hostname of the handling Spring Boot node. | `unihub-app-1`          |
+| `processedBy`   | Instance ID/hostname of the handling Spring Boot node. | `unihub-backend-1`      |
 | `clientIp`      | Client IP address observed by the gateway/application. | `192.168.1.4`           |
 | `userAgent`     | User agent string from the client request.             | `Mozilla/5.0`           |
 
@@ -52,7 +52,7 @@ Production uses structured JSON logging compatible with `logstash-logback-encode
     "http.uri": "/api/v1/auth/register",
     "http.status": "201",
     "duration_ms": "18",
-    "processedBy": "unihub-app-1",
+    "processedBy": "unihub-backend-1",
     "clientIp": "192.168.1.4",
     "userAgent": "Mozilla/5.0"
   }

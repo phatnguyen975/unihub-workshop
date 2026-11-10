@@ -1,4 +1,4 @@
-# Server Architectural Decisions
+# UniHub Workshop — Server Architectural Decisions
 
 Each decision has one owner. IDs start at ADR-001 within this namespace; references include the scoped path. Allocate the next unused number here. Preserve existing numbers after this organization is established.
 

@@ -1,4 +1,4 @@
-# Server Feature Delivery
+# UniHub Workshop — Server Feature Delivery
 
 ## Scope
 

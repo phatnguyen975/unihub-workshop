@@ -1,121 +1,68 @@
 # UniHub Workshop — Repository Structure
 
-## 1. Root Repository Structure
+## Scope
 
-This repository uses a monorepo approach to separate deliverable applications (Core Backend, Background Workers, Web Portal, and Mobile Check-in) from infrastructure and architecture blueprints. This keeps the Event-Driven Modular Monolith, offline-first JSI SQLite mobile stack, Redis-based SWR caching, RabbitMQ workers, and the Prometheus/Grafana observability stack easy to discover while preserving clean ownership boundaries for each runtime concern. Agent-assisted development is structured through `.agents/`, which defines scoped reusable skills and workflow entrypoints that enforce Spec-Driven and Test-Driven Development across the monorepo.
+UniHub is a monorepo with independently owned applications, public contracts, specifications, infrastructure and agent instructions. This document maps directory responsibilities; app source guides define internal module layout and dependency boundaries.
+
+## Structure
 
 ```text
 UniHub/
 ├── AGENTS.md
+├── README.md
+├── LICENSE
 ├── .agents/
+│   ├── README.md
+│   ├── skill-catalog.md
 │   ├── rules/
 │   ├── workflows/
 │   ├── skills/{shared,server,client}/
-│   ├── templates/{shared,server,client}/
-│   └── skill-catalog.md
-├── apps/{backend,workers,web,mobile}/
-├── docs/{adrs,server,client,data,diagrams}/
-├── contracts/http/
+│   └── templates/{shared,server,client}/
+├── apps/
+│   ├── backend/
+│   ├── workers/
+│   ├── web/
+│   └── mobile/
+├── docs/
+│   ├── README.md
+│   ├── product-overview.md
+│   ├── product-features.md
+│   ├── adrs/
+│   ├── server/
+│   ├── client/
+│   ├── data/
+│   └── diagrams/
 ├── specs/{server,client}/
+├── contracts/http/
 ├── infra/
 └── scripts/
 ```
 
-This physical separation mirrors Clean Architecture boundaries: `apps/` holds the deployable units, `infra/` defines the local runtime environment (Redis, RabbitMQ, Elasticsearch, MinIO, Prometheus, Grafana), and `docs/` anchors the system's authoritative architectural and schema decisions referenced during implementation. `specs/` captures the living, per-feature artifacts (specifications and task history; public contracts live in contracts/) produced when a feature goes through the `$server-spec` → `$server-plan` → `$server-build` → `$server-review` workflow.
+## Ownership
 
-Note that PostgreSQL is intentionally omitted from the local `infra/` stack as the system strictly connects to the serverless Neon PostgreSQL Cloud via encrypted JDBC. Operational automation is centralized in `scripts/`, keeping the root directory clean.
+| Location                            | Responsibility                                                                   | Guide                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `apps/backend/` and `apps/workers/` | Provider implementations, app configuration and server tests                     | [Server Source Structure](server/source-structure.md)        |
+| `apps/web/`                         | Web feature modules, app composition and web tests                               | [Web Source Structure](client/web/source-structure.md)       |
+| `apps/mobile/`                      | Mobile feature modules, local persistence, device adapters and tests             | [Mobile Source Structure](client/mobile/source-structure.md) |
+| `docs/`                             | Product scope, scoped decisions, architecture, data design and delivery catalogs | [Documentation Map](README.md)                               |
+| `specs/`                            | Behavior/design bundles, tasks, review and verification records                  | [Specifications](../specs/README.md)                         |
+| `contracts/`                        | Approved public interfaces and HTTP conventions                                  | [Public Contracts](../contracts/README.md)                   |
+| `infra/`                            | Local infrastructure topology and component configuration                        | [Infrastructure Guide](../infra/README.md)                   |
+| `.agents/`                          | Task routing, policy, workflow, techniques and artifact templates                | [Agent Configuration](../.agents/README.md)                  |
+| `scripts/`                          | Workspace automation with an established task owner                              | Repository task/configuration requirements                   |
 
-```mermaid
-flowchart LR
-  subgraph Apps["Apps"]
-    Web("Web")
-    Mobile("Mobile")
-    Backend("Backend")
-    Workers("Workers")
-  end
-  subgraph Infrastructure["Infrastructure"]
-    Redis[("Redis")]
-    Rabbit("RabbitMQ")
-    Postgres[("PostgreSQL")]
-    ES[("Elasticsearch")]
-    MinIO[("MinIO / S3")]
-    Obs("Prometheus/Grafana")
-  end
-  subgraph External["External Services"]
-    Pay("Payment Gateway")
-    AI("AI Service")
-    Notify("Notification Providers")
-  end
+Product feature IDs link shared scope to server/web/mobile delivery records. Capability IDs and progress belong to their owning app. Providers and consumers share approved contracts without importing one another's implementation internals.
 
-  Web -- HTTP/REST --> Backend
-  Mobile -- HTTP/REST --> Backend
-  Backend -- AMQP --> Rabbit
-  Rabbit -- AMQP --> Workers
-  Backend -- RESP --> Redis
-  Workers -- RESP --> Redis
-  Backend -- JDBC/SSL --> Postgres
-  Workers -- JDBC/SSL --> Postgres
-  Backend -- HTTP/REST --> ES & Pay
-  Workers -- HTTP/REST --> ES & AI & Notify
-  Backend -- S3 API --> MinIO
-  Workers -- S3 API --> MinIO
-  Obs -- Micrometer Pull --> Backend & Workers
+## Artifact Locations
 
-  classDef app fill:#e6f0ff,stroke:#2b6cb0,stroke-width:1.2px,color:#1a365d
-  classDef cache fill:#ffe6e6,stroke:#c53030,stroke-width:1.2px,color:#742a2a
-  classDef db fill:#f0e6ff,stroke:#6b46c1,stroke-width:1.2px,color:#44337a
-  classDef storage fill:#e6fffa,stroke:#319795,stroke-width:1.2px,color:#234e52
-  classDef obs fill:#fff7d6,stroke:#b7791f,stroke-width:1.2px,color:#744210
-  classDef ext fill:#fff1f0,stroke:#e53e3e,stroke-width:1.2px,color:#742a2a
+Directory trees define ownership and artifact schemas, including files authored by later workflow stages. [Client Document Structure](client/README.md#structure) assigns experience maps, platform `ui-design.md` files and foundation prototypes. [Contract Structure](../contracts/README.md#structure) assigns `openapi.yaml`, referenced operation definitions and reusable components. [Specifications](../specs/README.md) assigns server/client artifact bundles; [Artifact Templates](../.agents/templates/README.md) defines their document formats.
 
-  class Web,Mobile,Backend,Workers app
-  class Redis cache
-  class Postgres,ES db
-  class MinIO storage
-  class Obs obs
-  class Pay,AI,Notify ext
+Fixed directories may be empty until their artifacts are authored. Parameterized names such as `<capability-id>` identify instances and are not literal folder names. Files in a structure diagram do not imply approval or completion.
 
-  style Redis color:#744210,stroke:#b7791f,fill:#fff7d6
-  style Rabbit fill:#fff7d6,color:#744210,stroke:#b7791f
-  style Postgres color:#744210,stroke:#b7791f,fill:#fff7d6
-  style ES color:#744210,stroke:#b7791f,fill:#fff7d6
-  style MinIO stroke:#b7791f,fill:#fff7d6,color:#744210
-  style Apps fill:#e6f0ff,stroke:#2b6cb0,color:#000000
-  style Infrastructure fill:#fff7d6,stroke:#b7791f,color:#000000
-  style External fill:#fff1f0,stroke:#e53e3e,color:#000000
-```
+## References
 
-## 2. Tech Stack
-
-| Layer                 | Technology                                                                 |
-| :-------------------- | :------------------------------------------------------------------------- |
-| Backend runtime       | Java 25, Spring Boot 4.0.6, Gradle Groovy                                  |
-| Backend architecture  | Event-Driven Modular Monolith via Spring Modulith                          |
-| Workers architecture  | Hexagonal Architecture (inbound/core/outbound)                             |
-| Web                   | React (TypeScript)                                                         |
-| Mobile                | React Native (TypeScript) + SQLite (offline-first)                         |
-| API Gateway           | Nginx (pure reverse proxy + load balancer; no rate limiting at this layer) |
-| Primary database      | PostgreSQL on Neon (serverless, primary + read replica)                    |
-| Cache / rate limiting | Redis (Bucket4j Token Bucket, cache-aside, JTI blacklist)                  |
-| Message broker        | RabbitMQ                                                                   |
-| Search                | Elasticsearch (CQRS read model)                                            |
-| Object storage        | MinIO (S3-compatible)                                                      |
-| Resilience            | Resilience4j (circuit breaker)                                             |
-| Auth                  | JWT RS256 (asymmetric), Redis-backed `jti` revocation                      |
-| Observability         | Micrometer → Prometheus → Grafana                                          |
-| Payments              | Stripe (sandbox, with `ChaosMockAdapter` for resilience testing)           |
-
-The repository is a monorepo: `apps/backend/`, `apps/workers/`, `apps/web/`, `apps/mobile/` — each independently deployable.
-
-## Application Structures
-
-- [Backend/Workers](server/source-structure.md)
-- [Web](client/web/source-structure.md)
-- [Mobile](client/mobile/source-structure.md)
-- [Infrastructure](../infra/README.md)
-
-## Artifact Guides
-
-- [Specifications](../specs/README.md)
-- [Contracts](../contracts/README.md)
-- [Agent Configuration](../.agents/README.md)
+- [Product Overview](product-overview.md)
+- [Product Features](product-features.md)
+- [Documentation Map](README.md)
+- [HTTP Contract Registry](../contracts/http/README.md)

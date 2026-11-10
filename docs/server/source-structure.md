@@ -1,4 +1,4 @@
-# Server Source Structure
+# UniHub Workshop — Server Source Structure
 
 ## Core Backend (`apps/backend/`)
 
