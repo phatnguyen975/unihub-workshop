@@ -1,4 +1,4 @@
-# Specifications
+# UniHub Workshop — Specifications
 
 ## Scope
 
