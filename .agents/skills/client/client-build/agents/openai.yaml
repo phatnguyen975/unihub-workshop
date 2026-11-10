@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-build"
+  short_description: "Client build workflow for web and mobile"
+  default_prompt: "Use $client-build for the requested client platform and capability."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "client-fix"
+  short_description: "Client fix workflow for web and mobile"
+  default_prompt: "Use $client-fix for the requested client platform and capability."
