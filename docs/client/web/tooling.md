@@ -59,7 +59,7 @@ The app-local agent CLI was also exercised in its own browser session: open the 
 
 ## CI
 
-`.github/workflows/ci-web.yml` runs for scoped pull requests to main, scoped pushes to main and manual dispatch. It performs repository Gitleaks scanning, `npm ci`, `verify`, installs Chromium and runs production-preview E2E/accessibility checks. Failure evidence is uploaded for seven days. Jobs have timeouts and minimal permissions; no backend service or deployment is required.
+`.github/workflows/ci-web.yml` is called by the PR orchestrator when web or shared CI paths change; it also runs directly for matching pushes to main and manual dispatch. It performs repository Gitleaks scanning, `npm ci`, `verify`, installs Chromium and runs production-preview E2E/accessibility checks. Browser evidence is uploaded for seven days. Jobs have timeouts and minimal permissions; no backend service or deployment is required. [CI Configuration](../../../.github/README.md) owns trigger selection and the required `CI Gate` branch protection check.
 
 ## Dependency Audit
 
