@@ -9,6 +9,8 @@ Client documents define platform architecture, delivery progress, experience map
 ```text
 docs/client/
 ├── README.md
+├── source-boundaries.md
+├── feature-planning.md
 ├── adrs/
 │   ├── README.md
 │   └── ADR-NNN-slug.md
@@ -50,6 +52,10 @@ The tree defines canonical artifact locations, including files produced by later
 | Capability Bundle               | client-spec/prototype/plan | Approved capability behavior, design and tasks                                   |
 
 Web uses `docs/client/web/ui-design.md`; mobile uses `docs/client/mobile/ui-design.md`. Capability specs reference the owning baseline's rule IDs and revision and add local requirements. Reusable patterns and scoped exceptions follow baseline approval and impact review across dependent prototypes/components/capabilities/golden images.
+
+## Capability Discovery
+
+[Client Capability Planning](feature-planning.md) defines feature sizing, dependency semantics and readiness gates. The [Web Experience Map](web/experience-map.md) and [Mobile Experience Map](mobile/experience-map.md) define platform journeys; their delivery catalogs own the ordered capability inventory and blocking relationships. Draft discovery does not imply bundle approval or completed implementation.
 
 ## Source Ownership
 
