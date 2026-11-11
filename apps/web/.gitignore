@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Web verification artifacts
+playwright-report/
+test-results/
+.playwright-cli/
+coverage/
+.env
+.env.*
+!.env.example
