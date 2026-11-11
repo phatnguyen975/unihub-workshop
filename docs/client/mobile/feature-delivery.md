@@ -32,7 +32,7 @@ Mode is `MOCK` or `INTEGRATION`. Record the mode independently of lifecycle. App
 Add a row when a capability ID and its scope are established. Link approved artifact revisions and update progress through the client workflow. Integration uses its own approved integration plan and keeps the mock record.
 
 | Capability ID | Product Feature IDs | Mode | State | Spec | Plan | Prototype | Verification | Human Acceptance |
-| ------------- | ------------------- | ---- | ----- | ---- | ----- | --------- | ------------ | ---------------- |
+| ------------- | ------------------- | ---- | ----- | ---- | ---- | --------- | ------------ | ---------------- |
 
 ## Verification and Acceptance
 

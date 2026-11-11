@@ -2,6 +2,10 @@
 
 Use client rules and `docs/client/web/ui-design.md`. If the baseline does not exist, draft it through `client-foundation` and obtain approval before dependent capability implementation. Read `docs/client/adrs/README.md` for established platform decisions; Use `docs/client/web/source-structure.md` for the feature-oriented source architecture; tooling is selected during app setup.
 
+## Source Composition
+
+Keep the Vite mount in `src/main.tsx`; app routes, layouts, providers and adapter selection belong in `src/app/`. Cohesive feature pages live under `src/features/<feature>/`; cross-feature route composition stays in the app layer. Public configuration is not secret storage.
+
 ## Browser and Visual Feedback
 
 Use `playwright-cli` as the browser driver for local prototypes/app previews and Playwright Test author/run/debug work. It needs a compatible installed CLI/browser runtime; a `SKILL.md` alone does not supply either. Use the repository's configured commands and versions when available, not an automatic latest install.

@@ -5,3 +5,5 @@ Paths are repository-relative. Read `.agents/rules/shared.md`, `.agents/rules/cl
 Use `docs/product-overview.md`, `docs/product-features.md`, `docs/client/mobile/` and `specs/client/mobile/<capability>/`. The approved mobile `ui-design.md` and capability prototype govern design. Use client-foundation when that baseline is missing.
 
 Verify on physical devices using the proven target connection. If native UI access is unavailable, prepare human UI review and report pending device evidence. Browser prototypes and component tests do not certify native UI. Follow the declared mock/integrated mode and public contract boundary.
+
+Source ownership follows `docs/client/mobile/source-structure.md`. Keep `src/app/` limited to Expo Router routes/layouts; providers, factories and lifecycle orchestration belong in `src/bootstrap/`. Capability/spec IDs do not imply one source module per capability.

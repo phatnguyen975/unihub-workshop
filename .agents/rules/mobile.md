@@ -2,6 +2,10 @@
 
 Use client rules, `docs/client/adrs/README.md` and the existing mobile persistence design when relevant. The approved `docs/client/mobile/ui-design.md` owns mobile design, including Android/iOS differences; HTML prototypes approve flow/design, not native behavior. Use `docs/client/mobile/source-structure.md` for feature-oriented source organization. App dependencies, Expo SDK/client and runtime tooling are selected during app setup.
 
+## Source Composition
+
+`src/app/` contains Expo Router routes/layouts only. Use `src/bootstrap/` for providers, adapter factories, public config and startup/session/foreground lifecycle. Native persistence ownership and replay boundaries follow the mobile source guide; mock mode fakes remote services without replacing required durable local capture.
+
 ## Development Feedback and Device Control
 
 Use physical Android/iOS devices; do not boot or silently substitute an emulator/simulator. Metro/Expo Fast Refresh transfers JS/TS/style changes to a connected Expo Go/development client. This connection does not give the agent device automation access. Native dependency/config changes may require rebuilding; normal JS/style edits do not require a native build each time.

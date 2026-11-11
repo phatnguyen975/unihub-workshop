@@ -268,4 +268,6 @@ Plan required versus optional checks before execution, with rationale for inappl
 
 ## Configuration Work
 
+Source ownership follows the platform source guide; capability plans map to cohesive feature modules rather than one module per spec. Web uses Vite mounting with app composition; Expo reserves its app directory for routes/layouts and keeps composition in bootstrap. Package/setup work does not require populating every architecture folder.
+
 Application bootstrap/lint/test/CI/runtime setup follows an authorized setup plan and client/shared rules. UI prototypes are dependencies for product behavior, not a requirement for configuration-only work. Runtime and library choices follow the actual stack and compatibility constraints.

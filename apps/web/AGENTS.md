@@ -5,3 +5,5 @@ Paths are repository-relative. Read `.agents/rules/shared.md`, `.agents/rules/cl
 Use `docs/product-overview.md`, `docs/product-features.md`, `docs/client/web/` and `specs/client/web/<capability>/`. The approved web `ui-design.md` and capability prototype govern visual review. If the design foundation is missing, use `client-foundation` to draft and obtain approval before dependent capability implementation.
 
 Use client models and the declared mock/integrated mode. Server implementation documents are references; public contracts govern API integration.
+
+Source ownership follows `docs/client/web/source-structure.md`. Keep Vite mounting in `src/main.tsx` and composition in `src/app/`. Capability/spec IDs do not imply one source module per capability.

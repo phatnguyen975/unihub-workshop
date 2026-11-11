@@ -7,6 +7,8 @@
 
 ## Dependency Order
 
+Map the capability to cohesive source feature owners and identify cross-feature composition responsibilities. Record the platform source-guide revision; capability IDs are not automatically source directory names.
+
 List stable task IDs in executable order and prerequisite artifact/tooling revisions. This file owns MOCK tasks; integration tasks belong in integration-plan.md.
 
 ## Vertical Slices

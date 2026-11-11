@@ -6,6 +6,10 @@ Use product requirements, platform experience map and ADRs, the approved platfor
 
 Client models and service interfaces own UI state/data needs. Implement deterministic resettable service fakes/scenarios first; HTTP adapters map the approved public contract only during `client-integrate`. Mock requests must not leak to the live backend. Scenario controls for review belong outside the product UI. Do not invent a public endpoint from a fake, or silently add roles, money flows or business transitions.
 
+## Source Boundaries
+
+Follow the platform source guide: web uses Vite `src/main.tsx` with `src/app/` composition; mobile reserves `src/app/` for Expo Router routes/layouts and uses `src/bootstrap/` for composition. Feature modules own cohesive product responsibilities and may implement multiple capabilities. Plans map capability IDs to source owners; do not split modules by role, screen or endpoint. UI uses injected feature service contracts; mock/HTTP/local adapters remain behind that boundary. Shared primitives do not import features or composition.
+
 ## Approval and Execution
 
 Use `.agents/workflows/client.md`. Approve scope/journeys, platform foundation, and the coherent capability spec/prototype/task bundle before dependent production implementation. Within that approved scope, complete implement/run/inspect/test/review/fix/verify autonomously. A task-id narrows the requested scope; it does not grant permission to start another task outside it. Material spec/UI/scope changes require an amendment/impact review before dependent code.
