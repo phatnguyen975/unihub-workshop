@@ -2,7 +2,8 @@
 
 > **Platform/mode/scope:** <values>  
 > **Spec/prototype/UI/contract revisions:** <applicable references>  
-> **Technical state:** <not run|in progress|verified|pending checks>  
+> **Capability Lifecycle:** <state from docs/client/feature-planning.md><br>
+> **Readiness and Blockers:** <applicable readiness; concrete missing prerequisites><br>
 > **Human acceptance:** <pending or explicit decision/date/scope>
 
 ## Checks and Results

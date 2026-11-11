@@ -18,6 +18,8 @@ Map operation/schema fields and errors to owned service inputs/results. Describe
 
 ## Adapter Boundaries and Target Environment
 
+Name owning feature adapters and the platform composition root (`src/app/` for web, `src/bootstrap/` for mobile). Keep Expo route files thin and wire DTOs private to data adapters.
+
 Declare adapter/composition files, target base URL configuration and synthetic account/data setup without credentials. Specify mock/live isolation, cleanup and authorized external effects.
 
 ## Ordered Tasks and Dependencies
@@ -33,7 +35,7 @@ Define contract-derived auth expiry, cancellation, duplicate actions, timeout/re
 Separate pure mapping checks, schema validation, controlled integration scenarios and actual environment journeys. Identify commands, expected outcomes, required targets and provider dependencies.
 
 | Scenario | Unit/Component | Contract | Browser/Native | Human | Pending Dependencies |
-| --- | --- | --- | --- | --- | --- |
+| -------- | -------------- | -------- | -------------- | ----- | -------------------- |
 
 ## Contract Gaps and Approval-Sensitive Changes
 

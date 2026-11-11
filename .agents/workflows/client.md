@@ -41,6 +41,10 @@ Design the platform scope and representative foundation first, then design and a
 
 Resolve schemas through `.agents/templates/README.md`. Specs reference approved UI rule IDs/revisions. Scope/foundation and coherent capability bundles are approved dependencies. Delivery catalogs record established capability IDs, mode, state, revisions and explicit human decisions. Artifact approval, technical verification and human acceptance are distinct records.
 
+## Delivery State Authority
+
+`docs/client/feature-planning.md` defines capability size, hard prerequisites, lifecycle, readiness and per-check results. Platform catalogs record those values for exact mode/revisions. Experience maps own journeys; source guides own code layout. Readiness identifies blockers and never substitutes for human approval or verification. Dependency invalidation and routine fixes follow the shared state definitions.
+
 ## Revision and Record Management
 
 Use stable capability IDs and record artifact path plus revision; do not use a timestamp alone as approval. A material change to an approved dependency creates a proposed revision and impact list. Preserve the accepted revision/history, stop only dependent work, and obtain approval of the affected bundle before resuming. Unaffected approved work may continue within its authorized scope.
@@ -69,7 +73,7 @@ Resolve journeys, navigation, screen/state inventory, supporting UX, priorities 
 
 ### Outputs
 
-`docs/client/<platform>/experience-map.md`.
+`docs/client/<platform>/experience-map.md` and the matching `feature-delivery.md` inventory, sizing, suggested order and forward/reverse dependency records. Keep shared product applicability consistent with confirmed platform scope; do not mark implementation approved or fabricate downstream artifacts.
 
 ### Completion Gate
 
@@ -267,5 +271,7 @@ Prepare integrated acceptance through `client-accept` in `INTEGRATION` mode. Rec
 Plan required versus optional checks before execution, with rationale for inapplicable checks. Native checks are platform-specific. A human may supply missing UI/device evidence but cannot turn a failing code check into a pass. Use synthetic accounts/data; live payments, notifications and other irreversible external effects need authorization for the selected environment and scenario. Retry only operations whose approved semantics allow it.
 
 ## Configuration Work
+
+Source ownership follows the platform source guide; capability plans map to cohesive feature modules rather than one module per spec. Web uses Vite mounting with app composition; Expo reserves its app directory for routes/layouts and keeps composition in bootstrap. Package/setup work does not require populating every architecture folder.
 
 Application bootstrap/lint/test/CI/runtime setup follows an authorized setup plan and client/shared rules. UI prototypes are dependencies for product behavior, not a requirement for configuration-only work. Runtime and library choices follow the actual stack and compatibility constraints.

@@ -1,0 +1,77 @@
+name: CI — Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/ci-web.yml"
+      - ".gitleaks.toml"
+      - ".gitattributes"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/ci-web.yml"
+      - ".gitleaks.toml"
+      - ".gitattributes"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-web-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  verify:
+    name: Lint, Types, Tests, Build and Browser
+    needs: secret-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/web/.node-version
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install Locked Dependencies
+        run: npm ci
+      - name: Verify Code and Build
+        run: npm run verify
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Browser Smoke and Accessibility
+        run: npm run test:e2e
+      - name: Upload Browser Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-evidence
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

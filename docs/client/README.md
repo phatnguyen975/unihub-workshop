@@ -9,11 +9,15 @@ Client documents define platform architecture, delivery progress, experience map
 ```text
 docs/client/
 ├── README.md
+├── source-boundaries.md
+├── feature-planning.md
 ├── adrs/
 │   ├── README.md
 │   └── ADR-NNN-slug.md
 ├── web/
 │   ├── source-structure.md
+│   ├── tooling-plan.md             # Approved web setup scope
+│   ├── tooling.md                  # Commands and verification evidence
 │   ├── feature-delivery.md
 │   ├── experience-map.md           # Authored by client-discover
 │   ├── ui-design.md                # Authored by client-foundation
@@ -51,6 +55,14 @@ The tree defines canonical artifact locations, including files produced by later
 
 Web uses `docs/client/web/ui-design.md`; mobile uses `docs/client/mobile/ui-design.md`. Capability specs reference the owning baseline's rule IDs and revision and add local requirements. Reusable patterns and scoped exceptions follow baseline approval and impact review across dependent prototypes/components/capabilities/golden images.
 
+## Capability Discovery
+
+[Client Capability Planning](feature-planning.md) defines feature sizing, dependency semantics and readiness gates. The [Web Experience Map](web/experience-map.md) and [Mobile Experience Map](mobile/experience-map.md) define platform journeys; their delivery catalogs own the ordered capability inventory and blocking relationships. Draft discovery does not imply bundle approval or completed implementation.
+
+## Source Ownership
+
+Web uses Vite `src/main.tsx` and `src/app/` composition. Mobile uses Expo Router `src/app/` for routes/layouts only and `src/bootstrap/` for composition/lifecycle. Both use cohesive `src/features/<feature>/` modules and narrowly reusable `src/shared/` primitives; source module IDs need not match capability/spec IDs. [Client Source Boundaries](source-boundaries.md) owns shared import/state rules; platform source guides own layout and composition details. Web/mobile share public contract semantics; source-code sharing requires an explicit package/ownership decision rather than importing one another's app files.
+
 ## References
 
 Platform decisions: [client ADRs](adrs/README.md) and [shared ADRs](../adrs/README.md); [mobile persistence](mobile/database-schema.md). Decisions and architecture targets do not claim that an application has been implemented. Feature-oriented architecture targets: [web structure](web/source-structure.md) and [mobile structure](mobile/source-structure.md). Framework/SDK versions and runtime/tooling are established during app setup.
@@ -68,3 +80,5 @@ HTML prototypes demonstrate design and flow. Native acceptance needs physical-de
 ## Workflow
 
 Follow [Client Workflow](../../.agents/workflows/client.md). Discovery produces the experience map; foundation produces each platform's UI baseline and representative prototype for human approval. Capability design/implementation depend on approved revisions. App setup selects compatible framework/SDK versions and runtime tooling; API integration follows its separate contract and integration-plan gates.
+
+Web setup and verification commands: [Web Tooling](web/tooling.md), under the approved [Web Tooling Plan](web/tooling-plan.md).
