@@ -1,0 +1,24 @@
+:root {
+    font-family: system-ui, sans-serif;
+    color: #111111;
+    background-color: #ffffff;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    margin: 0;
+}
+
+main {
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+}
+
+h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 500;
+}
