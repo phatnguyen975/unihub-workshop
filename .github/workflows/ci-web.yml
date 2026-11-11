@@ -6,15 +6,11 @@ on:
     paths:
       - "apps/web/**"
       - ".github/workflows/ci-web.yml"
+      - ".github/workflows/ci-gate.yml"
+      - ".github/ci/**"
       - ".gitleaks.toml"
       - ".gitattributes"
-  pull_request:
-    branches: [main]
-    paths:
-      - "apps/web/**"
-      - ".github/workflows/ci-web.yml"
-      - ".gitleaks.toml"
-      - ".gitattributes"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -26,7 +22,7 @@ concurrency:
 
 jobs:
   secret-scan:
-    name: Secret Scan
+    name: Web Secret Scan
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -43,7 +39,7 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
 
   verify:
-    name: Lint, Types, Tests, Build and Browser
+    name: Web Verification
     needs: secret-scan
     runs-on: ubuntu-latest
     timeout-minutes: 15

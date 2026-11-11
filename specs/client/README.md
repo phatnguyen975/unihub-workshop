@@ -16,6 +16,12 @@ client/
         ├── SPEC.md
         ├── tasks.md
         ├── prototype/
+        │   ├── index.html
+        │   ├── styles.css
+        │   ├── app.js
+        │   ├── fixtures/
+        │   │   └── scenarios.json
+        │   └── assets/
         ├── prototype-review.md
         ├── review-notes.md
         ├── verification.md
@@ -35,6 +41,26 @@ Both platform bundles use the same artifact layout. Create an instance directory
 | `review-notes.md`     | Technical findings and caller/human disposition                                 |
 | `verification.md`     | Checks performed, visual/native evidence, pending checks and acceptance         |
 | `integration-plan.md` | Approved contract revision, mappings, adapter tasks and integration checks      |
+
+## Prototype Artifacts
+
+Each capability owns `specs/client/<platform>/<capability-id>/prototype/`. Its prototype covers the capability's screen inventory, navigation, controls and relevant validation/loading/empty/error/success/permission/offline states. One capability can span multiple screens; it does not require one prototype directory per screen or source module.
+
+The platform foundation at `docs/client/<platform>/foundation-prototype/` follows the same file conventions but demonstrates representative global patterns. Capability prototypes reference the approved platform baseline and add only scoped requirements. Foundation approval does not approve individual capability behavior.
+
+| Path                      | Responsibility                                                         |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `index.html`              | Review entrypoint and semantic screen markup                           |
+| `styles.css`              | Prototype styles aligned with platform UI rule IDs and tokens          |
+| `app.js`                  | Local navigation, controls, validation and simulated state transitions |
+| `fixtures/scenarios.json` | Named deterministic synthetic datasets and scenario inputs             |
+| `assets/`                 | Local images, icons and other required design assets                   |
+
+Use plain HTML, CSS and JavaScript without React, Expo or a required application build step. Additional pages, scripts, styles and JSON files may be added when the review scope warrants them. Create populated assets and fixture files when needed; do not generate dummy content solely to fill the tree.
+
+JSON fixtures supply data, while JavaScript implements observable interactions and state transitions. Keep reset behavior deterministic and scenario controls outside the product UI. Use synthetic data only; prototypes must not call live APIs, perform real payments or require secrets. They demonstrate client needs rather than defining public wire contracts.
+
+Serve previews over local HTTP so JSON loading and asset paths work consistently; do not rely on `file://`. Record the exact preview command, URL, scenario selector, reset steps and artifact revisions in `prototype-review.md`. A preview must work without starting the production app or backend. Capture and inspect the required states and viewports. Mobile HTML previews establish design and flow only; native rendering and device behavior require the mobile verification process.
 
 ## References
 

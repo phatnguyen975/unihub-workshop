@@ -10,6 +10,7 @@
 
 [![ci-backend](https://github.com/phatnguyen975/unihub-workshop/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/phatnguyen975/unihub-workshop/actions/workflows/ci-backend.yml)
 [![ci-workers](https://github.com/phatnguyen975/unihub-workshop/actions/workflows/ci-workers.yml/badge.svg)](https://github.com/phatnguyen975/unihub-workshop/actions/workflows/ci-workers.yml)
+[![ci-web](https://github.com/phatnguyen975/unihub-workshop/actions/workflows/ci-web.yml/badge.svg?branch=main)](https://github.com/phatnguyen975/unihub-workshop/actions/workflows/ci-web.yml)
 
 ![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.6-6DB33F?logo=springboot&logoColor=white)
@@ -305,6 +306,10 @@ Use [Web Source Structure](docs/client/web/source-structure.md), [Web Feature De
 Use [Mobile Source Structure](docs/client/mobile/source-structure.md), [Mobile Feature Delivery](docs/client/mobile/feature-delivery.md) and the [Mobile Rules](.agents/rules/mobile.md). The approved app setup selects compatible SDK/native dependencies and package commands, proves physical-device access and defines any required human native review.
 
 Mobile uses physical devices. Fast Refresh updates a connected compatible Expo client; agent device control is a separate capability that must be proven. When native access is unavailable, code checks continue and native UI evidence remains pending human review under the [Mobile Rules](.agents/rules/mobile.md). Browser prototypes do not certify native rendering.
+
+## Continuous Integration
+
+Pull requests to `main` run a lightweight scope detector and the required `CI Gate`. Only applications affected by the PR run their verification workflows; unrelated backend, workers and web checks are skipped. Matching pushes to `main` also verify the affected applications. See [CI Configuration](.github/CI.md) for trigger rules, local policy checks and branch protection setup.
 
 ## Tests
 

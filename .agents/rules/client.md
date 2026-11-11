@@ -22,6 +22,8 @@ Web uses `docs/client/web/ui-design.md`; mobile uses `docs/client/mobile/ui-desi
 
 HTML prototypes are design artifacts separate from React/React Native application code. Show real navigation, controls and relevant validation/loading/empty/error/success/permission/offline states. Keep product copy user-facing and omit implementation explanations.
 
+Maintain a representative platform foundation at `docs/client/<platform>/foundation-prototype/` and a separate prototype for each capability at `specs/client/<platform>/<capability-id>/prototype/`. The foundation establishes shared patterns; it does not approve every capability's behavior. Use plain HTML/CSS/JavaScript and deterministic synthetic JSON fixtures, with no required application build or live API. Serve previews over local HTTP and record reproducible scenarios/reset steps. File responsibilities are defined in `specs/client/README.md` under Prototype Artifacts. Capability prototypes reference approved UI rules rather than redefining the platform baseline.
+
 ## Testing and Verification
 
 Server unit-only policy does not apply to client. Use Red-Green-Refactor for testable validation, state transitions, queues, retry/mapping logic and behavior fixes. Exploratory prototypes, pure styling and config changes do not require a test per line. Select unit/component, client-internal integration, mock E2E, visual and native checks by risk and observable acceptance criteria; do not add tests that merely mirror CSS or implementation details.

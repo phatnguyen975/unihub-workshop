@@ -43,6 +43,10 @@ Describe meaningful Android/iOS or browser/input differences for this platform. 
 
 List representative preview scenarios/viewports, screenshot comparison criteria and human approval scope. Record baseline/prototype revisions and pending inspection; never pre-fill approval.
 
+Identify `docs/client/<platform>/foundation-prototype/index.html` and its revision. Record the exact local HTTP preview command, working directory, URL, named synthetic JSON scenarios and reset steps. Follow the Prototype Artifacts conventions in `specs/client/README.md`: plain HTML/CSS/JavaScript, no application build or live API. List which global patterns and rule IDs each representative screen/state demonstrates, the screenshots actually inspected and interaction outcomes. Keep required native-device evidence separate from HTML preview evidence.
+
+Foundation approval covers these representative patterns and the platform rules. Each capability owns its detailed prototype and bundle approval under `specs/client/<platform>/<capability-id>/`; do not record blanket approval for unreviewed capability journeys.
+
 ## Approved Scoped Exceptions and Dependent Artifacts
 
 Record exception ID, rule, reason, owner, approval and affected capabilities. Track impact of changes to components/prototypes/visual baselines; preserve prior accepted revisions.

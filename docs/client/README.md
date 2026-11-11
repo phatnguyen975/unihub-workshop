@@ -23,6 +23,9 @@ docs/client/
 │   ├── ui-design.md                # Authored by client-foundation
 │   └── foundation-prototype/
 │       ├── index.html              # Authored with the UI baseline
+│       ├── styles.css
+│       ├── app.js
+│       ├── fixtures/               # Synthetic JSON scenarios
 │       └── assets/                 # Local assets when required
 └── mobile/
     ├── source-structure.md
@@ -32,6 +35,9 @@ docs/client/
     ├── ui-design.md                # Authored by client-foundation
     └── foundation-prototype/
         ├── index.html              # Authored with the UI baseline
+        ├── styles.css
+        ├── app.js
+        ├── fixtures/               # Synthetic JSON scenarios
         └── assets/                 # Local assets when required
 ```
 
@@ -58,6 +64,19 @@ Web uses `docs/client/web/ui-design.md`; mobile uses `docs/client/mobile/ui-desi
 ## Capability Discovery
 
 [Client Capability Planning](feature-planning.md) defines feature sizing, dependency semantics and readiness gates. The [Web Experience Map](web/experience-map.md) and [Mobile Experience Map](mobile/experience-map.md) define platform journeys; their delivery catalogs own the ordered capability inventory and blocking relationships. Draft discovery does not imply bundle approval or completed implementation.
+
+## Prototype Ownership
+
+Each platform has two design artifact scopes:
+
+| Scope               | Canonical Directory                                  | Approval Coverage                                                                       |
+| ------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Platform foundation | `docs/client/<platform>/foundation-prototype/`       | Representative screens and shared visual/interaction patterns supporting `ui-design.md` |
+| Capability          | `specs/client/<platform>/<capability-id>/prototype/` | The capability's screens, navigation, interactions and relevant states                  |
+
+The foundation is a representative design baseline, not a complete implementation of every capability journey. Each capability owns its prototype and references the approved platform UI rules and revision. Capability prototypes may contain multiple screens; source feature modules do not determine prototype boundaries. Approve capability bundles incrementally rather than requiring every platform capability prototype before implementation.
+
+Both prototype scopes use plain HTML, CSS and JavaScript with synthetic JSON fixtures, separate from React/Expo application code. Their file layout and preview requirements are defined in [Client Prototype Artifacts](../../specs/client/README.md#prototype-artifacts). Foundation approval establishes design direction; capability approval establishes the scoped behavior and UI. Neither substitutes for native-device verification.
 
 ## Source Ownership
 

@@ -20,6 +20,8 @@ Formats for web/mobile scope, design dependencies, implementation planning and a
 
 Identify platform, scope/mode, artifact revisions and actual approval decisions. Capability specs reference UI rule IDs; prototype review records scenarios and evidence. Task plans identify appropriate code, browser, native and human checks. Verification distinguishes technical results, pending evidence and human acceptance.
 
+The UI Design template records platform foundation preview instructions and approval. The Prototype Review template records a capability's independent preview, JSON fixture scenarios and design decision. Both follow [Prototype Artifacts](../../../specs/client/README.md#prototype-artifacts); neither review record substitutes for the other scope's approval.
+
 ## References
 
 - [Shared Review Template](../shared/review-notes.md)

@@ -89,7 +89,7 @@ Approved platform scope and journeys.
 
 ### Procedure
 
-Draft the platform UI baseline with stable rule IDs, semantic tokens, component/interaction criteria, accessibility and platform differences. Create a representative interactive HTML prototype. Use design/accessibility skills and browser inspection for supported previews; propose visual values for human review.
+Draft the platform UI baseline with stable rule IDs, semantic tokens, component/interaction criteria, accessibility and platform differences. Create a representative interactive HTML/CSS/JavaScript prototype with synthetic JSON fixtures following the Prototype Artifacts conventions in `specs/client/README.md`. Select representative screens and states that demonstrate shared patterns; foundation scope does not include every capability journey. Use design/accessibility skills and browser inspection for supported previews; propose visual values for human review. Record the local HTTP preview command, scenario/reset instructions, inspected states and approval scope with the platform baseline.
 
 ### Outputs
 
@@ -129,7 +129,7 @@ Capability spec draft/approved revision and approved platform baseline.
 
 ### Procedure
 
-Build an interactive HTML/CSS/JS prototype covering navigation, dialogs, validation and relevant loading/empty/error/success/permission/offline states. Keep scenario selectors outside product UI. Operate the preview, capture and view screenshots and verify named outcomes when browser access is available. Mobile HTML demonstrates design/flow; native evidence belongs to the device stage.
+Build the capability's own interactive plain HTML/CSS/JavaScript prototype under `specs/client/<platform>/<capability>/prototype/`, referencing the approved platform baseline. Follow Prototype Artifacts in `specs/client/README.md` for file responsibilities and deterministic synthetic JSON fixtures. Cover navigation, dialogs, validation and relevant loading/empty/error/success/permission/offline states. Keep scenario selectors outside product UI; simulate interactions locally without React/Expo, application builds or live APIs. Serve over local HTTP, record preview/reset instructions, operate the preview, capture and view screenshots and verify named outcomes when browser access is available. Mobile HTML demonstrates design/flow; native evidence belongs to the device stage.
 
 ### Outputs
 
