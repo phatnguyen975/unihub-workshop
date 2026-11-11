@@ -1,6 +1,6 @@
 ---
 name: client-discover
-description: "Client discover: Product scope, experience map, screen inventory."
+description: "Client discover: Platform scope/journeys, screen inventory and ordered capability dependencies for human approval."
 ---
 
 # client-discover

@@ -7,6 +7,8 @@
 
 ## Dependency Order
 
+For each hard prerequisite record producer capability ID, required output, approved compatible revision and evidence of availability/verification. Separate fixture relationships and suggested order from true blockers. Use readiness definitions from `docs/client/feature-planning.md`; approval of this document does not mean prerequisite implementation is complete.
+
 Map the capability to cohesive source feature owners and identify cross-feature composition responsibilities. Record the platform source-guide revision; capability IDs are not automatically source directory names.
 
 List stable task IDs in executable order and prerequisite artifact/tooling revisions. This file owns MOCK tasks; integration tasks belong in integration-plan.md.

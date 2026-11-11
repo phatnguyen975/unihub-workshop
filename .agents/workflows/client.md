@@ -41,6 +41,10 @@ Design the platform scope and representative foundation first, then design and a
 
 Resolve schemas through `.agents/templates/README.md`. Specs reference approved UI rule IDs/revisions. Scope/foundation and coherent capability bundles are approved dependencies. Delivery catalogs record established capability IDs, mode, state, revisions and explicit human decisions. Artifact approval, technical verification and human acceptance are distinct records.
 
+## Delivery State Authority
+
+`docs/client/feature-planning.md` defines capability size, hard prerequisites, lifecycle, readiness and per-check results. Platform catalogs record those values for exact mode/revisions. Experience maps own journeys; source guides own code layout. Readiness identifies blockers and never substitutes for human approval or verification. Dependency invalidation and routine fixes follow the shared state definitions.
+
 ## Revision and Record Management
 
 Use stable capability IDs and record artifact path plus revision; do not use a timestamp alone as approval. A material change to an approved dependency creates a proposed revision and impact list. Preserve the accepted revision/history, stop only dependent work, and obtain approval of the affected bundle before resuming. Unaffected approved work may continue within its authorized scope.
@@ -69,7 +73,7 @@ Resolve journeys, navigation, screen/state inventory, supporting UX, priorities 
 
 ### Outputs
 
-`docs/client/<platform>/experience-map.md`.
+`docs/client/<platform>/experience-map.md` and the matching `feature-delivery.md` inventory, sizing, suggested order and forward/reverse dependency records. Keep shared product applicability consistent with confirmed platform scope; do not mark implementation approved or fabricate downstream artifacts.
 
 ### Completion Gate
 

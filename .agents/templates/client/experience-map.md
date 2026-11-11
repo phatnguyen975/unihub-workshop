@@ -25,7 +25,7 @@ Assign stable screen/scenario IDs. Include applicable initial, loading, empty, s
 
 ## Capabilities and Dependencies
 
-Use stable capability IDs, product feature references, priority and dependency IDs. Label supporting UX without inventing a product feature ID. Detect cycles before planning implementation.
+Use stable capability IDs, product feature references, priority and dependency IDs. Label supporting UX without inventing a product feature ID. Detect cycles before planning implementation. Keep the ordered inventory, lifecycle/readiness and reverse dependency records in the platform delivery catalog; reference it here rather than maintaining a second conflicting dependency graph.
 
 | Capability | Core feature reference | Supporting UX | Priority | Depends on |
 | ---------- | ---------------------- | ------------- | -------- | ---------- |

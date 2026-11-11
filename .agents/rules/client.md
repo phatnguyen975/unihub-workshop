@@ -42,4 +42,4 @@ For a real readability opportunity on covered green code, invoke `code-simplific
 
 ## Delivery Records
 
-The platform `feature-delivery.md` owns capability progress. Record mode, approved revisions, technical status and explicit human acceptance separately; use the lifecycle defined in that catalog.
+The platform `feature-delivery.md` owns capability progress. Record mode, approved revisions, technical status and explicit human acceptance separately; use the lifecycle/readiness/check definitions in `docs/client/feature-planning.md`. The catalog records those definitions for the declared scope/mode/revision; artifact approval, capability implementation and per-check status remain separate.
