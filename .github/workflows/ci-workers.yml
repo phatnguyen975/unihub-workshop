@@ -7,14 +7,12 @@ on:
     paths:
       - "apps/workers/**"
       - ".github/workflows/ci-workers.yml"
+      - ".github/workflows/ci-gate.yml"
+      - ".github/ci/**"
       - ".gitleaks.toml"
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "apps/workers/**"
-      - ".github/workflows/ci-workers.yml"
-      - ".gitleaks.toml"
+      - ".gitattributes"
+  workflow_call:
+  workflow_dispatch:
 
 # Cancel in-flight runs for the same PR to save runner minutes, but never cancel runs on main
 concurrency:
@@ -23,7 +21,7 @@ concurrency:
 
 jobs:
   secret-scan:
-    name: Secret Scan
+    name: Workers Secret Scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -41,7 +39,7 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
 
   test:
-    name: Unit Tests
+    name: Workers Unit Tests
     runs-on: ubuntu-latest
     needs: secret-scan
     defaults:

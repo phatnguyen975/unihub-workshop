@@ -1,0 +1,66 @@
+name: CI — Pull Request
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect CI Scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+      workers: ${{ steps.scope.outputs.workers }}
+      web: ${{ steps.scope.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify Scope and Gate Policy
+        run: node --test .github/ci/scopes.test.cjs
+      - name: Detect Changed Applications
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/ci/scopes.cjs detect
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/ci-backend.yml
+
+  workers:
+    needs: changes
+    if: needs.changes.outputs.workers == 'true'
+    uses: ./.github/workflows/ci-workers.yml
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    uses: ./.github/workflows/ci-web.yml
+
+  gate:
+    name: CI Gate
+    if: always()
+    needs: [changes, backend, workers, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require Successful Selected Workflows
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: node .github/ci/scopes.cjs gate
