@@ -309,7 +309,7 @@ Mobile uses physical devices. Fast Refresh updates a connected compatible Expo c
 
 ## Continuous Integration
 
-Pull requests to `main` run a lightweight scope detector and the required `CI Gate`. Only applications affected by the PR run their verification workflows; unrelated backend, workers and web checks are skipped. Matching pushes to `main` also verify the affected applications. See [CI Configuration](.github/README.md) for trigger rules, local policy checks and branch protection setup.
+Pull requests to `main` run a lightweight scope detector and the required `CI Gate`. Only applications affected by the PR run their verification workflows; unrelated backend, workers and web checks are skipped. Matching pushes to `main` also verify the affected applications. See [CI Configuration](.github/CI.md) for trigger rules, local policy checks and branch protection setup.
 
 ## Tests
 
