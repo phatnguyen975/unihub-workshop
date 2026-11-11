@@ -16,6 +16,8 @@ docs/client/
 │   └── ADR-NNN-slug.md
 ├── web/
 │   ├── source-structure.md
+│   ├── tooling-plan.md             # Approved web setup scope
+│   ├── tooling.md                  # Commands and verification evidence
 │   ├── feature-delivery.md
 │   ├── experience-map.md           # Authored by client-discover
 │   ├── ui-design.md                # Authored by client-foundation
@@ -78,3 +80,5 @@ HTML prototypes demonstrate design and flow. Native acceptance needs physical-de
 ## Workflow
 
 Follow [Client Workflow](../../.agents/workflows/client.md). Discovery produces the experience map; foundation produces each platform's UI baseline and representative prototype for human approval. Capability design/implementation depend on approved revisions. App setup selects compatible framework/SDK versions and runtime tooling; API integration follows its separate contract and integration-plan gates.
+
+Web setup and verification commands: [Web Tooling](web/tooling.md), under the approved [Web Tooling Plan](web/tooling-plan.md).
