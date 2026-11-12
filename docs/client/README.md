@@ -100,4 +100,6 @@ HTML prototypes demonstrate design and flow. Native acceptance needs physical-de
 
 Follow [Client Workflow](../../.agents/workflows/client.md). Discovery produces the experience map; foundation produces each platform's UI baseline and representative prototype for human approval. Capability design/implementation depend on approved revisions. App setup selects compatible framework/SDK versions and runtime tooling; API integration follows its separate contract and integration-plan gates.
 
+Discovery and foundation run sequentially per platform. After their approvals, repeat the spec/prototype/plan → approved mock build → capability acceptance cycle for each authorized, dependency-ready capability. Revisit platform artifacts when their requirements change. `client-accept <platform> all-mock` is the platform-wide mock acceptance milestone, covering its complete scoped inventory and composed journeys; it neither implements missing capabilities nor authorizes API integration. See [Execution Units](../../.agents/workflows/client.md#execution-units) for stage scope and invocation boundaries.
+
 Web setup and verification commands: [Web Tooling](web/tooling.md), under the approved [Web Tooling Plan](web/tooling-plan.md).
