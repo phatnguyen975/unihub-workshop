@@ -1,0 +1,213 @@
+{
+  "revision": 1,
+  "locales": {
+    "en": {
+      "reviewDiscover": "Discover",
+      "reviewOrganizer": "Organizer",
+      "reviewBrand": "Brand & color",
+      "scenario": "Scenario",
+      "reset": "Reset",
+      "discover": "Discover",
+      "myTickets": "My tickets",
+      "language": "Language",
+      "skip": "Skip to main content",
+      "footer": "Learn something new. Meet your kind of people.",
+      "heroTitle": "Fresh ideas.\nYour next move.",
+      "heroText": "Find your next workshop — from a first skill to a new career direction.",
+      "heroCta": "Explore workshops",
+      "heroNote": "Skills & Career Week · Nov 16–20, 2026",
+      "week": "This week",
+      "heroWorkshop": "Work smarter with AI",
+      "heroTag": "Featured workshop",
+      "browseTitle": "Make room for what’s next",
+      "browseText": "Find a workshop that fits your next move.",
+      "search": "Search workshops or speakers",
+      "all": "All topics",
+      "technology": "Technology",
+      "design": "Design",
+      "career": "Career",
+      "results": "workshops",
+      "free": "Free",
+      "seats": "seats left",
+      "view": "View workshop",
+      "back": "All workshops",
+      "about": "What will you learn?",
+      "speaker": "Speaker",
+      "when": "When",
+      "where": "Where",
+      "fee": "Registration fee",
+      "register": "Register now",
+      "full": "Fully booked",
+      "fullText": "This workshop is at capacity. You can explore other workshops.",
+      "registrationTitle": "Confirm your place",
+      "registrationText": "Register with your student account.",
+      "name": "Full name",
+      "email": "Student email",
+      "confirm": "Confirm registration",
+      "cancel": "Not now",
+      "close": "Close",
+      "successTitle": "Your next opportunity is booked!",
+      "successText": "You’re registered. The workshop has been added to your tickets.",
+      "seeTicket": "View my tickets",
+      "emptyTitle": "No matching workshops yet",
+      "emptyText": "Try another search or remove a filter.",
+      "clear": "Clear filters",
+      "errorTitle": "We couldn’t load workshops",
+      "errorText": "Something interrupted loading. Try again; your filters are saved.",
+      "retry": "Try again",
+      "loading": "Loading workshops…",
+      "organizer": "Organizer workspace",
+      "orgName": "UniHub University",
+      "manageTitle": "Your workshops",
+      "manageText": "Manage workshop content and schedules in one place.",
+      "titleColumn": "Workshop",
+      "dateColumn": "Date & time",
+      "statusColumn": "Status",
+      "registered": "Registrations",
+      "action": "Actions",
+      "published": "Published",
+      "draft": "Draft",
+      "edit": "Edit draft",
+      "editTitle": "Edit workshop draft",
+      "workshopTitle": "Workshop title",
+      "save": "Save draft",
+      "saved": "Draft saved.",
+      "orgNotice": "Showing workshops belonging to your organization.",
+      "brandTitle": "One connection. More possibilities.",
+      "brandText": "An open U, connected stems and the spark of a new idea.",
+      "identity": "UniHub identity",
+      "symbol": "Symbol",
+      "smallSizes": "Favicon · 16 / 24 / 32 px",
+      "palette": "Light palette",
+      "brandPrimary": "Cobalt · primary action",
+      "brandAccent": "Lime · accent",
+      "brandInk": "Ink · content",
+      "brandSurface": "Mist · background",
+      "logoDownload": "Open SVG logo",
+      "iconDownload": "Open SVG favicon",
+      "walletTitle": "My tickets",
+      "walletText": "Your next opportunities to learn and connect.",
+      "noTickets": "No workshop tickets yet",
+      "noTicketsText": "Explore a topic you love and join your first workshop.",
+      "ticketStatus": "Registered",
+      "ticketNote": "Attendance details",
+      "validation": "Enter a name and a valid email address.",
+      "mockNote": "Design sample ticket; not valid for check-in.",
+      "brandMono": "Monochrome",
+      "lightOnly": "Light theme is under review. Dark theme design follows light palette approval."
+    }
+  },
+  "workshops": [
+    {
+      "id": "ai",
+      "category": "technology",
+      "title": {
+        "vi": "Làm việc thông minh hơn cùng AI",
+        "en": "Work smarter with AI"
+      },
+      "description": {
+        "vi": "Biến AI thành cộng sự thực thụ. Thực hành xây dựng quy trình nghiên cứu, viết và giải quyết vấn đề trong học tập.",
+        "en": "Make AI a useful collaborator. Build practical workflows for research, writing and solving study challenges."
+      },
+      "speaker": "Nguyễn Hà Linh",
+      "role": {
+        "vi": "Chuyên gia ứng dụng AI",
+        "en": "Applied AI specialist"
+      },
+      "start": "2026-11-16T09:00:00+07:00",
+      "end": "11:00",
+      "room": "Innovation Lab · A2.301",
+      "seats": 24,
+      "capacity": 120,
+      "registered": 96,
+      "price": 0,
+      "poster": "poster-ai.svg",
+      "status": "published"
+    },
+    {
+      "id": "design",
+      "category": "design",
+      "title": {
+        "vi": "Design thinking: từ ý tưởng đến giải pháp",
+        "en": "Design thinking: from idea to impact"
+      },
+      "description": {
+        "vi": "Bắt đầu từ một vấn đề thật, lắng nghe người dùng và biến ý tưởng thành giải pháp có thể thử nghiệm.",
+        "en": "Start with a real problem, listen to people and turn an idea into a solution you can test."
+      },
+      "speaker": "Trần Hoàng Nam",
+      "role": {
+        "vi": "Product Designer",
+        "en": "Product designer"
+      },
+      "start": "2026-11-17T13:30:00+07:00",
+      "end": "16:00",
+      "room": "Creative Studio · B1.202",
+      "seats": 18,
+      "capacity": 60,
+      "registered": 42,
+      "price": 75000,
+      "poster": "poster-design.svg",
+      "status": "published"
+    },
+    {
+      "id": "career",
+      "category": "career",
+      "title": {
+        "vi": "Portfolio kể câu chuyện của bạn",
+        "en": "A portfolio that tells your story"
+      },
+      "description": {
+        "vi": "Chọn dự án, trình bày tư duy và xây dựng câu chuyện nghề nghiệp mang dấu ấn của chính bạn.",
+        "en": "Choose your projects, show your thinking and build a career story that feels like you."
+      },
+      "speaker": "Lê Minh Khang",
+      "role": {
+        "vi": "Career Mentor",
+        "en": "Career mentor"
+      },
+      "start": "2026-11-19T14:00:00+07:00",
+      "end": "16:00",
+      "room": "Career Hub · C1.105",
+      "seats": 35,
+      "capacity": 80,
+      "registered": 45,
+      "price": 0,
+      "poster": "poster-career.svg",
+      "status": "published"
+    },
+    {
+      "id": "draft",
+      "category": "career",
+      "title": {
+        "vi": "Kỹ năng phỏng vấn: tự tin thể hiện mình",
+        "en": "Interview skills: show your strengths"
+      },
+      "description": {
+        "vi": "Thực hành thể hiện kinh nghiệm và năng lực trong phỏng vấn.",
+        "en": "Choose your projects, show your thinking and build a career story that feels like you."
+      },
+      "speaker": "Lê Minh Khang",
+      "role": {
+        "vi": "Career Mentor",
+        "en": "Career mentor"
+      },
+      "start": "2026-11-19T14:00:00+07:00",
+      "end": "16:00",
+      "room": "Career Hub · C1.105",
+      "seats": 35,
+      "capacity": 80,
+      "registered": 0,
+      "price": 0,
+      "poster": "poster-career.svg",
+      "status": "draft"
+    }
+  ],
+  "scenarios": {
+    "normal": "Populated results",
+    "empty": "No matching results",
+    "error": "Recoverable load error",
+    "loading": "Transient loading, then normal",
+    "full": "Selected workshop has no available seats"
+  }
+}
