@@ -17,7 +17,10 @@ flowchart TD
     build --> review[Technical Review and Scoped Fixes]
     review --> accept[client-accept: Mock]
     accept --> human{Human Mock Acceptance}
-    human --> stop[Mock Baseline Complete]
+    human --> stop[Capability Mock Baseline Complete]
+    stop -. Explicit Next Capability Invocation .-> bundle
+    stop -. All Scoped Capabilities Accepted .-> platform[client-accept: all-mock]
+    platform --> platformApproval{Human Platform Mock Acceptance}
     human -. Separate Authorized Integration Planning .-> plan[client-plan: Integration]
     plan --> gate{Contract and Plan Approval}
     gate --> integrate[client-integrate]
@@ -25,6 +28,16 @@ flowchart TD
 ```
 
 Design the platform scope and representative foundation first, then design and approve one coherent capability bundle at a time. Do not require every capability prototype to be complete before implementing an approved capability. Spec, prototype and plan may be refined together within the authorized design scope; approval identifies their compatible revisions. Routine implementation review/fix cycles are internal to approved build/integration work. Arrows across human gates require an explicit decision; the diagram does not authorize stage chaining.
+
+## Execution Units
+
+`client-discover` and `client-foundation` operate per platform, sequentially across their approval gates. Web and mobile have independent scope and foundation revisions. Revisit these stages when their scope or shared design rules materially change; they are not repeated for every capability.
+
+After foundation approval, repeat `client-spec`, `client-prototype`, `client-plan`, `client-build` and capability-scoped `client-accept` for each selected capability, respecting the catalog's hard prerequisites. Technical review and in-scope fixes support that iteration; standalone review/fix commands are used when their scope applies, not mandatory separate human invocations for every file. The next capability requires its own authorized scope; completion does not automatically start another capability or API integration.
+
+`client-accept <platform> <capability>` prepares acceptance of that capability at its declared mode and revisions. `client-accept <platform> all-mock` prepares a platform-wide mock acceptance milestone: every capability in the explicit platform inventory plus composed cross-capability journeys. It does not build pending capabilities, accept only whichever capabilities happen to exist, span both platforms or integrate real APIs. Record missing work as pending; complete platform acceptance requires the declared scope's technical evidence and explicit human decision. Integration uses capability-scoped acceptance in `INTEGRATION` mode, not `all-mock`.
+
+For example, accept the mock access and discovery capabilities individually, then subsequent dependency-ready capabilities. Once the platform's mock inventory is complete, review journeys such as discovery → registration → ticket and cross-role/session isolation through `all-mock`. Preserve earlier capability decisions and reference them from the platform delivery catalog.
 
 ## Artifact Ownership
 

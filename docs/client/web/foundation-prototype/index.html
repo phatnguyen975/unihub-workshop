@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="light dark" />
+        <title>UniHub — Discover workshops</title>
+        <link
+            rel="icon"
+            type="image/svg+xml"
+            sizes="any"
+            href="assets/unihub-symbol.svg"
+        />
+        <link rel="stylesheet" href="styles.css" />
+        <script src="controls.js" defer></script>
+        <script src="shell.js" defer></script>
+        <script src="app.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to main content</a>
+        <aside class="reviewbar" aria-label="Prototype review">
+            <span class="review-label">Foundation · r6</span>
+            <nav aria-label="Review views">
+                <a href="#discover" data-copy="reviewDiscover">Discover</a>
+                <a href="#organizer" data-copy="reviewOrganizer">Organizer</a>
+                <a href="#brand" data-copy="reviewBrand">Brand & color</a>
+            </nav>
+            <label class="scenario-label"
+                ><span data-copy="scenario">Scenario</span>
+                <select id="scenario">
+                    <option value="normal">Normal</option>
+                    <option value="empty">Empty</option>
+                    <option value="error">Error</option>
+                    <option value="loading">Loading</option>
+                    <option value="full">Full</option>
+                </select>
+            </label>
+            <label class="scenario-label"
+                >Payment simulation<select id="payment-result">
+                    <option value="pending">Pending</option>
+                    <option value="success">Success</option>
+                    <option value="failure">Failure</option>
+                </select></label
+            >
+            <button class="review-reset" id="reset" data-copy="reset">
+                Reset
+            </button>
+        </aside>
+        <header class="header">
+            <a class="brand" href="#discover" aria-label="UniHub"
+                ><img
+                    src="assets/unihub-logo.svg"
+                    alt="UniHub"
+                    width="156"
+                    height="41"
+            /></a>
+            <nav class="product-nav" aria-label="Main">
+                <a href="#discover" data-copy="discover">Discover</a
+                ><a href="#wallet" data-copy="myTickets">My tickets</a>
+            </nav>
+            <div class="header-actions">
+                <label class="language-label"
+                    ><span class="sr-only" data-copy="language">Language</span
+                    ><select id="language">
+                        <option value="vi">VI</option>
+                        <option value="en">EN</option>
+                    </select></label
+                ><span class="avatar" aria-label="Minh Anh">MA</span>
+            </div>
+        </header>
+        <main id="main" tabindex="-1"><p class="boot">Loading…</p></main>
+        <footer>
+            <span>© UniHub · 2026</span
+            ><span data-copy="footer"
+                >Learn something new. Meet your kind of people.</span
+            >
+        </footer>
+        <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+        <p
+            id="announcement"
+            class="sr-only"
+            role="status"
+            aria-live="polite"
+        ></p>
+        <div id="toast" role="status" hidden></div>
+    </body>
+</html>
