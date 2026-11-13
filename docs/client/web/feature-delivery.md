@@ -61,6 +61,8 @@ Visitor entry, role-specific login, initial temporary-password change, session r
 
 **Product References:** `authentication-and-session-management`.
 
+**MOCK Design Record:** Human approved [Capability Spec](../../../specs/client/web/web-access/SPEC.md) revision 1 on 2026-11-14, including login/navigation, tab-scoped synthetic persistence and logout-recovery requirements. Approval covers the specification only. The capability prototype and task plan are not yet prepared; bundle approval and implementation remain pending. Capability lifecycle/readiness stays `DRAFT` / `WAITING_BUNDLE`.
+
 ### Workshop Discovery and Details
 
 **Capability:** `web-workshop-discovery`. **Source Owner:** `workshops`.
