@@ -38,8 +38,8 @@ The system architecture is organized into a strict tiered structure to distribut
 ### Level 1 - System Context Diagram
 
 <p align="center">
-  <img src="./diagrams/c4_system_context.png" style="width:100%;" alt="System Context Diagram">
-  <img src="./diagrams/c4_system_context_key.png" style="width:100%;" alt="System Context Diagram Key">
+  <img src="../diagrams/c4_system_context.png" style="width:100%;" alt="System Context Diagram">
+  <img src="../diagrams/c4_system_context_key.png" style="width:100%;" alt="System Context Diagram Key">
 </p>
 
 | Actor / System                       | Type            | Core Responsibility / Description                                                                                                                                                                                                                                     |
@@ -56,8 +56,8 @@ The system architecture is organized into a strict tiered structure to distribut
 ### Level 2 - Container Diagram
 
 <p align="center">
-  <img src="./diagrams/c4_container.png" style="width:100%;" alt="Container Diagram">
-  <img src="./diagrams/c4_container_key.png" style="width:100%;" alt="Container Diagram Key">
+  <img src="../diagrams/c4_container.png" style="width:100%;" alt="Container Diagram">
+  <img src="../diagrams/c4_container_key.png" style="width:100%;" alt="Container Diagram Key">
 </p>
 
 | Container                       | Technology Stack                   | Deployment Target                 | Architectural Purpose                                                                                                                                                                                                                     |
@@ -86,7 +86,7 @@ The system architecture is organized into a strict tiered structure to distribut
 - Offline-first mobile check-in with a local SQLite queue and batched reconciliation to the cloud-backed authoritative store.
 
 <p align="center">
-  <img src="./diagrams/system_architecture.svg" style="width:100%;" alt="System Architecture Diagram">
+  <img src="../diagrams/system_architecture.svg" style="width:100%;" alt="System Architecture Diagram">
 </p>
 
 | Architectural Pattern              | Implementation Details                                                                                                                                                                                                                                                                                         |
