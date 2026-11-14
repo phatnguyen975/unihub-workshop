@@ -22,7 +22,7 @@
 
 There are no hard capability prerequisites. No server readiness, live provider, other capability acceptance or mobile artifact is required for this MOCK build. Register/recovery/workshop destinations are composition boundaries, not producer implementation dependencies. Fixtures are not verified provider outputs.
 
-Current lifecycle/readiness is `APPROVED / READY_FOR_BUILD`: the human approved the compatible bundle on 2026-11-15 and there are no hard capability prerequisites. A later `client-build` invocation authorizes execution. Nothing in this document starts build or integration.
+At bundle approval, lifecycle/readiness was `APPROVED / READY_FOR_BUILD`: the human approved the compatible bundle on 2026-11-15 and there are no hard capability prerequisites. A later `client-build` invocation authorizes execution. Nothing in this document starts build or integration.
 
 ### Source Ownership and State
 
@@ -52,7 +52,7 @@ Planned order: `WA-T01 → WA-T02 → WA-T03 → WA-T04 → WA-T05 → WA-T06`. 
 
 All checkboxes start unchecked. A completed task requires its stated behavior and checks; artifact approval is not a checked implementation task. Record results, red/green evidence and unresolved checks in the owning capability `verification.md`, labelled `MOCK` and exact revisions. Technical review findings belong in `review-notes.md`; neither record exists merely because this plan names it.
 
-- [ ] **WA-T01 — Visitor Can Enter Shared Login and Recover Navigation**
+- [x] **WA-T01 — Visitor Can Enter Shared Login and Recover Navigation**
   - **Depends on:** Approved bundle and existing tooling; no other capability output.
   - **File scope:** App routes/layouts/providers/styles/assets; public surfaces of identity login page and minimal service contract/fake; shared field/button primitives only as needed; existing app/component/browser smoke tests.
   - **Outcome:** `/` provides Sign In; `/login` has one common form, labeled Email/password, eye/eye-off and native reveal suppression. `/register`, `/forgot-password`, `/workshops`, `/organizer/workshops`, `/staff/workshops` have approved minimal boundaries. Unknown routes recover safely. Use clean BrowserRouter paths, not the prototype's hash transport. EN/VI and light/dark apply to this complete entry slice; authored input survives locale changes, and English is restored on reload.
@@ -60,7 +60,7 @@ All checkboxes start unchecked. A completed task requires its stated behavior an
   - **Test-first:** Route transitions, safe destination registry (external/protocol-relative/encoded/auth-loop/unknown cases), field validation and visible password-toggle state. Verify keyboard/paste semantics. Replace placeholder product assertions with real approved entry assertions while preserving regression intent; retain infrastructure tests.
   - **Verification:** Targeted Vitest/component checks, lint/typecheck, browser entry/unknown-route/adjacent-boundary journey and viewed desktop/narrow screenshots. Pure token/spacing work uses visual checks rather than tests mirroring CSS.
 
-- [ ] **WA-T02 — Existing Accounts Sign In to the Correct Role Destination**
+- [x] **WA-T02 — Existing Accounts Sign In to the Correct Role Destination**
   - **Depends on:** T01 route registry/form/shell outputs, tested at the same bundle revisions.
   - **File scope:** Identity model/service/fake/login UI and tests; app service/provider composition and guards; `tests/journeys/access-login.spec.ts` and synthetic fixtures.
   - **Outcome:** Actual form input reaches injected fake; each role reaches its authorized intent/default. Anonymous protected navigation preserves intent; wrong role and missing organizer/staff organization are distinct denied cases. Student organization may be null. Loading prevents duplicate submissions; invalid credentials, inactive account, rate limit and unavailable outcomes have approved feedback.
@@ -68,7 +68,7 @@ All checkboxes start unchecked. A completed task requires its stated behavior an
   - **Test-first:** Anti-enumeration copy, role/scope guards, authorized intent/query retention, single submission and bounded rate-delay recovery. Fake time is injected; do not use real sleeps for state tests or automatically retry mutations.
   - **Verification:** Unit/service/component checks plus browser login for all roles, invalid/inactive credentials, wrong role, missing scope and safe intent through adjacent auth boundaries. Observe no external requests and no raw secrets in URL/storage/logging.
 
-- [ ] **WA-T03 — Provisioned Account Replaces Temporary Password and Enters Its Session**
+- [x] **WA-T03 — Provisioned Account Replaces Temporary Password and Enters Its Session**
   - **Depends on:** T02 typed login outcomes, session establishment seam and guards.
   - **File scope:** Identity temporary-password page/UI/schema/transitions/fake and colocated tests; app route entry; `tests/journeys/access-temporary-password.spec.ts`.
   - **Outcome:** Temporary login opens replacement with carried email/current secret in memory only. Direct entry/reload requests missing temporary credentials. Validate the exact spec constraints, confirmation and difference from current password. Success immediately establishes returned role session without another login. Lost response after commit explains uncertainty and permits recovery with the new password; no automatic second activation.
@@ -76,7 +76,7 @@ All checkboxes start unchecked. A completed task requires its stated behavior an
   - **Test-first:** Invalid bounds/classes, whitespace handling, same password, mismatch, missing transient credential after reload, single-use transition, obsolete result and committed-but-lost response. Login with the new synthetic credential must work after recovery/reload.
   - **Verification:** Schema/service/component tests and real UI journeys for both provisioned roles, direct entry/reload, success and uncertain completion. Inspect long VI copy and both password icon states.
 
-- [ ] **WA-T04 — Session Restores, Renews and Expires Without Account Leakage**
+- [x] **WA-T04 — Session Restores, Renews and Expires Without Account Leakage**
   - **Depends on:** T02/T03 authenticated/limited outcomes and current-generation establishment.
   - **File scope:** Identity lifecycle controller, fake clock/storage/state validation, app provider/query coordination and guards; `tests/journeys/access-session.spec.ts`.
   - **Outcome:** Private views remain hidden during restore/renewal. Tab-scoped synthetic persistence restores valid identity; expiry coordinates one renewal. Confirmed unusable session routes to login with explanation/intent, while service/network failure remains locked and retryable. Storage denial/corruption becomes safe anonymous/in-memory fallback with accurate limitation. A fresh independent tab starts anonymous. Cancel obsolete work and remove sensitive projections on identity/scope loss.
@@ -84,7 +84,7 @@ All checkboxes start unchecked. A completed task requires its stated behavior an
   - **Test-first:** Concurrent expiry, valid/expired/revoked timelines, one renewal, late restore/renew after newer login/logout, version/schema-invalid stored state, throwing read/write/remove and account/org cache isolation. Seed a prior synthetic private query to prove cleanup, without building another capability. Do not invent provider TTL or introspection endpoints.
   - **Verification:** Unit/client-internal integration tests with deferred promises and fake clocks; browser reload/protected deep link/expiry/revocation/offline-restore/recovery and independent-tab checks. Real browser offline is supplemental to deterministic fake errors; offline app-shell reload is not promised.
 
-- [ ] **WA-T05 — Sign Out Confirms Completion or Safely Locks for Recovery**
+- [x] **WA-T05 — Sign Out Confirms Completion or Safely Locks for Recovery**
   - **Depends on:** T04 persistence/lock/cleanup coordination and operation generations.
   - **File scope:** Identity logout transitions/fake/UI and tests, shared named confirmation dialog where reusable, app account menu and query cleanup; `tests/journeys/access-logout.spec.ts`.
   - **Outcome:** Sign Out immediately hides private content. Confirmed completion clears local session/private projections. Failure/uncertainty stays locked across reload and route changes; Retry can complete a committed-but-lost logout. Explicit local removal explains its limits and clears only local access. Other tabs/devices are not claimed signed out.
@@ -141,3 +141,9 @@ All rows below are **required** for their applicable behavior. The human column 
 6. **Material changes require approval.** Changes to business behavior, role/tenant powers, route semantics, persistent auth policy, global UI or bundle scope stop dependent work for impact review. Routine in-scope file organization and defect fixes do not introduce per-file gates.
 
 The intended approval bundle is **spec revision 1 + prototype revision 2 + task plan revision 1**, referencing experience/inventory 1 and UI baseline/foundation 6. Human approved that exact bundle on 2026-11-15. `VERIFIED` requires every required technical check to pass; `ACCEPTED` additionally requires explicit human MOCK acceptance and required UX review. A commit/push, passing checks or this `client-plan` invocation does not approve the bundle or start another capability/integration.
+
+## Execution Record: 2026-11-15
+
+Build was explicitly invoked against the approved bundle. WA-T01 through WA-T05 implementation and automated checks are complete; all planned task code has been implemented. WA-T06 technical review and acceptance preparation are complete, while required actual browser zoom, screen-reader and Edge-specific review evidence remains pending. Its checkbox stays open rather than claiming required checks that have not run.
+
+Final `npm run verify:all`: PASS (46 unit/component tests and 54 browser tests, including both configured projects, 96 matrix cases plus two dialog variants per project). See [Verification](verification.md) and [Technical Review](verification.md#technical-review). Capability lifecycle is `VERIFICATION_PENDING`; human MOCK acceptance has not been recorded. No next capability or integration has started.

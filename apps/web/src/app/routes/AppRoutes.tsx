@@ -1,27 +1,97 @@
-import { Link, Route, Routes } from "react-router";
-
+import { useEffect, useRef } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router';
+import { LockKeyhole } from 'lucide-react';
+import { AccessForm, useAccess, landing, requiredRole, safeDestination } from '@/features/identity';
+import { useLocale } from '@/shared/ui/useLocale';
+import { Shell } from '../layouts/Shell';
+import artwork from '@/assets/poster-design.svg';
+function Status({ title, text, children }: {
+    title: string;
+    text: string;
+    children?: React.ReactNode;
+}) {
+    const { t } = useLocale();
+    const heading = useRef<HTMLHeadingElement>(null);
+    useEffect(() => { heading.current?.focus(); }, [title]);
+    return <section className="status-panel">
+    <div className="status-symbol">
+    <LockKeyhole />
+    </div>
+    <h1 id="page-title" ref={heading} tabIndex={-1}>{t(title)}</h1>
+    <p>{t(text)}</p>
+    <div className="actions">{children}</div>
+    </section>;
+}
+function Content() {
+    const navigate = useNavigate();
+    const { state, controller } = useAccess();
+    const { t } = useLocale();
+    const location = useLocation();
+    const path = location.pathname;
+    const dialog = useRef<HTMLDialogElement>(null);
+    const intent = safeDestination(new URLSearchParams(location.search).get('next') ?? '');
+    const suffix = intent ? '?next=' + encodeURIComponent(intent) : '';
+    useEffect(() => { document.querySelector<HTMLElement>('#page-title')?.focus(); }, [path, state.kind]);
+    useEffect(() => { document.title = (path === '/login' ? t('signIn') : path === '/change-temporary-password' ? t('temporaryTitle') : t('workshops')) + ' · UniHub'; }, [path, t]);
+    if (['restoring', 'renewing', 'logging-out'].includes(state.kind))
+        return <Status title={state.kind === 'logging-out' ? 'signingOut' : 'restoring'} text={state.kind === 'logging-out' ? 'signingOutText' : 'restoringText'}>
+        <span className="spinner" role="status" aria-label={t('restoring')}/>
+        </Status>;
+    if (state.kind === 'restore-unavailable' || state.kind === 'logout-unconfirmed')
+        return <>
+        <Status title={state.kind === 'restore-unavailable' ? 'restoreError' : 'logoutError'} text={state.kind === 'restore-unavailable' ? 'restoreErrorText' : 'logoutErrorText'}>
+        <button className="btn" onClick={() => { void (state.kind === 'restore-unavailable' ? controller.restore() : controller.logout().then(() => { if (controller.getSnapshot().kind === 'anonymous')
+            navigate('/', { replace: true }); })); }}>{t('retry')}</button>
+        <button className="btn secondary" onClick={() => dialog.current?.showModal()}>{t('removeLocal')}</button>
+        </Status>
+        <dialog ref={dialog} aria-labelledby="remove-title" aria-describedby="remove-description">
+        <button className="dialog-close" aria-label={t('close')} onClick={() => dialog.current?.close()}>×</button>
+        <h2 id="remove-title">{t('removeTitle')}</h2>
+        <p id="remove-description">{t('removeText')}</p>
+        <div className="dialog-actions">
+        <button autoFocus className="btn secondary" onClick={() => dialog.current?.close()}>{t('cancel')}</button>
+        <button className="btn" onClick={() => { dialog.current?.close(); controller.clearLocal(); navigate('/', { replace: true }); }}>{t('removeConfirm')}</button>
+        </div>
+        </dialog>
+        </>;
+    const identity = state.kind === 'authenticated' ? state.identity : null;
+    if (requiredRole(path) && !identity)
+        return <Navigate to={'/login?next=' + encodeURIComponent(path + location.search)} replace/>;
+    if (requiredRole(path) && identity && (requiredRole(path) !== identity.role || !identity.organization)) {
+        const missing = identity.role !== 'STUDENT' && !identity.organization;
+        return <Status title="denied" text={missing ? 'missingOrg' : 'deniedText'}>
+        <Link className="btn" to={missing ? '/' : landing(identity.role)}>{t(missing ? 'backHome' : 'goToWorkshops')}</Link>
+        </Status>;
+    }
+    if (path === '/login' || path === '/change-temporary-password') {
+        if (identity)
+            return <Navigate to={safeDestination(intent, identity.role) || landing(identity.role)} replace/>;
+        return <AccessForm key={path} temporary={path !== '/login'}/>;
+    }
+    if (state.kind === 'temporary')
+        return <Navigate to={'/change-temporary-password' + suffix} replace/>;
+    const notice = state.kind === 'anonymous' || state.kind === 'authenticated' ? state.message : undefined;
+    if (path === '/')
+        return <section className="home">
+        <div>
+        <h1 id="page-title" tabIndex={-1}>{t('homeTitle')}</h1>
+        <p>{t('homeText')}</p>{notice && <div className="notice" role="status">{t(notice)}</div>}<div className="actions">
+        <Link className="btn" to="/workshops">{t('explore')}</Link>{!identity && <Link className="btn secondary" to="/login">{t('signIn')}</Link>}</div>
+        </div>
+        <img src={artwork} width="800" height="500" alt=""/>
+        </section>;
+    if (['/workshops', '/organizer/workshops', '/staff/workshops', '/register', '/forgot-password'].includes(path)) {
+        const auth = ['/register', '/forgot-password'].includes(path);
+        const title = path === '/register' ? 'registerTitle' : path === '/forgot-password' ? 'recoveryTitle' : path === '/staff/workshops' ? 'staffWorkshops' : 'workshops';
+        return <section className="boundary">{identity && <p className="eyebrow">{t('signedIn')} · {identity.name} · {t('role' + (identity.role === 'STUDENT' ? 'Student' : identity.role === 'STAFF' ? 'Staff' : 'Organizer'))}</p>}<h1 id="page-title" tabIndex={-1}>{t(title)}</h1>{notice && <div className="notice" role="status">{t(notice)}</div>}{controller.storageFailed() && <div className="notice" role="status">{t('storage')}</div>}<Link className="back-link" to={auth ? '/login' + suffix : '/'}>{t(auth ? 'backLogin' : 'backHome')}</Link>
+        </section>;
+    }
+    return <Status title="notFound" text="notFoundText">
+    <Link className="btn" to="/">{t('backHome')}</Link>
+    </Status>;
+}
 export function AppRoutes() {
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <main className="grid min-h-svh place-items-center">
-            <h1 className="text-2xl font-medium">UniHub Web</h1>
-          </main>
-        }
-      />
-      <Route
-        path="*"
-        element={
-          <main className="grid min-h-svh place-content-center gap-4 text-center">
-            <h1 className="text-2xl font-medium">Page not found</h1>
-            <Link className="underline focus-visible:outline-2" to="/">
-              Return home
-            </Link>
-          </main>
-        }
-      />
-    </Routes>
-  );
+    return <Shell>
+    <Content />
+    </Shell>;
 }
