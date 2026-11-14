@@ -61,7 +61,7 @@ Visitor entry, role-specific login, initial temporary-password change, session r
 
 **Product References:** `authentication-and-session-management`.
 
-**MOCK Design Record:** Human approved [Capability Spec](../../../specs/client/web/web-access/SPEC.md) revision 1 on 2026-11-14, including login/navigation, tab-scoped synthetic persistence and logout-recovery requirements. Approval covers the specification only. The capability prototype and task plan are not yet prepared; bundle approval and implementation remain pending. Capability lifecycle/readiness stays `DRAFT` / `WAITING_BUNDLE`.
+**MOCK Design Record:** Human approved [Capability Spec](../../../specs/client/web/web-access/SPEC.md) revision 1 on 2026-11-14, including login/navigation, tab-scoped synthetic persistence and logout-recovery requirements. Approval covers the specification only. [Prototype Review](../../../specs/client/web/web-access/prototype-review.md) records human approval of capability prototype revision 2 on 2026-11-15, compatible with spec revision 1 and UI baseline revision 6. The task plan is not yet prepared; bundle approval and implementation remain pending. Capability lifecycle/readiness stays `DRAFT` / `WAITING_BUNDLE`.
 
 ### Workshop Discovery and Details
 

@@ -1,0 +1,111 @@
+{
+  "revision": 1,
+  "clockOrigin": 1794618000,
+  "accessSeconds": 60,
+  "renewalSeconds": 600,
+  "latencyMs": 450,
+  "demoPassword": "UniHubDemo1!",
+  "suggestedNewPassword": "NextWorkshop2!",
+  "accounts": [
+    {
+      "id": "student",
+      "label": "Student · Linh Nguyen",
+      "email": "linh@example.test",
+      "name": "Linh Nguyen",
+      "role": "STUDENT",
+      "organization": null,
+      "temporary": false
+    },
+    {
+      "id": "organizer",
+      "label": "Organizer · Minh Tran",
+      "email": "minh@example.test",
+      "name": "Minh Tran",
+      "role": "ORGANIZER",
+      "organization": "Career Development Center",
+      "temporary": false
+    },
+    {
+      "id": "staff",
+      "label": "Staff · An Le",
+      "email": "an@example.test",
+      "name": "An Le",
+      "role": "STAFF",
+      "organization": "Career Development Center",
+      "temporary": false
+    },
+    {
+      "id": "new-organizer",
+      "label": "First login · Organizer",
+      "email": "new.organizer@example.test",
+      "name": "Mai Pham",
+      "role": "ORGANIZER",
+      "organization": "Career Development Center",
+      "temporary": true
+    },
+    {
+      "id": "new-staff",
+      "label": "First login · Staff",
+      "email": "new.staff@example.test",
+      "name": "Bao Hoang",
+      "role": "STAFF",
+      "organization": "Career Development Center",
+      "temporary": true
+    },
+    {
+      "id": "missing-org",
+      "label": "Invalid organization context",
+      "email": "unscoped@example.test",
+      "name": "Review Account",
+      "role": "ORGANIZER",
+      "organization": null,
+      "temporary": false
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "normal",
+      "label": "Normal"
+    },
+    {
+      "id": "invalid",
+      "label": "Invalid credentials"
+    },
+    {
+      "id": "disabled",
+      "label": "Account disabled"
+    },
+    {
+      "id": "offline",
+      "label": "Offline"
+    },
+    {
+      "id": "unavailable",
+      "label": "Service unavailable"
+    },
+    {
+      "id": "rate",
+      "label": "Rate limited · 3s delay"
+    },
+    {
+      "id": "lost-password",
+      "label": "Password changed · response lost"
+    },
+    {
+      "id": "logout-failure",
+      "label": "Logout failed"
+    },
+    {
+      "id": "logout-lost",
+      "label": "Logout committed · response lost"
+    },
+    {
+      "id": "slow",
+      "label": "Slow response · 2.5s"
+    },
+    {
+      "id": "storage",
+      "label": "Tab storage unavailable"
+    }
+  ]
+}
