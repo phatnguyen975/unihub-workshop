@@ -192,10 +192,11 @@ summary:focus-visible {
 }
 .header-inner {
     max-width: 1280px;
-    padding: 16px 32px;
+    padding: 14px 20px;
     margin: auto;
     display: flex;
-    gap: 36px;
+    flex-wrap: wrap;
+    gap: 14px;
     align-items: center;
     min-height: 80px;
 }
@@ -203,10 +204,12 @@ summary:focus-visible {
     flex-shrink: 0;
 }
 .brand img {
-    width: 156px;
-    height: 41px;
+    width: 120px;
+    height: auto;
 }
 .product-nav {
+    order: 3;
+    width: 100%;
     display: flex;
     gap: 28px;
     align-items: center;
@@ -233,12 +236,13 @@ summary:focus-visible {
 .header-actions {
     margin-left: auto;
     display: flex;
-    gap: 10px;
+    gap: 6px;
     align-items: center;
 }
 .icon-button {
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
     display: grid;
     place-items: center;
     background: var(--surface);
@@ -307,8 +311,8 @@ summary:focus-visible {
     background: var(--tint);
     color: var(--brand);
     font-size: 13px;
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
     font-weight: 700;
 }
 main {
@@ -698,35 +702,13 @@ dialog p {
     .auth-card {
         padding: 28px;
     }
-    .header-inner {
-        gap: 24px;
-    }
-    .product-nav {
-        gap: 18px;
-    }
     .welcome h2 {
         font-size: 1.8rem;
     }
 }
 @media (max-width: 650px) {
-    .header-inner {
-        padding: 14px 20px;
-        gap: 14px;
-        flex-wrap: wrap;
-    }
-    .brand img {
-        width: 120px;
-        height: auto;
-    }
-    .header-actions {
-        gap: 6px;
-    }
     .header-actions .btn {
         padding: 10px 12px;
-    }
-    .product-nav {
-        order: 3;
-        width: 100%;
     }
     .auth-layout {
         grid-template-columns: 1fr;
@@ -850,7 +832,9 @@ dialog { margin: auto; }
 .boundary h1 { margin: 8px 0 24px; }
 .form-back-link { display: flex; justify-content: center; }
 .workspace-navigation a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 12px; border-radius: 8px; background: var(--tint); }
-.workspace-toggle { display: none; }
+.workspace-toggle { display: grid; }
+.has-workspace-menu { gap: 6px; }
+.has-workspace-menu .product-nav { display: none; }
 .navigation-dialog { max-width: 400px; }
 .navigation-dialog .organization { margin: 16px 0 24px; }
 .session-progress { position: relative; overflow: hidden; width: 180px; height: 5px; border-radius: 8px; background: var(--tint); }
@@ -860,18 +844,26 @@ dialog { margin: auto; }
 .footer-inner p { margin: 0; }
 .footer-inner button { padding-block: 6px; }
 @media (max-width: 650px) {
-    .workspace-toggle { display: grid; }
-    .has-workspace-menu { gap: 6px; }
-    .has-workspace-menu .product-nav { display: none; }
     .organizer-layout { grid-template-columns: 1fr; padding: 0 20px; }
     .sidebar { display: none; }
     .footer-inner { padding-block: 10px; gap: 4px 20px; }
     .footer-inner nav { gap: 20px; }
     .navigation-dialog { padding: 28px 24px; }
 }
-@media (max-width: 360px) {
-    .has-workspace-menu .brand img { width: 80px; height: auto; }
-}
 @media (prefers-reduced-motion: reduce) {
     .session-progress span { animation: none; transform: translateX(60%); }
+}
+
+/* Header starts at narrow widths; enhance only when its content fits. */
+@media (min-width: 651px) {
+    .header-inner, .has-workspace-menu { padding: 16px 32px; gap: 24px; flex-wrap: nowrap; }
+    .brand img { width: 156px; height: 41px; }
+    .icon-button, .avatar { width: 44px; height: 44px; }
+    .header-actions { gap: 10px; }
+    .product-nav, .has-workspace-menu .product-nav { display: flex; order: 0; width: auto; gap: 18px; }
+    .workspace-toggle { display: none; }
+}
+@media (min-width: 901px) {
+    .header-inner, .has-workspace-menu { gap: 36px; }
+    .product-nav { gap: 28px; }
 }

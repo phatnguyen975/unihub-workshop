@@ -80,3 +80,18 @@ test('logout failure is red and local removal is a warning toast',async({page},i
  const error=page.getByRole('status').filter({hasText:en.logoutError}).locator('..');await expect(error).toBeVisible();expect(await error.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(180, 35, 53)');
  await page.getByRole('button',{name:en.removeLocal,exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:en.removeConfirm,exact:true}).click();const warning=page.getByRole('status').filter({hasText:en.localRemoved}).locator('..');await expect(warning).toBeVisible();expect(await error.isVisible()).toBe(false);expect(await warning.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(254, 243, 199)');await page.screenshot({path:info.outputPath('semantic-toasts.png'),fullPage:true});
 });
+
+
+test('narrow header controls match the logo height with no extra shrinking at 320px',async({page},info)=>{
+ await login(page);
+ for(const width of [320,390,650,768,1440]){
+  await page.setViewportSize({width,height:900});
+  const logo=await page.locator('.brand img').boundingBox();
+  for(const control of [page.locator('.workspace-toggle'),page.locator('.header-actions > button'),page.locator('.locale-trigger'),page.locator('.avatar')]){
+   if(width<=650){await expect(control).toBeVisible();const box=await control.boundingBox();expect(box!.width).toBe(32);expect(box!.height).toBe(32);expect(Math.abs(box!.height-logo!.height)).toBeLessThan(1);expect(Math.abs(box!.y+box!.height/2-logo!.y-logo!.height/2)).toBeLessThan(1);}
+  }
+  if(width<=650)expect(logo!.width).toBe(120);else await expect(page.locator('.workspace-toggle')).not.toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  if(width===320||width===390)await page.screenshot({path:info.outputPath('header-'+width+'.png'),fullPage:true});
+ }
+});
