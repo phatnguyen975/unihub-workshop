@@ -55,7 +55,6 @@ export function Shell({ children }: PropsWithChildren) {
                 <Link className="brand" to="/" aria-label="UniHub home"><img src={dark ? darkLogo : logo} width="156" height="41" alt="UniHub" /></Link>
                 <nav className="product-nav" aria-label={t('home')}>
                     <NavLink to="/workshops">{t('discover')}</NavLink>
-                    {identity?.role === 'STAFF' && <NavLink to="/staff/workshops">{t('staffWorkshops')}</NavLink>}
                 </nav>
                 <div className="header-actions">
                     <button className="icon-button" aria-label={t('theme')} aria-pressed={dark} onClick={() => setDark(!dark)}>{dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}</button>

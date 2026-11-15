@@ -123,7 +123,7 @@ Official guideline snapshot: `https://raw.githubusercontent.com/vercel-labs/web-
 
 ## Feedback Revision 3: 2026-11-16
 
-**Mode:** `MOCK`. **Authority:** Explicit human correction request, recorded in [Feedback Amendment](feedback-2026-11-16.md). Historical approved dependencies remain spec 1 / prototype 2 / tasks 1 / UI baseline 6. These requested capability presentations are implemented for review; proposed reusable baseline amendments and human acceptance remain pending. Lifecycle remains `VERIFICATION_PENDING`.
+**Mode:** `MOCK`. **Authority:** Explicit human correction request in the conversation. Historical approved dependencies remain spec 1 / prototype 2 / tasks 1 / UI baseline 6. These requested capability presentations are implemented for review; proposed reusable baseline amendments and human acceptance remain pending. Lifecycle remains `VERIFICATION_PENDING`.
 
 ### Corrections and Regression Evidence
 
@@ -167,3 +167,33 @@ CLI exploratory attempts initially used an English label absent from the UI (`Re
 | Style/Visual | Actual desktop/narrow and light/dark images viewed; requested sidebar, close target, popup typography, footer and loader corrected |
 
 No unresolved critical/should-fix issue found in this scoped self-review. Required real 200% browser zoom, actual screen reader and Edge-native reveal checks from the earlier record remain pending; viewport emulation does not replace them. This revision is ready for the user's next review, not `VERIFIED`/`ACCEPTED`, global foundation approval or API integration.
+
+## UI Correction Follow-up: 2026-11-16
+
+**Mode:** `MOCK`. The human clarified the requested presentation directly in the conversation. No separate feedback document is required by the rules/workflow; that extra artifact and every reference to it have been removed. Corrections remain subject to human review, not acceptance or global baseline promotion.
+
+### Corrected Interpretation and Behavior
+
+- Center the outer page container, with normal top-left heading content inside it. Student, staff and organizer identity/heading groups have an 8px gap. Full-height list boundaries align at the top rather than floating centrally; access cards and short status panels retain appropriate container centering.
+- Organizer account action is `Dashboard`; staff action is `Assigned Workshops` (Title Case). Staff has no separate assigned-workshop action beside the logo. Existing default role landings remain `/organizer/workshops` and `/staff/workshops`; no dashboard business content is added.
+- Notifications use shared `notify.success/error/warning/info` entry points and one shared top-right toaster. Green means confirmed success, red means failure, amber/yellow means warning, and neutral means basic information. Local removal is a warning because service revocation is unconfirmed. Persistent recovery controls remain in-page.
+- Toasts sit below the header and beneath its popup stacking context so theme/locale controls remain operable. Text does not fade into the underlying page, preserving contrast. Error toasts dismiss when their corresponding error state is left, preventing a stale failure message from overlapping a resolved-state warning.
+- Language trigger uses weight 600; locale options retain normal weight and selected background. Email/password validation copy omits technical maximum lengths in both languages, while actual input/schema limits remain enforced. The temporary form's Back to Sign In link centers within the form card.
+
+### Technical Review and Maintainability
+
+The scoped six-axis self-review found no remaining critical/should-fix implementation finding or prerequisite architecture rewrite for the next capability. App composition still selects injected identity services; role navigation consumes the public identity surface; fields, dialogs and notifications reuse shared UI; ESLint enforces import direction. Downstream pages remain explicit capability boundaries to replace as their scopes are built. Existing generation cancellation, private Query cleanup, tab-scoped synthetic state and safe intent checks are retained.
+
+Removed obsolete open-ring spinner/keyframes and mobile menu-row CSS. Extracted reusable notification rendering/severity styling from identity-specific message mapping. No speculative router/state/UI framework or cross-feature service layer was added. Future features still need their own approved design; this review is not a guarantee that future requirements never justify refactoring.
+
+`codegraph status` reported the repository was not initialized; no graph/index or MCP structural analysis is claimed. This review used direct source/import inspection plus the existing lint and runtime regression checks. No tool setup or repository graph generation was needed for these localized edits.
+
+### Verification Record
+
+The added staff-header regression failed against the previous shell and passed after the fix. A new stale-error regression failed when local removal left the old error toast visible, then passed after state-lifecycle dismissal was added. An intermediate full browser run exposed toast opacity contrast and header control obstruction; both were corrected without disabling axe checks or weakening assertions.
+
+Fresh code checks: `npm run verify` passed lint, TypeScript, 53 unit/component tests and the standard build. Standard output: JS 466.41 kB / 145.50 kB gzip; CSS 18.75 kB / 5.06 kB gzip. Final `npm run test:e2e -- --workers=2` passed all 74 tests across both configured Chromium projects (2.2 minutes), including axe checks. No tests were skipped. `git diff --check` also passed. Tests additionally cover each role's top-left identity/heading group, centered outer container, staff dropdown entry, unchanged default landing, centered temporary back link, user-facing validation copy and semantic toast colors/position/expiry.
+
+Actually viewed current React images: student/staff/organizer heading groups; green success, red failure and yellow local-removal notification; temporary form back link. Browser project viewports are 1440x900 and 390x844, with existing 320/390/768/1440 bilingual/light/dark matrix retained. The CLI also performed actual UI login/logout, failure recovery, locale interaction and temporary-form navigation at 1440x1000. Final console: 0 errors/warnings; all 32 observed requests were localhost static GETs (200/304), with no live API request. Browser and owned preview 4182 were stopped afterward; screenshots/logs are disposable OS-temp evidence. No screenshot was promoted to an approved golden.
+
+Human UI review and previously required real browser 200% zoom, actual screen reader and Edge reveal evidence remain pending. Lifecycle remains `VERIFICATION_PENDING`; no human MOCK acceptance, next capability or real API integration is implied.

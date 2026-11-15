@@ -602,18 +602,7 @@ main {
     margin-bottom: 24px;
     overflow-wrap: anywhere;
 }
-.mobile-menu {
-    display: none;
-}
-.spinner {
-    display: inline-block;
-    width: 17px;
-    height: 17px;
-    border: 2px solid currentColor;
-    border-right-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
+
 .boot {
     padding: 60px 32px;
     text-align: center;
@@ -700,11 +689,6 @@ dialog p {
 }
 :root[data-theme="dark"] .btn.secondary {
     color: var(--ink);
-}
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
 }
 @media (max-width: 900px) {
     .auth-layout {
@@ -794,16 +778,7 @@ dialog p {
         border-right: 0;
         border-bottom: 1px solid var(--line);
     }
-    .mobile-menu {
-        display: block;
-    }
-    .sidebar nav {
-        display: none;
-    }
-    .sidebar nav.expanded {
-        display: block;
-        margin-top: 12px;
-    }
+
     .sidebar .organization {
         display: none;
     }
@@ -854,7 +829,8 @@ dialog { margin: auto; }
 }
 .dialog-close:hover, .dialog-close:focus-visible { background: var(--canvas); }
 .dialog-close svg { display: block; width: 20px; height: 20px; }
-.locale-trigger, .locale-options button, .locale-options button[aria-pressed="true"] { font-weight: 400; }
+.locale-trigger { font-weight: 600; }
+.locale-options button, .locale-options button[aria-pressed="true"] { font-weight: 400; }
 .account-options { width: min(288px, calc(100vw - 40px)); min-width: 0; }
 .account-options .identity { min-width: 0; padding: 12px; }
 .account-name, .account-email { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -865,12 +841,14 @@ dialog { margin: auto; }
 .public-main { display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .public-main > .auth-layout, .public-main > .home { width: 100%; margin-block: 32px; }
 .public-main > .status-panel { width: min(560px, calc(100% - 40px)); margin: 32px auto; }
-.public-main > .boundary { width: min(1080px, 100%); margin-block: 32px; text-align: center; }
+.public-main > .boundary { width: min(1080px, 100%); flex: 1; margin-block: 32px; }
 .workspace-main { display: flex; }
 .organizer-layout { width: 100%; flex: 1; min-height: 0; margin: 24px auto; padding: 0 32px; gap: 24px; }
 .sidebar { align-self: start; border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
-.workspace-content { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; }
-.workspace-content .boundary { width: 100%; margin-block: 32px; text-align: center; }
+.workspace-content { min-width: 0; }
+.workspace-content .boundary { width: 100%; margin: 0; padding: 0; }
+.boundary h1 { margin: 8px 0 24px; }
+.form-back-link { display: flex; justify-content: center; }
 .workspace-navigation a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 12px; border-radius: 8px; background: var(--tint); }
 .workspace-toggle { display: none; }
 .navigation-dialog { max-width: 400px; }

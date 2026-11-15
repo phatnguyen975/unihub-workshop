@@ -11,3 +11,7 @@ describe('organizer shell boundaries',()=>{
  it('does not wrap public workshop browsing in the management sidebar',async()=>{await organizer('/workshops');expect(document.querySelector('.sidebar')).toBeNull();});
  it('provides a management entry and header menu only in workspace',async()=>{await organizer('/organizer/workshops');expect(screen.getByRole('button',{name:'Open workshop navigation'})).toBeInTheDocument();});
 });
+
+it('keeps the staff workspace entry in the avatar popup rather than the header navigation',async()=>{
+ const service=createMockIdentity({delay:async()=>{}});const controller=new AccessController(service,()=>{});await controller.login('an@example.test','UniHubDemo1!');render(<MemoryRouter initialEntries={['/staff/workshops']}><LocaleProvider><IdentityProvider controller={controller}><Shell><h1>Content</h1></Shell></IdentityProvider></LocaleProvider></MemoryRouter>);await screen.findByRole('button',{name:'Account'});expect(document.querySelector('.product-nav a[href="/staff/workshops"]')).toBeNull();
+});

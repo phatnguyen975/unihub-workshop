@@ -41,8 +41,8 @@
   "updatePassword": "Đổi mật khẩu và tiếp tục",
   "passwordUpdated": "Đã đổi mật khẩu. Bạn đã được đăng nhập.",
   "required": "Vui lòng điền trường này.",
-  "emailInvalid": "Nhập địa chỉ email hợp lệ, tối đa 254 ký tự.",
-  "passwordInvalid": "Nhập mật khẩu, tối đa 255 ký tự.",
+  "emailInvalid": "Nhập địa chỉ email hợp lệ.",
+  "passwordInvalid": "Nhập mật khẩu.",
   "newInvalid": "Mật khẩu mới cần đáp ứng các yêu cầu bên dưới.",
   "samePassword": "Mật khẩu mới phải khác mật khẩu tạm thời.",
   "mismatch": "Mật khẩu nhập lại chưa khớp.",
@@ -97,6 +97,6 @@
   "roleStudent": "Sinh viên",
   "roleOrganizer": "Ban tổ chức",
   "roleStaff": "Nhân viên",
-  "management": "Quản lý workshop",
+  "management": "Bảng điều khiển",
   "openNavigation": "Mở điều hướng workshop"
 }

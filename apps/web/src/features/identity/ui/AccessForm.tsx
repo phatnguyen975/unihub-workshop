@@ -69,7 +69,7 @@ export function AccessForm({ temporary = false }: {
         <button className="btn wide" disabled={busy || retrySeconds > 0}>{t(busy ? 'working' : 'signIn')}</button>
         </form>}
 
- {temporary ? <Link className="back-link" onClick={() => controller.forgetTemporary()} to={'/login' + suffix}>{t('backLogin')}</Link> : <p className="join">{t('noAccount')} <Link to={'/register' + suffix}>{t('createAccount')}</Link>
+ {temporary ? <Link className="back-link form-back-link" onClick={() => controller.forgetTemporary()} to={'/login' + suffix}>{t('backLogin')}</Link> : <p className="join">{t('noAccount')} <Link to={'/register' + suffix}>{t('createAccount')}</Link>
         </p>}</section>
     </div>;
 }

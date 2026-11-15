@@ -150,4 +150,6 @@ Final `npm run verify:all`: PASS (46 unit/component tests and 54 browser tests, 
 
 ### Feedback Correction: 2026-11-16
 
-Implemented the explicitly requested [UI Feedback Revision 3](feedback-2026-11-16.md) within MOCK web-access. Fresh verification passed lint, TypeScript, 51 unit/component tests, build and 68 browser tests; desktop/narrow screenshots were actually viewed. [Feedback Evidence](verification.md#feedback-revision-3-2026-11-16) retains reproduction and scoped technical review. User review, shared UI amendment promotion and the previously required real zoom/AT/Edge checks remain pending. WA-T06 remains open and lifecycle remains `VERIFICATION_PENDING`.
+Implemented the explicitly requested UI Feedback Revision 3 within MOCK web-access. Fresh verification passed lint, TypeScript, 51 unit/component tests, build and 68 browser tests; desktop/narrow screenshots were actually viewed. [Feedback Evidence](verification.md#feedback-revision-3-2026-11-16) retains reproduction and scoped technical review. User review, shared UI amendment promotion and the previously required real zoom/AT/Edge checks remain pending. WA-T06 remains open and lifecycle remains `VERIFICATION_PENDING`.
+
+The subsequent human clarification has also been implemented: outer-container alignment with top-left headings, semantic top-right notifications, role dropdown/navigation copy and form text/alignment. The latest verification section owns current test results and outstanding human checks; no separate feedback artifact is retained.

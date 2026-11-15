@@ -83,4 +83,4 @@ The initial UniHub Web placeholder has been replaced by the approved web-access 
 
 The historical setup evidence above describes the earlier placeholder. Current capability scenarios, commands/results and remaining human checks belong to [Web Access Verification](../../../specs/client/web/web-access/verification.md).
 
-The requested web-access feedback revision 3 adds `react-hot-toast` 2.6.1 for short-lived success messages. Theme tokens and polite status semantics apply; actionable failures remain persistent. See [Feedback Amendment](../../../specs/client/web/web-access/feedback-2026-11-16.md) for its review status; this does not establish a new approved global UI baseline.
+The requested web-access feedback revision 3 adds `react-hot-toast` 2.6.1 for short-lived success messages. Theme tokens and polite status semantics apply; actionable failures remain persistent. Current corrections use top-right semantic notifications through shared UI helpers; the verification record owns review status. This does not establish a new approved global UI baseline.

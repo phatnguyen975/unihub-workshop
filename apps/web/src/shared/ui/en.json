@@ -4,7 +4,7 @@
   "tickets": "My tickets",
   "workshops": "Workshops",
   "members": "Members",
-  "staffWorkshops": "Assigned workshops",
+  "staffWorkshops": "Assigned Workshops",
   "home": "Home",
   "signIn": "Sign in",
   "signOut": "Sign out",
@@ -41,8 +41,8 @@
   "updatePassword": "Update password & continue",
   "passwordUpdated": "Your password has been updated. You’re signed in.",
   "required": "Enter a value for this field.",
-  "emailInvalid": "Enter a valid email address, up to 254 characters.",
-  "passwordInvalid": "Enter your password, up to 255 characters.",
+  "emailInvalid": "Enter a valid email address.",
+  "passwordInvalid": "Enter your password.",
   "newInvalid": "Your new password must meet the requirements below.",
   "samePassword": "Choose a password different from your temporary password.",
   "mismatch": "Your passwords don’t match.",
@@ -97,6 +97,6 @@
   "roleStudent": "Student",
   "roleOrganizer": "Organizer",
   "roleStaff": "Staff",
-  "management": "Workshop management",
+  "management": "Dashboard",
   "openNavigation": "Open workshop navigation"
 }

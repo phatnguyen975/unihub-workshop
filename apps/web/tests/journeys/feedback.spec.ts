@@ -1,4 +1,4 @@
-﻿import {test,expect} from '@playwright/test';
+import {test,expect} from '@playwright/test';
 import en from '../../src/shared/ui/en.json' with {type:'json'};
 
 async function login(page:import('@playwright/test').Page,email='minh@example.test'){
@@ -39,18 +39,44 @@ test('footer close icon is centered, borderless and shows only hover background'
  await close.hover();expect(await close.evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe(before.background);await page.screenshot({path:info.outputPath('footer-dialog-close-hover.png'),fullPage:true});await close.click();await expect(dialog).not.toBeVisible();
 });
 
-test('short pages center their body content and keep a compact footer and normal-weight locale',async({page})=>{
+test('short pages center their body content and keep a compact footer and balanced locale weight',async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await page.goto('/login');await expect(page.getByRole('heading',{name:en.welcome,exact:true})).toBeVisible();
  const main=await page.locator('main').boundingBox(),content=await page.locator('.auth-layout').boundingBox();expect(Math.abs(main!.y+main!.height/2-content!.y-content!.height/2)).toBeLessThan(3);expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight)).toBe(true);
  const footer=await page.locator('footer').boundingBox();expect(footer!.height).toBeLessThan(90);
- const trigger=page.getByRole('button',{name:en.language,exact:true});expect(await trigger.evaluate(el=>getComputedStyle(el).fontWeight)).toBe('400');await trigger.click();
+ const trigger=page.getByRole('button',{name:en.language,exact:true});expect(await trigger.evaluate(el=>getComputedStyle(el).fontWeight)).toBe('600');await trigger.click();
  const english=page.getByRole('button',{name:en.en,exact:true}),vietnamese=page.getByRole('button',{name:en.vi,exact:true});for(const option of [english,vietnamese])expect(await option.evaluate(el=>getComputedStyle(el).fontWeight)).toBe('400');expect(await english.evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe(await vietnamese.evaluate(el=>getComputedStyle(el).backgroundColor));
 });
 
 test('logout toast expires and does not repeat after navigation',async({page})=>{
- await login(page,'linh@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('button',{name:en.signOut,exact:true}).click();await expect(page.getByText(en.signedOut,{exact:true})).toBeVisible();await expect(page.locator('main')).not.toContainText(en.signedOut);await expect(page.getByText(en.signedOut,{exact:true})).not.toBeVisible({timeout:7000});await page.getByRole('link',{name:en.explore,exact:true}).click();await expect(page.getByText(en.signedOut,{exact:true})).toHaveCount(0);
+ await login(page,'linh@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('button',{name:en.signOut,exact:true}).click();await expect(page.getByText(en.signedOut,{exact:true})).toBeVisible();const toast=page.getByRole('status').filter({hasText:en.signedOut}).locator('..');expect(await toast.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(22, 99, 69)');const toastBox=await toast.boundingBox();expect(Math.abs(await page.evaluate(()=>innerWidth)-toastBox!.x-toastBox!.width-16)).toBeLessThan(2);await expect(page.locator('main')).not.toContainText(en.signedOut);await expect(page.getByText(en.signedOut,{exact:true})).not.toBeVisible({timeout:7000});await page.getByRole('link',{name:en.explore,exact:true}).click();await expect(page.getByText(en.signedOut,{exact:true})).toHaveCount(0);
 });
 
 test('logout progress has a named bar, then actionable failure instead of a stuck loader',async({page})=>{
  await page.addInitScript(()=>sessionStorage.setItem('unihub.access.mock.v1',JSON.stringify({version:1,scenario:'logout-failure',now:1794618000,session:null,lock:false,activated:{}})));await login(page,'linh@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('button',{name:en.signOut,exact:true}).click();await expect(page.getByRole('heading',{name:en.signingOut,exact:true})).toBeVisible();await expect(page.getByRole('progressbar',{name:en.signingOut,exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:en.logoutError,exact:true})).toBeVisible();await expect(page.getByRole('progressbar')).toHaveCount(0);await expect(page.getByRole('button',{name:en.retry,exact:true})).toBeVisible();
+});
+
+
+test('role page containers are centered while their heading groups stay at top left',async({page},info)=>{
+ for(const email of ['linh@example.test','an@example.test','minh@example.test']){
+  await page.goto('/login');await page.evaluate(()=>sessionStorage.clear());await page.reload();await login(page,email);
+  const main=await page.locator('main').boundingBox(),container=await page.locator('.boundary').boundingBox(),heading=await page.locator('main h1').boundingBox(),identity=await page.locator('.eyebrow').boundingBox();
+  expect(heading!.x).toBeCloseTo(identity!.x,0);expect(heading!.y-identity!.y-identity!.height).toBeLessThan(12);expect(heading!.y-main!.y).toBeLessThan(120);
+  expect(await page.locator('.boundary').evaluate(el=>getComputedStyle(el).textAlign)).not.toBe('center');
+  if(email==='an@example.test'){await expect(page.locator('.product-nav a[href="/staff/workshops"]')).toHaveCount(0);await page.getByRole('button',{name:en.account,exact:true}).click();await expect(page.locator('.account-options').getByRole('link',{name:en.staffWorkshops,exact:true})).toBeVisible();}
+  if(email==='linh@example.test')expect(Math.abs(container!.x+container!.width/2-(main!.x+main!.width/2))).toBeLessThan(2);
+  await page.screenshot({path:info.outputPath(email.split('@')[0]+'-heading.png'),fullPage:true});
+ }
+});
+
+test('temporary back link centers in form and validation hides technical limits',async({page})=>{
+ await page.goto('/change-temporary-password');const link=page.getByRole('link',{name:en.backLogin,exact:true}),card=page.locator('.auth-card');
+ const linkBox=await link.boundingBox(),cardBox=await card.boundingBox();expect(Math.abs(linkBox!.x+linkBox!.width/2-cardBox!.x-cardBox!.width/2)).toBeLessThan(2);expect(await link.evaluate(el=>getComputedStyle(el).justifyContent)).toBe('center');
+ await link.click();await page.getByLabel('Email',{exact:true}).fill('wrong-email');await page.getByRole('button',{name:en.signIn,exact:true}).click();await expect(page.getByText(en.emailInvalid,{exact:true})).toBeVisible();await expect(page.locator('main')).not.toContainText(/up to|254|255/);
+});
+
+
+test('logout failure is red and local removal is a warning toast',async({page},info)=>{
+ await page.addInitScript(()=>sessionStorage.setItem('unihub.access.mock.v1',JSON.stringify({version:1,scenario:'logout-failure',now:1794618000,session:null,lock:false,activated:{}})));await login(page,'linh@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('button',{name:en.signOut,exact:true}).click();
+ const error=page.getByRole('status').filter({hasText:en.logoutError}).locator('..');await expect(error).toBeVisible();expect(await error.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(180, 35, 53)');
+ await page.getByRole('button',{name:en.removeLocal,exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:en.removeConfirm,exact:true}).click();const warning=page.getByRole('status').filter({hasText:en.localRemoved}).locator('..');await expect(warning).toBeVisible();expect(await error.isVisible()).toBe(false);expect(await warning.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(254, 243, 199)');await page.screenshot({path:info.outputPath('semantic-toasts.png'),fullPage:true});
 });
