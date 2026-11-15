@@ -120,3 +120,50 @@ The full six-axis findings report is local `review-notes.md`, ignored by the rep
 Resolved should-fix findings WR-01/02/03/04/06/07 concern the fixes above. No unresolved critical/should-fix implementation finding remains from this self-review. WR-05 records pending human evidence; there is no independent maintainer or human MOCK acceptance claim.
 
 Official guideline snapshot: `https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md`, fetched 2026-11-14T19:05:00Z; SHA-256 `d246b026f4f29b5823a9cc857f9edf3d2507002e055e32040cadeaf3b38e0234`. Approved app rules override upstream automatic locale detection and Title Case advice. No extra product scope/library was inferred from the audit.
+
+## Feedback Revision 3: 2026-11-16
+
+**Mode:** `MOCK`. **Authority:** Explicit human correction request, recorded in [Feedback Amendment](feedback-2026-11-16.md). Historical approved dependencies remain spec 1 / prototype 2 / tasks 1 / UI baseline 6. These requested capability presentations are implemented for review; proposed reusable baseline amendments and human acceptance remain pending. Lifecycle remains `VERIFICATION_PENDING`.
+
+### Corrections and Regression Evidence
+
+- Organizer chrome previously depended only on role; it now additionally requires the management route. Public home and `/workshops` have no organizer sidebar. Avatar management entry navigates to the existing `/organizer/workshops` boundary. Three shell regression tests failed before the correction and passed afterward.
+- Desktop sidebar is an inset rounded card. At narrow widths an icon beside the header logo opens centered native dialog navigation with a dimmed backdrop, Escape/focus return, close and selection dismissal. No additional menu row or new dashboard capability.
+- A shared Lucide close control centers the X in a transparent borderless target; hover/focus shows the circular surface. Footer placeholder text is unchanged.
+- Account name is larger than action labels; name/email truncate with ellipsis and retain full text/title. Leading Lucide icons distinguish account actions. A deliberately long synthetic organizer fixture covers overflow.
+- Removed the redundant signed-in prefix from role boundary identity text. Shortened bilingual password guidance while retaining existing validation. Locale trigger/options use normal weight with active background. Footer spacing is reduced, and short content centers within available main space while long forms continue to scroll.
+- The C-shaped graphic was an open CSS spinner. Session restoration and logout now have named progress bars and distinct headings. A deferred fake regression proves logout transitions from progress to actionable unconfirmed failure, without a stuck loader.
+- Installed `react-hot-toast` 2.6.1 for confirmed success messages, with 4-second duration, polite status semantics and theme tokens. Controller message consumption prevents repeated success on navigation. Field/recovery errors, unconfirmed logout and uncertain password results remain persistent. Local removal still explicitly does not confirm service revocation.
+
+### Fresh Checks
+
+| Check | Result |
+| ----- | ------ |
+| Targeted new Chromium journeys, both configured projects | PASS: 14 tests |
+| `npm run verify:all -- --workers=2` | PASS: lint, TypeScript, 51 unit/component tests, standard build and 68 browser tests. npm treated the workers argument as configuration; Playwright actually used its default 6 workers. No tests were skipped. |
+| Standard build | PASS: JS 465.61 kB / 145.19 kB gzip; CSS 19.09 kB / 5.15 kB gzip |
+| `git diff --check` | PASS |
+| CLI preview at loopback 4182 | Chromium opened; snapshot, actual form login, public/management navigation, language/theme switching and modal operation checked |
+| CLI failure scenario | Logout progress replaced by unconfirmed failure, no progressbar/account button left, recovery actions present |
+| Browser console/network | 0 errors/warnings; 12 successful localhost static GETs; no live API requests observed |
+
+Browser tests remain in `tests/journeys/feedback.spec.ts` and existing suites. They assert public/workspace separation, modal focus/dismissal and no overflow at 320px, ellipsis/full titles and typography, X geometry/background, footer/short-content layout, locale styling, toast expiry/no repeat and logout progress/error recovery. Existing bilingual/theme/viewport matrix, role/session/security and accessibility checks also passed. Browser projects use 1440x900 and 390x844; feedback cases additionally set 1440x1000, 390x900 and 320x900 where relevant.
+
+### Actually Viewed Visual Evidence
+
+Captured and viewed current React screenshots: desktop workspace card and organizer public home (1440x1000, EN/light); centered menu (320x900, EN/light and 390x844, VI/dark); long-name/email popup (390x900, EN/light); footer dialog hover close (1440x1000, EN/light); logout progress, unconfirmed failure and success toast (1440x1000, EN/light). The CLI also confirmed the success toast disappears. No clipped modal/header content or horizontal overflow was found in these cases. Screenshots assess presentation; assertions separately establish behavior.
+
+CLI exploratory attempts initially used an English label absent from the UI (`Retry` instead of `Try again`) and a locale label from the wrong locale; corrected scripts completed. The installed CLI uses `requests --static`, not `network`. Those failed tool attempts are not counted as passing evidence. Disposable CLI images/logs remain in OS temporary storage; Playwright reports/images remain ignored outputs, not approved golden files. Reproduction scenarios and tests above are the retained record.
+
+### Scoped Technical Review
+
+| Axis | Outcome |
+| ---- | ------- |
+| Correctness | Route guards and operation generations retained; new shell and one-shot-message regressions pass; critical recovery is persistent |
+| Design | App composition owns notifications, shared close primitive imports no feature, identity service remains injected MOCK; requested amendments recorded separately |
+| Security | No real API, stored credential or permission-policy change; private content stays locked during ambiguous logout; full popup values are synthetic identity data |
+| Performance | Named icons reused; one toast dependency plus its small style runtime; no new polling/network work; standard build size recorded above |
+| Coverage | 51 unit/component and 68 browser tests pass; existing role/password/retry/isolation matrix retained |
+| Style/Visual | Actual desktop/narrow and light/dark images viewed; requested sidebar, close target, popup typography, footer and loader corrected |
+
+No unresolved critical/should-fix issue found in this scoped self-review. Required real 200% browser zoom, actual screen reader and Edge-native reveal checks from the earlier record remain pending; viewport emulation does not replace them. This revision is ready for the user's next review, not `VERIFIED`/`ACCEPTED`, global foundation approval or API integration.

@@ -1,3 +1,4 @@
+import { CloseButton } from '@/shared/ui/CloseButton';
 import { useEffect, useRef } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 import { LockKeyhole } from 'lucide-react';
@@ -34,8 +35,8 @@ function Content() {
     useEffect(() => { document.querySelector<HTMLElement>('#page-title')?.focus(); }, [path, state.kind]);
     useEffect(() => { document.title = (path === '/login' ? t('signIn') : path === '/change-temporary-password' ? t('temporaryTitle') : t('workshops')) + ' · UniHub'; }, [path, t]);
     if (['restoring', 'renewing', 'logging-out'].includes(state.kind))
-        return <Status title={state.kind === 'logging-out' ? 'signingOut' : 'restoring'} text={state.kind === 'logging-out' ? 'signingOutText' : 'restoringText'}>
-        <span className="spinner" role="status" aria-label={t('restoring')}/>
+        return <Status title={state.kind === 'logging-out' ? 'signingOut' : state.kind === 'renewing' ? 'renewing' : 'restoring'} text={state.kind === 'logging-out' ? 'signingOutText' : 'restoringText'}>
+        <div className="session-progress" role="progressbar" aria-label={t(state.kind === 'logging-out' ? 'signingOut' : state.kind === 'renewing' ? 'renewing' : 'restoring')}><span /></div>
         </Status>;
     if (state.kind === 'restore-unavailable' || state.kind === 'logout-unconfirmed')
         return <>
@@ -45,7 +46,7 @@ function Content() {
         <button className="btn secondary" onClick={() => dialog.current?.showModal()}>{t('removeLocal')}</button>
         </Status>
         <dialog ref={dialog} aria-labelledby="remove-title" aria-describedby="remove-description">
-        <button className="dialog-close" aria-label={t('close')} onClick={() => dialog.current?.close()}>×</button>
+        <CloseButton onClick={() => dialog.current?.close()} />
         <h2 id="remove-title">{t('removeTitle')}</h2>
         <p id="remove-description">{t('removeText')}</p>
         <div className="dialog-actions">
@@ -70,7 +71,8 @@ function Content() {
     }
     if (state.kind === 'temporary')
         return <Navigate to={'/change-temporary-password' + suffix} replace/>;
-    const notice = state.kind === 'anonymous' || state.kind === 'authenticated' ? state.message : undefined;
+    const message = state.kind === 'anonymous' || state.kind === 'authenticated' ? state.message : undefined;
+    const notice = message && !['signedOut', 'passwordUpdated', 'localRemoved'].includes(message) ? message : undefined;
     if (path === '/')
         return <section className="home">
         <div>
@@ -83,7 +85,7 @@ function Content() {
     if (['/workshops', '/organizer/workshops', '/staff/workshops', '/register', '/forgot-password'].includes(path)) {
         const auth = ['/register', '/forgot-password'].includes(path);
         const title = path === '/register' ? 'registerTitle' : path === '/forgot-password' ? 'recoveryTitle' : path === '/staff/workshops' ? 'staffWorkshops' : 'workshops';
-        return <section className="boundary">{identity && <p className="eyebrow">{t('signedIn')} · {identity.name} · {t('role' + (identity.role === 'STUDENT' ? 'Student' : identity.role === 'STAFF' ? 'Staff' : 'Organizer'))}</p>}<h1 id="page-title" tabIndex={-1}>{t(title)}</h1>{notice && <div className="notice" role="status">{t(notice)}</div>}{controller.storageFailed() && <div className="notice" role="status">{t('storage')}</div>}<Link className="back-link" to={auth ? '/login' + suffix : '/'}>{t(auth ? 'backLogin' : 'backHome')}</Link>
+        return <section className="boundary">{identity && <p className="eyebrow">{identity.name} · {t('role' + (identity.role === 'STUDENT' ? 'Student' : identity.role === 'STAFF' ? 'Staff' : 'Organizer'))}</p>}<h1 id="page-title" tabIndex={-1}>{t(title)}</h1>{notice && <div className="notice" role="status">{t(notice)}</div>}{controller.storageFailed() && <div className="notice" role="status">{t('storage')}</div>}<Link className="back-link" to={auth ? '/login' + suffix : '/'}>{t(auth ? 'backLogin' : 'backHome')}</Link>
         </section>;
     }
     return <Status title="notFound" text="notFoundText">

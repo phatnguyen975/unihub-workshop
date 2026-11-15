@@ -60,6 +60,15 @@
       "role": "ORGANIZER",
       "organization": null,
       "temporary": false
+    },
+    {
+      "id": "long-organizer",
+      "label": "Organizer with long display text",
+      "email": "alexandria.montgomery.wellington.workshop.organizer.with.long.email.address@example.test",
+      "name": "Alexandria Montgomery-Wellington with an exceptionally long display name for account menu review",
+      "role": "ORGANIZER",
+      "organization": "Career Development Center",
+      "temporary": false
     }
   ],
   "scenarios": [

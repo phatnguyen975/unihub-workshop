@@ -843,3 +843,57 @@ h2 { font-weight: 700; }
 
 /* Restore native dialog centering after Tailwind preflight resets margins. */
 dialog { margin: auto; }
+/* Web-access feedback revision 3: scoped presentation amendments. */
+.dialog-close {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    line-height: 0;
+}
+.dialog-close:hover, .dialog-close:focus-visible { background: var(--canvas); }
+.dialog-close svg { display: block; width: 20px; height: 20px; }
+.locale-trigger, .locale-options button, .locale-options button[aria-pressed="true"] { font-weight: 400; }
+.account-options { width: min(288px, calc(100vw - 40px)); min-width: 0; }
+.account-options .identity { min-width: 0; padding: 12px; }
+.account-name, .account-email { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.account-name { font-size: 17px; font-weight: 650; line-height: 1.4; }
+.account-email { font-size: 13px; margin-top: 4px; }
+.account-options a, .account-options button { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 400; }
+.account-options svg { flex-shrink: 0; }
+.public-main { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.public-main > .auth-layout, .public-main > .home { width: 100%; margin-block: 32px; }
+.public-main > .status-panel { width: min(560px, calc(100% - 40px)); margin: 32px auto; }
+.public-main > .boundary { width: min(1080px, 100%); margin-block: 32px; text-align: center; }
+.workspace-main { display: flex; }
+.organizer-layout { width: 100%; flex: 1; min-height: 0; margin: 24px auto; padding: 0 32px; gap: 24px; }
+.sidebar { align-self: start; border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+.workspace-content { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; }
+.workspace-content .boundary { width: 100%; margin-block: 32px; text-align: center; }
+.workspace-navigation a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 12px; border-radius: 8px; background: var(--tint); }
+.workspace-toggle { display: none; }
+.navigation-dialog { max-width: 400px; }
+.navigation-dialog .organization { margin: 16px 0 24px; }
+.session-progress { position: relative; overflow: hidden; width: 180px; height: 5px; border-radius: 8px; background: var(--tint); }
+.session-progress span { display: block; width: 45%; height: 100%; border-radius: inherit; background: var(--brand); animation: session-progress 1.3s ease-in-out infinite alternate; }
+@keyframes session-progress { from { transform: translateX(0); } to { transform: translateX(125%); } }
+.footer-inner { padding-block: 10px; gap: 8px 24px; font-size: 14px; }
+.footer-inner p { margin: 0; }
+.footer-inner button { padding-block: 6px; }
+@media (max-width: 650px) {
+    .workspace-toggle { display: grid; }
+    .has-workspace-menu { gap: 6px; }
+    .has-workspace-menu .product-nav { display: none; }
+    .organizer-layout { grid-template-columns: 1fr; padding: 0 20px; }
+    .sidebar { display: none; }
+    .footer-inner { padding-block: 10px; gap: 4px 20px; }
+    .footer-inner nav { gap: 20px; }
+    .navigation-dialog { padding: 28px 24px; }
+}
+@media (max-width: 360px) {
+    .has-workspace-menu .brand img { width: 80px; height: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .session-progress span { animation: none; transform: translateX(60%); }
+}

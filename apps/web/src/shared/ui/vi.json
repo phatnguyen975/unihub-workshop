@@ -37,7 +37,7 @@
   "temporaryTitle": "Bắt đầu với mật khẩu của bạn",
   "temporaryText": "Đặt mật khẩu mới trước khi tiếp tục. Bạn sẽ được đăng nhập ngay sau khi đổi thành công.",
   "missingCredentials": "Nhập email và mật khẩu tạm thời để tiếp tục.",
-  "passwordHelp": "Dùng 8–255 ký tự, gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt (! @ # $ % ^ & * ( ) , . ? : { } | < > hoặc dấu ngoặc kép). Mật khẩu mới phải khác mật khẩu tạm thời.",
+  "passwordHelp": "Ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.",
   "updatePassword": "Đổi mật khẩu và tiếp tục",
   "passwordUpdated": "Đã đổi mật khẩu. Bạn đã được đăng nhập.",
   "required": "Vui lòng điền trường này.",
@@ -96,5 +96,7 @@
   "signedIn": "Đã đăng nhập",
   "roleStudent": "Sinh viên",
   "roleOrganizer": "Ban tổ chức",
-  "roleStaff": "Nhân viên"
+  "roleStaff": "Nhân viên",
+  "management": "Quản lý workshop",
+  "openNavigation": "Mở điều hướng workshop"
 }

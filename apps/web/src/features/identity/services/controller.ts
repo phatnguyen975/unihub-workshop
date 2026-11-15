@@ -49,5 +49,9 @@ export class AccessController {
             this.set({ kind: 'logout-unconfirmed' });
     } };
     error(error: unknown) { return error instanceof AccessError ? error.kind : 'unavailable'; }
+    consumeMessage(expected: string) {
+        const state = this.state;
+        if ((state.kind === 'anonymous' || state.kind === 'authenticated') && state.message === expected) this.set({ ...state, message: undefined });
+    }
     storageFailed = () => this.service.storageFailed();
 }

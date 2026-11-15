@@ -147,3 +147,7 @@ The intended approval bundle is **spec revision 1 + prototype revision 2 + task 
 Build was explicitly invoked against the approved bundle. WA-T01 through WA-T05 implementation and automated checks are complete; all planned task code has been implemented. WA-T06 technical review and acceptance preparation are complete, while required actual browser zoom, screen-reader and Edge-specific review evidence remains pending. Its checkbox stays open rather than claiming required checks that have not run.
 
 Final `npm run verify:all`: PASS (46 unit/component tests and 54 browser tests, including both configured projects, 96 matrix cases plus two dialog variants per project). See [Verification](verification.md) and [Technical Review](verification.md#technical-review). Capability lifecycle is `VERIFICATION_PENDING`; human MOCK acceptance has not been recorded. No next capability or integration has started.
+
+### Feedback Correction: 2026-11-16
+
+Implemented the explicitly requested [UI Feedback Revision 3](feedback-2026-11-16.md) within MOCK web-access. Fresh verification passed lint, TypeScript, 51 unit/component tests, build and 68 browser tests; desktop/narrow screenshots were actually viewed. [Feedback Evidence](verification.md#feedback-revision-3-2026-11-16) retains reproduction and scoped technical review. User review, shared UI amendment promotion and the previously required real zoom/AT/Edge checks remain pending. WA-T06 remains open and lifecycle remains `VERIFICATION_PENDING`.

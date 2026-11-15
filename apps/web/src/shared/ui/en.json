@@ -37,7 +37,7 @@
   "temporaryTitle": "Make this account yours",
   "temporaryText": "Set a new password before you continue. You’ll be signed in as soon as it’s updated.",
   "missingCredentials": "Enter your email and temporary password to continue.",
-  "passwordHelp": "Use 8–255 characters with uppercase and lowercase letters, a number, and a special character (! @ # $ % ^ & * ( ) , . ? : { } | < > or a quotation mark). Choose a password different from your temporary password.",
+  "passwordHelp": "At least 8 characters, including uppercase and lowercase letters, a number and a special character.",
   "updatePassword": "Update password & continue",
   "passwordUpdated": "Your password has been updated. You’re signed in.",
   "required": "Enter a value for this field.",
@@ -96,5 +96,7 @@
   "signedIn": "Signed in",
   "roleStudent": "Student",
   "roleOrganizer": "Organizer",
-  "roleStaff": "Staff"
+  "roleStaff": "Staff",
+  "management": "Workshop management",
+  "openNavigation": "Open workshop navigation"
 }
