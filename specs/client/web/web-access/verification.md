@@ -1,10 +1,10 @@
 # Verification: Web Access
 
 - **Mode:** `MOCK`
-- **Implementation Evidence Revision:** 1, 2026-11-15
+- **Implementation Evidence Revision:** 2, 2026-11-16 (prior revision and correction records retained)
 - **Approved Dependencies:** Spec 1, prototype 2, tasks 1, UI baseline/foundation 6, experience/inventory 1
-- **Technical State:** Automated checks passed; required human checks below remain pending
-- **Human Mock Acceptance:** Pending; no API integration or production deployment is asserted
+- **Technical State:** `VERIFIED` for implementation `72d1160`; automated evidence plus user-reported required manual checks
+- **Human Mock Acceptance:** `ACCEPTED`, acceptance revision 1 on 2026-11-16; Web / `MOCK` only. No API integration or production deployment is asserted
 
 ## Implementation and Entry
 
@@ -93,14 +93,14 @@ Screenshots and traces are disposable evidence under the configured ignored Play
 
 | Check | Steps / Expected Result | Status / Owner |
 | ----- | ----------------------- | -------------- |
-| Browser zoom | In a real desktop browser at 200%, operate login, temporary-password and local-removal flow; no clipping, overlapping controls or unreachable actions | NOT_RUN; human reviewer |
-| Screen reader | NVDA + Chromium (or equivalent actual AT): labels/errors/status, first-invalid focus, locale popup, logout lock and dialog name/description/focus return are understandable | NOT_RUN; human reviewer |
-| Edge reveal | Enter a password in Edge, check only custom visibility button appears and toggles its visual/accessibility state | NOT_RUN in Edge; Chromium custom toggle tests passed |
-| Human MOCK review | Exercise three roles, initial password replacement, errors/retries and local logout distinction against spec 1 / prototype 2 / UI 6 | Pending explicit human decision |
+| Browser zoom | In a real desktop browser at 200%, operate login, temporary-password and local-removal flow; no clipping, overlapping controls or unreachable actions | PASS; user-reported on 2026-11-16 |
+| Screen reader | NVDA + Chromium (or equivalent actual AT): labels/errors/status, first-invalid focus, locale popup, logout lock and dialog name/description/focus return are understandable | PASS; user-reported on 2026-11-16 |
+| Edge reveal | Enter a password in Edge, check only custom visibility button appears and toggles its visual/accessibility state | PASS; user-reported Edge check on 2026-11-16; Chromium custom toggle tests also passed |
+| Human MOCK review | Exercise three roles, initial password replacement, errors/retries and local logout distinction against spec 1 / prototype 2 / UI 6 | ACCEPTED; explicit user decision on 2026-11-16 |
 
 No native/mobile evidence is applicable. Pending human checks cannot be converted into passing results by axe, viewport emulation or tests. If those checks reveal in-scope defects, correct through the authorized client-fix path and rerun affected evidence. Material behavior/global UI changes require owning approval.
 
-## Delivery State
+## Delivery State at Initial Build
 
 Implementation slices WA-T01–WA-T05 have code and automated evidence. WA-T06 has technical review and acceptance preparation; its mandatory human checks remain pending. Keep lifecycle `VERIFICATION_PENDING` and do not claim `VERIFIED` or `ACCEPTED` until all applicable required evidence and human decisions are recorded. No next capability, real integration or publication is authorized by this record.
 
@@ -209,3 +209,18 @@ Fresh `npm run verify` passed lint, TypeScript, 53 unit/component tests and stan
 CLI Chromium checked actual login and menu open/Escape plus 320/390/650/651/768/900/901/1440px widths. Measurements confirmed 32px controls through 650px and 44px controls from 651px, with no horizontal page overflow. Current 320px, 390px and 1440px screenshots were captured and actually viewed. Console had zero errors/warnings; all five observed requests were successful loopback static GETs. Owned browser and preview 4182 were stopped. Images/logs remain disposable OS-temp evidence, not approved golden files.
 
 Scoped technical review: sizing/menu and public/private navigation behavior retained; mobile-first header rules replace conflicting narrow overrides; no service/security/dependency change; no new polling or runtime work; fresh browser and visual evidence covers the requested adjustment. Required human checks and acceptance remain pending. Keep `VERIFICATION_PENDING` until the applicable evidence and explicit human acceptance are recorded.
+
+
+## Human MOCK Acceptance: 2026-11-16
+
+- **Decision:** `ACCEPTED`, acceptance revision 1, Web / `MOCK` / `web-access` only.
+- **Accepted Implementation:** `72d116078aba07ce9ee4528eefa98f5d198d2823`, including all requested UI corrections through narrow header sizing. Acceptance-stage edits are documentation only.
+- **Compatible Dependencies:** Spec 1, capability prototype 2, tasks 1, experience/inventory 1, UI baseline/foundation 6 plus the explicitly requested and approved scoped React presentation exceptions recorded in the UI baseline. Historical HTML prototypes have not been relabelled as newer revisions.
+- **Human Evidence:** The user explicitly invoked `client-accept web web-access`, accepted the current implementation and requested commit/push. When asked about the three previously outstanding checks, the user confirmed all three had been checked and passed: real browser 200% zoom, actual screen reader and the Edge password-reveal control. These are user-reported results, not agent-run AT/Edge certification; exact browser/AT versions were not supplied.
+- **Task Closure:** WA-T01 through WA-T06 are complete. No required check or unresolved acceptance-blocking finding remains in the declared MOCK scope. Prior pending statements above describe historical review snapshots and are superseded by this decision.
+- **Approved Presentation:** Top-left role page heading groups within centered outer containers; Dashboard / Assigned Workshops role entries; workspace-only organizer sidebar and narrow header modal navigation; matching narrow logo/control sizing; semantic top-right notifications and persistent recovery; compact footer, shared close control, account ellipsis/icons, localized validation copy and temporary-form back-link alignment.
+- **Boundary:** No real API/provider behavior, production deployment, all-mock platform acceptance, next capability or integration is accepted or started. Register/recovery and workshop/role destinations remain the approved minimal capability boundaries.
+
+### Acceptance-Stage Verification
+
+The code identity above is unchanged from the latest reviewed implementation. Fresh acceptance-stage `npm run verify` passed lint, TypeScript, 53 unit/component tests and the standard build. `npm run test:e2e -- --workers=2` passed all 76 Chromium browser tests in 2.0 minutes, including both configured projects and their bilingual/theme/viewport/accessibility matrices. No test was skipped or weakened. `git diff --check` and changed-document link checks passed. Previous visual/UI evidence remains applicable to that same code identity. The canonical catalog and task completion record use this exact acceptance decision; Git publication does not establish a further approval or merge.

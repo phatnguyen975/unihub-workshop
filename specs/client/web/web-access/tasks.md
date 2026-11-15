@@ -4,7 +4,7 @@
 - **Plan Revision:** 1
 - **Status:** `APPROVED`
 - **Spec/Prototype/UI Revisions:** Spec 1; capability prototype 2; web UI baseline/foundation prototype 6; experience/inventory 1
-- **Approval:** Human approved the MOCK bundle (spec revision 1, prototype revision 2 and plan revision 1) on 2026-11-15, referencing UI baseline/foundation 6 and experience/inventory 1. Implementation awaits a separate client-build invocation; mock acceptance remains pending.
+- **Approval:** Human approved the MOCK bundle (spec revision 1, prototype revision 2 and plan revision 1) on 2026-11-15, referencing UI baseline/foundation 6 and experience/inventory 1. At bundle approval, implementation awaited a separate client-build invocation. The resulting MOCK implementation was accepted on 2026-11-16; see the current execution decision below.
 
 ## Dependency Order
 
@@ -92,7 +92,7 @@ All checkboxes start unchecked. A completed task requires its stated behavior an
   - **Test-first:** Success/rejection/uncertain/already-unusable results; stale login/renew after logout; persisted lock before private rendering; idempotent local cleanup even with unavailable storage; password/identity scrubbing. No blanket error-to-success conversion or automatic logout replay.
   - **Verification:** Service/controller/component tests; browser success → Back/reload, failed logout → reload/route change → locked, retry recovery, local-removal cancel/Escape/confirm and keyboard focus restoration. Inspect local-removal dialog in EN light desktop and VI dark 320 px.
 
-- [ ] **WA-T06 — Complete Capability Review and Prepare Human MOCK Acceptance**
+- [x] **WA-T06 — Complete Capability Review and Prepare Human MOCK Acceptance**
   - **Depends on:** T01–T05 implemented outputs and regression checks.
   - **File scope:** In-scope access corrections, colocated/browser tests, app review harness, capability `verification.md`/`review-notes.md`, task progress and web catalog. Do not expand product scope.
   - **Outcome:** Full spec/prototype parity, repeatable review scenarios and honest evidence. Human acceptance is prepared, not assumed. Standard product build contains no scenario toolbar; the default adapter remains fake in MOCK mode, with no live provider instantiated.
@@ -153,3 +153,8 @@ Final `npm run verify:all`: PASS (46 unit/component tests and 54 browser tests, 
 Implemented the explicitly requested UI Feedback Revision 3 within MOCK web-access. Fresh verification passed lint, TypeScript, 51 unit/component tests, build and 68 browser tests; desktop/narrow screenshots were actually viewed. [Feedback Evidence](verification.md#feedback-revision-3-2026-11-16) retains reproduction and scoped technical review. User review, shared UI amendment promotion and the previously required real zoom/AT/Edge checks remain pending. WA-T06 remains open and lifecycle remains `VERIFICATION_PENDING`.
 
 The subsequent human clarification has also been implemented: outer-container alignment with top-left headings, semantic top-right notifications, role dropdown/navigation copy and form text/alignment. The latest verification section owns current test results and outstanding human checks; no separate feedback artifact is retained.
+
+
+## Accepted Execution: 2026-11-16
+
+WA-T01 through WA-T06 are complete for implementation `72d1160`, Web / `MOCK` / `web-access`. The user accepted the reviewed UI and confirmed all previously outstanding real 200% browser zoom, screen-reader and Edge password-reveal checks passed. The current [Acceptance Decision](verification.md#human-mock-acceptance-2026-11-16) supersedes historical pending snapshots above; spec 1 / prototype 2 / plan 1 and UI baseline/foundation 6 remain historical approved dependencies with approved scoped presentation exceptions. Lifecycle is `ACCEPTED`; no integration or next capability is authorized by task closure.

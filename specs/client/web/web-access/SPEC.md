@@ -5,7 +5,9 @@
 > **Status:** `APPROVED`<br>
 > **Revision:** 1<br>
 > **Experience/UI Baseline:** Web experience map revision 1; delivery inventory revision 1; web UI baseline revision 6 and foundation prototype revision 6<br>
-> **Approval:** Human approved this specification at revision 1 for Web / `MOCK` on 2026-11-14. Approval covers the specification only; the compatible prototype/task bundle and production implementation remain pending.
+> **Approval:** Human approved this specification at revision 1 for Web / `MOCK` on 2026-11-14. That decision covered the specification only; later bundle/build and acceptance decisions are recorded separately.
+
+> **Current Delivery:** Web / `MOCK` implementation `72d1160` accepted on 2026-11-16, including explicitly requested presentation corrections. See [Acceptance Decision](verification.md#human-mock-acceptance-2026-11-16) and the approved scoped exceptions in [Web UI Design](../../../../docs/client/web/ui-design.md#approved-scoped-exceptions-and-dependent-artifacts). Specification revision 1 business scope is unchanged.
 
 ## Actors and Preconditions
 

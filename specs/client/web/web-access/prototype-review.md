@@ -8,7 +8,7 @@
 >
 > **Spec/UI Revisions:** Approved `SPEC.md` revision 1; experience/inventory revision 1; UI baseline and foundation prototype revision 6
 >
-> **Review/Approval:** Human approved prototype revision 2, including the email-label/password-toggle/cache updates, on 2026-11-15 against spec revision 1 and UI baseline revision 6. Capability bundle approval, implementation and mock acceptance remain pending.
+> **Review/Approval:** Human approved prototype revision 2, including the email-label/password-toggle/cache updates, on 2026-11-15 against spec revision 1 and UI baseline revision 6. At that review, capability bundle approval, implementation and mock acceptance remained pending. Subsequent delivery is recorded below.
 
 ## Artifact Scope
 
@@ -158,3 +158,8 @@ Installed `lucide-react` 1.73.0 in `apps/web` for the future React build; packag
 ## Prototype Revision 2 Approval
 
 Human approved the current prototype on 2026-11-15 after reviewing the UI feedback updates. Revision 2 includes the Email label, native reveal suppression, eye/eye-off toggle and fresh translation loading. Revision 1 automated browser evidence remains historical; revision 2 has syntax/diff checks and the recorded human design decision, without a claimed fresh full browser replay. The MOCK task plan and coherent bundle approval remain pending.
+
+
+## Subsequent React Implementation Acceptance
+
+The user accepted `web-access` Web / `MOCK` implementation `72d1160` on 2026-11-16 after the requested UI corrections. See [Acceptance Decision](verification.md#human-mock-acceptance-2026-11-16) and the UI baseline's approved scoped exceptions. This is acceptance of the current React implementation; HTML capability prototype revision 2 and foundation revision 6 remain historical design artifacts, not revised production evidence or newly numbered prototypes. Requirements not changed by the explicit corrections retain their approved meaning.
