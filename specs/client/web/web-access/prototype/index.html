@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="light dark" />
+        <title>Sign in · UniHub</title>
+        <link rel="icon" type="image/svg+xml" href="assets/unihub-symbol.svg" />
+        <link rel="stylesheet" href="styles.css" />
+        <script type="module" src="app.js?v=20261115-email"></script>
+    </head>
+    <body>
+        <a class="skip" href="#main" id="skip">Skip to main content</a>
+        <aside class="reviewbar" aria-label="Prototype review">
+            <div class="review-top">
+                <strong>Web access · r1</strong
+                ><span>MOCK · Spec r1 / UI r6</span>
+                <button id="reset" type="button">Reset</button>
+            </div>
+            <div class="review-controls">
+                <label>Sample account<select id="sample"></select></label>
+                <label>Service scenario<select id="scenario"></select></label>
+                <button id="expire" type="button">Advance clock +61s</button>
+                <button id="revoke" type="button">Revoke session</button>
+                <a href="#/organizer/workshops">Protected entry</a>
+            </div>
+            <details>
+                <summary>Review credentials &amp; boundaries</summary>
+                <p id="fixture-note"></p>
+                <p>
+                    Use synthetic credentials only. Adjacent destinations show a
+                    heading and navigation; their capabilities are not
+                    implemented. Select a failure before the action; choose
+                    Normal to recover. Reset clears this tab's synthetic state.
+                </p>
+            </details>
+            <p id="review-state" aria-live="polite"></p>
+        </aside>
+        <header class="header">
+            <div class="header-inner">
+                <a href="#/" class="brand" aria-label="UniHub home"
+                    ><img
+                        id="logo"
+                        src="assets/unihub-logo.svg"
+                        alt="UniHub"
+                        width="156"
+                        height="41"
+                /></a>
+                <nav
+                    id="navigation"
+                    class="product-nav"
+                    aria-label="Main navigation"
+                ></nav>
+                <div class="header-actions">
+                    <button
+                        type="button"
+                        class="icon-button"
+                        id="theme"
+                    ></button>
+                    <div class="locale-control">
+                        <button
+                            type="button"
+                            class="icon-button"
+                            id="locale"
+                            aria-expanded="false"
+                            aria-controls="language-options"
+                        >
+                            EN
+                        </button>
+                        <div id="language-options" class="popup" hidden>
+                            <button type="button" data-locale="en">
+                                English</button
+                            ><button type="button" data-locale="vi">
+                                Vietnamese
+                            </button>
+                        </div>
+                    </div>
+                    <div id="account"></div>
+                </div>
+            </div>
+        </header>
+        <main id="main" tabindex="-1">
+            <p class="boot" role="status">Loading UniHub…</p>
+        </main>
+        <footer>
+            <div class="footer-inner">
+                <p id="footer-copy"></p>
+                <nav id="footer-links" aria-label="Help"></nav>
+                <span>© UniHub</span>
+            </div>
+        </footer>
+        <div
+            id="announcer"
+            class="sr-only"
+            role="status"
+            aria-live="polite"
+        ></div>
+        <dialog
+            id="confirm-local"
+            aria-labelledby="dialog-title"
+            aria-describedby="dialog-description"
+        >
+            <button
+                type="button"
+                id="dialog-close"
+                class="dialog-close"
+                aria-label="Close"
+            >
+                ×
+            </button>
+            <h2 id="dialog-title"></h2>
+            <p id="dialog-description"></p>
+            <div class="dialog-actions">
+                <button
+                    type="button"
+                    id="dialog-cancel"
+                    class="btn secondary"
+                ></button
+                ><button type="button" id="dialog-confirm" class="btn"></button>
+            </div>
+        </dialog>
+    </body>
+</html>

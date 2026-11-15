@@ -6,6 +6,12 @@ Use client rules and `docs/client/web/ui-design.md`. If the baseline does not ex
 
 Keep the Vite mount in `src/main.tsx`; app routes, layouts, providers and adapter selection belong in `src/app/`. Cohesive feature pages live under `src/features/<feature>/`; cross-feature route composition stays in the app layer. Public configuration is not secret storage.
 
+## Mobile-First Responsive Implementation
+
+Build web screens and HTML prototypes from narrow viewports upward. Unprefixed Tailwind utilities (or base CSS) define the mobile layout; add `sm:`, `md:`, `lg:` utilities or `min-width` queries only to enhance wider layouts. Select breakpoints from actual content and approved UI criteria. Do not treat `sm:` as the mobile default or start each new feature with a desktop layout patched by shrinking overrides.
+
+When modifying an existing component, make the touched responsive rules mobile-first where practical; preserve approved behavior and avoid unrelated whole-app rewrites. Reuse the shared header/control sizing and semantic tokens. Check long bilingual content, keyboard/focus, usable pointer targets, image proportions and overflow at 320/390/768/1440 px, plus the changed breakpoint boundaries. View current screenshots at narrow and wide widths before completion. Emulated viewports do not replace required real browser zoom or assistive-technology checks.
+
 ## Browser and Visual Feedback
 
 Use `playwright-cli` as the browser driver for local prototypes/app previews and Playwright Test author/run/debug work. It needs a compatible installed CLI/browser runtime; a `SKILL.md` alone does not supply either. Use the repository's configured commands and versions when available, not an automatic latest install.

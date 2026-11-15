@@ -70,6 +70,8 @@ Delivery rows are keyed by capability ID and mode. Keep separate `MOCK` and `INT
 
 Use applicable skills from the matching client workflow entrypoint. Browser inspection requires actual screenshot viewing, UI actions/assertions and console/network review; preserve approved acceptance criteria and golden-image gates. Native work uses proven physical targets under mobile rules. Pending evidence stays pending. Technical review uses the six-axis shared review template; only the authorized caller dispatches fixes.
 
+For web design, prototypes, planning, build and fixes, follow the mobile-first implementation policy in `.agents/rules/web.md`. Include narrow-to-wide responsive behavior and breakpoint checks in the applicable task/verification plan; this web policy does not govern native layouts.
+
 Shared context runs in workflow mode. Debug unexpected failures through root-cause analysis. Simplify only covered green code with a real readability opportunity, approved scope and test command; no HTML report/template loading, save-location question or duplicate refactor gate. Follow shared Git rules and the user's delivery instructions. Routine implementation within approved scope proceeds autonomously.
 
 ## client-discover

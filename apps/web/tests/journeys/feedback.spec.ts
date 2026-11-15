@@ -1,0 +1,97 @@
+import {test,expect} from '@playwright/test';
+import en from '../../src/shared/ui/en.json' with {type:'json'};
+
+async function login(page:import('@playwright/test').Page,email='minh@example.test'){
+ await page.goto('/login');await expect(page.getByRole('heading',{name:en.welcome,exact:true})).toBeVisible();
+ await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill('UniHubDemo1!');await page.getByRole('button',{name:en.signIn,exact:true}).click();await expect(page.getByRole('button',{name:en.account,exact:true})).toBeVisible();
+}
+
+test('organizer public pages stay public and account entry opens inset workspace',async({page})=>{
+ await page.setViewportSize({width:1440,height:1000});await login(page);
+ await page.getByRole('link',{name:'UniHub home',exact:true}).click();await expect(page.locator('.sidebar')).toHaveCount(0);
+ await page.getByRole('link',{name:en.explore,exact:true}).click();await expect(page).toHaveURL(/\/workshops$/);await expect(page.locator('.sidebar')).toHaveCount(0);
+ await expect(page.locator('main')).not.toContainText(en.signedIn);
+ await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('link',{name:en.management,exact:true}).click();await expect(page).toHaveURL(/\/organizer\/workshops$/);await expect(page.locator('.sidebar')).toBeVisible();
+ const card=await page.locator('.sidebar').boundingBox(),header=await page.locator('header').boundingBox();expect(card!.y).toBeGreaterThan(header!.y+header!.height);expect(await page.locator('.sidebar').evaluate(el=>getComputedStyle(el).borderRadius)).not.toBe('0px');
+});
+
+test('narrow workspace navigation lives in header and opens a centered modal',async({page},info)=>{
+ await page.setViewportSize({width:320,height:900});await login(page);
+ const menu=page.locator('header').getByRole('button',{name:en.openNavigation,exact:true});await expect(menu).toBeVisible();await expect(page.locator('.sidebar')).not.toBeVisible();
+ await menu.click();const dialog=page.getByRole('dialog',{name:en.management,exact:true});await expect(dialog).toBeVisible();const box=await dialog.boundingBox();expect(Math.abs(box!.x+box!.width/2-160)).toBeLessThan(2);expect(box!.y).toBeGreaterThan(0);
+ await page.screenshot({path:info.outputPath('mobile-workspace-navigation.png'),fullPage:true});await page.keyboard.press('Escape');await expect(menu).toBeFocused();await expect(menu).toHaveAttribute('aria-expanded','false');
+ await menu.click();await dialog.getByRole('link',{name:en.workshops,exact:true}).click();await expect(dialog).not.toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('account popup gives name priority, truncates long text and adds action icons',async({page},info)=>{
+ await page.setViewportSize({width:390,height:900});await login(page,'alexandria.montgomery.wellington.workshop.organizer.with.long.email.address@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();
+ const popup=page.locator('.account-options');const name=popup.locator('.account-name'),email=popup.locator('.account-email'),signOut=popup.getByRole('button',{name:en.signOut,exact:true});
+ const nameSize=await name.evaluate(el=>parseFloat(getComputedStyle(el).fontSize)),actionSize=await signOut.evaluate(el=>parseFloat(getComputedStyle(el).fontSize));expect(nameSize).toBeGreaterThan(actionSize);
+ for(const field of [name,email]){expect(await field.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);expect(await field.getAttribute('title')).toBe(await field.textContent());expect(await field.evaluate(el=>getComputedStyle(el).textOverflow)).toBe('ellipsis');}
+ await expect(signOut.locator('svg')).toHaveCount(1);await expect(popup.getByRole('link',{name:en.management,exact:true}).locator('svg')).toHaveCount(1);await page.screenshot({path:info.outputPath('account-long-text.png'),fullPage:true});
+});
+
+test('footer close icon is centered, borderless and shows only hover background',async({page},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/');await page.getByRole('button',{name:en.about,exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:en.about,exact:true}),close=dialog.getByRole('button',{name:en.close,exact:true});await expect(dialog.getByText(en.aboutText,{exact:true})).toBeVisible();await close.blur();await page.mouse.move(0,0);
+ const before=await close.evaluate(el=>({border:getComputedStyle(el).borderTopWidth,background:getComputedStyle(el).backgroundColor}));expect(before.border).toBe('0px');expect(before.background).toBe('rgba(0, 0, 0, 0)');
+ const target=await close.boundingBox(),icon=await close.locator('svg').boundingBox();expect(Math.abs(target!.x+target!.width/2-icon!.x-icon!.width/2)).toBeLessThan(1);expect(Math.abs(target!.y+target!.height/2-icon!.y-icon!.height/2)).toBeLessThan(1);
+ await close.hover();expect(await close.evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe(before.background);await page.screenshot({path:info.outputPath('footer-dialog-close-hover.png'),fullPage:true});await close.click();await expect(dialog).not.toBeVisible();
+});
+
+test('short pages center their body content and keep a compact footer and balanced locale weight',async({page})=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/login');await expect(page.getByRole('heading',{name:en.welcome,exact:true})).toBeVisible();
+ const main=await page.locator('main').boundingBox(),content=await page.locator('.auth-layout').boundingBox();expect(Math.abs(main!.y+main!.height/2-content!.y-content!.height/2)).toBeLessThan(3);expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight)).toBe(true);
+ const footer=await page.locator('footer').boundingBox();expect(footer!.height).toBeLessThan(90);
+ const trigger=page.getByRole('button',{name:en.language,exact:true});expect(await trigger.evaluate(el=>getComputedStyle(el).fontWeight)).toBe('600');await trigger.click();
+ const english=page.getByRole('button',{name:en.en,exact:true}),vietnamese=page.getByRole('button',{name:en.vi,exact:true});for(const option of [english,vietnamese])expect(await option.evaluate(el=>getComputedStyle(el).fontWeight)).toBe('400');expect(await english.evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe(await vietnamese.evaluate(el=>getComputedStyle(el).backgroundColor));
+});
+
+test('logout toast expires and does not repeat after navigation',async({page})=>{
+ await login(page,'linh@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('button',{name:en.signOut,exact:true}).click();await expect(page.getByText(en.signedOut,{exact:true})).toBeVisible();const toast=page.getByRole('status').filter({hasText:en.signedOut}).locator('..');expect(await toast.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(22, 99, 69)');const toastBox=await toast.boundingBox();expect(Math.abs(await page.evaluate(()=>innerWidth)-toastBox!.x-toastBox!.width-16)).toBeLessThan(2);await expect(page.locator('main')).not.toContainText(en.signedOut);await expect(page.getByText(en.signedOut,{exact:true})).not.toBeVisible({timeout:7000});await page.getByRole('link',{name:en.explore,exact:true}).click();await expect(page.getByText(en.signedOut,{exact:true})).toHaveCount(0);
+});
+
+test('logout progress has a named bar, then actionable failure instead of a stuck loader',async({page})=>{
+ await page.addInitScript(()=>sessionStorage.setItem('unihub.access.mock.v1',JSON.stringify({version:1,scenario:'logout-failure',now:1794618000,session:null,lock:false,activated:{}})));await login(page,'linh@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('button',{name:en.signOut,exact:true}).click();await expect(page.getByRole('heading',{name:en.signingOut,exact:true})).toBeVisible();await expect(page.getByRole('progressbar',{name:en.signingOut,exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:en.logoutError,exact:true})).toBeVisible();await expect(page.getByRole('progressbar')).toHaveCount(0);await expect(page.getByRole('button',{name:en.retry,exact:true})).toBeVisible();
+});
+
+
+test('role page containers are centered while their heading groups stay at top left',async({page},info)=>{
+ for(const email of ['linh@example.test','an@example.test','minh@example.test']){
+  await page.goto('/login');await page.evaluate(()=>sessionStorage.clear());await page.reload();await login(page,email);
+  const main=await page.locator('main').boundingBox(),container=await page.locator('.boundary').boundingBox(),heading=await page.locator('main h1').boundingBox(),identity=await page.locator('.eyebrow').boundingBox();
+  expect(heading!.x).toBeCloseTo(identity!.x,0);expect(heading!.y-identity!.y-identity!.height).toBeLessThan(12);expect(heading!.y-main!.y).toBeLessThan(120);
+  expect(await page.locator('.boundary').evaluate(el=>getComputedStyle(el).textAlign)).not.toBe('center');
+  if(email==='an@example.test'){await expect(page.locator('.product-nav a[href="/staff/workshops"]')).toHaveCount(0);await page.getByRole('button',{name:en.account,exact:true}).click();await expect(page.locator('.account-options').getByRole('link',{name:en.staffWorkshops,exact:true})).toBeVisible();}
+  if(email==='linh@example.test')expect(Math.abs(container!.x+container!.width/2-(main!.x+main!.width/2))).toBeLessThan(2);
+  await page.screenshot({path:info.outputPath(email.split('@')[0]+'-heading.png'),fullPage:true});
+ }
+});
+
+test('temporary back link centers in form and validation hides technical limits',async({page})=>{
+ await page.goto('/change-temporary-password');const link=page.getByRole('link',{name:en.backLogin,exact:true}),card=page.locator('.auth-card');
+ const linkBox=await link.boundingBox(),cardBox=await card.boundingBox();expect(Math.abs(linkBox!.x+linkBox!.width/2-cardBox!.x-cardBox!.width/2)).toBeLessThan(2);expect(await link.evaluate(el=>getComputedStyle(el).justifyContent)).toBe('center');
+ await link.click();await page.getByLabel('Email',{exact:true}).fill('wrong-email');await page.getByRole('button',{name:en.signIn,exact:true}).click();await expect(page.getByText(en.emailInvalid,{exact:true})).toBeVisible();await expect(page.locator('main')).not.toContainText(/up to|254|255/);
+});
+
+
+test('logout failure is red and local removal is a warning toast',async({page},info)=>{
+ await page.addInitScript(()=>sessionStorage.setItem('unihub.access.mock.v1',JSON.stringify({version:1,scenario:'logout-failure',now:1794618000,session:null,lock:false,activated:{}})));await login(page,'linh@example.test');await page.getByRole('button',{name:en.account,exact:true}).click();await page.getByRole('button',{name:en.signOut,exact:true}).click();
+ const error=page.getByRole('status').filter({hasText:en.logoutError}).locator('..');await expect(error).toBeVisible();expect(await error.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(180, 35, 53)');
+ await page.getByRole('button',{name:en.removeLocal,exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:en.removeConfirm,exact:true}).click();const warning=page.getByRole('status').filter({hasText:en.localRemoved}).locator('..');await expect(warning).toBeVisible();expect(await error.isVisible()).toBe(false);expect(await warning.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(254, 243, 199)');await page.screenshot({path:info.outputPath('semantic-toasts.png'),fullPage:true});
+});
+
+
+test('narrow header controls match the logo height with no extra shrinking at 320px',async({page},info)=>{
+ await login(page);
+ for(const width of [320,390,650,768,1440]){
+  await page.setViewportSize({width,height:900});
+  const logo=await page.locator('.brand img').boundingBox();
+  for(const control of [page.locator('.workspace-toggle'),page.locator('.header-actions > button'),page.locator('.locale-trigger'),page.locator('.avatar')]){
+   if(width<=650){await expect(control).toBeVisible();const box=await control.boundingBox();expect(box!.width).toBe(32);expect(box!.height).toBe(32);expect(Math.abs(box!.height-logo!.height)).toBeLessThan(1);expect(Math.abs(box!.y+box!.height/2-logo!.y-logo!.height/2)).toBeLessThan(1);}
+  }
+  if(width<=650)expect(logo!.width).toBe(120);else await expect(page.locator('.workspace-toggle')).not.toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  if(width===320||width===390)await page.screenshot({path:info.outputPath('header-'+width+'.png'),fullPage:true});
+ }
+});

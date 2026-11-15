@@ -135,6 +135,19 @@ Human approved the complete representative web foundation at baseline revision 6
 
 ## Approved Scoped Exceptions and Dependent Artifacts
 
-No approved scoped exceptions. Capability specs reference stable rule IDs and exact baseline revisions, adding local requirements only. Shared changes require impact review and updated approval; detailed prototypes remain under `specs/client/web/<capability-id>/prototype/`. The foundation does not authorize production app implementation or public contract changes.
+### Web Access React Acceptance Addendum: 2026-11-16
+
+The user explicitly approved the requested presentation corrections and accepted Web / `MOCK` / `web-access` implementation `72d1160`. These scoped exceptions qualify rules WEB-UI-002/003/005/006/007/010/013/014 for the current React access shell. Baseline revision 6 and foundation prototype revision 6 remain historical approved artifacts; this addendum does not silently revise their HTML or approve every future capability.
+
+- Public home and public workshops do not show an organizer sidebar. Organizer account action is Dashboard, targeting the existing management boundary; staff uses Assigned Workshops in the avatar dropdown only. Default role destinations remain as specified by web-access.
+- Organizer sidebar is an inset rounded workspace card. Narrow workspace navigation opens from an icon beside the logo into a centered modal with dimmed backdrop and accessible close/Escape/focus behavior.
+- Header follows mobile-first rules: through 650px, logo width is 120px and menu/theme/locale/avatar controls are 32x32px; from 651px, logo is 156x41px and controls are 44x44px. Preserve logo proportions and do not shrink it again at 320px.
+- Center the outer page container; list-page identity/heading groups stay at the top left with an 8px gap. Short access/status compositions center in their available main space. Long content scrolls naturally.
+- Account name has stronger/larger typography than actions; name/email truncate with ellipsis and retain full accessible text. Actions have leading icons. Locale trigger weight is 600; locale options use normal weight and selected background.
+- Shared close targets are borderless and transparent at rest with a centered X and subtle circular hover/focus background. Footer spacing is compact and placeholder content is retained.
+- Top-right notifications distinguish green success, red error, amber warning and neutral information. Position them below the header without blocking its popups. Critical errors and uncertain outcomes retain persistent recovery controls; local session removal is a warning, not proof of service revocation.
+- Temporary-password guidance is concise without changing validation rules. Field validation copy omits technical maximum lengths; the actual limits remain enforced. Back to Sign In centers within the temporary form.
+
+Current [Acceptance Evidence](../../../specs/client/web/web-access/verification.md#human-mock-acceptance-2026-11-16) records the human decision and required manual checks. Future capability bundles must assess compatibility with these shared React primitives and this source addendum rather than copying stale prototype presentations. Unaffected baseline rules remain in force; broader shared design changes still require impact review and owning approval. Detailed prototypes remain under `specs/client/web/<capability-id>/prototype/`; no public contract or next capability is authorized here.
 
 Progress-pattern reference: [Carbon Progress Indicator](https://www.carbondesignsystem.com/building-blocks/core/components/progress-indicator/guidelines).

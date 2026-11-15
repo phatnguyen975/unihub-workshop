@@ -76,3 +76,13 @@ Vite development normally uses port 5173. Playwright uses an isolated production
 ## Versioned Configuration and Ignored Output
 
 Commit `.node-version`: CI reads it to select Node 24, and compatible version managers can reuse it. It does not switch the current terminal's Node automatically. Commit package/lockfile, Vite/Vitest/Playwright/TypeScript/ESLint configurations and the tested boundary rule. Ignore dependencies, build output, browser sessions/reports/traces/screenshots, coverage and real environment files. Build-info files are written under ignored `node_modules/.tmp/`. An IDE-only setting is optional and is not required by runtime or CI.
+
+## Access Mock Implementation
+
+The initial UniHub Web placeholder has been replaced by the approved web-access MOCK implementation. App composition injects the identity fake; BrowserRouter uses clean paths and Query cleanup is coordinated with session changes. RHF/Zod own form validation. Lucide React 1.73.0 supplies named UI icons; approved SVG identity remains unchanged. The `DEV`-only lazy review toolbar sits outside product content and is omitted from the standard build; fake adapters remain selected in MOCK mode. No live API is configured.
+
+The historical setup evidence above describes the earlier placeholder. Current capability scenarios, commands/results and remaining human checks belong to [Web Access Verification](../../../specs/client/web/web-access/verification.md).
+
+The requested web-access feedback revision 3 adds `react-hot-toast` 2.6.1 for short-lived success messages. Theme tokens and polite status semantics apply; actionable failures remain persistent. Current corrections use top-right semantic notifications through shared UI helpers; the verification record owns review status. Accepted access-shell exceptions are recorded in the web UI baseline; historical foundation revision 6 is unchanged.
+
+The web-access MOCK implementation `72d1160` was accepted on 2026-11-16 after automated verification and user-confirmed required manual checks. The canonical verification and catalog own acceptance; this tooling note does not authorize integration or deployment.

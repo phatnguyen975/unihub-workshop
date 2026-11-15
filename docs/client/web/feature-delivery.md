@@ -20,34 +20,34 @@ The platform experience map and UI baseline live in `docs/client/web/experience-
 
 ## Delivery Index
 
-> **Inventory Revision:** 1. **Inventory Status:** APPROVED. **Approval:** Human confirmed the 22 web capabilities, scope, recommended order and dependencies on 2026-11-11, aligned with experience-map revision 1. **Mode:** MOCK. Capability lifecycle remains `DRAFT`; local implementation tooling/code/browser smoke is verified under [Web Tooling](tooling.md). Human approved [Web UI Design](ui-design.md) revision 6 and its foundation prototype revision 6 on 2026-11-12. Readiness is `WAITING_BUNDLE`: each capability still requires compatible spec/prototype/task approval and its declared prerequisites. Platform scope/foundation approval does not approve capability implementation or acceptance.
+> **Inventory Revision:** 1. **Inventory Status:** APPROVED. **Approval:** Human confirmed the 22 web capabilities, scope, recommended order and dependencies on 2026-11-11, aligned with experience-map revision 1. **Mode:** MOCK. The initial inventory lifecycle was `DRAFT`; current capability states are recorded below; local implementation tooling/code/browser smoke is verified under [Web Tooling](tooling.md). Human approved [Web UI Design](ui-design.md) revision 6 and its foundation prototype revision 6 on 2026-11-12. Initial readiness was `WAITING_BUNDLE`; each capability requires compatible spec/prototype/task approval and its declared prerequisites, with subsequent decisions recorded below. Platform scope/foundation approval does not approve capability implementation or acceptance.
 
 Dependency and size definitions are owned by [Client Capability Planning](../feature-planning.md). [Experience Map](experience-map.md) owns the journey/screen/state inventory. Order is recommended; only named prerequisites are hard edges. All capabilities also require the common scope/tooling/foundation/bundle gates.
 
-| Order | Capability ID                   | Outcome                               | Size | Hard Prerequisites                                                                  | State   | Readiness        |
-| ----- | ------------------------------- | ------------------------------------- | ---- | ----------------------------------------------------------------------------------- | ------- | ---------------- |
-| 01    | `web-access`                    | Access and Role Navigation            | M    | None                                                                                | `DRAFT` | `WAITING_BUNDLE` |
-| 02    | `web-workshop-discovery`        | Workshop Discovery and Details        | M    | None                                                                                | `DRAFT` | `WAITING_BUNDLE` |
-| 03    | `web-student-onboarding`        | Student Registration and Verification | M    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
-| 04    | `web-account-recovery`          | Account Recovery                      | M    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
-| 05    | `web-account-settings`          | Profile and Account Security          | M    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
-| 06    | `web-ticket-wallet`             | Registrations and QR Tickets          | M    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
-| 07    | `web-free-registration`         | Free Workshop Registration            | M    | `web-access`, `web-workshop-discovery`, `web-ticket-wallet`                         | `DRAFT` | `WAITING_BUNDLE` |
-| 08    | `web-paid-registration`         | Paid Workshop Registration            | L    | `web-access`, `web-workshop-discovery`, `web-ticket-wallet`                         | `DRAFT` | `WAITING_BUNDLE` |
-| 09    | `web-registration-cancellation` | Registration Cancellation             | M    | `web-ticket-wallet`                                                                 | `DRAFT` | `WAITING_BUNDLE` |
-| 10    | `web-payment-history`           | Payment History and Status            | M    | `web-access`, `web-ticket-wallet`                                                   | `DRAFT` | `WAITING_BUNDLE` |
-| 11    | `web-member-administration`     | Organization Member Administration    | M    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
-| 12    | `web-workshop-authoring`        | Workshop Draft Authoring              | L    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
-| 13    | `web-workshop-publishing`       | Workshop Publishing and Updates       | M    | `web-workshop-authoring`                                                            | `DRAFT` | `WAITING_BUNDLE` |
-| 14    | `web-workshop-rescheduling`     | Workshop Rescheduling                 | M    | `web-workshop-publishing`                                                           | `DRAFT` | `WAITING_BUNDLE` |
-| 15    | `web-workshop-cancellation`     | Workshop Cancellation                 | M    | `web-workshop-publishing`                                                           | `DRAFT` | `WAITING_BUNDLE` |
-| 16    | `web-staff-assignment`          | Workshop Staff Assignment             | M    | `web-member-administration`, `web-workshop-publishing`                              | `DRAFT` | `WAITING_BUNDLE` |
-| 17    | `web-registration-roster`       | Organizer Registration Roster         | M    | `web-workshop-publishing`                                                           | `DRAFT` | `WAITING_BUNDLE` |
-| 18    | `web-attendance-monitoring`     | Organizer Attendance Monitoring       | M    | `web-workshop-publishing`, `web-registration-roster`                                | `DRAFT` | `WAITING_BUNDLE` |
-| 19    | `web-staff-workshops`           | Staff Assigned Workshop Portal        | M    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
-| 20    | `web-notifications`             | In-App Notification Inbox             | M    | `web-access`, `web-ticket-wallet`, `web-workshop-publishing`, `web-staff-workshops` | `DRAFT` | `WAITING_BUNDLE` |
-| 21    | `web-brochure-summary`          | AI Brochure Summary Review            | M    | `web-workshop-authoring`                                                            | `DRAFT` | `WAITING_BUNDLE` |
-| 22    | `web-ingestion-reports`         | Student Ingestion Reject Reports      | M    | `web-access`                                                                        | `DRAFT` | `WAITING_BUNDLE` |
+| Order | Capability ID                   | Outcome                               | Size | Hard Prerequisites                                                                  | State      | Readiness         |
+| ----- | ------------------------------- | ------------------------------------- | ---- | ----------------------------------------------------------------------------------- | ---------- | ----------------- |
+| 01    | `web-access`                    | Access and Role Navigation            | M    | None                                                                                | `ACCEPTED` | `READY_FOR_BUILD` |
+| 02    | `web-workshop-discovery`        | Workshop Discovery and Details        | M    | None                                                                                | `DRAFT`    | `WAITING_BUNDLE`  |
+| 03    | `web-student-onboarding`        | Student Registration and Verification | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
+| 04    | `web-account-recovery`          | Account Recovery                      | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
+| 05    | `web-account-settings`          | Profile and Account Security          | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
+| 06    | `web-ticket-wallet`             | Registrations and QR Tickets          | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
+| 07    | `web-free-registration`         | Free Workshop Registration            | M    | `web-access`, `web-workshop-discovery`, `web-ticket-wallet`                         | `DRAFT`    | `WAITING_BUNDLE`  |
+| 08    | `web-paid-registration`         | Paid Workshop Registration            | L    | `web-access`, `web-workshop-discovery`, `web-ticket-wallet`                         | `DRAFT`    | `WAITING_BUNDLE`  |
+| 09    | `web-registration-cancellation` | Registration Cancellation             | M    | `web-ticket-wallet`                                                                 | `DRAFT`    | `WAITING_BUNDLE`  |
+| 10    | `web-payment-history`           | Payment History and Status            | M    | `web-access`, `web-ticket-wallet`                                                   | `DRAFT`    | `WAITING_BUNDLE`  |
+| 11    | `web-member-administration`     | Organization Member Administration    | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
+| 12    | `web-workshop-authoring`        | Workshop Draft Authoring              | L    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
+| 13    | `web-workshop-publishing`       | Workshop Publishing and Updates       | M    | `web-workshop-authoring`                                                            | `DRAFT`    | `WAITING_BUNDLE`  |
+| 14    | `web-workshop-rescheduling`     | Workshop Rescheduling                 | M    | `web-workshop-publishing`                                                           | `DRAFT`    | `WAITING_BUNDLE`  |
+| 15    | `web-workshop-cancellation`     | Workshop Cancellation                 | M    | `web-workshop-publishing`                                                           | `DRAFT`    | `WAITING_BUNDLE`  |
+| 16    | `web-staff-assignment`          | Workshop Staff Assignment             | M    | `web-member-administration`, `web-workshop-publishing`                              | `DRAFT`    | `WAITING_BUNDLE`  |
+| 17    | `web-registration-roster`       | Organizer Registration Roster         | M    | `web-workshop-publishing`                                                           | `DRAFT`    | `WAITING_BUNDLE`  |
+| 18    | `web-attendance-monitoring`     | Organizer Attendance Monitoring       | M    | `web-workshop-publishing`, `web-registration-roster`                                | `DRAFT`    | `WAITING_BUNDLE`  |
+| 19    | `web-staff-workshops`           | Staff Assigned Workshop Portal        | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
+| 20    | `web-notifications`             | In-App Notification Inbox             | M    | `web-access`, `web-ticket-wallet`, `web-workshop-publishing`, `web-staff-workshops` | `DRAFT`    | `WAITING_BUNDLE`  |
+| 21    | `web-brochure-summary`          | AI Brochure Summary Review            | M    | `web-workshop-authoring`                                                            | `DRAFT`    | `WAITING_BUNDLE`  |
+| 22    | `web-ingestion-reports`         | Student Ingestion Reject Reports      | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
 
 When implementation artifacts exist, add links to their compatible spec/plan/prototype/verification revisions and the explicit human acceptance; do not link to missing files. Add a separate integration record only when integration work is scoped.
 
@@ -60,6 +60,11 @@ When implementation artifacts exist, add links to their compatible spec/plan/pro
 Visitor entry, role-specific login, initial temporary-password change, session restore/expiry, logout and access/error navigation. No separate dashboard with invented analytics.
 
 **Product References:** `authentication-and-session-management`.
+
+**MOCK Design Record:** Human approved [Capability Spec](../../../specs/client/web/web-access/SPEC.md) revision 1 on 2026-11-14, [Capability Prototype](../../../specs/client/web/web-access/prototype-review.md) revision 2 and [Task Plan](../../../specs/client/web/web-access/tasks.md) revision 1 as a coherent MOCK bundle on 2026-11-15, with experience/inventory 1 and UI baseline/foundation 6. The explicitly requested React presentation corrections through implementation `72d1160` are approved scoped exceptions recorded at [Web UI Design](ui-design.md#approved-scoped-exceptions-and-dependent-artifacts); historical HTML artifacts retain their original revisions.
+
+**MOCK Acceptance:** `ACCEPTED`, acceptance revision 1 on 2026-11-16 for implementation `72d116078aba07ce9ee4528eefa98f5d198d2823`. The user explicitly accepted the current capability and confirmed real browser 200% zoom, screen-reader and Edge password-reveal checks passed. [Verification and Acceptance](../../../specs/client/web/web-access/verification.md#human-mock-acceptance-2026-11-16) records 53 unit/component and 76 browser tests, inspected visuals, technical review, human-reported evidence and task closure WA-T01 through WA-T06. No required MOCK check or blocking finding remains. Readiness remains `READY_FOR_BUILD` because all dependency gates are satisfied; lifecycle records completed acceptance. No live API integration, platform all-mock acceptance or next capability is started.
+
 
 ### Workshop Discovery and Details
 
