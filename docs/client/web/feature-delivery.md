@@ -27,7 +27,7 @@ Dependency and size definitions are owned by [Client Capability Planning](../fea
 | Order | Capability ID                   | Outcome                               | Size | Hard Prerequisites                                                                  | State      | Readiness         |
 | ----- | ------------------------------- | ------------------------------------- | ---- | ----------------------------------------------------------------------------------- | ---------- | ----------------- |
 | 01    | `web-access`                    | Access and Role Navigation            | M    | None                                                                                | `ACCEPTED` | `READY_FOR_BUILD` |
-| 02    | `web-workshop-discovery`        | Workshop Discovery and Details        | M    | None                                                                                | `DRAFT`    | `WAITING_BUNDLE`  |
+| 02    | `web-workshop-discovery`        | Workshop Discovery and Details        | M    | None                                                                                | `APPROVED` | `READY_FOR_BUILD` |
 | 03    | `web-student-onboarding`        | Student Registration and Verification | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
 | 04    | `web-account-recovery`          | Account Recovery                      | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
 | 05    | `web-account-settings`          | Profile and Account Security          | M    | `web-access`                                                                        | `DRAFT`    | `WAITING_BUNDLE`  |
@@ -65,12 +65,11 @@ Visitor entry, role-specific login, initial temporary-password change, session r
 
 **MOCK Acceptance:** `ACCEPTED`, acceptance revision 1 on 2026-11-16 for implementation `72d116078aba07ce9ee4528eefa98f5d198d2823`. The user explicitly accepted the current capability and confirmed real browser 200% zoom, screen-reader and Edge password-reveal checks passed. [Verification and Acceptance](../../../specs/client/web/web-access/verification.md#human-mock-acceptance-2026-11-16) records 53 unit/component and 76 browser tests, inspected visuals, technical review, human-reported evidence and task closure WA-T01 through WA-T06. No required MOCK check or blocking finding remains. Readiness remains `READY_FOR_BUILD` because all dependency gates are satisfied; lifecycle records completed acceptance. No live API integration, platform all-mock acceptance or next capability is started.
 
-
 ### Workshop Discovery and Details
 
 **Capability:** `web-workshop-discovery`. **Source Owner:** `workshops`.
 
-**MOCK Design Record:** Human approved [Capability Spec](../../../specs/client/web/web-workshop-discovery/SPEC.md) revision 1 on 2026-11-25. The prototype and task plan are pending. Capability lifecycle/readiness remain `DRAFT / WAITING_BUNDLE` pending approval of the coherent bundle.
+**MOCK Design Record:** Human approved [Capability Spec](../../../specs/client/web/web-workshop-discovery/SPEC.md) revision 1, [Capability Prototype](../../../specs/client/web/web-workshop-discovery/prototype-review.md) revision 3 and [Task Plan](../../../specs/client/web/web-workshop-discovery/tasks.md) revision 1 as a coherent MOCK bundle on 2026-11-25. Applicable platform dependencies are experience/inventory revision 1 and UI baseline/foundation revision 6 with the approved React access shell addendum. Capability lifecycle/readiness are `APPROVED / READY_FOR_BUILD`.
 
 Public catalog, text/filter search, pagination, workshop schedule/speaker/location/brochure details and available-seat presentation; preserve intended destination when login is needed.
 

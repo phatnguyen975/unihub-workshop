@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Discover workshops · UniHub</title>
+        <link rel="stylesheet" href="styles.css" />
+        <link
+            rel="icon"
+            href="../../../../../docs/client/web/foundation-prototype/assets/unihub-symbol.svg"
+        />
+        <script type="module" src="app.js"></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to main content</a>
+        <aside class="review" aria-label="Prototype review">
+            <label
+                >Review scenario
+                <select id="scenario"></select
+            ></label>
+            <a href="#/workshops">Catalog</a>
+            <a href="#/workshops/private-draft">Nonpublic detail</a>
+            <button id="reset" type="button">Reset</button>
+        </aside>
+        <header class="header">
+            <div class="wrap shell">
+                <a id="brand" href="#/" aria-label="UniHub home"
+                    ><img alt="UniHub"
+                /></a>
+                <nav aria-label="Main">
+                    <a id="discover" href="#/workshops">Discover</a>
+                </nav>
+                <div class="actions">
+                    <button
+                        id="theme"
+                        type="button"
+                        aria-label="Toggle dark theme"
+                    ></button>
+                    <button
+                        id="language"
+                        type="button"
+                        aria-controls="languages"
+                        aria-expanded="false"
+                    >
+                        EN
+                    </button>
+                    <div id="languages" class="popover" hidden>
+                        <button data-lang="en">English</button
+                        ><button data-lang="vi">Vietnamese</button>
+                    </div>
+                    <a id="account" class="button primary" href="#/login"
+                        >Sign in</a
+                    >
+                    <button
+                        id="account-trigger"
+                        class="avatar"
+                        type="button"
+                        aria-controls="account-options"
+                        aria-expanded="false"
+                        hidden
+                    ></button>
+                    <div id="account-options" class="popover" hidden>
+                        <div class="account-identity">
+                            <strong id="account-name"></strong
+                            ><span id="account-email"></span>
+                        </div>
+                        <button id="signout" type="button"></button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main id="main" class="wrap" tabindex="-1">
+            <p>Loading workshops…</p>
+        </main>
+        <footer><div class="wrap">© UniHub · 2026</div></footer>
+    </body>
+</html>

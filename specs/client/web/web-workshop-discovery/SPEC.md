@@ -5,7 +5,7 @@
 > **Status:** `APPROVED`<br>
 > **Revision:** 1<br>
 > **Experience/UI baseline:** Experience map and delivery inventory revision 1; web UI baseline and foundation prototype revision 6; approved React access shell addendum<br>
-> **Approval:** Human approved this specification at revision 1 for Web / `MOCK` on 2026-11-25. The coherent spec, prototype and task plan still require bundle approval. Capability lifecycle/readiness remain `DRAFT / WAITING_BUNDLE`.
+> **Approval:** Human approved this specification at revision 1 for Web / `MOCK` on 2026-11-25. The [approved bundle](tasks.md) pairs it with prototype revision 3 and task plan revision 1.
 
 ## Actors and Preconditions
 
@@ -113,4 +113,4 @@ No hard capability prerequisites. The proposed implementation reuses accepted ac
 
 Account activation and recovery, organizer publishing, operational views, booking, payment, tickets, room diagrams, live seat updates, real search ranking, durable offline data and API integration are outside this slice.
 
-Bundle to submit for approval consists of this `SPEC.md` revision 1, the capability prototype and review record, and MOCK `tasks.md` at compatible revisions once prepared. Technical verification and human MOCK acceptance are later records.
+The [approved MOCK bundle](tasks.md) records the compatible artifact revisions. Technical verification and human MOCK acceptance are later records.
