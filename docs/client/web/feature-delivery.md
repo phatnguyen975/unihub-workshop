@@ -70,6 +70,8 @@ Visitor entry, role-specific login, initial temporary-password change, session r
 
 **Capability:** `web-workshop-discovery`. **Source Owner:** `workshops`.
 
+**MOCK Design Record:** Human approved [Capability Spec](../../../specs/client/web/web-workshop-discovery/SPEC.md) revision 1 on 2026-11-25. The prototype and task plan are pending. Capability lifecycle/readiness remain `DRAFT / WAITING_BUNDLE` pending approval of the coherent bundle.
+
 Public catalog, text/filter search, pagination, workshop schedule/speaker/location/brochure details and available-seat presentation; preserve intended destination when login is needed.
 
 **Product References:** `workshop-catalog-browsing`, `workshop-full-text-search`.
