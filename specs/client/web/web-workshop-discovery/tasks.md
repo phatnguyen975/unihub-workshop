@@ -18,35 +18,35 @@ Execute WD-T01 → WD-T02 → WD-T03 → WD-T04 → WD-T05. File paths below are
 
 ## Vertical Slices
 
-- [ ] **WD-T01 — Open and browse the public catalog.**
+- [x] **WD-T01 — Open and browse the public catalog.**
   - **Depends on:** Approved bundle.
   - **File scope:** `src/features/workshops/` public exports, summary model, read interface, deterministic mock adapter, catalog page and UI; `src/app/routes/AppRoutes.tsx` and app service composition; scoped copy/styles and `tests/journeys/`.
   - **Acceptance:** Home and Discover open `/workshops` within the existing shell. Published records expose title, event date/time, place, price and seats. The manually controlled featured carousel uses up to three ordered public fixtures, labeled controls and a position indicator. Omit carousel when none are available. Loading, globally empty and transient list failure have recoverable presentation. Covers the catalog portion of AC-001, AC-002 and AC-008 / WD-01 and WD-07.
   - **Test-first:** Assert public-only stable results and carousel eligibility and bounds before implementing reads/interaction. Keep fixtures and delay/failure injection deterministic.
   - **Verification:** Run `npm test` for the slice and persist a browser journey for home → Discover, carousel keyboard operation and an empty or failed read. Inspect catalog against prototype revision 3.
 
-- [ ] **WD-T02 — Search, filter and navigate results by cursor.**
+- [x] **WD-T02 — Search, filter and navigate results by cursor.**
   - **Depends on:** WD-T01.
   - **File scope:** Workshops criteria, URL and cursor handling, read service/fake, catalog controls, scoped locale/style changes and journey tests.
   - **Acceptance:** Combine text, event-local inclusive dates and price. Validate long input, normalize reversed/same-day selections and leave incomplete selections unapplied. Clear individual criteria or reset after no matches. Use two equal 44 × 44 px labeled arrow controls with inactive endpoints, stable filter-bound keyset cursors and Previous/Next behavior. Reload restores supported criteria and cursor; stale or mismatched cursor keeps valid criteria and returns to the initial results. A changed filter starts a new result set. Retry keeps its inputs and late reads cannot overwrite the active view. Covers AC-003, the catalog portion of AC-004 and AC-008 / WD-02, WD-03 and WD-07.
   - **Test-first:** Exercise the 200-character boundary, whitespace, date boundary across UTC and event-local days, tie ordering, cursor invalidation and page limits. Use controlled deferred completions for stale responses rather than timing-based pass criteria.
   - **Verification:** Run `npm test`; replay search, range and price selection, empty reset, forward/back across three result sets and invalid cursor recovery in Chromium.
 
-- [ ] **WD-T03 — Open public details and return to the same results.**
+- [x] **WD-T03 — Open public details and return to the same results.**
   - **Depends on:** WD-T02.
   - **File scope:** Workshops detail projection/read, detail page and local brochure asset; app route composition; workshop unit/component and browser tests.
   - **Acceptance:** List cards and featured items open `/workshops/:slug`. Direct and reloaded detail links work. Free, paid and full share the approved layout, with descriptions, speaker information and brochure only where present. Missing and nonpublic slugs use equivalent unavailable feedback. Retry reuses the slug. Browser Back and the in-page return action recover the originating catalog criteria and cursor; direct detail entry has a safe catalog return. Covers AC-001, AC-004–006, detail portion of AC-008 / WD-03–05 and WD-07.
   - **Test-first:** Assert equivalent unavailable outcomes, optional-field handling and retry with the same identifier. Cover removal of stale detail data when a newer route wins.
   - **Verification:** Run `npm test`; replay direct and card entry, brochure view/download, full and optional-content cases, retry and catalog restoration. Inspect detail at narrow and wide widths.
 
-- [ ] **WD-T04 — Resume workshop details after sign-in.**
+- [x] **WD-T04 — Resume workshop details after sign-in.**
   - **Depends on:** WD-T03.
   - **File scope:** Workshops detail CTA/state, app route composition, narrow existing identity validator/call-site changes where needed, access regression tests and cross-feature browser tests.
   - **Acceptance:** Guests on an available workshop can sign in and return to the same validated slug, including after required temporary-password replacement. Signed-in students see the registration-unavailable message. Nonstudent roles receive no student registration action; full workshops show the full state. A lost session leaves the public route usable. Reuse the accepted access form and avatar/menu, with sign-out returning the viewer to public behavior. Covers AC-007 / WD-06 and the approved prototype revision 3 header.
   - **Test-first:** Extend intent tests for the exact detail route, supported catalog criteria, wrong-role and malformed/external intent. Cover session transition without triggering writes, plus guest, student, organizer and staff display. Preserve existing access role landing and authorized routes.
   - **Verification:** Run `npm test`; replay guest-to-student sign-in, temporary password, unsafe fallback, expiry and avatar popup open/dismiss/sign-out. Re-run existing access and shell suites affected by route changes.
 
-- [ ] **WD-T05 — Verify the composed MOCK journey and prepare acceptance evidence.**
+- [x] **WD-T05 — Verify the composed MOCK journey and prepare acceptance evidence.**
   - **Depends on:** WD-T01–04.
   - **File scope:** Discovery and related access journeys, scoped discovery UI fixes, app development review wiring and capability `verification.md`.
   - **Acceptance:** The composed journeys satisfy AC-001–010 at the approved revisions. Scenario selection/reset stays outside product content. Standard build retains discovery MOCK data access and excludes the development scenario control module. Both languages and themes preserve filter state and reflow with long content. Close technical findings within scope and record required human checks awaiting `client-accept`.
