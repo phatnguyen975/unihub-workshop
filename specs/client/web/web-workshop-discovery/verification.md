@@ -21,7 +21,11 @@
 - A search of the built `dist` output found no `unihub:workshop-scenario`, `Workshop scenario`, `MOCK review` or `Reset workshop scenario` markers. The discovery MOCK data remains available in the production app.
 - Wide English and narrow Vietnamese dark catalog screenshots were captured and visually inspected during WD-T05. Their files and the `evidence` folder were subsequently removed at the user's request.
 
-## Pending Human Acceptance
+## UI Approval and Pending MOCK Verification
+
+The user approved the current UI on 2026-11-27 after the Tailwind and shared access layout changes. Full MOCK acceptance remains `VERIFICATION_PENDING`.
+
+The follow-up alignment with prototype revision 3 restored the catalog hero, workshop artwork, card hierarchy, filter panels and detail layout. The date panel uses browser-native date fields. The shared access shell and sign-in forms continue to follow the approved React access baseline.
 
 - Perform the planned real-browser 200% zoom and screen-reader review for catalog, filters and detail, including announcements and focus return.
-- Review the capability against the approved prototype and decide MOCK acceptance. This verification record documents technical evidence; it does not record human acceptance.
+- Record the accessibility results before closing MOCK acceptance.

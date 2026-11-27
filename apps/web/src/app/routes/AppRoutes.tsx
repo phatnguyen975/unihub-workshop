@@ -1,5 +1,6 @@
 import { WorkshopDiscovery, createWorkshopService } from "@/features/workshops";
 import { CloseButton } from "@/shared/ui/CloseButton";
+import { AuthLayout } from "@/shared/ui/AuthLayout";
 import { useEffect, useRef } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { LockKeyhole } from "lucide-react";
@@ -243,24 +244,29 @@ function Content() {
         service={workshopService}
       />
     );
-  if (
-    [
-      "/workshops",
-      "/organizer/workshops",
-      "/staff/workshops",
-      "/register",
-      "/forgot-password",
-    ].includes(path)
-  ) {
-    const auth = ["/register", "/forgot-password"].includes(path);
-    const title =
-      path === "/register"
-        ? "registerTitle"
-        : path === "/forgot-password"
-          ? "recoveryTitle"
-          : path === "/staff/workshops"
-            ? "staffWorkshops"
-            : "workshops";
+  if (path === "/register" || path === "/forgot-password")
+    return (
+      <AuthLayout>
+        <h1 id="page-title" tabIndex={-1}>
+          {t(path === "/register" ? "registerTitle" : "recoveryTitle")}
+        </h1>
+        {notice && (
+          <p className="notice" role="status">
+            {t(notice)}
+          </p>
+        )}
+        {controller.storageFailed() && (
+          <p className="notice" role="status">
+            {t("storage")}
+          </p>
+        )}
+        <Link className="back-link form-back-link mt-6!" to={"/login" + suffix}>
+          {t("backLogin")}
+        </Link>
+      </AuthLayout>
+    );
+  if (path === "/organizer/workshops" || path === "/staff/workshops") {
+    const title = path === "/staff/workshops" ? "staffWorkshops" : "workshops";
     return (
       <section className="boundary">
         {identity && (
@@ -289,8 +295,8 @@ function Content() {
             {t("storage")}
           </div>
         )}
-        <Link className="back-link" to={auth ? "/login" + suffix : "/"}>
-          {t(auth ? "backLogin" : "backHome")}
+        <Link className="back-link" to="/">
+          {t("backHome")}
         </Link>
       </section>
     );

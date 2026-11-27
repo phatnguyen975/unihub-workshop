@@ -61,11 +61,16 @@ test("search, filters, cursor navigation and reload preserve the applied set", a
   await page.goto("/workshops");
   await page.getByRole("textbox", { name: "Search workshops" }).fill("design");
   await page.getByRole("button", { name: "Search" }).click();
-  await page.getByRole("combobox", { name: "Price" }).selectOption("paid");
+  await page.getByText("Price", { exact: true }).click();
+  await page.getByRole("button", { name: "Paid", exact: true }).click();
   await expect(page.locator(".workshop-grid article")).toHaveCount(1);
   await expect(page.locator(".workshop-grid")).toContainText("Design Clinic");
-  await page.getByRole("combobox", { name: "Price" }).selectOption("");
-  await page.getByRole("button", { name: "Next" }).last().click();
+  await page.getByText("Price", { exact: true }).click();
+  await page.getByRole("button", { name: "All prices", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Pagination" })
+    .getByRole("button", { name: "Next" })
+    .click();
   await expect(page).toHaveURL(/cursor=/);
   await page.reload();
   await expect(
@@ -98,6 +103,7 @@ test("reversed inclusive dates normalize to the workshop local calendar range", 
   page,
 }) => {
   await page.goto("/workshops");
+  await page.getByText("Dates", { exact: true }).click();
   await page.getByLabel("From").fill("2026-11-30");
   await page.getByLabel("To").fill("2026-11-29");
   await expect(page.getByLabel("From")).toHaveValue("2026-11-29");

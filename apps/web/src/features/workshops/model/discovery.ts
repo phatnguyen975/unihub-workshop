@@ -2,6 +2,7 @@ import fixtures from "../data/mock/fixtures.json";
 
 export interface Workshop {
   slug: string;
+  poster: string;
   title: { en: string; vi: string };
   startsAt: string;
   endsAt: string;
