@@ -25,3 +25,7 @@ Use explicit UI/response assertions for readiness. SSE/persistent connections ma
 Review keyboard/focus behavior, responsive overflow, contrast and other applicable accessibility rules. Automated scanners do not certify the entire experience. `web-design-guidelines` is a code audit input: fetch and save its guideline snapshot/hash/time, reconcile it with the approved app baseline, and merge findings into the capability review.
 
 Apply React/composition/performance rules to the actual framework and version. Do not introduce Next.js/RSC/server actions, BFFs, SWR or a UI library solely from an upstream example. Browser viewport emulation is a web/prototype check and does not verify React Native on a phone.
+
+## Formatting
+
+After web code changes, run `npm run format` from `apps/web/`, then run `npm run format:check` and the applicable verification commands. Preserve unrelated work and restrict formatting to the authorized scope.
